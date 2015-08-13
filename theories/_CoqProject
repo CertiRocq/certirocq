@@ -1,0 +1,36 @@
+-R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3
+
+# common
+common/RandyPrelude.v
+common/AstCommon.v
+common/exceptionMonad.v 
+common/Common.v
+
+# L1
+L1_MalechaQuoted/term.v
+L1_MalechaQuoted/program.v
+L1_MalechaQuoted/wndEval.v
+L1_MalechaQuoted/awndEval.v
+L1_MalechaQuoted/wcbvEval.v
+L1_MalechaQuoted/wNorm.v
+L1_MalechaQuoted/malecha_L1.v
+L1_MalechaQuoted/L1.v
+
+# L2
+L2_typeStrippedL1/term.v
+L2_typeStrippedL1/program.v
+L2_typeStrippedL1/wndEval.v
+L2_typeStrippedL1/wcbvEval.v
+L2_typeStrippedL1/wNorm.v
+L2_typeStrippedL1/stripEvalCommute.v
+L2_typeStrippedL1/L2.v
+
+
+# L3
+L3_flattenedApp/term.v
+L3_flattenedApp/program.v
+L3_flattenedApp/wndEval.v
+L3_flattenedApp/wcbvEval.v
+L3_flattenedApp/wNorm.v
+L3_flattenedApp/unaryApplications.v
+L3_flattenedApp/L3.v
