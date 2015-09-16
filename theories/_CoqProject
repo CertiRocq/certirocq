@@ -34,3 +34,7 @@ L3_flattenedApp/wcbvEval.v
 L3_flattenedApp/wNorm.v
 L3_flattenedApp/unaryApplications.v
 L3_flattenedApp/L3.v
+
+# L4
+L4_CPS/simpleCPS.v
+L4_CPS/L3_to_L4.v
