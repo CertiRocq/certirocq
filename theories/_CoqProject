@@ -36,5 +36,6 @@ L3_flattenedApp/unaryApplications.v
 L3_flattenedApp/L3.v
 
 # L4
-L4_CPS/simpleCPS.v
+L4_CPS/simple_cps.v
 L4_CPS/L3_to_L4.v
+L4_CPS/L4.v
