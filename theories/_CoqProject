@@ -1,4 +1,4 @@
--R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3
+-R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3 -R L4_CPS L4
 
 # common
 common/RandyPrelude.v
