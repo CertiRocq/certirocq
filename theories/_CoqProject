@@ -1,5 +1,5 @@
 
--R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R cps CPS -R L6_PCPS "" -R ../libraries ""
+-R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS "" -R ../libraries ""
 
 
 # common
@@ -41,11 +41,11 @@ L3_flattenedApp/L3.v
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
 
-# CPS
-cps/cpstrans.v
-cps/u_deBruijn.v
-cps/k_deBruijn.v
-cps/cpseval.v
+# L5: CPS
+L5_CPS/cpstrans.v
+L5_CPS/u_deBruijn.v
+L5_CPS/k_deBruijn.v
+L5_CPS/cpseval.v
 
 # L6
 L6_PCPS/shrink_cps.v
