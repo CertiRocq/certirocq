@@ -48,6 +48,7 @@ L5_CPS/k_deBruijn.v
 L5_CPS/cpseval.v
 
 # L6
+L6_PCPS/L5_to_L6.v
 L6_PCPS/shrink_cps.v
 L6_PCPS/cps_util.v
 L6_PCPS/cps.v
