@@ -1,5 +1,5 @@
 
--R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS "" -R ../libraries ""
+-Q common Common -Q L1_MalechaQuoted L1 -Q L2_typeStrippedL1 L2 -Q L3_flattenedApp L3 -Q L4_deBruijn L4 -Q L5_CPS CPS -Q L6_PCPS "" -Q ../libraries ""
 
 
 # common
