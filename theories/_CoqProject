@@ -53,4 +53,5 @@ L6_PCPS/shrink_cps.v
 L6_PCPS/cps_util.v
 L6_PCPS/cps.v
 L6_PCPS/tags.v
+L6_PCPS/hoisting.v
 L6_PCPS/closure_conversion.v
