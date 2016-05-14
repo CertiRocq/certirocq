@@ -40,6 +40,8 @@ L3_flattenedApp/L3.v
 # L4
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
+L4_deBruijn/simpleCPSAA.v
+L4_deBruijn/L5a.v
 
 # L5: CPS
 L5_CPS/cpstrans.v
