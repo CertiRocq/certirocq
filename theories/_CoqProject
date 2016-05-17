@@ -43,6 +43,7 @@ L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/simpleCPSAA.v
 L4_deBruijn/L5a.v
+L4_deBruijn/VarInstance.v
 
 # L5: CPS
 L5_CPS/cpstrans.v
