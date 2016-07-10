@@ -1,4 +1,4 @@
--R common Common -R L1_MalechaQuoted L1 -R L2_typeStrippedL1 L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
+-R common Common -R L1_MalechaQuoted L1 -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
 
 
 # common
@@ -8,26 +8,38 @@ common/exceptionMonad.v
 common/Common.v
 
 # L1
+L1_MalechaQuoted/compile.v
 L1_MalechaQuoted/term.v
 L1_MalechaQuoted/program.v
-L1_MalechaQuoted/wndEval.v
 L1_MalechaQuoted/awndEval.v
+L1_MalechaQuoted/wndEval.v
 L1_MalechaQuoted/wcbvEval.v
 L1_MalechaQuoted/wNorm.v
-L1_MalechaQuoted/malecha_L1.v
 L1_MalechaQuoted/L1.v
 
-# L2
-L2_typeStrippedL1/term.v
-L2_typeStrippedL1/program.v
-L2_typeStrippedL1/wndEval.v
-L2_typeStrippedL1/wcbvEval.v
-L2_typeStrippedL1/wNorm.v
-L2_typeStrippedL1/stripEvalCommute.v
-L2_typeStrippedL1/L2.v
+# L1_5
+L1_5_box/compile.v
+L1_5_box/term.v
+L1_5_box/program.v
+L1_5_box/awndEval.v
+L1_5_box/wndEval.v
+L1_5_box/wcbvEval.v
+L1_5_box/wNorm.v
+L1_5_box/L1_5.v
 
+# L2
+L2_typeStripped/compile.v
+L2_typeStripped/term.v
+L2_typeStripped/program.v
+L2_typeStripped/awndEval.v
+L2_typeStripped/wndEval.v
+L2_typeStripped/wcbvEval.v
+L2_typeStripped/wNorm.v
+#L2_typeStripped/stripEvalCommute.v
+#L2_typeStripped/L2.v
 
 # L3
+L3_flattenedApp/compile.v
 L3_flattenedApp/term.v
 L3_flattenedApp/program.v
 L3_flattenedApp/wndEval.v
