@@ -73,6 +73,7 @@ L6_PCPS/set_util.v
 L6_PCPS/ctx.v
 L6_PCPS/tags.v
 L6_PCPS/identifiers.v
+L6_PCPS/functions.v
 L6_PCPS/env.v
 L6_PCPS/relations.v
 L6_PCPS/eval.v
