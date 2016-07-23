@@ -1,11 +1,15 @@
--R common Common -R L1_MalechaQuoted L1 -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
+-R common Common -R L0_QuotedCoq L0 -R L1_MalechaQuoted L1 -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
 
 
 # common
+common/exceptionMonad.v 
 common/RandyPrelude.v
 common/AstCommon.v
-common/exceptionMonad.v 
 common/Common.v
+
+#L0
+L0_QuotedCoq/term.v
+L0_QuotedCoq/program.v
 
 # L1
 L1_MalechaQuoted/compile.v
