@@ -1,4 +1,4 @@
--R common Common -R L0_QuotedCoq L0 -R L1_MalechaQuoted L1 -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS ""  -R ../libraries ""
 
 
 # common
@@ -7,19 +7,20 @@ common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
 
-#L0
-L0_QuotedCoq/term.v
-L0_QuotedCoq/program.v
+#L1
+L1_QuotedCoq/term.v
+L1_QuotedCoq/program.v
+L1_QuotedCoq/L1.v
 
-# L1
-L1_MalechaQuoted/compile.v
-L1_MalechaQuoted/term.v
-L1_MalechaQuoted/program.v
-L1_MalechaQuoted/awndEval.v
-L1_MalechaQuoted/wndEval.v
-L1_MalechaQuoted/wcbvEval.v
-L1_MalechaQuoted/wNorm.v
-L1_MalechaQuoted/L1.v
+# L1g
+L1g/compile.v
+L1g/term.v
+L1g/program.v
+L1g/awndEval.v
+L1g/wndEval.v
+L1g/wcbvEval.v
+L1g/wNorm.v
+L1g/L1g.v
 
 # L1_5
 L1_5_box/compile.v
