@@ -5,6 +5,7 @@
 common/exceptionMonad.v 
 common/RandyPrelude.v
 common/AstCommon.v
+common/classes.v
 common/Common.v
 
 #L1
