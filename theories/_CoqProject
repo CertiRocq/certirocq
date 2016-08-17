@@ -45,7 +45,7 @@ L2_typeStripped/wNorm.v
 L2_typeStripped/stripWndCommute.v
 L2_typeStripped/stripEvalCommute.v
 L2_typeStripped/L2.v
-L2_typeStripped/classes.v
+L2_typeStripped/instances.v
 
 # L3
 L3_flattenedApp/compile.v
@@ -56,7 +56,7 @@ L3_flattenedApp/wcbvEval.v
 L3_flattenedApp/wNorm.v
 L3_flattenedApp/unaryApplications.v
 L3_flattenedApp/L3.v
-L3_flattenedApp/classes.v
+L3_flattenedApp/instances.v
 
 # L4
 L4_deBruijn/expression.v
@@ -65,7 +65,7 @@ L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/L4a_to_L5.v
 L4_deBruijn/L5a.v
 L4_deBruijn/L4_to_L4a.v
-L4_deBruijn/classes.v
+L4_deBruijn/instances.v
 
 # L5: CPS
 #L5_CPS/cpstrans.v
@@ -99,6 +99,6 @@ L6_PCPS/hoisting.v
 L6_PCPS/uncurry.v
 L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
-L6_PCPS/classes.v
+L6_PCPS/instances.v
 
 allInstances.v
