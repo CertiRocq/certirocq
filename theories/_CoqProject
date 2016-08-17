@@ -99,6 +99,7 @@ L6_PCPS/hoisting.v
 L6_PCPS/uncurry.v
 L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
+L6.PCPS/L6_compose.v
 L6_PCPS/instances.v
 
 allInstances.v
