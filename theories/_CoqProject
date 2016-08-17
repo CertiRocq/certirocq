@@ -1,4 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L5_CPS CPS -R L6_PCPS L6  -R ../libraries ""
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries ""
 
 
 # common
@@ -68,10 +68,10 @@ L4_deBruijn/L4_to_L4a.v
 L4_deBruijn/classes.v
 
 # L5: CPS
-L5_CPS/cpstrans.v
-L5_CPS/u_deBruijn.v
-L5_CPS/k_deBruijn.v
-L5_CPS/cpseval.v
+#L5_CPS/cpstrans.v
+#L5_CPS/u_deBruijn.v
+#L5_CPS/k_deBruijn.v
+#L5_CPS/cpseval.v
 
 # L6
 L6_PCPS/L5_to_L6.v
