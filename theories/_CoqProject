@@ -1,5 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries ""
-
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries "" -R L7 L7 -R compcert compcert
 
 # common
 common/classes.v
@@ -101,5 +100,56 @@ L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
 L6_PCPS/L6_compose.v
 L6_PCPS/instances.v
+
+# L7
+L7/L6_to_Clight.v
+
+# Compcert
+compcert/lib/Coqlib.v
+compcert/lib/Integers.v
+compcert/lib/Fappli_IEEE_extra.v
+compcert/lib/Floats.v
+compcert/lib/Maps.v
+compcert/lib/Axioms.v
+compcert/lib/Intv.v
+compcert/flocq/Core/Fcore_Zaux.v
+compcert/flocq/Core/Fcore_Raux.v
+compcert/flocq/Core/Fcore_defs.v
+compcert/flocq/Core/Fcore_float_prop.v
+compcert/flocq/Core/Fcore_rnd.v
+compcert/flocq/Core/Fcore_generic_fmt.v
+compcert/flocq/Core/Fcore_ulp.v
+compcert/flocq/Core/Fcore_rnd_ne.v
+compcert/flocq/Core/Fcore_FIX.v
+compcert/flocq/Core/Fcore_FLX.v
+compcert/flocq/Core/Fcore_FLT.v
+compcert/flocq/Core/Fcore.v
+compcert/flocq/Core/Fcore_digits.v
+compcert/flocq/Calc/Fcalc_digits.v
+compcert/flocq/Calc/Fcalc_bracket.v
+compcert/flocq/Calc/Fcalc_round.v
+compcert/flocq/Calc/Fcalc_ops.v
+compcert/flocq/Calc/Fcalc_div.v
+compcert/flocq/Calc/Fcalc_sqrt.v
+compcert/flocq/Prop/Fprop_relative.v
+compcert/flocq/Appli/Fappli_IEEE.v
+compcert/flocq/Appli/Fappli_IEEE_bits.v
+compcert/flocq/Prop/Fprop_Sterbenz.v
+compcert/flocq/Appli/Fappli_rnd_odd.v
+compcert/ia32/Archi.v
+compcert/common/Errors.v
+compcert/common/AST.v
+compcert/common/Linking.v
+compcert/common/Values.v
+compcert/common/Memdata.v
+compcert/common/Memtype.v
+compcert/common/Memory.v
+compcert/common/Globalenvs.v
+compcert/common/Events.v
+compcert/common/Smallstep.v
+compcert/cfrontend/Ctypes.v
+compcert/cfrontend/Cop.v
+compcert/cfrontend/Clight.v
+compcert/exportclight/Clightdefs.v
 
 allInstances.v
