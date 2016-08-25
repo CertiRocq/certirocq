@@ -1,4 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries "" -R L7 L7 -R compcert compcert
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert
 
 # common
 common/classes.v
@@ -60,11 +60,11 @@ L3_flattenedApp/instances.v
 # L4
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
-L4_deBruijn/L3_to_L4_correct.v
-L4_deBruijn/L4a_to_L5.v
-L4_deBruijn/L5a.v
-L4_deBruijn/L4_to_L4a.v
-L4_deBruijn/instances.v
+# L4_deBruijn/L3_to_L4_correct.v
+# L4_deBruijn/L4a_to_L5.v
+# L4_deBruijn/L5a.v
+# L4_deBruijn/L4_to_L4a.v
+# L4_deBruijn/instances.v
 
 # L5: CPS
 #L5_CPS/cpstrans.v
@@ -73,7 +73,7 @@ L4_deBruijn/instances.v
 #L5_CPS/cpseval.v
 
 # L6
-L6_PCPS/L5_to_L6.v
+# L6_PCPS/L5_to_L6.v
 # L6_PCPS/shrink_cps.v
 L6_PCPS/cps.v
 L6_PCPS/cps_util.v
@@ -99,7 +99,8 @@ L6_PCPS/uncurry.v
 L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
 L6_PCPS/L6_compose.v
-L6_PCPS/instances.v
+L6_PCPS/lambda_lifting.v
+# L6_PCPS/instances.v
 
 # L7
 L7/L6_to_Clight.v
@@ -152,4 +153,4 @@ compcert/cfrontend/Cop.v
 compcert/cfrontend/Clight.v
 compcert/exportclight/Clightdefs.v
 
-allInstances.v
+# allInstances.v
