@@ -61,9 +61,10 @@ L3_flattenedApp/instances.v
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
 # L4_deBruijn/L3_to_L4_correct.v
+L4_deBruijn/L4_to_L4a.v
+L4_deBruijn/L4_to_L4a_correct.v
 L4_deBruijn/L4a_to_L5.v
 L4_deBruijn/L5a.v
-L4_deBruijn/L4_to_L4a.v
 L4_deBruijn/instances.v
 
 # L5: CPS
