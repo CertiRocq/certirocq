@@ -101,6 +101,7 @@ L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
 L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
+L6_PCPS/lambda_lifting_correct.v
 # L6_PCPS/instances.v
 
 # L7
