@@ -74,8 +74,8 @@ L4_deBruijn/instances.v
 #L5_CPS/cpseval.v
 
 # L6
-# L6_PCPS/L5_to_L6.v
-# L6_PCPS/shrink_cps.v
+L6_PCPS/L5_to_L6.v
+L6_PCPS/shrink_cps.v
 L6_PCPS/cps.v
 L6_PCPS/cps_util.v
 L6_PCPS/List_util.v
@@ -101,8 +101,9 @@ L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
 L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
+L6_PCPS/instances.v
+
 L6_PCPS/lambda_lifting_correct.v
-# L6_PCPS/instances.v
 
 # L7
 L7/L6_to_Clight.v
