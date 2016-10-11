@@ -1,4 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert -R Extraction extraction -R Runtime runtime
 
 # common
 common/classes.v
@@ -154,6 +154,13 @@ compcert/common/Smallstep.v
 compcert/cfrontend/Ctypes.v
 compcert/cfrontend/Cop.v
 compcert/cfrontend/Clight.v
+compcert/cfrontend/Csyntax.v
 compcert/exportclight/Clightdefs.v
+
+# Runtime
+Runtime/runtime.v
+
+# Extraction
+Extraction/extraction.v
 
 allInstances.v
