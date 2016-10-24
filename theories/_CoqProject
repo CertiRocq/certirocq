@@ -164,6 +164,6 @@ compcert/exportclight/Clightdefs.v
 Runtime/runtime.v
 
 # Extraction
-Extraction/extraction.v
+# Extraction/extraction.v
 
 allInstances.v
