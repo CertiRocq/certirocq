@@ -1,4 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L1_5_box L1_5 -R L2_typeStripped L2 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert -R Extraction extraction -R Runtime runtime
+-R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert -R Extraction extraction -R Runtime runtime
 
 # common
 common/classes.v
@@ -23,16 +23,6 @@ L1g/wcbvEval.v
 L1g/wNorm.v
 L1g/L1g.v
 
-# L1_5
-L1_5_box/compile.v
-L1_5_box/term.v
-L1_5_box/program.v
-L1_5_box/awndEval.v
-L1_5_box/wndEval.v
-L1_5_box/wcbvEval.v
-L1_5_box/wNorm.v
-L1_5_box/L1_5.v
-
 # L2
 L2_typeStripped/compile.v
 L2_typeStripped/term.v
@@ -45,6 +35,16 @@ L2_typeStripped/stripWndCommute.v
 L2_typeStripped/stripEvalCommute.v
 L2_typeStripped/L2.v
 L2_typeStripped/instances.v
+
+# L2_5
+L2_5_box/compile.v
+L2_5_box/term.v
+L2_5_box/program.v
+L2_5_box/awndEval.v
+L2_5_box/wndEval.v
+L2_5_box/wcbvEval.v
+L2_5_box/wNorm.v
+L2_5_box/L2_5.v
 
 # L3
 L3_flattenedApp/compile.v
