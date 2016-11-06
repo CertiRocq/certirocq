@@ -31,8 +31,8 @@ L2_typeStripped/awndEval.v
 L2_typeStripped/wndEval.v
 L2_typeStripped/wcbvEval.v
 L2_typeStripped/wNorm.v
-L2_typeStripped/stripWndCommute.v
 L2_typeStripped/stripEvalCommute.v
+L2_typeStripped/stripWndCommute.v
 L2_typeStripped/L2.v
 L2_typeStripped/instances.v
 
@@ -44,6 +44,8 @@ L2_5_box/awndEval.v
 L2_5_box/wndEval.v
 L2_5_box/wcbvEval.v
 L2_5_box/wNorm.v
+#L2_5_typeStripped/stripEvalCommute.v
+#L2_5_typeStripped/stripWndCommute.v
 L2_5_box/L2_5.v
 
 # L3
