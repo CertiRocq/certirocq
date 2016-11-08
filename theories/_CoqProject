@@ -19,9 +19,9 @@ L1g/term.v
 L1g/program.v
 L1g/awndEval.v
 L1g/wndEval.v
-L1g/wcbvEval.v
-L1g/wNorm.v
-L1g/L1g.v
+#L1g/wcbvEval.v
+#L1g/wNorm.v
+#L1g/L1g.v
 
 # L2
 L2_typeStripped/compile.v
@@ -31,9 +31,9 @@ L2_typeStripped/awndEval.v
 L2_typeStripped/wndEval.v
 L2_typeStripped/wcbvEval.v
 L2_typeStripped/wNorm.v
-L2_typeStripped/stripEvalCommute.v
-L2_typeStripped/stripWndCommute.v
-L2_typeStripped/L2.v
+#L2_typeStripped/stripEvalCommute.v
+#L2_typeStripped/stripWndCommute.v
+#L2_typeStripped/L2.v
 L2_typeStripped/instances.v
 
 # L2_5
