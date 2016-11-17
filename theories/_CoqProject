@@ -47,6 +47,7 @@ L2_5_box/wNorm.v
 #L2_5_typeStripped/stripEvalCommute.v
 #L2_5_typeStripped/stripWndCommute.v
 L2_5_box/L2_5.v
+L2_5_box/instances.v
 
 # L3
 L3_flattenedApp/compile.v
