@@ -23,6 +23,7 @@ L1g/wndEval.v
 L1g/wcbvEval.v
 L1g/wNorm.v
 L1g/L1g.v
+L1g/instances.v
 
 # L2
 L2_typeStripped/compile.v
