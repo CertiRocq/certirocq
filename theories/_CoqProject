@@ -111,6 +111,7 @@ L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/lambda_lifting_correct.v
 L6_PCPS/lambda_lifting_corresp.v
+L6_PCPS/space_sem.v
 L6_PCPS/instances.v
 
 
