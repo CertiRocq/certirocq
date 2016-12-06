@@ -8,6 +8,8 @@ common/AstCommon.v
 common/Common.v
 common/certiClasses.v
 common/ExtLibMisc.v
+common/TermAbs.v
+#common/TermAbs_parametricity.v (* need the parametricity plugin*)
 
 #L1
 L1_QuotedCoq/term.v
@@ -69,11 +71,11 @@ L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/L4_to_L4_2.v
-# L4_deBruijn/L4_to_L4_2_correct.v
+L4_deBruijn/L4_to_L4_1_to_L4_2.v
+# L4_deBruijn/L4_to_L4_2_correct.v (* need the parametricity plugin *)
 L4_deBruijn/L4_2_to_L5.v
 L4_deBruijn/polyEval.v
 L4_deBruijn/L5a.v
-L4_deBruijn/TermAbs.v
 L4_deBruijn/instances.v
 
 # L5: CPS
