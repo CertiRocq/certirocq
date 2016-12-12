@@ -1,4 +1,4 @@
--R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R compcert compcert -R Extraction extraction -R Runtime runtime
+-R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R compcert compcert
 
 # common
 common/classes.v
@@ -176,4 +176,4 @@ Runtime/runtime.v
 # Extraction
 # Extraction/extraction.v
 
-allInstances.v
+Compiler/allInstances.v
