@@ -10,6 +10,7 @@ common/certiClasses.v
 common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
+common/mapenv.v
 #common/TermAbs_parametricity.v (* need the parametricity plugin*)
 
 #L1
