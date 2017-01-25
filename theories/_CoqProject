@@ -117,9 +117,10 @@ L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/lambda_lifting_correct.v
 L6_PCPS/lambda_lifting_corresp.v
+L6_PCPS/heap.v
+L6_PCPS/heap_defs.v
 L6_PCPS/space_sem.v
 L6_PCPS/instances.v
-
 
 # L7
 L7/L6_to_Clight.v
