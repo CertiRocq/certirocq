@@ -1,4 +1,4 @@
--R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6  -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R ../benchmarks Benchmarks -R compcert compcert
+-R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6 -R L6_PCPS/Heap L6.Heap -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R ../benchmarks Benchmarks -R compcert compcert
 
 # common
 common/classes.v
@@ -117,10 +117,13 @@ L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/lambda_lifting_correct.v
 L6_PCPS/lambda_lifting_corresp.v
-L6_PCPS/heap.v
-L6_PCPS/heap_defs.v
-L6_PCPS/space_sem.v
 L6_PCPS/instances.v
+
+# L6/Heap
+L6_PCPS/Heap/heap.v
+L6_PCPS/Heap/heap_defs.v
+L6_PCPS/Heap/space_sem.v
+L6_PCPS/Heap/cc_log_rel.v
 
 # L7
 L7/L6_to_Clight.v
