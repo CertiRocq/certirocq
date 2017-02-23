@@ -7,6 +7,7 @@ common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
 common/certiClasses.v
+common/certiClasses2.v
 common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
