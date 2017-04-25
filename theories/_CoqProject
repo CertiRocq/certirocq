@@ -1,4 +1,4 @@
--R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6 -R L6_PCPS/Heap L6.Heap -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R ../benchmarks Benchmarks -R compcert compcert
+-R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2k_noCnstrParams L2k  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6 -R L6_PCPS/Heap L6.Heap -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R ../benchmarks Benchmarks -R compcert compcert
 
 # common
 common/classes.v
@@ -44,16 +44,23 @@ L2_typeStripped/stripWndCommute.v
 L2_typeStripped/L2.v
 L2_typeStripped/instances.v
 
+# L2k
+L2k_noCnstrParams/compile.v
+L2k_noCnstrParams/term.v
+L2k_noCnstrParams/program.v
+L2k_noCnstrParams/wcbvEval.v
+L2k_noCnstrParams/wNorm.v
+L2k_noCnstrParams/stripEvalCommute.v
+L2k_noCnstrParams/L2k.v
+L2k_noCnstrParams/instances.v
+
 # L2_5
 L2_5_box/compile.v
 L2_5_box/term.v
 L2_5_box/program.v
-L2_5_box/awndEval.v
-L2_5_box/wndEval.v
 L2_5_box/wcbvEval.v
 L2_5_box/wNorm.v
 L2_5_box/stripEvalCommute.v
-L2_5_box/stripWndCommute.v
 L2_5_box/L2_5.v
 L2_5_box/instances.v
 
@@ -61,7 +68,6 @@ L2_5_box/instances.v
 L3_flattenedApp/compile.v
 L3_flattenedApp/term.v
 L3_flattenedApp/program.v
-L3_flattenedApp/wndEval.v
 L3_flattenedApp/wcbvEval.v
 L3_flattenedApp/wNorm.v
 L3_flattenedApp/unaryApplications.v
