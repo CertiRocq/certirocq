@@ -15,6 +15,10 @@ common/references.v
 common/mapenv.v
 #common/TermAbs_parametricity.v (* need the parametricity plugin*)
 
+# Benchmarks
+../benchmarks/Binom.v
+../benchmarks/Color.v
+../benchmarks/vs.v
 
 # L1
 L1_QuotedCoq/term.v
@@ -202,13 +206,6 @@ compcert/exportclight/Clightdefs.v
 
 # Runtime
 Runtime/runtime.v
-
-
-# Benchmarks
-../benchmarks/Binom.v
-../benchmarks/Color.v
-../benchmarks/vs.v
-
 
 # Compiler
 Compiler/allInstances.v
