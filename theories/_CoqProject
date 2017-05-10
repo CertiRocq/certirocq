@@ -86,7 +86,6 @@ L4_deBruijn/varInterface.v
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
-#L4_deBruijn/L4_to_L4_2.v (* old version. not in use anymore *)
 L4_deBruijn/L4_to_L4_1_to_L4_2.v
 # L4_deBruijn/L4_to_L4_2_correct.v (* need the parametricity plugin *)
 L4_deBruijn/L4_5_to_L5.v
