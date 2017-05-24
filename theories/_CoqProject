@@ -10,6 +10,7 @@ common/certiClasses.v
 common/certiClasses2.v
 common/certiClasses3.v
 common/certiClassesLinkable.v
+common/certiClassesLinkableExt.v
 common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
