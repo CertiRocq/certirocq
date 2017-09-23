@@ -42,8 +42,6 @@ L1g/instances.v
 L2_typeStripped/compile.v
 L2_typeStripped/term.v
 L2_typeStripped/program.v
-L2_typeStripped/awndEval.v
-L2_typeStripped/wndEval.v
 L2_typeStripped/wcbvEval.v
 L2_typeStripped/wNorm.v
 L2_typeStripped/stripEvalCommute.v
