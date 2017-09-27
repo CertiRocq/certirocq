@@ -90,6 +90,8 @@ L3_flattenedApp/instances.v
 
 # L4
 L4_deBruijn/L3_to_L3_eta.v
+L4_deBruijn/L3_eta_crct.v
+L4_deBruijn/L3_to_L3_eta_correct.v
 L4_deBruijn/variables.v
 L4_deBruijn/varInterface.v
 L4_deBruijn/expression.v
