@@ -23,9 +23,9 @@ common/mapenv.v
 ../benchmarks/vs.v
 
 # L1
-L1_QuotedCoq/term.v
-L1_QuotedCoq/program.v
-L1_QuotedCoq/L1.v
+# L1_QuotedCoq/term.v
+# L1_QuotedCoq/program.v
+# L1_QuotedCoq/L1.v
 
 # L1g
 L1g/compile.v
