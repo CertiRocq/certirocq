@@ -66,7 +66,7 @@ L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
 L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
-#L2k_noCnstrParams/instances.v
+L2k_noCnstrParams/instances.v
 
 # L2_5
 L2_5_box/compile.v
@@ -76,7 +76,7 @@ L2_5_box/wcbvEval.v
 L2_5_box/wNorm.v
 L2_5_box/stripEvalCommute.v
 L2_5_box/L2_5.v
-#L2_5_box/instances.v
+L2_5_box/instances.v
 
 # L3
 L3_flattenedApp/compile.v
