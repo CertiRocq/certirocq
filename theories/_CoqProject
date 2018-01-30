@@ -155,9 +155,9 @@ L6_PCPS/instances.v
 # L6/Heap
 L6_PCPS/Heap/heap.v
 L6_PCPS/Heap/heap_defs.v
-L6_PCPS/Heap/space_sem.v
-L6_PCPS/Heap/heap_equiv.v
-L6_PCPS/Heap/cc_log_rel.v
+#L6_PCPS/Heap/space_sem.v
+#L6_PCPS/Heap/heap_equiv.v
+#L6_PCPS/Heap/cc_log_rel.v
 
 # L7
 L7/L6_to_Clight.v
