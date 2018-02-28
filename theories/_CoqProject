@@ -1,4 +1,4 @@
--R Compiler Compiler -R common Common -R L1_QuotedCoq L1 -R L1g L1g -R L2_typeStripped L2  -R L2d_flattenedApp L2d  -R L2k_noCnstrParams L2k  -R L2_5_box L2_5 -R L3_flattenedApp L3 -R L4_deBruijn L4 -R L6_PCPS L6 -R L6_PCPS/Heap L6.Heap -R ../libraries Libraries -R L7 L7 -R Extraction extraction -R Runtime runtime -R ../benchmarks Benchmarks -R compcert compcert
+-R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R ../benchmarks CertiCoq.Benchmarks -R compcert compcert
 
 # common
 common/classes.v
@@ -15,7 +15,7 @@ common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
 common/mapenv.v
-#common/TermAbs_parametricity.v (* need the parametricity plugin*)
+common/TermAbs_parametricity.v # need the parametricity plugin
 
 # Benchmarks
 ../benchmarks/Binom.v
@@ -98,7 +98,7 @@ L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/L4_to_L4_1_to_L4_2.v
-# L4_deBruijn/L4_to_L4_2_correct.v (* need the parametricity plugin *)
+L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
 L4_deBruijn/L4_5_to_L5.v
 L4_deBruijn/L4_2_to_L4_5.v
 L4_deBruijn/polyEval.v
