@@ -159,6 +159,7 @@ L6_PCPS/Heap/heap_equiv.v
 L6_PCPS/Heap/space_sem.v
 L6_PCPS/Heap/cc_log_rel.v
 L6_PCPS/Heap/compat.v
+L6_PCPS/Heap/size_cps.v
 
 # L7
 L7/L6_to_Clight.v
