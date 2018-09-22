@@ -165,6 +165,7 @@ L6_PCPS/Heap/closure_conversion_util.v
 L6_PCPS/Heap/bounds.v
 L6_PCPS/Heap/invariants.v
 L6_PCPS/Heap/closure_conversion_correct.v
+L6_PCPS/Heap/toplevel.v
 
 # L7
 L7/L6_to_Clight.v
