@@ -156,8 +156,16 @@ L6_PCPS/instances.v
 L6_PCPS/Heap/heap.v
 L6_PCPS/Heap/heap_defs.v
 L6_PCPS/Heap/heap_equiv.v
+L6_PCPS/Heap/GC.v
 L6_PCPS/Heap/space_sem.v
-#L6_PCPS/Heap/cc_log_rel.v
+L6_PCPS/Heap/cc_log_rel.v
+L6_PCPS/Heap/compat.v
+L6_PCPS/Heap/closure_conversion.v
+L6_PCPS/Heap/closure_conversion_util.v
+L6_PCPS/Heap/bounds.v
+L6_PCPS/Heap/invariants.v
+L6_PCPS/Heap/closure_conversion_correct.v
+L6_PCPS/Heap/toplevel.v
 
 # L7
 L7/L6_to_Clight.v
