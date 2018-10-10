@@ -154,6 +154,7 @@ L6_PCPS/instances.v
 
 # L6/Heap
 L6_PCPS/Heap/heap.v
+L6_PCPS/Heap/heap_impl.v
 L6_PCPS/Heap/heap_defs.v
 L6_PCPS/Heap/heap_equiv.v
 L6_PCPS/Heap/GC.v
