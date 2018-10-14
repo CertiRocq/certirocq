@@ -151,6 +151,7 @@ L6_PCPS/alpha_fresh.v
 L6_PCPS/beta_contraction.v
 L6_PCPS/tactics.v
 L6_PCPS/instances.v
+L6_PCPS/map_util.v
 
 # L6/Heap
 L6_PCPS/Heap/heap.v
