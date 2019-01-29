@@ -18,9 +18,9 @@ common/mapenv.v
 common/TermAbs_parametricity.v # need the parametricity plugin
 
 # Benchmarks
-../benchmarks/Binom.v
-../benchmarks/Color.v
-../benchmarks/vs.v
+# ../benchmarks/Binom.v
+# ../benchmarks/Color.v
+# ../benchmarks/vs.v
 
 # L1
 # L1_QuotedCoq/term.v
@@ -31,32 +31,31 @@ common/TermAbs_parametricity.v # need the parametricity plugin
 L1g/compile.v
 L1g/term.v
 L1g/program.v
-L1g/awndEval.v
 L1g/wndEval.v
 L1g/wcbvEval.v
-L1g/wNorm.v
-L1g/L1g.v
-L1g/instances.v
+# L1g/wNorm.v
+# L1g/L1g.v
+# L1g/instances.v
 
 # L2
-L2_typeStripped/compile.v
-L2_typeStripped/term.v
-L2_typeStripped/program.v
-L2_typeStripped/wcbvEval.v
-L2_typeStripped/wNorm.v
-L2_typeStripped/stripEvalCommute.v
-L2_typeStripped/L2.v
-L2_typeStripped/instances.v
+# L2_typeStripped/compile.v
+# L2_typeStripped/term.v
+# L2_typeStripped/program.v
+# L2_typeStripped/wcbvEval.v
+# L2_typeStripped/wNorm.v
+# L2_typeStripped/stripEvalCommute.v
+# L2_typeStripped/L2.v
+# L2_typeStripped/instances.v
 
 # L2d
-L2d_flattenedApp/compile.v
-L2d_flattenedApp/term.v
-L2d_flattenedApp/program.v
-L2d_flattenedApp/wcbvEval.v
-L2d_flattenedApp/wNorm.v
-L2d_flattenedApp/stripEvalCommute.v
-L2d_flattenedApp/L2d.v
-L2d_flattenedApp/instances.v
+# L2d_flattenedApp/compile.v
+# L2d_flattenedApp/term.v
+# L2d_flattenedApp/program.v
+# L2d_flattenedApp/wcbvEval.v
+# L2d_flattenedApp/wNorm.v
+# L2d_flattenedApp/stripEvalCommute.v
+# L2d_flattenedApp/L2d.v
+# L2d_flattenedApp/instances.v
 
 # L2k
 L2k_noCnstrParams/compile.v
@@ -64,47 +63,47 @@ L2k_noCnstrParams/term.v
 L2k_noCnstrParams/program.v
 L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
-L2k_noCnstrParams/stripEvalCommute.v
+# L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
-L2k_noCnstrParams/instances.v
+# L2k_noCnstrParams/instances.v
 
 # L2_5
-L2_5_box/compile.v
-L2_5_box/term.v
-L2_5_box/program.v
-L2_5_box/wcbvEval.v
-L2_5_box/wNorm.v
-L2_5_box/stripEvalCommute.v
-L2_5_box/L2_5.v
-L2_5_box/instances.v
+# L2_5_box/compile.v
+# L2_5_box/term.v
+# L2_5_box/program.v
+# L2_5_box/wcbvEval.v
+# L2_5_box/wNorm.v
+# L2_5_box/stripEvalCommute.v
+# L2_5_box/L2_5.v
+# L2_5_box/instances.v
 
 # L3
-L3_flattenedApp/compile.v
-L3_flattenedApp/term.v
-L3_flattenedApp/program.v
-L3_flattenedApp/wcbvEval.v
-L3_flattenedApp/wNorm.v
-L3_flattenedApp/unaryApplications.v
-L3_flattenedApp/L3.v
-L3_flattenedApp/instances.v
+# L3_flattenedApp/compile.v
+# L3_flattenedApp/term.v
+# L3_flattenedApp/program.v
+# L3_flattenedApp/wcbvEval.v
+# L3_flattenedApp/wNorm.v
+# L3_flattenedApp/unaryApplications.v
+# L3_flattenedApp/L3.v
+# L3_flattenedApp/instances.v
 
 # L4
 L4_deBruijn/L3_to_L3_eta.v
 L4_deBruijn/L3_eta_crct.v
-L4_deBruijn/L3_to_L3_eta_correct.v
+# L4_deBruijn/L3_to_L3_eta_correct.v
 L4_deBruijn/variables.v
 L4_deBruijn/varInterface.v
 L4_deBruijn/expression.v
 L4_deBruijn/L3_to_L4.v
-L4_deBruijn/L3_to_L4_correct.v
+# L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/L4_to_L4_1_to_L4_2.v
 L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
 L4_deBruijn/L4_5_to_L5.v
 L4_deBruijn/L4_2_to_L4_5.v
 L4_deBruijn/polyEval.v
 L4_deBruijn/L5a.v
-L4_deBruijn/instances.v
-L4_deBruijn/linkableInstances.v
+#L4_deBruijn/instances.v
+#L4_deBruijn/linkableInstances.v
 
 # L5: CPS
 #L5_CPS/cpstrans.v
