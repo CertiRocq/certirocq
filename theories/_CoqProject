@@ -204,7 +204,8 @@ compcert/flocq/Appli/Fappli_IEEE.v
 compcert/flocq/Appli/Fappli_IEEE_bits.v
 compcert/flocq/Prop/Fprop_Sterbenz.v
 compcert/flocq/Appli/Fappli_rnd_odd.v
-compcert/ia32/Archi.v
+#compcert/ia32/Archi.v
+compcert/x86_64/Archi.v
 compcert/common/Errors.v
 compcert/common/AST.v
 compcert/common/Linking.v
