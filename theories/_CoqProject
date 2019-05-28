@@ -231,12 +231,12 @@ compcert/cfrontend/Clight.v
 compcert/cfrontend/Csyntax.v
 compcert/cfrontend/Csem.v
 compcert/cfrontend/Cstrategy.v	
-#compcert/cfrontend/Cexec.v
+compcert/cfrontend/Cexec.v
 compcert/exportclight/Clightdefs.v
 
 # L7
 L7/L6_to_Clight.v
-#L7/Clightexec.v
+L7/Clightexec.v
 
 
 
