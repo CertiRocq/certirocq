@@ -157,8 +157,31 @@ L6_PCPS/beta_contraction.v
 
 # Compcert
 compcert/lib/Coqlib.v
+compcert/flocq/Core/Zaux.v	
+compcert/flocq/Core/Raux.v
+compcert/flocq/Core/Defs.v
+compcert/flocq/Core/Digits.v
+compcert/flocq/Core/Round_pred.v
+compcert/flocq/Core/Float_prop.v
+compcert/flocq/Core/Generic_fmt.v
+compcert/flocq/Core/Ulp.v
+compcert/flocq/Core/Round_NE.v
+compcert/flocq/Core/FIX.v
+compcert/flocq/Core/FLX.v
+compcert/flocq/Core/FLT.v
+compcert/flocq/Core/Core.v
+compcert/flocq/Calc/Bracket.v
+compcert/flocq/Calc/Round.v
+compcert/flocq/Calc/Operations.v
+compcert/flocq/Calc/Div.v
+compcert/flocq/Calc/Sqrt.v
+compcert/flocq/Prop/Relative.v
+compcert/flocq/IEEE754/Binary.v
+compcert/flocq/IEEE754/Bits.v
 compcert/x86_64/Archi.v
 compcert/lib/Integers.v
+compcert/flocq/Prop/Sterbenz.v
+compcert/flocq/Prop/Round_odd.v
 compcert/lib/Fappli_IEEE_extra.v
 compcert/lib/Floats.v
 compcert/lib/Maps.v
