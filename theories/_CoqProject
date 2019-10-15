@@ -23,6 +23,7 @@ common/TermAbs_parametricity.v # need the parametricity plugin
 ../benchmarks/Binom.v
 ../benchmarks/Color.v
 ../benchmarks/vs.v
+../benchmarks/sha256.v
 
 # L1
 # L1_QuotedCoq/term.v
