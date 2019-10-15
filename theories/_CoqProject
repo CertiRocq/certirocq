@@ -136,25 +136,48 @@ L6_PCPS/relations.v
 L6_PCPS/logical_relations.v
 L6_PCPS/ctx_approx.v
 L6_PCPS/alpha_conv.v
+L6_PCPS/state.v
 L6_PCPS/hoare.v
 L6_PCPS/hoisting.v
 L6_PCPS/closure_conversion.v
+L6_PCPS/closure_conversion2.v
 L6_PCPS/closure_conversion_util.v
 L6_PCPS/closure_conversion_correct.v	
-L6_PCPS/closure_conversion_corresp.v
+# L6_PCPS/closure_conversion_corresp.v
 L6_PCPS/shrink_cps.v
 L6_PCPS/shrink_cps_correct.v
 L6_PCPS/shrink_cps_corresp.v
 L6_PCPS/uncurry.v
-L6_PCPS/uncurry_correct.v
+# L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
-#L6_PCPS/L6_compose.v
+# L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/lambda_lifting_correct.v
-L6_PCPS/lambda_lifting_corresp.v
+# L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/alpha_fresh.v
 L6_PCPS/beta_contraction.v
+L6_PCPS/instances.v
+L6_PCPS/map_util.v
 
+# L6/Heap
+L6_PCPS/Heap/heap.v
+L6_PCPS/Heap/heap_impl.v
+L6_PCPS/Heap/heap_defs.v
+L6_PCPS/Heap/heap_equiv.v
+L6_PCPS/Heap/GC.v
+L6_PCPS/Heap/space_sem.v
+L6_PCPS/Heap/cc_log_rel.v
+L6_PCPS/Heap/log_rel_defs.v
+L6_PCPS/Heap/log_rel_post_cc.v
+L6_PCPS/Heap/compat.v
+L6_PCPS/Heap/closure_conversion.v
+L6_PCPS/Heap/closure_conversion_util.v
+L6_PCPS/dead_param_elim.v
+#L6_PCPS/Heap/dead_param_elim_rel.v
+L6_PCPS/Heap/bounds.v
+L6_PCPS/Heap/invariants.v
+L6_PCPS/Heap/closure_conversion_correct.v
+L6_PCPS/Heap/toplevel.v
 
 # Compcert
 compcert/lib/Coqlib.v
@@ -238,25 +261,6 @@ compcert/exportclight/Clightdefs.v
 # L7
 L7/L6_to_Clight.v
 L7/Clightexec.v
-
-
-
-# L6/Heap
-L6_PCPS/Heap/heap.v
-L6_PCPS/Heap/heap_defs.v
-L6_PCPS/Heap/heap_equiv.v
-L6_PCPS/Heap/GC.v
-L6_PCPS/Heap/space_sem.v
-L6_PCPS/Heap/cc_log_rel.v
-L6_PCPS/Heap/compat.v
-L6_PCPS/Heap/closure_conversion.v
-L6_PCPS/Heap/closure_conversion_util.v
-L6_PCPS/Heap/bounds.v
-L6_PCPS/Heap/invariants.v
-L6_PCPS/Heap/closure_conversion_correct.v
-L6_PCPS/Heap/toplevel.v
-L6_PCPS/instances.v
-
 
 # Runtime
 Runtime/runtime.v
