@@ -1,10 +1,10 @@
--R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R ../benchmarks CertiCoq.Benchmarks -R compcert compcert
+-R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R ../benchmarks CertiCoq.Benchmarks -R compcert compcert
 # -R ../../../../Downloads/VST VST  -R ../../../../Downloads/ramifycoq/ RamifyCoq
 
 
 # common
 common/classes.v
-common/exceptionMonad.v 
+common/exceptionMonad.v
 common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
@@ -100,7 +100,7 @@ L4_deBruijn/varInterface.v
 L4_deBruijn/variables.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
-L4_deBruijn/polyEval.v	
+L4_deBruijn/polyEval.v
 L4_deBruijn/L4_to_L4_1_to_L4_2.v
 L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
 L4_deBruijn/L4_5_to_L5.v
@@ -122,7 +122,7 @@ L6_PCPS/List_util.v
 L6_PCPS/functions.v
 L6_PCPS/set_util.v
 L6_PCPS/cps.v
-L6_PCPS/tactics.v	
+L6_PCPS/tactics.v
 L6_PCPS/ctx.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
@@ -142,7 +142,7 @@ L6_PCPS/hoisting.v
 L6_PCPS/closure_conversion.v
 L6_PCPS/closure_conversion2.v
 L6_PCPS/closure_conversion_util.v
-L6_PCPS/closure_conversion_correct.v	
+L6_PCPS/closure_conversion_correct.v
 # L6_PCPS/closure_conversion_corresp.v
 L6_PCPS/shrink_cps.v
 L6_PCPS/shrink_cps_correct.v
@@ -181,7 +181,7 @@ L6_PCPS/Heap/toplevel.v
 
 # Compcert
 compcert/lib/Coqlib.v
-compcert/flocq/Core/Zaux.v	
+compcert/flocq/Core/Zaux.v
 compcert/flocq/Core/Raux.v
 compcert/flocq/Core/Defs.v
 compcert/flocq/Core/Digits.v
@@ -247,14 +247,14 @@ compcert/common/Memory.v
 compcert/common/Globalenvs.v
 compcert/common/Events.v
 compcert/common/Smallstep.v
-compcert/common/Behaviors.v	
+compcert/common/Behaviors.v
 compcert/common/Determinism.v
 compcert/cfrontend/Ctypes.v
 compcert/cfrontend/Cop.v
 compcert/cfrontend/Clight.v
 compcert/cfrontend/Csyntax.v
 compcert/cfrontend/Csem.v
-compcert/cfrontend/Cstrategy.v	
+compcert/cfrontend/Cstrategy.v
 compcert/cfrontend/Cexec.v
 compcert/exportclight/Clightdefs.v
 
@@ -262,6 +262,9 @@ compcert/exportclight/Clightdefs.v
 L7/L6_to_Clight.v
 L7/L6_to_Clight_old.v
 L7/Clightexec.v
+
+# Glue
+Glue/glue.v
 
 # Runtime
 Runtime/runtime.v
