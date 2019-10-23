@@ -260,8 +260,8 @@ compcert/cfrontend/Cexec.v
 compcert/exportclight/Clightdefs.v
 
 # L7
+L7/tactics.v
 L7/L6_to_Clight.v
-L7/L6_to_Clight_old.v
 L7/Clightexec.v
 
 # Runtime
