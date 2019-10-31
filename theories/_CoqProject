@@ -174,7 +174,7 @@ L6_PCPS/map_util.v
 # L6_PCPS/Heap/compat.v
 # L6_PCPS/Heap/closure_conversion.v
 # L6_PCPS/Heap/closure_conversion_util.v
-# #L6_PCPS/Heap/dead_param_elim_rel.v
+# L6_PCPS/Heap/dead_param_elim_rel.v
 # L6_PCPS/Heap/bounds.v
 # L6_PCPS/Heap/invariants.v
 # L6_PCPS/Heap/closure_conversion_correct.v
