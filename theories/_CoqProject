@@ -134,7 +134,7 @@ L6_PCPS/identifiers.v
 # L6_PCPS/env.v
 L6_PCPS/relations.v
 # L6_PCPS/tags.v
-# L6_PCPS/logical_relations.v
+L6_PCPS/logical_relations.v
 # L6_PCPS/ctx_approx.v
 # L6_PCPS/alpha_conv.v
 L6_PCPS/state.v
