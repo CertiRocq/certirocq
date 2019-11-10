@@ -90,6 +90,7 @@ L2k_noCnstrParams/toplevel.v
 
 # L4
 L4_deBruijn/expression.v
+L4_deBruijn/exp_eval.v
 L4_deBruijn/L3_to_L3_eta.v
 L4_deBruijn/L3_eta_crct.v
 L4_deBruijn/L3_to_L3_eta_correct.v
