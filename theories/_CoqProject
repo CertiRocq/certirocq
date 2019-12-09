@@ -268,7 +268,7 @@ L7/L6_to_Clight_stack.v
 L7/Clightexec.v
 
 # Glue
-Glue/glue.v
+#Glue/glue.v
 
 # Runtime
 Runtime/runtime.v
