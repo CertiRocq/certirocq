@@ -42,7 +42,7 @@ L1g/wcbvEval.v
 L1g/wNorm.v
 L1g/L1g.v
 L1g/toplevel.v
-L1g/instances.v
+# L1g/instances.v
 
 # L2
 # L2_typeStripped/compile.v
@@ -72,7 +72,7 @@ L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
 L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
-L2k_noCnstrParams/instances.v
+# L2k_noCnstrParams/instances.v
 L2k_noCnstrParams/toplevel.v
 
 # L2_5
@@ -112,7 +112,7 @@ L4_deBruijn/L4_2_to_L4_5.v
 
 #L4_deBruijn/L5a.v
 L4_deBruijn/toplevel.v
-L4_deBruijn/instances.v
+#L4_deBruijn/instances.v
 #L4_deBruijn/linkableInstances.v
 
 # L5: CPS
@@ -165,7 +165,7 @@ L6_PCPS/dead_param_elim.v
 # L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/alpha_fresh.v
 L6_PCPS/beta_contraction.v
-L6_PCPS/instances.v
+# L6_PCPS/instances.v
 L6_PCPS/toplevel.v
 L6_PCPS/map_util.v
 

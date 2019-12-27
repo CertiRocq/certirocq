@@ -34,6 +34,8 @@ Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- L6_trans p ;;
   compile_Clight p.
 
+(* TODO better notation for threading the program, maybe monad for
+   CertiCoq trans *)
 
 Definition default_opts : Options :=
   {| direct := false;
@@ -65,7 +67,6 @@ Definition compile (cps : bool) (opt : nat) (p : Template.Ast.program) :=
     run_pipeline _ _ opts p pipeline_ANF.
 
 (** * Glue Code *)
-
 Definition make_glue (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue p with
