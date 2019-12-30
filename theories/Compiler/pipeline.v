@@ -46,12 +46,12 @@ Definition default_opts : Options :=
      debug := false;
      dev := 0 |}.
 
-Definition make_opts (cps : bool) (opt : nat) : Options :=
+Definition make_opts (cps : bool) (opt : nat) (time : bool) : Options :=
   {| direct := negb cps;
      c_args := 5;
      show_anf := false;
      o_level := opt;
-     time := false;
+     time := time;
      debug := false;
      dev := 0 |}.
 
@@ -59,14 +59,15 @@ Definition printProg :=
   fun prog file =>
     L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
-Definition compile (cps : bool) (opt : nat) (p : Template.Ast.program) :=
-  let opts := make_opts cps opt in
+Definition compile (cps : bool) (opt : nat) (time : bool) (p : Template.Ast.program) :=
+  let opts := make_opts cps opt time in
   if cps then
     run_pipeline _ _ opts p pipeline_CPS
   else
     run_pipeline _ _ opts p pipeline_ANF.
 
 (** * Glue Code *)
+
 Definition make_glue (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue p with

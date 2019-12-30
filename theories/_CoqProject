@@ -1,5 +1,4 @@
--R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R ../benchmarks CertiCoq.Benchmarks -R compcert compcert
-# -R ../../../../Downloads/VST VST  -R ../../../../Downloads/ramifycoq/ RamifyCoq
+-R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R compcert compcert
 
 
 # common
@@ -8,8 +7,6 @@ common/exceptionMonad.v
 common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
-common/compM.v
-common/Pipeline_utils.v
 common/certiClasses.v
 common/certiClasses2.v
 common/certiClasses3.v
@@ -19,13 +16,9 @@ common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
 common/mapenv.v
+common/compM.v
+common/Pipeline_utils.v
 common/TermAbs_parametricity.v # need the parametricity plugin
-
-# Benchmarks
-../benchmarks/Binom.v
-../benchmarks/Color.v
-../benchmarks/vs.v
-../benchmarks/sha256.v
 
 # L1
 # L1_QuotedCoq/term.v
