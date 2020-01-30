@@ -46,9 +46,9 @@ Definition default_opts : Options :=
      debug := false;
      dev := 0 |}.
 
-Definition make_opts (cps : bool) (opt : nat) (time : bool) : Options :=
+Definition make_opts (cps : bool) (opt : nat) (time : bool) (args : nat) : Options :=
   {| direct := negb cps;
-     c_args := 5;
+     c_args := args;
      show_anf := false;
      o_level := opt;
      time := time;
@@ -59,8 +59,8 @@ Definition printProg :=
   fun prog file =>
     L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
-Definition compile (cps : bool) (opt : nat) (time : bool) (p : Template.Ast.program) :=
-  let opts := make_opts cps opt time in
+Definition compile (cps : bool) (opt : nat) (time : bool) (args : nat) (p : Template.Ast.program) :=
+  let opts := make_opts cps opt time args in
   if cps then
     run_pipeline _ _ opts p pipeline_CPS
   else
