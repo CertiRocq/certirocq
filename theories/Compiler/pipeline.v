@@ -22,8 +22,7 @@ Definition pipeline_CPS (p : Template.Ast.program) :=
   p <- compile_L4_5 p ;;
   p <- compile_L5 p ;;
   p <- compile_L6_CPS p ;;
-  p <- L6_trans p ;;
-  compile_Clight p.
+  L6_trans p.
 
 Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- compile_L1g p ;;
@@ -31,7 +30,14 @@ Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- compile_L2k_eta p ;;
   p <- compile_L4 p ;;
   p <- compile_L6_ANF p ;;
-  p <- L6_trans p ;;
+  L6_trans p.
+  
+Definition pipeline (p : Template.Ast.program) :=
+  o <- get_options ;;
+  p <- (if direct o then
+         pipeline_ANF p
+       else
+         pipeline_CPS p) ;;
   compile_Clight p.
 
 (* TODO better notation for threading the program, maybe monad for
@@ -60,17 +66,31 @@ Definition printProg :=
     L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
 Definition compile (opts : Options) (p : Template.Ast.program) :=
-  if direct opts then
-    run_pipeline _ _ opts p pipeline_ANF
-  else
-    run_pipeline _ _ opts p pipeline_CPS.
+  run_pipeline _ _ opts p pipeline.
+
+
+Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
+  let (perr, log) :=
+      if direct opts then
+        run_pipeline _ _ opts p pipeline_ANF
+      else
+        run_pipeline _ _ opts p pipeline_CPS
+  in
+  match perr with
+  | Ret p =>
+    let '(pr, cenv, _, _, nenv, fenv, _,  e) := p in
+    (Ret (cps_show.show_exp nenv cenv false e), log)
+  | Err s => (Err s, log)
+  end.
+ 
+
 
 (** * Glue Code *)
 
 Definition make_glue (opts : Options) (p : Template.Ast.program)
-  : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
+  : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue opts p with
   | (nenv, Some hdr, Some prg, logs) =>
-    exceptionMonad.Ret (nenv, hdr, prg, logs)
-  | _ => Exc ""
+    Ret (nenv, hdr, prg, logs)
+  | _ => Err "Error in generating glue code"
   end.
