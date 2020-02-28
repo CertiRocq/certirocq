@@ -90,7 +90,7 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
 Definition make_glue (opts : Options) (p : Template.Ast.program)
   : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue opts p with
-  | (nenv, Some hdr, Some prg, logs) =>
+  | Ret (nenv, Some hdr, Some prg, logs) =>
     Ret (nenv, hdr, prg, logs)
   | _ => Err "Error in generating glue code"
   end.
