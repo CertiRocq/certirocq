@@ -46,15 +46,20 @@ Definition pipeline (p : Template.Ast.program) :=
 Definition default_opts : Options :=
   {| direct := false;
      c_args := 5;
+     fv_args := 5;
      show_anf := false;
      o_level := 0;
      time := false;
      debug := false;
      dev := 0 |}.
 
-Definition make_opts (cps : bool) (args : nat) (o_level : nat) (time : bool) (debug : bool) : Options :=
+Definition make_opts (cps : bool)
+           (args : nat) (* number of C args *)
+           (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
+           (o_level : nat) (time : bool) (debug : bool) : Options :=
   {| direct := negb cps;
      c_args := args;
+     fv_args := args;
      show_anf := false;
      o_level := o_level;
      time := time;
@@ -82,7 +87,7 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
     (Ret (cps_show.show_exp nenv cenv false e), log)
   | Err s => (Err s, log)
   end.
- 
+
 
 
 (** * Glue Code *)
