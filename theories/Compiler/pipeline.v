@@ -56,7 +56,7 @@ Definition default_opts : Options :=
 Definition make_opts (cps : bool)
            (args : nat) (* number of C args *)
            (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
-           (o_level : nat) (time : bool) (debug : bool) : Options :=
+           (o_level : nat) (time : bool) (debug : bool) (dev : nat) : Options :=
   {| direct := negb cps;
      c_args := args;
      fv_args := args;
@@ -64,7 +64,7 @@ Definition make_opts (cps : bool)
      o_level := o_level;
      time := time;
      debug := debug;
-     dev := 0 |}.
+     dev := dev |}.
 
 Definition printProg :=
   fun prog file =>
