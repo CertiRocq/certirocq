@@ -21,7 +21,7 @@ common/TermAbs_parametricity.v # need the parametricity plugin
 
 # Benchmarks
 ../benchmarks/Binom.v
-../benchmarks/Color.v
+# ../benchmarks/Color.v
 ../benchmarks/vs.v
 
 # L1
