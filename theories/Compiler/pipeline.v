@@ -5,6 +5,7 @@ Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import String.
 Require Import maps_util.
 Require Import Glue.glue.
+Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 
 Import Monads.
@@ -95,6 +96,14 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
 Definition make_glue (opts : Options) (p : Template.Ast.program)
   : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue opts p with
+  | Ret (nenv, Some hdr, Some prg, logs) =>
+    Ret (nenv, hdr, prg, logs)
+  | _ => Err "Error in generating glue code"
+  end.
+
+Definition make_ffi (opts : Options) (p : Template.Ast.program)
+  : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
+  match generate_ffi opts p with
   | Ret (nenv, Some hdr, Some prg, logs) =>
     Ret (nenv, hdr, prg, logs)
   | _ => Err "Error in generating glue code"
