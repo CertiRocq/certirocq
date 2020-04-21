@@ -1,10 +1,9 @@
--R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R ../benchmarks CertiCoq.Benchmarks -R compcert compcert
-# -R ../../../../Downloads/VST VST  -R ../../../../Downloads/ramifycoq/ RamifyCoq
+-R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R compcert compcert
 
 
 # common
 common/classes.v
-common/exceptionMonad.v 
+common/exceptionMonad.v
 common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
@@ -17,12 +16,9 @@ common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
 common/mapenv.v
+common/compM.v
+common/Pipeline_utils.v
 common/TermAbs_parametricity.v # need the parametricity plugin
-
-# Benchmarks
-../benchmarks/Binom.v
-# ../benchmarks/Color.v
-../benchmarks/vs.v
 
 # L1
 # L1_QuotedCoq/term.v
@@ -37,9 +33,9 @@ L1g/wndEval.v
 L1g/WndEvalCorrect.v
 L1g/wcbvEval.v
 L1g/wNorm.v
-L1g/compileCorrect.v
 L1g/L1g.v
-L1g/instances.v
+L1g/toplevel.v
+# L1g/instances.v
 
 # L2
 # L2_typeStripped/compile.v
@@ -69,7 +65,8 @@ L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
 L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
-L2k_noCnstrParams/instances.v
+# L2k_noCnstrParams/instances.v
+L2k_noCnstrParams/toplevel.v
 
 # L2_5
 # L2_5_box/compile.v
@@ -100,14 +97,15 @@ L4_deBruijn/varInterface.v
 L4_deBruijn/variables.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
-L4_deBruijn/polyEval.v	
+L4_deBruijn/polyEval.v
 L4_deBruijn/L4_to_L4_1_to_L4_2.v
 L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
 L4_deBruijn/L4_5_to_L5.v
 L4_deBruijn/L4_2_to_L4_5.v
 
 #L4_deBruijn/L5a.v
-L4_deBruijn/instances.v
+L4_deBruijn/toplevel.v
+#L4_deBruijn/instances.v
 #L4_deBruijn/linkableInstances.v
 
 # L5: CPS
@@ -122,64 +120,70 @@ L6_PCPS/List_util.v
 L6_PCPS/functions.v
 L6_PCPS/set_util.v
 L6_PCPS/cps.v
-L6_PCPS/tactics.v	
+L6_PCPS/tactics.v
 L6_PCPS/ctx.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
 L6_PCPS/cps_util.v
 L6_PCPS/L5_to_L6.v
+L6_PCPS/L4_to_L6_anf.v
 L6_PCPS/identifiers.v
 L6_PCPS/stemctx.v
 L6_PCPS/env.v
 L6_PCPS/relations.v
 # L6_PCPS/tags.v
 L6_PCPS/logical_relations.v
-L6_PCPS/ctx_approx.v
+L6_PCPS/logical_relations_cc.v
+# L6_PCPS/ctx_approx.v
 L6_PCPS/alpha_conv.v
+L6_PCPS/state.v
 L6_PCPS/hoare.v
 L6_PCPS/hoisting.v
 L6_PCPS/closure_conversion.v
+# L6_PCPS/closure_conversion2.v
 L6_PCPS/closure_conversion_util.v
-L6_PCPS/closure_conversion_correct.v	
-L6_PCPS/closure_conversion_corresp.v
+L6_PCPS/closure_conversion_invariants.v
+L6_PCPS/closure_conversion_correct.v
+# L6_PCPS/closure_conversion_corresp.v
 L6_PCPS/shrink_cps.v
-L6_PCPS/shrink_cps_correct.v
-L6_PCPS/shrink_cps_corresp.v
+# L6_PCPS/shrink_cps_correct.v
+# L6_PCPS/shrink_cps_corresp.v
 L6_PCPS/uncurry.v
-L6_PCPS/uncurry_correct.v
+# L6_PCPS/uncurry_correct.v
 L6_PCPS/cps_show.v
 # L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
-L6_PCPS/lambda_lifting_correct.v
-L6_PCPS/lambda_lifting_corresp.v
+L6_PCPS/dead_param_elim.v
+# L6_PCPS/lambda_lifting_correct.v
+# L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/alpha_fresh.v
 L6_PCPS/beta_contraction.v
-L6_PCPS/instances.v
+# L6_PCPS/instances.v
+L6_PCPS/toplevel.v
 L6_PCPS/map_util.v
 
 # L6/Heap
-L6_PCPS/Heap/heap.v
-L6_PCPS/Heap/heap_impl.v
-L6_PCPS/Heap/heap_defs.v
-L6_PCPS/Heap/heap_equiv.v
-L6_PCPS/Heap/GC.v
-L6_PCPS/Heap/space_sem.v
-L6_PCPS/Heap/cc_log_rel.v
-L6_PCPS/Heap/log_rel_defs.v
-L6_PCPS/Heap/log_rel_post_cc.v
-L6_PCPS/Heap/compat.v
-L6_PCPS/Heap/closure_conversion.v
-L6_PCPS/Heap/closure_conversion_util.v
-L6_PCPS/Heap/dead_param_elim.v
-L6_PCPS/Heap/dead_param_elim_rel.v
-L6_PCPS/Heap/bounds.v
-L6_PCPS/Heap/invariants.v
-L6_PCPS/Heap/closure_conversion_correct.v
-L6_PCPS/Heap/toplevel.v
+# L6_PCPS/Heap/heap.v
+# L6_PCPS/Heap/heap_impl.v
+# L6_PCPS/Heap/heap_defs.v
+# L6_PCPS/Heap/heap_equiv.v
+# L6_PCPS/Heap/GC.v
+# L6_PCPS/Heap/space_sem.v
+# L6_PCPS/Heap/cc_log_rel.v
+# L6_PCPS/Heap/log_rel_defs.v
+# L6_PCPS/Heap/log_rel_post_cc.v
+# L6_PCPS/Heap/compat.v
+# L6_PCPS/Heap/closure_conversion.v
+# L6_PCPS/Heap/closure_conversion_util.v
+# L6_PCPS/Heap/dead_param_elim_rel.v
+# L6_PCPS/Heap/bounds.v
+# L6_PCPS/Heap/invariants.v
+# L6_PCPS/Heap/closure_conversion_correct.v
+# L6_PCPS/Heap/toplevel.v
 
 # Compcert
 compcert/lib/Coqlib.v
-compcert/flocq/Core/Zaux.v	
+compcert/flocq/Core/Zaux.v
 compcert/flocq/Core/Raux.v
 compcert/flocq/Core/Defs.v
 compcert/flocq/Core/Digits.v
@@ -245,26 +249,33 @@ compcert/common/Memory.v
 compcert/common/Globalenvs.v
 compcert/common/Events.v
 compcert/common/Smallstep.v
-compcert/common/Behaviors.v	
+compcert/common/Behaviors.v
 compcert/common/Determinism.v
 compcert/cfrontend/Ctypes.v
 compcert/cfrontend/Cop.v
 compcert/cfrontend/Clight.v
 compcert/cfrontend/Csyntax.v
 compcert/cfrontend/Csem.v
-compcert/cfrontend/Cstrategy.v	
+compcert/cfrontend/Cstrategy.v
 compcert/cfrontend/Cexec.v
 compcert/exportclight/Clightdefs.v
 
 # L7
+L7/tactics.v
 L7/L6_to_Clight.v
+L7/L6_to_Clight_stack.v
 L7/Clightexec.v
+L7/toplevel.v
+
+# Glue
+Glue/glue.v
 
 # Runtime
 Runtime/runtime.v
 
 # Compiler
-Compiler/allInstances.v
+#Compiler/allInstances.v
+Compiler/pipeline.v
 
 # Extraction
 Extraction/extraction.v
