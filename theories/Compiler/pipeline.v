@@ -32,7 +32,7 @@ Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- compile_L4 p ;;
   p <- compile_L6_ANF p ;;
   L6_trans p.
-  
+
 Definition pipeline (p : Template.Ast.program) :=
   o <- get_options ;;
   p <- (if direct o then
@@ -52,12 +52,13 @@ Definition default_opts : Options :=
      o_level := 0;
      time := false;
      debug := false;
-     dev := 0 |}.
+     dev := 0;
+     Pipeline_utils.prefix := "" |}.
 
 Definition make_opts (cps : bool)
            (args : nat) (* number of C args *)
            (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
-           (o_level : nat) (time : bool) (debug : bool) (dev : nat) : Options :=
+           (o_level : nat) (time : bool) (debug : bool) (dev : nat) (prefix : string) : Options :=
   {| direct := negb cps;
      c_args := args;
      fv_args := args;
@@ -65,7 +66,8 @@ Definition make_opts (cps : bool)
      o_level := o_level;
      time := time;
      debug := debug;
-     dev := dev |}.
+     dev := dev;
+     Pipeline_utils.prefix := prefix |}.
 
 Definition printProg :=
   fun prog file =>
