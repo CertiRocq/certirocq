@@ -5,6 +5,7 @@ Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import String.
 Require Import maps_util.
 Require Import Glue.glue.
+Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 
 Import Monads.
@@ -31,7 +32,7 @@ Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- compile_L4 p ;;
   p <- compile_L6_ANF p ;;
   L6_trans p.
-  
+
 Definition pipeline (p : Template.Ast.program) :=
   o <- get_options ;;
   p <- (if direct o then
@@ -51,12 +52,13 @@ Definition default_opts : Options :=
      o_level := 0;
      time := false;
      debug := false;
-     dev := 0 |}.
+     dev := 0;
+     Pipeline_utils.prefix := "" |}.
 
 Definition make_opts (cps : bool)
            (args : nat) (* number of C args *)
            (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
-           (o_level : nat) (time : bool) (debug : bool) (dev : nat) : Options :=
+           (o_level : nat) (time : bool) (debug : bool) (dev : nat) (prefix : string) : Options :=
   {| direct := negb cps;
      c_args := args;
      fv_args := args;
@@ -64,7 +66,8 @@ Definition make_opts (cps : bool)
      o_level := o_level;
      time := time;
      debug := debug;
-     dev := dev |}.
+     dev := dev;
+     Pipeline_utils.prefix := prefix |}.
 
 Definition printProg :=
   fun prog file =>
@@ -96,6 +99,18 @@ Definition make_glue (opts : Options) (p : Template.Ast.program)
   : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue opts p with
   | Ret (nenv, Some hdr, Some prg, logs) =>
-    Ret (nenv, hdr, prg, logs)
-  | _ => Err "Error in generating glue code"
+      Ret (nenv, hdr, prg, logs)
+  | Ret (nenv, _, _, logs) =>
+      Err "No Clight program generated"
+  | Err s => Err s
+  end.
+
+Definition make_ffi (opts : Options) (p : Template.Ast.program)
+  : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
+  match generate_ffi opts p with
+  | Ret (nenv, Some hdr, Some prg, logs) =>
+      Ret (nenv, hdr, prg, logs)
+  | Ret (nenv, _, _, logs) =>
+      Err "No Clight program generated"
+  | Err s => Err s
   end.
