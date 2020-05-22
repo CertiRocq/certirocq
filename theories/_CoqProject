@@ -157,7 +157,7 @@ L6_PCPS/lambda_lifting.v
 L6_PCPS/dead_param_elim.v
 L6_PCPS/lambda_lifting_correct.v
 # L6_PCPS/lambda_lifting_corresp.v
-L6_PCPS/alpha_fresh.v
+L6_PCPS/freshen.v
 L6_PCPS/inline.v
 # L6_PCPS/instances.v
 L6_PCPS/toplevel.v
