@@ -125,6 +125,7 @@ L6_PCPS/cps.v
 L6_PCPS/ctx.v
 L6_PCPS/cps_util.v
 L6_PCPS/identifiers.v
+L6_PCPS/rename.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
 L6_PCPS/L5_to_L6.v
