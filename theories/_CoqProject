@@ -128,6 +128,7 @@ L6_PCPS/eval.v
 L6_PCPS/cps_util.v
 L6_PCPS/L5_to_L6.v
 L6_PCPS/L4_to_L6_anf.v
+L6_PCPS/L4_to_L6.v
 L6_PCPS/identifiers.v
 L6_PCPS/stemctx.v
 L6_PCPS/env.v
