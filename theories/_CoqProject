@@ -132,6 +132,7 @@ L6_PCPS/eval.v
 L6_PCPS/L5_to_L6.v
 L6_PCPS/cps_show.v
 L6_PCPS/state.v
+L6_PCPS/rel_comp.v
 L6_PCPS/L4_to_L6_anf.v
 #L6_PCPS/L4_to_L6.v
 L6_PCPS/identifiers.v
@@ -146,6 +147,7 @@ L6_PCPS/bounds.v
 L6_PCPS/alpha_conv.v
 #L6_PCPS/hoare.v
 L6_PCPS/hoisting.v
+L6_PCPS/inline_letapp.v
 L6_PCPS/closure_conversion.v
 # L6_PCPS/closure_conversion2.v
 L6_PCPS/closure_conversion_util.v
@@ -156,7 +158,7 @@ L6_PCPS/shrink_cps.v
 L6_PCPS/shrink_cps_correct.v
 # L6_PCPS/shrink_cps_corresp.v
 L6_PCPS/uncurry.v
-# L6_PCPS/uncurry_correct.v
+L6_PCPS/uncurry_correct.v
 # L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/dead_param_elim.v
