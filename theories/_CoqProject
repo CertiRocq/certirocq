@@ -116,6 +116,7 @@ L4_deBruijn/toplevel.v
 
 # L6
 L6_PCPS/Ensembles_util.v
+L6_PCPS/algebra.v
 L6_PCPS/tactics.v
 L6_PCPS/List_util.v
 L6_PCPS/functions.v
