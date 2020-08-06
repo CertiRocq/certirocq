@@ -115,6 +115,12 @@ L4_deBruijn/toplevel.v
 #L5_CPS/cpseval.v
 
 # L6
+L6_PCPS/Frame.v
+L6_PCPS/Rewriting.v
+L6_PCPS/PrototypeGenFrame.v
+L6_PCPS/Prototype.v
+L6_PCPS/MockExpr.v
+L6_PCPS/PrototypeTests.v
 L6_PCPS/Ensembles_util.v
 L6_PCPS/tactics.v
 L6_PCPS/List_util.v
@@ -125,6 +131,8 @@ L6_PCPS/cps.v
 L6_PCPS/ctx.v
 L6_PCPS/cps_util.v
 L6_PCPS/identifiers.v
+L6_PCPS/cps_proto.v
+L6_PCPS/proto_util.v
 L6_PCPS/rename.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
