@@ -19,9 +19,9 @@ Definition pipeline_CPS (p : Template.Ast.program) :=
   p <- compile_L2k p ;;
   p <- compile_L2k_eta p ;;
   p <- compile_L4 p ;;
-  p <- compile_L4_2 p ;;
-  p <- compile_L4_5 p ;;
-  p <- compile_L5 p ;;
+  (* p <- compile_L4_2 p ;; *)
+  (* p <- compile_L4_5 p ;; *)
+  (* p <- compile_L5 p ;; *)
   p <- compile_L6_CPS p ;;
   L6_trans p.
 
