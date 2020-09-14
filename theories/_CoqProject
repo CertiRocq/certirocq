@@ -164,14 +164,14 @@ L6_PCPS/closure_conversion_corresp.v
 L6_PCPS/shrink_cps.v
 L6_PCPS/shrink_cps_correct.v
 # L6_PCPS/scoping.v
-# L6_PCPS/shrink_cps_corresp.v
+L6_PCPS/shrink_cps_corresp.v
 L6_PCPS/uncurry.v
 # L6_PCPS/uncurry_correct.v
 # L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/dead_param_elim.v
 L6_PCPS/freshen.v
-# L6_PCPS/lambda_lifting_correct.v
+L6_PCPS/lambda_lifting_correct.v
 # L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/inline.v
 L6_PCPS/inline_correct.v
