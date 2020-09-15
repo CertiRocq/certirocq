@@ -98,16 +98,15 @@ L4_deBruijn/varInterface.v
 L4_deBruijn/variables.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
-L4_deBruijn/polyEval.v
-L4_deBruijn/L4_to_L4_1_to_L4_2.v
-L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
-L4_deBruijn/L4_5_to_L5.v
-L4_deBruijn/L4_2_to_L4_5.v
-
-#L4_deBruijn/L5a.v
 L4_deBruijn/toplevel.v
-#L4_deBruijn/instances.v
-#L4_deBruijn/linkableInstances.v
+# L4_deBruijn/polyEval.v
+# L4_deBruijn/L4_to_L4_1_to_L4_2.v
+# L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
+# L4_deBruijn/L4_5_to_L5.v
+# L4_deBruijn/L4_2_to_L4_5.v
+# L4_deBruijn/L5a.v
+# L4_deBruijn/instances.v
+# L4_deBruijn/linkableInstances.v
 
 # L5: CPS
 #L5_CPS/cpstrans.v
@@ -138,7 +137,7 @@ L6_PCPS/proto_util.v
 L6_PCPS/rename.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
-L6_PCPS/L5_to_L6.v
+# L6_PCPS/L5_to_L6.v
 L6_PCPS/cps_show.v
 L6_PCPS/state.v
 L6_PCPS/rel_comp.v
