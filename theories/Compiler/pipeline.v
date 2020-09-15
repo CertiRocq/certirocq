@@ -11,49 +11,27 @@ Require Import ExtLib.Structures.Monad.
 Import Monads.
 Import MonadNotation.
 
-(** * Compiler Pipeline *)
-
-(* NOTE : The ANF and CPS pipeline should be unified when we have the L4 -> L6 CPS translation *)
-Definition pipeline_CPS (p : global_context * term) :=
+(** * CertiCoq's Compilation Pipeline *)
+Definition CertiCoq_pipeline (p : global_context * term) :=
+  o <- get_options ;;
   p <- compile_L1g p ;;
   p <- compile_L2k p ;;
   p <- compile_L2k_eta p ;;
   p <- compile_L4 p ;;
-  (* p <- compile_L4_2 p ;; *)
-  (* p <- compile_L4_5 p ;; *)
-  (* p <- compile_L5 p ;; *)
-  p <- compile_L6_CPS p ;;
-  L6_trans p.
+  p <- (if direct o then compile_L6_ANF p else compile_L6_CPS p) ;; 
+  compile_L6 p.
 
-Definition pipeline_ANF (p : global_context * term) :=
-  p <- compile_L1g p ;;
-  p <- compile_L2k p ;;
-  p <- compile_L2k_eta p ;;
-  p <- compile_L4 p ;;
-  p <- compile_L6_ANF p ;;
-  L6_trans p.
-
-(* The main CertiCoq pipeline *)
+(** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
 Definition pipeline (p : Template.Ast.program) :=
-  o <- get_options ;;
   p <- erase_PCUIC p ;; 
-  p <- (if direct o then
-         pipeline_ANF p
-       else
-         pipeline_CPS p) ;;
+  p <- CertiCoq_pipeline p ;;
   compile_Clight p.
 
-(* After-erasure pipeline -- could be useful for using CertiCoq with custom erasure functions *)
+(** * After-erasure pipeline -- could be useful for using CertiCoq with custom erasure functions *)
 Definition lbox_pipeline (p : global_context * term) :=
-  o <- get_options ;;
-  p <- (if direct o then
-         pipeline_ANF p
-       else
-         pipeline_CPS p) ;;
+  p <- CertiCoq_pipeline p ;;
   compile_Clight p.
 
-(* TODO better notation for threading the program, maybe monad for
-   CertiCoq trans *)
 
 Definition default_opts : Options :=
   {| direct := false;
@@ -87,13 +65,10 @@ Definition printProg :=
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.
 
+(** * For compiling to λ_ANF and printing out the code *)
 Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
-  let ir_term := 
-      fun p =>
-        if direct opts then
-          (p <- erase_PCUIC p ;; pipeline_ANF p)
-        else
-          (p <- erase_PCUIC p ;; pipeline_CPS p)
+  let ir_term p := 
+      p <- erase_PCUIC p ;; CertiCoq_pipeline p
   in 
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
