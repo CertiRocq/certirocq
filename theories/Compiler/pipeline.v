@@ -14,7 +14,7 @@ Import MonadNotation.
 (** * Compiler Pipeline *)
 
 (* NOTE : The ANF and CPS pipeline should be unified when we have the L4 -> L6 CPS translation *)
-Definition pipeline_CPS (p : Template.Ast.program) :=
+Definition pipeline_CPS (p : global_context * term) :=
   p <- compile_L1g p ;;
   p <- compile_L2k p ;;
   p <- compile_L2k_eta p ;;
@@ -25,7 +25,7 @@ Definition pipeline_CPS (p : Template.Ast.program) :=
   p <- compile_L6_CPS p ;;
   L6_trans p.
 
-Definition pipeline_ANF (p : Template.Ast.program) :=
+Definition pipeline_ANF (p : global_context * term) :=
   p <- compile_L1g p ;;
   p <- compile_L2k p ;;
   p <- compile_L2k_eta p ;;
@@ -33,7 +33,18 @@ Definition pipeline_ANF (p : Template.Ast.program) :=
   p <- compile_L6_ANF p ;;
   L6_trans p.
 
+(* The main CertiCoq pipeline *)
 Definition pipeline (p : Template.Ast.program) :=
+  o <- get_options ;;
+  p <- erase_PCUIC p ;; 
+  p <- (if direct o then
+         pipeline_ANF p
+       else
+         pipeline_CPS p) ;;
+  compile_Clight p.
+
+(* After-erasure pipeline -- could be useful for using CertiCoq with custom erasure functions *)
+Definition lbox_pipeline (p : global_context * term) :=
   o <- get_options ;;
   p <- (if direct o then
          pipeline_ANF p
@@ -76,14 +87,15 @@ Definition printProg :=
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.
 
-
 Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
-  let (perr, log) :=
-      if direct opts then
-        run_pipeline _ _ opts p pipeline_ANF
-      else
-        run_pipeline _ _ opts p pipeline_CPS
-  in
+  let ir_term := 
+      fun p =>
+        if direct opts then
+          (p <- erase_PCUIC p ;; pipeline_ANF p)
+        else
+          (p <- erase_PCUIC p ;; pipeline_CPS p)
+  in 
+  let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
   | Ret p =>
     let '(pr, cenv, _, _, nenv, fenv, _,  e) := p in
@@ -91,7 +103,8 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
   | Err s => (Err s, log)
   end.
 
-
+Definition compile_lbox (opts : Options) (p : global_context * term) :=
+  run_pipeline _ _ opts p lbox_pipeline.
 
 (** * Glue Code *)
 
