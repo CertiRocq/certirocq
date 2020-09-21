@@ -40,6 +40,7 @@ Definition default_opts : Options :=
      show_anf := false;
      o_level := 0;
      time := false;
+     time_anf := false;
      debug := false;
      dev := 0;
      Pipeline_utils.prefix := "" |}.
@@ -47,13 +48,14 @@ Definition default_opts : Options :=
 Definition make_opts (cps : bool)
            (args : nat) (* number of C args *)
            (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
-           (o_level : nat) (time : bool) (debug : bool) (dev : nat) (prefix : string) : Options :=
+           (o_level : nat) (time : bool) (time_anf : bool) (debug : bool) (dev : nat) (prefix : string) : Options :=
   {| direct := negb cps;
      c_args := args;
      fv_args := args;
      show_anf := false;
      o_level := o_level;
      time := time;
+     time_anf := time_anf;
      debug := debug;
      dev := dev;
      Pipeline_utils.prefix := prefix |}.
