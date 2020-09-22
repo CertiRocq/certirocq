@@ -67,10 +67,25 @@ Definition printProg :=
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.
 
+(** * For debugging intermediate states of the λanf pipeline *)
+Definition CertiCoq_pipeline_debug (p : global_context * term) :=
+  o <- get_options ;;
+  p <- compile_L1g p ;;
+  p <- compile_L2k p ;;
+  p <- compile_L2k_eta p ;;
+  p <- compile_L4 p ;;
+  p <- (if direct o then compile_L6_ANF p else compile_L6_CPS p) ;; 
+  compile_L6_debug p.
+
+
 (** * For compiling to λ_ANF and printing out the code *)
 Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
-  let ir_term p := 
-      p <- erase_PCUIC p ;; CertiCoq_pipeline p
+  let ir_term p :=
+      o <- get_options ;;
+      if (dev o =? 3)%nat then 
+        p <- erase_PCUIC p ;; CertiCoq_pipeline_debug p
+      else
+        p <- erase_PCUIC p ;; CertiCoq_pipeline p
   in 
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
