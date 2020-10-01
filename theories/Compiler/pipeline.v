@@ -36,7 +36,7 @@ Definition lbox_pipeline (p : global_context * term) :=
 Definition default_opts : Options :=
   {| direct := false;
      c_args := 5;
-     fv_args := 5;
+     anf_conf := 0;
      show_anf := false;
      o_level := 0;
      time := false;
@@ -47,11 +47,11 @@ Definition default_opts : Options :=
 
 Definition make_opts (cps : bool)
            (args : nat) (* number of C args *)
-           (all_args : nat) (* do not add more fvs as args the number of original args and fvs exceeds all_args *)
+           (conf : nat)
            (o_level : nat) (time : bool) (time_anf : bool) (debug : bool) (dev : nat) (prefix : string) : Options :=
   {| direct := negb cps;
      c_args := args;
-     fv_args := args;
+     anf_conf := conf;
      show_anf := false;
      o_level := o_level;
      time := time;
