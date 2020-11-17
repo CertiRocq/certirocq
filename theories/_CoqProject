@@ -20,11 +20,6 @@ common/compM.v
 common/Pipeline_utils.v
 common/TermAbs_parametricity.v # need the parametricity plugin
 
-# L1
-# L1_QuotedCoq/term.v
-# L1_QuotedCoq/program.v
-# L1_QuotedCoq/L1.v
-
 # L1g
 L1g/compile.v
 L1g/term.v
@@ -37,26 +32,6 @@ L1g/L1g.v
 L1g/toplevel.v
 # L1g/instances.v
 
-# L2
-# L2_typeStripped/compile.v
-# L2_typeStripped/term.v
-# L2_typeStripped/program.v
-# L2_typeStripped/wcbvEval.v
-# L2_typeStripped/wNorm.v
-# L2_typeStripped/stripEvalCommute.v
-# L2_typeStripped/L2.v
-# L2_typeStripped/instances.v
-
-# L2d
-# L2d_flattenedApp/compile.v
-# L2d_flattenedApp/term.v
-# L2d_flattenedApp/program.v
-# L2d_flattenedApp/wcbvEval.v
-# L2d_flattenedApp/wNorm.v
-# L2d_flattenedApp/stripEvalCommute.v
-# L2d_flattenedApp/L2d.v
-# L2d_flattenedApp/instances.v
-
 # L2k
 L2k_noCnstrParams/compile.v
 L2k_noCnstrParams/term.v
@@ -68,25 +43,6 @@ L2k_noCnstrParams/L2k.v
 # L2k_noCnstrParams/instances.v
 L2k_noCnstrParams/toplevel.v
 
-# L2_5
-# L2_5_box/compile.v
-# L2_5_box/term.v
-# L2_5_box/program.v
-# L2_5_box/wcbvEval.v
-# L2_5_box/wNorm.v
-# L2_5_box/stripEvalCommute.v
-# L2_5_box/L2_5.v
-# L2_5_box/instances.v
-
-# L3
-# L3_flattenedApp/compile.v
-# L3_flattenedApp/term.v
-# L3_flattenedApp/program.v
-# L3_flattenedApp/wcbvEval.v
-# L3_flattenedApp/wNorm.v
-# L3_flattenedApp/unaryApplications.v
-# L3_flattenedApp/L3.v
-# L3_flattenedApp/instances.v
 
 # L4
 L4_deBruijn/expression.v
@@ -107,12 +63,6 @@ L4_deBruijn/toplevel.v
 # L4_deBruijn/L5a.v
 # L4_deBruijn/instances.v
 # L4_deBruijn/linkableInstances.v
-
-# L5: CPS
-#L5_CPS/cpstrans.v
-#L5_CPS/u_deBruijn.v
-#L5_CPS/k_deBruijn.v
-#L5_CPS/cpseval.v
 
 # L6
 L6_PCPS/Frame.v
@@ -154,7 +104,6 @@ L6_PCPS/alpha_conv.v
 L6_PCPS/hoisting.v
 L6_PCPS/inline_letapp.v
 L6_PCPS/closure_conversion.v
-# L6_PCPS/closure_conversion2.v
 L6_PCPS/closure_conversion_util.v
 L6_PCPS/closure_conversion_invariants.v
 L6_PCPS/closure_conversion_correct.v
@@ -182,25 +131,6 @@ L6_PCPS/inline.v
 L6_PCPS/inline_correct.v
 # L6_PCPS/instances.v
 L6_PCPS/toplevel.v
-
-# L6/Heap
-#L6_PCPS/Heap/heap.v
-#L6_PCPS/Heap/heap_impl.v
-#L6_PCPS/Heap/heap_defs.v
-#L6_PCPS/Heap/heap_equiv.v
-#L6_PCPS/Heap/GC.v
-#L6_PCPS/Heap/space_sem.v
-#L6_PCPS/Heap/cc_log_rel.v
-#L6_PCPS/Heap/log_rel_defs.v
-#L6_PCPS/Heap/log_rel_post_cc.v
-#L6_PCPS/Heap/compat.v
-#L6_PCPS/Heap/closure_conversion.v
-#L6_PCPS/Heap/closure_conversion_util.v
-#L6_PCPS/Heap/dead_param_elim_rel.v
-#L6_PCPS/Heap/bounds.v
-#L6_PCPS/Heap/invariants.v
-#L6_PCPS/Heap/closure_conversion_correct.v
-#L6_PCPS/Heap/toplevel.v
 
 # Compcert
 compcert/lib/Coqlib.v
