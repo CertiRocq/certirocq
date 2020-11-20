@@ -2,11 +2,13 @@
 
 
 # common
-common/classes.v
 common/exceptionMonad.v
 common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
+common/compM.v
+common/Pipeline_utils.v
+common/classes.v
 common/certiClasses.v
 common/certiClasses2.v
 common/certiClasses3.v
@@ -16,8 +18,6 @@ common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
 common/mapenv.v
-common/compM.v
-common/Pipeline_utils.v
 common/TermAbs_parametricity.v # need the parametricity plugin
 
 # L1g
@@ -30,7 +30,6 @@ L1g/wcbvEval.v
 L1g/wNorm.v
 L1g/L1g.v
 L1g/toplevel.v
-# L1g/instances.v
 
 # L2k
 L2k_noCnstrParams/compile.v
@@ -40,7 +39,6 @@ L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
 L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
-# L2k_noCnstrParams/instances.v
 L2k_noCnstrParams/toplevel.v
 
 
@@ -55,14 +53,6 @@ L4_deBruijn/variables.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/toplevel.v
-# L4_deBruijn/polyEval.v
-# L4_deBruijn/L4_to_L4_1_to_L4_2.v
-# L4_deBruijn/L4_to_L4_2_correct.v #need the parametricity plugin
-# L4_deBruijn/L4_5_to_L5.v
-# L4_deBruijn/L4_2_to_L4_5.v
-# L4_deBruijn/L5a.v
-# L4_deBruijn/instances.v
-# L4_deBruijn/linkableInstances.v
 
 # L6
 L6_PCPS/Frame.v
@@ -96,10 +86,8 @@ L6_PCPS/L4_to_L6.v
 L6_PCPS/stemctx.v
 L6_PCPS/env.v
 L6_PCPS/relations.v
-# L6_PCPS/tags.v
 L6_PCPS/logical_relations.v
 L6_PCPS/logical_relations_cc.v
-# L6_PCPS/ctx_approx.v
 L6_PCPS/alpha_conv.v
 L6_PCPS/hoisting.v
 L6_PCPS/inline_letapp.v
@@ -112,13 +100,11 @@ L6_PCPS/bounds.v
 L6_PCPS/shrink_cps.v
 L6_PCPS/shrink_cps_correct.v
 L6_PCPS/shrink_cps_toplevel.v
-# L6_PCPS/scoping.v
 L6_PCPS/shrink_cps_corresp.v
 L6_PCPS/uncurry.v
 L6_PCPS/uncurry_rel.v
 L6_PCPS/uncurry_proto.v
 L6_PCPS/uncurry_correct.v
-# L6_PCPS/L6_compose.v
 L6_PCPS/lambda_lifting.v
 L6_PCPS/dead_param_elim.v
 L6_PCPS/dead_param_elim_util.v
@@ -129,7 +115,6 @@ L6_PCPS/lambda_lifting_correct.v
 L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/inline.v
 L6_PCPS/inline_correct.v
-# L6_PCPS/instances.v
 L6_PCPS/toplevel.v
 
 # Compcert
