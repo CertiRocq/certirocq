@@ -41,38 +41,65 @@ Fixpoint find_prim_arrity (env : global_env) (pr : kername) : error nat :=
     else find_prim_arrity env pr
   end.
 
-Fixpoint find_prim_arrities (env : global_env) (prs : list (kername * string)) : error (list (kername * string * nat)) :=
+Fixpoint find_prim_arrities (env : global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
   match prs with
   | [] => Ret []
   | (pr, s) :: prs =>
     arr <- find_prim_arrity env pr ;;
     prs' <- find_prim_arrities env prs ;;
-    Ret ((pr, s, arr) :: prs')
+    Ret ((pr, s, arr, 1%positive) :: prs')
+  end.
+
+(* Picks an identifier for each primitive for internal representation *)
+Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * nat * positive))
+: (list (kername * string * nat * positive) * positive) :=
+  match prs with
+  | [] => ([], id)
+  | (pr, s, a, _) :: prs =>
+    let next_id := (id + 1)%positive in
+    let (prs', id') := pick_prim_ident next_id prs in
+    ((pr, s, a, id) :: prs', id')
   end.
 
 
-(** * CertiCoq's Compilation Pipeline *)
-
-Definition CertiCoq_pipeline (p : global_context * term) :=
+Definition register_prims (id : positive) (env : global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
   o <- get_options ;;
-  p <- compile_L1g p ;;
-  p <- compile_L2k p ;;
-  p <- compile_L2k_eta p ;;
-  p <- compile_L4 p ;;
-  p <- (if direct o then compile_L6_ANF p else compile_L6_CPS p) ;; 
-  compile_L6 p.
+  match find_prim_arrities env (prims o) with
+  | Ret prs =>
+    ret (pick_prim_ident id prs)
+  | Err s => failwith s
+  end.  
+  
+(** * CertiCoq's Compilation Pipeline, without code generation *)
+
+Section Pipeline.
+
+  Context (next_id : positive)
+          (prims : list (kername * string * nat * positive) * positive)
+          (debug : bool).
+  
+  Definition CertiCoq_pipeline (p : global_context * term) :=  
+    o <- get_options ;;
+    p <- compile_L1g p ;;
+    p <- compile_L2k p ;;
+    p <- compile_L2k_eta p ;;
+    p <- compile_L4 (* prims *) p ;;
+    p <- (if direct o then compile_L6_ANF next_id p else compile_L6_CPS next_id p) ;; 
+    if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
+    else compile_L6 next_id p.
+
+
+End Pipeline. 
+
+Let next_id := 10%positive.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
 
 Definition pipeline (p : Template.Ast.program) :=
+  let genv := fst p in
+  '(prs, next_id) <- register_prims next_id genv ;;
   p <- erase_PCUIC p ;; 
-  p <- CertiCoq_pipeline p ;;
-  compile_Clight p.
-
-(** * After-erasure pipeline -- could be useful for using CertiCoq with custom erasure functions *)
-
-Definition lbox_pipeline (p : global_context * term) :=
-  p <- CertiCoq_pipeline p ;;
+  p <- CertiCoq_pipeline next_id false p ;;
   compile_Clight p.
 
 
@@ -99,7 +126,7 @@ Definition make_opts
            (debug : bool)                          (* Debug log *)
            (dev : nat)                             (* Extra flag for development purposes *)
            (prefix : string)                       (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
-           (prims : list (kername * string * nat)) (* list of extracted constants *)
+           (prims : list (kername * string)) (* list of extracted constants *)
   : Options :=
   {| direct := negb cps;
      c_args := args;
@@ -120,27 +147,15 @@ Definition printProg :=
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.
 
-(** * For debugging intermediate states of the λanf pipeline *)
-
-Definition CertiCoq_pipeline_debug (p : global_context * term) :=
-  o <- get_options ;;
-  p <- compile_L1g p ;;
-  p <- compile_L2k p ;;
-  p <- compile_L2k_eta p ;;
-  p <- compile_L4 p ;;
-  p <- (if direct o then compile_L6_ANF p else compile_L6_CPS p) ;; 
-  compile_L6_debug p.
-
 
 (** * For compiling to λ_ANF and printing out the code *)
 
 Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
+  let genv := fst p in
   let ir_term p :=
       o <- get_options ;;
-      if (dev o =? 3)%nat then 
-        p <- erase_PCUIC p ;; CertiCoq_pipeline_debug p
-      else
-        p <- erase_PCUIC p ;; CertiCoq_pipeline p
+      (* The flag -dev 3 *)
+      p <- erase_PCUIC p ;; CertiCoq_pipeline next_id (dev o =? 3)%nat p
   in 
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
@@ -150,8 +165,6 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
   | Err s => (Err s, log)
   end.
 
-Definition compile_lbox (opts : Options) (prims : BasicAst.kername * string) (p : global_context * term) :=
-  run_pipeline _ _ opts p lbox_pipeline.
 
 (** * Glue Code *)
 
