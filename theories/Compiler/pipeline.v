@@ -75,7 +75,7 @@ Definition register_prims (id : positive) (env : global_env) : pipelineM (list (
 Section Pipeline.
 
   Context (next_id : positive)
-          (prims : list (kername * string * nat * positive) * positive)
+          (prims : list (kername * string * nat * positive))
           (debug : bool).
   
   Definition CertiCoq_pipeline (p : global_context * term) :=  
@@ -83,8 +83,8 @@ Section Pipeline.
     p <- compile_L1g p ;;
     p <- compile_L2k p ;;
     p <- compile_L2k_eta p ;;
-    p <- compile_L4 (* prims *) p ;;
-    p <- (if direct o then compile_L6_ANF next_id p else compile_L6_CPS next_id p) ;; 
+    p <- compile_L4 prims p ;;
+    p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;; 
     if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_L6 next_id p.
 
@@ -99,7 +99,7 @@ Definition pipeline (p : Template.Ast.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv ;;
   p <- erase_PCUIC p ;; 
-  p <- CertiCoq_pipeline next_id false p ;;
+  p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight p.
 
 
@@ -154,8 +154,9 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
   let genv := fst p in
   let ir_term p :=
       o <- get_options ;;
+      '(prims, next_id) <- register_prims next_id genv ;;
       (* The flag -dev 3 *)
-      p <- erase_PCUIC p ;; CertiCoq_pipeline next_id (dev o =? 3)%nat p
+      p <- erase_PCUIC p ;; CertiCoq_pipeline next_id prims (dev o =? 3)%nat p
   in 
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
