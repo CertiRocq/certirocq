@@ -105,7 +105,7 @@ Definition pipeline (p : Template.Ast.program) :=
   '(prs, next_id) <- register_prims next_id genv ;;
   p <- erase_PCUIC p ;; 
   p <- CertiCoq_pipeline next_id prs false p ;;
-  compile_Clight p.
+  compile_Clight prs p.
 
 
 Definition default_opts : Options :=
