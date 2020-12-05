@@ -13,6 +13,11 @@ Import Monads.
 Import MonadNotation.
 Import ListNotations.
 
+(* Axioms that are only realized in ocaml *)
+Axiom (print_Clight : Clight.program -> Datatypes.unit).
+Axiom (print_Clight_names_dest_imports : Clight.program -> list (positive * name) -> String.string -> list String.string -> Datatypes.unit).
+Axiom (print : String.string -> Datatypes.unit).
+
 (** * Constants realized in the target code *) 
 
 (* Each constant that is realized in the backend must have an associated arrity.
@@ -91,7 +96,7 @@ Section Pipeline.
 
 End Pipeline. 
 
-Let next_id := 10%positive.
+Let next_id := 100%positive.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
 
@@ -140,9 +145,6 @@ Definition make_opts
      Pipeline_utils.prefix := prefix;
      prims :=  prims |}.
 
-Definition printProg :=
-  fun prog file =>
-    L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.
