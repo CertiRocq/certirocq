@@ -1,4 +1,4 @@
--R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1_QuotedCoq CertiCoq.L1 -R L1g CertiCoq.L1g -R L2_typeStripped CertiCoq.L2  -R L2d_flattenedApp CertiCoq.L2d  -R L2k_noCnstrParams CertiCoq.L2k  -R L2_5_box CertiCoq.L2_5 -R L3_flattenedApp CertiCoq.L3 -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R compcert compcert
+-R Compiler CertiCoq.Compiler -R common CertiCoq.Common -R L1g CertiCoq.L1g -R L2k_noCnstrParams CertiCoq.L2k -R L4_deBruijn CertiCoq.L4 -R L6_PCPS CertiCoq.L6 -R ../libraries CertiCoq.Libraries -R L7 CertiCoq.L7 -R Glue CertiCoq.Glue -R Extraction CertiCoq.extraction -R Runtime CertiCoq.runtime -R compcert compcert
 
 
 # common
@@ -18,7 +18,6 @@ common/ExtLibMisc.v
 common/TermAbs.v
 common/references.v
 common/mapenv.v
-common/TermAbs_parametricity.v # need the parametricity plugin
 
 # L1g
 L1g/compile.v
