@@ -40,8 +40,6 @@ L4_deBruijn/exp_eval.v
 L4_deBruijn/L3_to_L3_eta.v
 L4_deBruijn/L3_eta_crct.v
 L4_deBruijn/L3_to_L3_eta_correct.v
-L4_deBruijn/varInterface.v
-L4_deBruijn/variables.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/toplevel.v
@@ -69,7 +67,6 @@ L6_PCPS/proto_util.v
 L6_PCPS/rename.v
 L6_PCPS/size_cps.v
 L6_PCPS/eval.v
-# L6_PCPS/L5_to_L6.v
 L6_PCPS/cps_show.v
 L6_PCPS/state.v
 L6_PCPS/rel_comp.v
@@ -192,7 +189,6 @@ compcert/exportclight/Clightdefs.v
 L7/tactics.v
 L7/L6_to_Clight.v
 L7/L6_to_Clight_stack.v
-L7/Clightexec.v
 L7/toplevel.v
 
 # Glue
@@ -201,10 +197,9 @@ Glue/glue.v
 Glue/ffi.v
 
 # Runtime
-Runtime/runtime.v
+# Runtime/runtime.v
 
 # Compiler
-#Compiler/allInstances.v
 Compiler/pipeline.v
 
 # Extraction
