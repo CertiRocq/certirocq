@@ -9,15 +9,8 @@ common/Common.v
 common/compM.v
 common/Pipeline_utils.v
 common/classes.v
-common/certiClasses.v
-common/certiClasses2.v
-common/certiClasses3.v
-common/certiClassesLinkable.v
-common/certiClassesLinkableExt.v
-common/ExtLibMisc.v
-common/TermAbs.v
-common/references.v
-common/mapenv.v
+# common/references.v
+# common/mapenv.v
 
 # L1g
 L1g/compile.v
