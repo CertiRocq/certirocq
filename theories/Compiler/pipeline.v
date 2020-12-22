@@ -167,26 +167,3 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
     (Ret (cps_show.show_exp nenv cenv false e), log)
   | Err s => (Err s, log)
   end.
-
-
-(** * Glue Code *)
-
-Definition make_glue (opts : Options) (globs : Template.Ast.global_env)
-  : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
-  match generate_glue opts globs with
-  | Ret (nenv, Some hdr, Some prg, logs) =>
-      Ret (nenv, hdr, prg, logs)
-  | Ret (nenv, _, _, logs) =>
-      Err "No Clight program generated"
-  | Err s => Err s
-  end.
-
-Definition make_ffi (opts : Options) (p : Template.Ast.program)
-  : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
-  match generate_ffi opts p with
-  | Ret (nenv, Some hdr, Some prg, logs) =>
-      Ret (nenv, hdr, prg, logs)
-  | Ret (nenv, _, _, logs) =>
-      Err "No Clight program generated"
-  | Err s => Err s
-  end.
