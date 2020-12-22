@@ -18,7 +18,7 @@ Axiom (print_Clight : Clight.program -> Datatypes.unit).
 Axiom (print_Clight_names_dest_imports : Clight.program -> list (positive * name) -> String.string -> list String.string -> Datatypes.unit).
 Axiom (print : String.string -> Datatypes.unit).
 
-(** * Constants realized in the target code *) 
+(** * Constants realized in the target code *)
 
 (* Each constant that is realized in the backend must have an associated arrity.
  * We find the arity of the extracted constant from its type in [global_env]
@@ -36,12 +36,12 @@ Fixpoint find_global_decl_arrity (gd : Ast.global_decl) : error nat :=
   | Ast.ConstantDecl bd => Ret (find_arrity (Ast.cst_type bd))
   | Ast.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
   end.
-    
+
 
 Fixpoint find_prim_arrity (env : global_env) (pr : kername) : error nat :=
   match env with
   | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
-  | (n, gd) :: env =>    
+  | (n, gd) :: env =>
     if eq_kername pr n then find_global_decl_arrity  gd
     else find_prim_arrity env pr
   end.
@@ -73,8 +73,8 @@ Definition register_prims (id : positive) (env : global_env) : pipelineM (list (
   | Ret prs =>
     ret (pick_prim_ident id prs)
   | Err s => failwith s
-  end.  
-  
+  end.
+
 (** * CertiCoq's Compilation Pipeline, without code generation *)
 
 Section Pipeline.
@@ -82,19 +82,19 @@ Section Pipeline.
   Context (next_id : positive)
           (prims : list (kername * string * nat * positive))
           (debug : bool).
-  
-  Definition CertiCoq_pipeline (p : global_context * term) :=  
+
+  Definition CertiCoq_pipeline (p : global_context * term) :=
     o <- get_options ;;
     p <- compile_L1g p ;;
     p <- compile_L2k p ;;
     p <- compile_L2k_eta p ;;
     p <- compile_L4 prims p ;;
-    p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;; 
+    p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
     if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_L6 next_id p.
 
 
-End Pipeline. 
+End Pipeline.
 
 Let next_id := 100%positive.
 
@@ -103,7 +103,7 @@ Let next_id := 100%positive.
 Definition pipeline (p : Template.Ast.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv ;;
-  p <- erase_PCUIC p ;; 
+  p <- erase_PCUIC p ;;
   p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
 
@@ -159,7 +159,7 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
       '(prims, next_id) <- register_prims next_id genv ;;
       (* The flag -dev 3 *)
       p <- erase_PCUIC p ;; CertiCoq_pipeline next_id prims (dev o =? 3)%nat p
-  in 
+  in
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
   | Ret p =>
@@ -171,9 +171,9 @@ Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string *
 
 (** * Glue Code *)
 
-Definition make_glue (opts : Options) (p : Template.Ast.program)
+Definition make_glue (opts : Options) (globs : Template.Ast.global_env)
   : error (cps_util.name_env * Clight.program * Clight.program * list string)  :=
-  match generate_glue opts p with
+  match generate_glue opts globs with
   | Ret (nenv, Some hdr, Some prg, logs) =>
       Ret (nenv, hdr, prg, logs)
   | Ret (nenv, _, _, logs) =>
