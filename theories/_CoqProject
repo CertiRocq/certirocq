@@ -77,6 +77,7 @@ L6_PCPS/env.v
 L6_PCPS/relations.v
 L6_PCPS/logical_relations.v
 L6_PCPS/logical_relations_cc.v
+L6_PCPS/exp_equiv.v
 L6_PCPS/alpha_conv.v
 L6_PCPS/hoisting.v
 L6_PCPS/inline_letapp.v
