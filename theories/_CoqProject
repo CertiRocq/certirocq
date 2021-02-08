@@ -36,7 +36,8 @@ L2k_noCnstrParams/toplevel.v
 
 # L4
 L4_deBruijn/expression.v
-L4_deBruijn/exp_eval.v
+L4_deBruijn/fuel_sem.v
+# L4_deBruijn/exp_eval.v
 L4_deBruijn/L3_to_L3_eta.v
 L4_deBruijn/L3_eta_crct.v
 L4_deBruijn/L3_to_L3_eta_correct.v
@@ -70,8 +71,10 @@ L6_PCPS/eval.v
 L6_PCPS/cps_show.v
 L6_PCPS/state.v
 L6_PCPS/rel_comp.v
-L6_PCPS/L4_to_L6_anf.v
 L6_PCPS/L4_to_L6.v
+L6_PCPS/L4_to_L6_util.v
+L6_PCPS/L4_to_L6_corresp.v
+L6_PCPS/L4_to_L6_correct.v
 L6_PCPS/stemctx.v
 L6_PCPS/env.v
 L6_PCPS/relations.v
