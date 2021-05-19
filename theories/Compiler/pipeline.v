@@ -27,7 +27,7 @@ Axiom (print : String.string -> Datatypes.unit).
 
 Fixpoint find_arrity (tau : Ast.term) : nat :=
   match tau with
-  | tProd na ty body => 1 + find_arrity body
+  | Ast.tProd na ty body => 1 + find_arrity body
   | _ => 0
   end.
 
@@ -38,7 +38,7 @@ Fixpoint find_global_decl_arrity (gd : Ast.global_decl) : error nat :=
   end.
 
 
-Fixpoint find_prim_arrity (env : global_env) (pr : kername) : error nat :=
+Fixpoint find_prim_arrity (env : Ast.global_env) (pr : kername) : error nat :=
   match env with
   | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
   | (n, gd) :: env =>
@@ -46,7 +46,7 @@ Fixpoint find_prim_arrity (env : global_env) (pr : kername) : error nat :=
     else find_prim_arrity env pr
   end.
 
-Fixpoint find_prim_arrities (env : global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
+Fixpoint find_prim_arrities (env : Ast.global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
   match prs with
   | [] => Ret []
   | (pr, s) :: prs =>
@@ -67,7 +67,7 @@ Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * nat * p
   end.
 
 
-Definition register_prims (id : positive) (env : global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
+Definition register_prims (id : positive) (env : Ast.global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
   o <- get_options ;;
   match find_prim_arrities env (prims o) with
   | Ret prs =>
