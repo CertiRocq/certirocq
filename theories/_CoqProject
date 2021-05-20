@@ -105,6 +105,7 @@ L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/inline.v
 L6_PCPS/inline_correct.v
 L6_PCPS/toplevel.v
+L6_PCPS/toplevel_theorems.v
 
 # Compcert
 compcert/lib/Coqlib.v

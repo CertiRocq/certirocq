@@ -31,7 +31,7 @@ Fixpoint find_arrity (tau : Ast.term) : nat :=
   | _ => 0
   end.
 
-Fixpoint find_global_decl_arrity (gd : Ast.global_decl) : error nat :=
+Definition find_global_decl_arrity (gd : Ast.global_decl) : error nat :=
   match gd with
   | Ast.ConstantDecl bd => Ret (find_arrity (Ast.cst_type bd))
   | Ast.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
@@ -96,7 +96,7 @@ Section Pipeline.
 
 End Pipeline.
 
-Let next_id := 100%positive.
+Definition next_id := 100%positive.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
 
