@@ -38,9 +38,6 @@ L2k_noCnstrParams/toplevel.v
 L4_deBruijn/expression.v
 L4_deBruijn/fuel_sem.v
 # L4_deBruijn/exp_eval.v
-L4_deBruijn/L3_to_L3_eta.v
-L4_deBruijn/L3_eta_crct.v
-L4_deBruijn/L3_to_L3_eta_correct.v
 L4_deBruijn/L3_to_L4.v
 L4_deBruijn/L3_to_L4_correct.v
 L4_deBruijn/toplevel.v
