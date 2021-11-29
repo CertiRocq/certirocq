@@ -31,14 +31,14 @@ Fixpoint find_arrity (tau : Ast.term) : nat :=
   | _ => 0
   end.
 
-Definition find_global_decl_arrity (gd : Ast.global_decl) : error nat :=
+Definition find_global_decl_arrity (gd : Ast.Env.global_decl) : error nat :=
   match gd with
-  | Ast.ConstantDecl bd => Ret (find_arrity (Ast.cst_type bd))
-  | Ast.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
+  | Ast.Env.ConstantDecl bd => Ret (find_arrity (Ast.Env.cst_type bd))
+  | Ast.Env.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
   end.
 
 
-Fixpoint find_prim_arrity (env : Ast.global_env) (pr : kername) : error nat :=
+Fixpoint find_prim_arrity (env : Ast.Env.global_env) (pr : kername) : error nat :=
   match env with
   | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
   | (n, gd) :: env =>
@@ -46,7 +46,7 @@ Fixpoint find_prim_arrity (env : Ast.global_env) (pr : kername) : error nat :=
     else find_prim_arrity env pr
   end.
 
-Fixpoint find_prim_arrities (env : Ast.global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
+Fixpoint find_prim_arrities (env : Ast.Env.global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
   match prs with
   | [] => Ret []
   | (pr, s) :: prs =>
@@ -67,7 +67,7 @@ Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * nat * p
   end.
 
 
-Definition register_prims (id : positive) (env : Ast.global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
+Definition register_prims (id : positive) (env : Ast.Env.global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
   o <- get_options ;;
   match find_prim_arrities env (prims o) with
   | Ret prs =>
@@ -87,7 +87,7 @@ Section Pipeline.
     o <- get_options ;;
     p <- compile_L1g p ;;
     p <- compile_L2k p ;;
-    p <- compile_L2k_eta p ;;
+    (* p <- compile_L2k_eta p ;; *)
     p <- compile_L4 prims p ;;
     p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
     if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
@@ -100,7 +100,7 @@ Definition next_id := 100%positive.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
 
-Definition pipeline (p : Template.Ast.program) :=
+Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv ;;
   p <- erase_PCUIC p ;;
@@ -146,13 +146,13 @@ Definition make_opts
      prims :=  prims |}.
 
 
-Definition compile (opts : Options) (p : Template.Ast.program) :=
+Definition compile (opts : Options) (p : Template.Ast.Env.program) :=
   run_pipeline _ _ opts p pipeline.
 
 
 (** * For compiling to λ_ANF and printing out the code *)
 
-Definition show_IR (opts : Options) (p : Template.Ast.program) : (error string * string) :=
+Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error string * string) :=
   let genv := fst p in
   let ir_term p :=
       o <- get_options ;;
