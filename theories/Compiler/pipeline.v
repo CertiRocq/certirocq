@@ -1,4 +1,4 @@
-Require Export L1g.toplevel L2k.toplevel L4.toplevel L6.toplevel L7.toplevel.
+Require Export L2k.toplevel L4.toplevel L6.toplevel L7.toplevel.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -38,7 +38,7 @@ Definition find_global_decl_arrity (gd : Ast.Env.global_decl) : error nat :=
   end.
 
 
-Fixpoint find_prim_arrity (env : Ast.Env.global_env) (pr : kername) : error nat :=
+Fixpoint find_prim_arrity (env : Ast.Env.global_declarations) (pr : kername) : error nat :=
   match env with
   | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
   | (n, gd) :: env =>
@@ -46,7 +46,7 @@ Fixpoint find_prim_arrity (env : Ast.Env.global_env) (pr : kername) : error nat 
     else find_prim_arrity env pr
   end.
 
-Fixpoint find_prim_arrities (env : Ast.Env.global_env) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
+Fixpoint find_prim_arrities (env : Ast.Env.global_declarations) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
   match prs with
   | [] => Ret []
   | (pr, s) :: prs =>
@@ -67,7 +67,7 @@ Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * nat * p
   end.
 
 
-Definition register_prims (id : positive) (env : Ast.Env.global_env) : pipelineM (list (kername * string * nat * positive) * positive) :=
+Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (kername * string * nat * positive) * positive) :=
   o <- get_options ;;
   match find_prim_arrities env (prims o) with
   | Ret prs =>
@@ -83,16 +83,15 @@ Section Pipeline.
           (prims : list (kername * string * nat * positive))
           (debug : bool).
 
-  Definition CertiCoq_pipeline (p : global_context * term) :=
+  Definition CertiCoq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
-    p <- compile_L1g p ;;
     p <- compile_L2k p ;;
     (* p <- compile_L2k_eta p ;; *)
     p <- compile_L4 prims p ;;
     p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
     if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_L6 next_id p.
-
+    
 
 End Pipeline.
 
@@ -102,11 +101,11 @@ Definition next_id := 100%positive.
 
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
-  '(prs, next_id) <- register_prims next_id genv ;;
-  p <- erase_PCUIC p ;;
-  p <- CertiCoq_pipeline next_id prs false p ;;
+  '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
+(*   p <- erase_PCUIC p ;;
+ *)  p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
-
+ 
 
 Definition default_opts : Options :=
   {| direct := false;
@@ -156,9 +155,9 @@ Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error stri
   let genv := fst p in
   let ir_term p :=
       o <- get_options ;;
-      '(prims, next_id) <- register_prims next_id genv ;;
+      '(prims, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
       (* The flag -dev 3 *)
-      p <- erase_PCUIC p ;; CertiCoq_pipeline next_id prims (dev o =? 3)%nat p
+      (* p <- erase_PCUIC p ;; *) CertiCoq_pipeline next_id prims (dev o =? 3)%nat p
   in
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
