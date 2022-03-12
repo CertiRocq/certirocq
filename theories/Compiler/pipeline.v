@@ -2,7 +2,7 @@ Require Export L2k.toplevel L4.toplevel L6.toplevel L7.toplevel.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
-Require Import String List.
+Require Import List.
 Require Import maps_util.
 Require Import Glue.glue.
 Require Import Glue.ffi.
