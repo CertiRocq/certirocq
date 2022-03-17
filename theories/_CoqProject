@@ -23,15 +23,15 @@ common/classes.v
 # common/mapenv.v
 
 # L1g
-L1g/compile.v
-L1g/term.v
-L1g/program.v
-L1g/wndEval.v
-L1g/WndEvalCorrect.v
-L1g/wcbvEval.v
-L1g/wNorm.v
-L1g/L1g.v
-L1g/toplevel.v
+# L1g/compile.v
+# L1g/term.v
+# L1g/program.v
+# L1g/wndEval.v
+# L1g/WndEvalCorrect.v
+# L1g/wcbvEval.v
+# L1g/wNorm.v
+# L1g/L1g.v
+# L1g/toplevel.v
 
 # L2k
 L2k_noCnstrParams/compile.v
@@ -39,7 +39,7 @@ L2k_noCnstrParams/term.v
 L2k_noCnstrParams/program.v
 L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
-L2k_noCnstrParams/stripEvalCommute.v
+# L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
 L2k_noCnstrParams/toplevel.v
 
