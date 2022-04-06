@@ -9,6 +9,7 @@
 -R Glue                 CertiCoq.Glue
 -R Extraction           CertiCoq.extraction
 -R Runtime              CertiCoq.runtime
+-R ExtractionVanilla    CertiCoq.extraction_vanilla
 
 
 # common
@@ -137,3 +138,4 @@ Compiler/pipeline.v
 
 # Extraction
 Extraction/extraction.v
+ExtractionVanilla/extraction.v
