@@ -40,7 +40,7 @@ L2k_noCnstrParams/term.v
 L2k_noCnstrParams/program.v
 L2k_noCnstrParams/wcbvEval.v
 L2k_noCnstrParams/wNorm.v
-# L2k_noCnstrParams/stripEvalCommute.v
+L2k_noCnstrParams/stripEvalCommute.v
 L2k_noCnstrParams/L2k.v
 L2k_noCnstrParams/toplevel.v
 
