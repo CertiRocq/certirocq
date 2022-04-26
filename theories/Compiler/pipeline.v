@@ -8,6 +8,7 @@ Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaCoq.Template.BasicAst.
+From MetaCoq.Template Require Import MCString.
 
 Import Monads.
 Import MonadNotation.
@@ -83,9 +84,28 @@ Section Pipeline.
           (prims : list (kername * string * nat * positive))
           (debug : bool).
 
+  Fixpoint find_axioms {T} acc (env : environ T) := 
+    match env with
+    | [] => acc
+    | (kn, d) :: decls => 
+      match d with
+      | ecTrm _ => find_axioms acc decls
+      | ecTyp 0 [] => find_axioms (kn :: acc) decls
+      | ecTyp _ _ => find_axioms acc decls
+      end 
+    end.
+
+  Definition check_axioms (p : Program (compile.Term)) : pipelineM Datatypes.unit :=
+    match find_axioms [] p.(env) with
+    | [] => ret tt 
+    | l => debug_msg ("Axioms found, use Extract Constants to realize them in C: " ++ newline ++
+      print_list string_of_kername ", " l)%bs
+    end.
+
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
     p <- compile_L2k p ;;
+    check_axioms p ;;
     (* p <- compile_L2k_eta p ;; *)
     p <- compile_L4 prims p ;;
     p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
