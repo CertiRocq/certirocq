@@ -47,28 +47,28 @@ Fixpoint find_prim_arrity (env : Ast.Env.global_declarations) (pr : kername) : e
     else find_prim_arrity env pr
   end.
 
-Fixpoint find_prim_arrities (env : Ast.Env.global_declarations) (prs : list (kername * string)) : error (list (kername * string * nat * positive)) :=
+Fixpoint find_prim_arrities (env : Ast.Env.global_declarations) (prs : list (kername * string * bool)) : error (list (kername * string * bool * nat * positive)) :=
   match prs with
   | [] => Ret []
-  | (pr, s) :: prs =>
+  | ((pr, s), b) :: prs =>
     arr <- find_prim_arrity env pr ;;
     prs' <- find_prim_arrities env prs ;;
-    Ret ((pr, s, arr, 1%positive) :: prs')
+    Ret ((pr, s, b, arr, 1%positive) :: prs')
   end.
 
 (* Picks an identifier for each primitive for internal representation *)
-Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * nat * positive))
-: (list (kername * string * nat * positive) * positive) :=
+Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * bool * nat * positive))
+: (list (kername * string * bool * nat * positive) * positive) :=
   match prs with
   | [] => ([], id)
-  | (pr, s, a, _) :: prs =>
+  | (pr, s, b, a, _) :: prs =>
     let next_id := (id + 1)%positive in
     let (prs', id') := pick_prim_ident next_id prs in
-    ((pr, s, a, id) :: prs', id')
+    ((pr, s, b, a, id) :: prs', id')
   end.
 
 
-Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (kername * string * nat * positive) * positive) :=
+Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (kername * string * bool * nat * positive) * positive) :=
   o <- get_options ;;
   match find_prim_arrities env (prims o) with
   | Ret prs =>
@@ -81,7 +81,7 @@ Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : 
 Section Pipeline.
 
   Context (next_id : positive)
-          (prims : list (kername * string * nat * positive))
+          (prims : list (kername * string * bool * nat * positive))
           (debug : bool).
 
   Fixpoint find_axioms {T} acc (env : environ T) := 
@@ -142,15 +142,15 @@ Definition default_opts : Options :=
   |}.
 
 Definition make_opts
-           (cps : bool)                            (* CPS or direct *)
-           (args : nat)                            (* number of C args *)
-           (conf : nat)                            (* λ_ANF configuration *)
-           (o_level : nat)                         (* optimization level *)
-           (time : bool) (time_anf : bool)         (* timing options *)
-           (debug : bool)                          (* Debug log *)
-           (dev : nat)                             (* Extra flag for development purposes *)
-           (prefix : string)                       (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
-           (prims : list (kername * string)) (* list of extracted constants *)
+           (cps : bool)                              (* CPS or direct *)
+           (args : nat)                              (* number of C args *)
+           (conf : nat)                              (* λ_ANF configuration *)
+           (o_level : nat)                           (* optimization level *)
+           (time : bool) (time_anf : bool)           (* timing options *)
+           (debug : bool)                            (* Debug log *)
+           (dev : nat)                               (* Extra flag for development purposes *)
+           (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
+           (prims : list (kername * string * bool))  (* list of extracted constants *)
   : Options :=
   {| direct := negb cps;
      c_args := args;
