@@ -106,7 +106,6 @@ Section Pipeline.
     o <- get_options ;;
     p <- compile_L2k p ;;
     check_axioms p ;;
-    (* p <- compile_L2k_eta p ;; *)
     p <- compile_L4 prims p ;;
     p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
     if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
