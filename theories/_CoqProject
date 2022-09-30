@@ -139,4 +139,6 @@ Compiler/pipeline.v
 
 # Extraction
 Extraction/extraction.v
+ExtractionVanilla/VanillaExtrOCamlInt63.v
+ExtractionVanilla/VanillaExtrOCamlFloats.v
 ExtractionVanilla/extraction.v
