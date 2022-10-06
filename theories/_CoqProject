@@ -71,6 +71,7 @@ L6_PCPS/cps.v
 L6_PCPS/ctx.v
 L6_PCPS/cps_util.v
 L6_PCPS/identifiers.v
+L6_PCPS/cps_proto_univ.v
 L6_PCPS/cps_proto.v
 L6_PCPS/proto_util.v
 L6_PCPS/rename.v
@@ -138,4 +139,6 @@ Compiler/pipeline.v
 
 # Extraction
 Extraction/extraction.v
+ExtractionVanilla/VanillaExtrOCamlInt63.v
+ExtractionVanilla/VanillaExtrOCamlFloats.v
 ExtractionVanilla/extraction.v

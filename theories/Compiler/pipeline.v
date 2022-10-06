@@ -21,39 +21,43 @@ Axiom (print : String.string -> Datatypes.unit).
 
 (** * Constants realized in the target code *)
 
-(* Each constant that is realized in the backend must have an associated arrity.
+(* Each constant that is realized in the backend must have an associated arity.
  * We find the arity of the extracted constant from its type in [global_env]
  * after reification. Assumes that the type is in some normal form.
  *)
 
-Fixpoint find_arrity (tau : Ast.term) : nat :=
+Fixpoint find_arity (tau : Ast.term) : nat :=
   match tau with
-  | Ast.tProd na ty body => 1 + find_arrity body
+  | Ast.tProd na ty body => 1 + find_arity body
   | _ => 0
   end.
 
-Definition find_global_decl_arrity (gd : Ast.Env.global_decl) : error nat :=
+Definition find_global_decl_arity (gd : Ast.Env.global_decl) : error nat :=
   match gd with
-  | Ast.Env.ConstantDecl bd => Ret (find_arrity (Ast.Env.cst_type bd))
+  | Ast.Env.ConstantDecl bd => Ret (find_arity (Ast.Env.cst_type bd))
   | Ast.Env.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
   end.
 
-
-Fixpoint find_prim_arrity (env : Ast.Env.global_declarations) (pr : kername) : error nat :=
+Fixpoint find_prim_arity (env : Ast.Env.global_declarations) (pr : kername) : error nat :=
   match env with
   | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
   | (n, gd) :: env =>
-    if eq_kername pr n then find_global_decl_arrity  gd
-    else find_prim_arrity env pr
+    if eq_kername pr n then find_global_decl_arity  gd
+    else find_prim_arity env pr
   end.
 
-Fixpoint find_prim_arrities (env : Ast.Env.global_declarations) (prs : list (kername * string * bool)) : error (list (kername * string * bool * nat * positive)) :=
+Fixpoint find_prim_arities (env : Ast.Env.global_declarations) (prs : list (kername * string * bool)) : error (list (kername * string * bool * nat * positive)) :=
   match prs with
   | [] => Ret []
   | ((pr, s), b) :: prs =>
-    arr <- find_prim_arrity env pr ;;
-    prs' <- find_prim_arrities env prs ;;
-    Ret ((pr, s, b, arr, 1%positive) :: prs')
+    match find_prim_arity env pr with
+    | Err _ => (* Be lenient, if a declared primitive is not part of the environment, just skip it *)
+      prs' <- find_prim_arities env prs ;;
+      Ret prs'
+    | Ret arity => 
+      prs' <- find_prim_arities env prs ;;
+      Ret ((pr, s, b, arity, 1%positive) :: prs')
+    end
   end.
 
 (* Picks an identifier for each primitive for internal representation *)
@@ -70,7 +74,7 @@ Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * bool * 
 
 Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (kername * string * bool * nat * positive) * positive) :=
   o <- get_options ;;
-  match find_prim_arrities env (prims o) with
+  match find_prim_arities env (prims o) with
   | Ret prs =>
     ret (pick_prim_ident id prs)
   | Err s => failwith s
@@ -90,7 +94,9 @@ Section Pipeline.
     | (kn, d) :: decls => 
       match d with
       | ecTrm _ => find_axioms acc decls
-      | ecTyp 0 [] => find_axioms (kn :: acc) decls
+      | ecTyp 0 [] => 
+        if List.find (fun prim => ReflectEq.eqb kn (fst (fst (fst (fst prim))))) prims then find_axioms acc decls
+        else find_axioms (kn :: acc) decls
       | ecTyp _ _ => find_axioms acc decls
       end 
     end.
@@ -98,7 +104,7 @@ Section Pipeline.
   Definition check_axioms (p : Program (compile.Term)) : pipelineM Datatypes.unit :=
     match find_axioms [] p.(env) with
     | [] => ret tt 
-    | l => debug_msg ("Axioms found, use Extract Constants to realize them in C: " ++ newline ++
+    | l => failwith ("Axioms found, use Extract Constant to realize them in C: " ++ newline ++
       print_list string_of_kername ", " l)%bs
     end.
 
