@@ -1,4 +1,4 @@
-Require Export L2k.toplevel L4.toplevel L6.toplevel L7.toplevel.
+Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -110,12 +110,12 @@ Section Pipeline.
 
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
-    p <- compile_L2k p ;;
+    p <- compile_LambdaBoxMut p ;;
     check_axioms p ;;
-    p <- compile_L4 prims p ;;
-    p <- (if direct o then compile_L6_ANF next_id prims p else compile_L6_CPS next_id prims p) ;;
-    if debug then compile_L6_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
-    else compile_L6 next_id p.
+    p <- compile_LambdaBoxLocal prims p ;;
+    p <- (if direct o then compile_LambdaANF_ANF next_id prims p else compile_LambdaANF_CPS next_id prims p) ;;
+    if debug then compile_LambdaANF_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
+    else compile_LambdaANF next_id p.
     
 
 End Pipeline.
