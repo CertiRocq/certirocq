@@ -8,7 +8,7 @@ Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaCoq.Common.BasicAst.
-From MetaCoq Require Import MCString.
+From MetaCoq.Utils Require Import MCString.
 
 Import Monads.
 Import MonadNotation.
