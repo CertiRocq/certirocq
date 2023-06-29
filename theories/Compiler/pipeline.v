@@ -7,8 +7,8 @@ Require Import maps_util.
 Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
-Require Import MetaCoq.Template.BasicAst.
-From MetaCoq.Template Require Import MCString.
+Require Import MetaCoq.Common.BasicAst.
+From MetaCoq.Utils Require Import MCString.
 
 Import Monads.
 Import MonadNotation.
