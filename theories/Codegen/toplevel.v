@@ -19,6 +19,7 @@ Definition heapInfIdent:positive := 95.
 Definition numArgsIdent:positive := 97.
 Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
+Definition resultIdent:positive := 93.
 
 Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
 Definition frameIdent:positive := 79. (* the stack frame of the current function *)
@@ -64,7 +65,7 @@ Definition Clight_trans_ANF (prims : list (kername * string * bool * nat * posit
   let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := LambdaANF_to_Clight_stack.compile
                      argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-                     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent resultIdent
                      args
                      pr_env
                      stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
