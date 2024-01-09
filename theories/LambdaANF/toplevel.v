@@ -137,12 +137,12 @@ Section IDENT.
     }.
 
 
-  Definition anf_trans : Type := exp -> comp_data -> error exp * comp_data. 
-
-
   Definition anf_state (A : Type) := comp_data -> error A * comp_data.
 
   
+  Definition anf_trans : Type := exp -> anf_state exp.
+
+
   Global Instance MonadState : Monad anf_state :=
     { ret A x := (fun c_data  => (Ret x, c_data));
       bind A B m f :=
