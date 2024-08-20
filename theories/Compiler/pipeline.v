@@ -110,7 +110,7 @@ Section Pipeline.
 
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
-    p <- compile_LambdaBoxMut o.(erasure_config) p ;;
+    p <- compile_LambdaBoxMut o.(erasure_config) o.(inductives_mapping) p ;;
     check_axioms p ;;
     p <- compile_LambdaBoxLocal prims p ;;
     p <- (if direct o then compile_LambdaANF_ANF next_id prims p else compile_LambdaANF_CPS next_id prims p) ;;
@@ -134,6 +134,7 @@ Definition pipeline (p : Template.Ast.Env.program) :=
 
 Definition default_opts : Options :=
   {| erasure_config := Erasure.default_erasure_config;
+     inductives_mapping := [];
      direct := false;
      c_args := 5;
      anf_conf := 0;
@@ -150,6 +151,7 @@ Definition default_opts : Options :=
 
 Definition make_opts
            (erasure_config : Erasure.erasure_configuration)
+           (im : EProgram.inductives_mapping)
            (cps : bool)                              (* CPS or direct *)
            (args : nat)                              (* number of C args *)
            (conf : nat)                              (* λ_ANF configuration *)
@@ -162,6 +164,7 @@ Definition make_opts
            (prims : list (kername * string * bool))  (* list of extracted constants *)
   : Options :=
   {| erasure_config := erasure_config; 
+     inductives_mapping := im;
      direct := negb cps;
      c_args := args;
      anf_conf := conf;
