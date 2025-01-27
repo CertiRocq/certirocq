@@ -7,7 +7,7 @@
 -R Codegen              CertiCoq.Codegen
 -R Glue                 CertiCoq.Glue
 -R Extraction           CertiCoq.extraction
--R Runtime              CertiCoq.runtime
+# -R Runtime              CertiCoq.runtime
 -R ExtractionVanilla    CertiCoq.extraction_vanilla
 
 
@@ -19,19 +19,6 @@ common/Common.v
 common/compM.v
 common/Pipeline_utils.v
 common/classes.v
-# common/references.v
-# common/mapenv.v
-
-# L1g
-# L1g/compile.v
-# L1g/term.v
-# L1g/program.v
-# L1g/wndEval.v
-# L1g/WndEvalCorrect.v
-# L1g/wcbvEval.v
-# L1g/wNorm.v
-# L1g/L1g.v
-# L1g/toplevel.v
 
 # Mutual-inductive lambda box
 LambdaBoxMut/compile.v
@@ -47,7 +34,6 @@ LambdaBoxMut/toplevel.v
 # Lamboda box without global definition envs
 LambdaBoxLocal/expression.v
 LambdaBoxLocal/fuel_sem.v
-# LambdaBoxLocal/exp_eval.v
 LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal.v
 LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal_correct.v
 LambdaBoxLocal/toplevel.v
@@ -58,7 +44,6 @@ LambdaANF/Rewriting.v
 LambdaANF/PrototypeGenFrame.v
 LambdaANF/Prototype.v
 LambdaANF/MockExpr.v
-LambdaANF/PrototypeTests.v
 LambdaANF/Ensembles_util.v
 LambdaANF/algebra.v
 LambdaANF/tactics.v
@@ -88,7 +73,6 @@ LambdaANF/env.v
 LambdaANF/relations.v
 LambdaANF/logical_relations.v
 LambdaANF/logical_relations_cc.v
-LambdaANF/exp_equiv.v
 LambdaANF/alpha_conv.v
 LambdaANF/hoisting.v
 LambdaANF/inline_letapp.v
@@ -129,9 +113,6 @@ Codegen/toplevel.v
 Glue/glue_utils.v
 Glue/glue.v
 Glue/ffi.v
-
-# Runtime
-# Runtime/runtime.v
 
 # Compiler
 Compiler/pipeline.v
