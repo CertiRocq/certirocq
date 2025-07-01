@@ -10,7 +10,7 @@ Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
-From MetaRocq.Utils Require Import MCString.
+From MetaRocq.Utils Require Import MRString.
 
 Import Monads.
 Import MonadNotation.
