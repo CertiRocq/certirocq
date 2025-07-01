@@ -5,6 +5,7 @@
 -R LambdaANF            CertiCoq.LambdaANF
 -R ../libraries         CertiCoq.Libraries
 -R Codegen              CertiCoq.Codegen
+-R CodegenWasm          CertiCoq.CodegenWasm
 -R Glue                 CertiCoq.Glue
 -R Extraction           CertiCoq.extraction
 # -R Runtime              CertiCoq.runtime
@@ -108,6 +109,18 @@ Codegen/tactics.v
 Codegen/LambdaANF_to_Clight.v
 Codegen/LambdaANF_to_Clight_stack.v
 Codegen/toplevel.v
+
+# CodegenWasm
+CodegenWasm/LambdaANF_to_Wasm_restrictions.v
+CodegenWasm/LambdaANF_to_Wasm_primitives.v
+CodegenWasm/LambdaANF_to_Wasm.v
+CodegenWasm/LambdaANF_to_Wasm_utils.v
+CodegenWasm/LambdaANF_to_Wasm_correct.v
+CodegenWasm/LambdaANF_to_Wasm_primitives_correct.v
+CodegenWasm/LambdaANF_to_Wasm_typing.v
+CodegenWasm/LambdaANF_to_Wasm_instantiation.v
+CodegenWasm/toplevel.v
+CodegenWasm/toplevel_theorem.v
 
 # Glue
 Glue/glue_utils.v

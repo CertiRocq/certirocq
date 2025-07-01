@@ -1,4 +1,6 @@
-Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel.
+From Wasm Require Import binary_format_printer.
+
+Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel CodegenWasm.toplevel.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -54,7 +56,7 @@ Fixpoint find_prim_arities (env : Ast.Env.global_declarations) (prs : list (kern
     | Err _ => (* Be lenient, if a declared primitive is not part of the environment, just skip it *)
       prs' <- find_prim_arities env prs ;;
       Ret prs'
-    | Ret arity => 
+    | Ret arity =>
       prs' <- find_prim_arities env prs ;;
       Ret ((pr, s, b, arity, 1%positive) :: prs')
     end
@@ -88,22 +90,22 @@ Section Pipeline.
           (prims : list (kername * string * bool * nat * positive))
           (debug : bool).
 
-  Fixpoint find_axioms {T} acc (env : environ T) := 
+  Fixpoint find_axioms {T} acc (env : environ T) :=
     match env with
     | [] => acc
-    | (kn, d) :: decls => 
+    | (kn, d) :: decls =>
       match d with
       | ecTrm _ => find_axioms acc decls
-      | ecTyp 0 [] => 
+      | ecTyp 0 [] =>
         if List.find (fun prim => ReflectEq.eqb kn (fst (fst (fst (fst prim))))) prims then find_axioms acc decls
         else find_axioms (kn :: acc) decls
       | ecTyp _ _ => find_axioms acc decls
-      end 
+      end
     end.
 
   Definition check_axioms (p : Program (compile.Term)) : pipelineM Datatypes.unit :=
     match find_axioms [] p.(env) with
-    | [] => ret tt 
+    | [] => ret tt
     | l => failwith ("Axioms found, use Extract Constant to realize them in C: " ++ newline ++
       print_list string_of_kername ", " l)%bs
     end.
@@ -116,7 +118,7 @@ Section Pipeline.
     p <- (if direct o then compile_LambdaANF_ANF next_id prims p else compile_LambdaANF_CPS next_id prims p) ;;
     if debug then compile_LambdaANF_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_LambdaANF next_id p.
-    
+
 
 End Pipeline.
 
@@ -130,7 +132,13 @@ Definition pipeline (p : Template.Ast.Env.program) :=
 (*   p <- erase_PCUIC p ;;
  *)  p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
- 
+
+Definition pipeline_Wasm (p : Template.Ast.Env.program) :=
+  let genv := fst p in
+  '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
+(*   p <- erase_PCUIC p ;;
+ *)  p <- CertiCoq_pipeline next_id prs false p ;;
+     compile_LambdaANF_to_Wasm prs p.
 
 Definition default_opts : Options :=
   {| erasure_config := Erasure.default_erasure_config;
@@ -198,5 +206,14 @@ Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error stri
   | Ret p =>
     let '(pr, cenv, _, _, nenv, fenv, _,  e) := p in
     (Ret (cps_show.show_exp nenv cenv false e), log)
+  | Err s => (Err s, log)
+  end.
+
+
+(** * For compiling lambda_ANF to Wasm *)
+Definition compile_Wasm (opts : Options) (p : Template.Ast.Env.program) : (error string * string) :=
+let (perr, log) := run_pipeline _ _ opts p pipeline_Wasm in
+  match perr with
+  | Ret p => (Ret (String.parse (binary_of_module p)), log)
   | Err s => (Err s, log)
   end.
