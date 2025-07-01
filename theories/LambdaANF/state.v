@@ -7,7 +7,7 @@ From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
      Sets.Ensembles micromega.Lia.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Import ListNotations Nnat MonadNotation.
 
 Require Import compcert.lib.Maps.
