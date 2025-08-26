@@ -216,7 +216,7 @@ Lemma store_preserves_INV (sr : store_record) : forall fr m addr off v,
   exists sr' m',
     smem sr' (f_inst fr) = Some m'
     /\ mem_length m = mem_length m'
-    /\ store m addr off (bits v) (length (bits v)) = Some m'
+    /\ store m addr off (serialise_num v) (length (serialise_num v)) = Some m'
     /\ smem_store sr (f_inst fr) addr off v (typeof_num v) = Some sr'
     /\ INV fenv nenv sr' fr
     /\ (forall a, (a + 4 <= (addr + off))%N -> load_i32 m a = load_i32 m' a)
@@ -232,8 +232,8 @@ Proof.
   destruct Hm0size as [Hmemsize [Hmemmaxsize Hsizebound]].
   assert (Hsrmem: lookup_N (s_mems sr) 0 = Some m)
       by now unfold smem in Hm; rewrite Hmeminst in Hm; cbn in Hm; destruct (s_mems sr).
-  assert (Hstore: exists m', store m addr off (bits v) (length (bits v)) = Some m')
-      by (destruct v; apply notNone_Some, enough_space_to_store; unfold_bits; cbn in *; lia).
+  assert (Hstore: exists m', store m addr off (serialise_num v) (length (serialise_num v)) = Some m').
+  { destruct v; apply notNone_Some, enough_space_to_store; cbn in *; unfold_serialise; cbn; lia. }
   destruct Hstore as [m' Hstore].
   remember (upd_s_mem sr (set_nth m' sr.(s_mems) (N.to_nat 0) m')) as sr'.
   assert (Hsmem_store : smem_store sr (f_inst fr) addr off v (typeof_num v) = Some sr'). {
@@ -241,12 +241,12 @@ Proof.
     destruct (s_mems sr). now cbn in Hsrmem.
     replace m1 with m in * by now cbn in *.
     cbn.
-    replace (ssrnat.nat_of_bin (tnum_length (typeof_num v))) with (Datatypes.length (bits v))
+    replace (ssrnat.nat_of_bin (tnum_length (typeof_num v))) with (Datatypes.length (serialise_num v))
          by now destruct v.
     now rewrite Hstore Heqsr'. }
   assert (Hmemlength': mem_length m = mem_length m'). {
     unfold store in Hstore.
-    destruct (addr + off + N.of_nat (Datatypes.length (bits v)) <=? mem_length m)%N=>//.
+    destruct (addr + off + N.of_nat (Datatypes.length (serialise_num v)) <=? mem_length m)%N=>//.
     now edestruct (write_bytes_meminst_preserve_type). }
   exists sr', m'; auto.
 
@@ -285,7 +285,7 @@ Proof.
   unfold smem_store in Hsmem_store.
   destruct (lookup_N (inst_mems (f_inst fr)) 0). 2: discriminate.
   destruct (lookup_N (s_mems sr) m1)=>//.
-  destruct (store m2 addr off (bits v) (ssrnat.nat_of_bin (tnum_length (typeof_num v))))=>//.
+  destruct (store m2 addr off (serialise_num v) (ssrnat.nat_of_bin (tnum_length (typeof_num v))))=>//.
   rewrite -Hmemlength'.
   by inv Hsmem_store.
 Qed.
@@ -320,11 +320,11 @@ Proof with eassumption.
   assert (8 + 8 <= page_size)%N as Hoff2 by now unfold page_size.
   assert (12 + 8 <= page_size)%N as Hoff3 by now unfold page_size.
   remember (VAL_int64 (Int64.repr res)) as res_val.
-  assert (HdesRes: wasm_deserialise (bits res_val) T_i64 = res_val) by now apply deserialise_bits; subst res_val.
+  assert (HdesRes: wasm_deserialise (serialise_num res_val) T_i64 = res_val) by now apply deserialise_serialise; subst res_val.
   remember (VAL_int32 (Int32.repr (Z.of_N gmp))) as res_addr.
-  assert (HdesResAddr: wasm_deserialise (bits res_addr) T_i32 = res_addr) by now apply deserialise_bits; subst res_addr.
+  assert (HdesResAddr: wasm_deserialise (serialise_num res_addr) T_i32 = res_addr) by now apply deserialise_serialise; subst res_addr.
   remember (VAL_int32 (Int32.repr (Z.of_N ord))) as ord_val.
-  assert (HdesOrd: wasm_deserialise (bits ord_val) T_i32 = ord_val) by now apply deserialise_bits; subst ord_val.
+  assert (HdesOrd: wasm_deserialise (serialise_num ord_val) T_i32 = ord_val) by now apply deserialise_serialise; subst ord_val.
   remember (VAL_int32 (Int32.repr (Z.of_N (gmp + 8)))) as ord_addr.
   remember (VAL_int32 (Int32.repr (Z.of_N (gmp + 12)))) as arg_addr.
   remember (VAL_num (VAL_int32 (N_to_i32 (gmp + 16)))) as newgmp.
@@ -1084,16 +1084,16 @@ Proof with eassumption.
   assert (16 + 8 <= page_size)%N as Hoff3 by now unfold page_size.
   assert (20 + 8 <= page_size)%N as Hoff4 by now unfold page_size.
   assert (24 + 8 <= page_size)%N as Hoff5 by now unfold page_size.
-  assert (Hdesp1: wasm_deserialise (bits (VAL_int64 (Int64.repr p1))) T_i64 = VAL_int64 (Int64.repr p1))
-      by now apply deserialise_bits.
-  assert (Hdesp2: wasm_deserialise (bits (VAL_int64 (Int64.repr p2))) T_i64 = VAL_int64 (Int64.repr p2))
-      by now apply deserialise_bits.
-  assert (Hdesp1Addr: wasm_deserialise (bits (VAL_int32 (N_to_i32 gmp))) T_i32 = VAL_int32 (N_to_i32 gmp))
-      by now apply deserialise_bits.
-  assert (Hdesp2Addr: wasm_deserialise (bits (VAL_int32 (N_to_i32 (gmp + 8)))) T_i32 = VAL_int32 (N_to_i32 (gmp + 8)))
-      by now apply deserialise_bits.
-  assert (HdesOrd: wasm_deserialise (bits (VAL_int32 (N_to_i32 pair_ord))) T_i32 = VAL_int32 (N_to_i32 pair_ord))
-      by now apply deserialise_bits.
+  assert (Hdesp1: wasm_deserialise (serialise_num (VAL_int64 (Int64.repr p1))) T_i64 = VAL_int64 (Int64.repr p1))
+      by now apply deserialise_serialise.
+  assert (Hdesp2: wasm_deserialise (serialise_num (VAL_int64 (Int64.repr p2))) T_i64 = VAL_int64 (Int64.repr p2))
+      by now apply deserialise_serialise.
+  assert (Hdesp1Addr: wasm_deserialise (serialise_num (VAL_int32 (N_to_i32 gmp))) T_i32 = VAL_int32 (N_to_i32 gmp))
+      by now apply deserialise_serialise.
+  assert (Hdesp2Addr: wasm_deserialise (serialise_num (VAL_int32 (N_to_i32 (gmp + 8)))) T_i32 = VAL_int32 (N_to_i32 (gmp + 8)))
+      by now apply deserialise_serialise.
+  assert (HdesOrd: wasm_deserialise (serialise_num (VAL_int32 (N_to_i32 pair_ord))) T_i32 = VAL_int32 (N_to_i32 pair_ord))
+      by now apply deserialise_serialise.
   (* Store p1 at gmp *)
   destruct (store_preserves_INV sr fr m gmp 0%N (VAL_int64 (Int64.repr p1)) HINV Hmem Hoff1 HenoughMem)
         as [sr1 [m1 [Hmem1 [Hmemlength1 [Hstore1 [Hsmem_store1 [HINV1 [Hpres32_1 [Hpres64_1 [Hsfs1 [HglobPres1 HenoughMem1]]]]]]]]]]].
@@ -1178,19 +1178,19 @@ Proof with eassumption.
   repeat (split; auto).
   - (* Load p1 *)
     rewrite <-Hpres64_5, <-Hpres64_4, <-Hpres64_3, <-Hpres64_2, <-Hdesp1; try lia.
-    eapply store_load_i64 with (m:=m); erewrite i64_val_8_bytes in *; eauto.
+    eapply store_load_i64 with (m:=m); auto.
   - (* Load p2 *)
     rewrite <-Hpres64_5, <-Hpres64_4, <-Hpres64_3, <-Hdesp2; try lia.
-    eapply store_load_i64 with (m:=m1); erewrite i64_val_8_bytes in *; rewrite store_offset_eq in Hstore2; eauto.
+    eapply store_load_i64 with (m:=m1); rewrite store_offset_eq in Hstore2; auto.
   - (* The ordinal can be loaded as an i32 from address gmp + 16 *)
     rewrite <-Hpres32_5, <-Hpres32_4, <-HdesOrd; try lia.
-    eapply store_load_i32 with (m:=m2); erewrite i32_val_4_bytes in *; rewrite store_offset_eq in Hstore3; eauto.
+    eapply store_load_i32 with (m:=m2); rewrite store_offset_eq in Hstore3; auto.
   - (* The address of the result (gmp) can be loaded from address gmp + 20 *)
     rewrite <-Hpres32_5, <-Hdesp1Addr; try lia.
-    apply store_load_i32 with (m:=m3); erewrite i32_val_4_bytes in *; rewrite store_offset_eq in Hstore4; eauto.
+    apply store_load_i32 with (m:=m3); rewrite store_offset_eq in Hstore4; eauto.
   - (* The address of the result (gmp) can be loaded from address gmp + 20 *)
     rewrite <-Hdesp2Addr; try lia.
-    apply store_load_i32 with (m:=m4); erewrite i32_val_4_bytes in *; rewrite store_offset_eq in Hstore5; eauto.
+    apply store_load_i32 with (m:=m4); rewrite store_offset_eq in Hstore5; eauto.
   - (* Functions in the store are preserved*)
     rewrite Hsfs1 Hsfs2 Hsfs3 Hsfs_4 Hsfs_5; eapply update_global_preserves_funcs; eassumption.
   - (* Length of memory is preserved *)
@@ -1937,10 +1937,10 @@ Proof.
   inv HprimRepr.
   { (* Unary operations *)
     assert (forall w, exists mem, store m (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) 0%N
-                                          (bits (VAL_int64 w)) 8 = Some mem)
+                                          (serialise_num (VAL_int64 w)) 8 = Some mem)
         as Htest. {
       intros. apply notNone_Some, enough_space_to_store. cbn.
-      rewrite length_bits_i64. cbn.
+      rewrite length_serialise_num_i64. cbn.
       rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
 
     rename H into Hrepr_arg1, H0 into Hrepr_primop.
@@ -2143,9 +2143,9 @@ Proof.
         assumption. assumption. lia. exists n0. lia.
         replace (smem sr' (f_inst fr)) with (smem s' (f_inst fr)) by now subst fr; eapply update_global_preserves_memory.
         now subst fr.
-        assert ((wasm_deserialise (bits (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_bits.
+        assert ((wasm_deserialise (serialise_num (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_serialise.
         rewrite -H0.
-        apply (store_load_i64 m m' gmp_v (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+        apply (store_load_i64 m m' gmp_v (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
         assert (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v) = gmp_v). {
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         rewrite -H1.
@@ -2179,14 +2179,14 @@ Proof.
           destruct Hex as [v' Hv'].
           rewrite Hv'.
           symmetry.
-          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         { intros a Ha.
           assert (Hex: exists v, load_i64 m a = Some v). {
             apply enough_space_to_load_i64. lia. }
           destruct Hex as [v' Hv'].
           rewrite Hv'. symmetry.
-          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
         }
         now subst fr. }
@@ -2368,11 +2368,11 @@ Proof.
   { (* Binary operations *)
     assert (forall w,
              exists mem, store m (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) 0%N
-                           (bits (VAL_int64 w))
+                           (serialise_num (VAL_int64 w))
                            8 = Some mem) as Htest. {
       intros.
       apply notNone_Some, enough_space_to_store. cbn.
-      rewrite length_bits_i64. cbn.
+      rewrite length_serialise_num_i64. cbn.
       rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
 
     (* TODO cleanup *)
@@ -2521,9 +2521,9 @@ Proof.
         assumption. assumption. lia. exists n0. lia.
         replace (smem sr' (f_inst fr)) with (smem s' (f_inst fr)) by now subst fr; eapply update_global_preserves_memory.
         now subst fr.
-        assert ((wasm_deserialise (bits (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_bits.
+        assert ((wasm_deserialise (serialise_num (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_serialise.
         rewrite -H4.
-        apply (store_load_i64 m m' gmp_v (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+        apply (store_load_i64 m m' gmp_v (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
         assert (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v) = gmp_v). {
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         rewrite -H5.
@@ -2557,14 +2557,14 @@ Proof.
           destruct Hex as [v' Hv'].
           rewrite Hv'.
           symmetry.
-          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         { intros a Ha.
           assert (Hex: exists v, load_i64 m a = Some v). {
             apply enough_space_to_load_i64. lia. }
           destruct Hex as [v' Hv'].
           rewrite Hv'. symmetry.
-          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
         }
         now subst fr. }
@@ -4701,11 +4701,11 @@ Proof.
     { (* addmuldiv *)
       assert (forall w,
                exists mem, store m (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) 0%N
-                           (bits (VAL_int64 w))
+                           (serialise_num (VAL_int64 w))
                            8 = Some mem) as Htest. {
       intros.
       apply notNone_Some, enough_space_to_store. cbn.
-      rewrite length_bits_i64. cbn.
+      rewrite length_serialise_num_i64. cbn.
       rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
 
     (* TODO cleanup *)
@@ -4853,9 +4853,9 @@ Proof.
         assumption. assumption. lia. exists n0. lia.
         replace (smem sr' (f_inst fr)) with (smem s' (f_inst fr)) by now subst fr; eapply update_global_preserves_memory.
         now subst fr.
-        assert ((wasm_deserialise (bits (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_bits.
+        assert ((wasm_deserialise (serialise_num (VAL_int64 (Z_to_i64 (to_Z n)))) T_i64) = (VAL_int64 (Z_to_i64 (to_Z n)))) by now apply deserialise_serialise.
         rewrite -H0.
-        apply (store_load_i64 m m' gmp_v (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+        apply (store_load_i64 m m' gmp_v (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
         assert (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v) = gmp_v). {
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         rewrite -H1.
@@ -4889,14 +4889,14 @@ Proof.
           destruct Hex as [v' Hv'].
           rewrite Hv'.
           symmetry.
-          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i32' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
         { intros a Ha.
           assert (Hex: exists v, load_i64 m a = Some v). {
             apply enough_space_to_load_i64. lia. }
           destruct Hex as [v' Hv'].
           rewrite Hv'. symmetry.
-          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (bits (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
+          apply (load_store_load_i64' m m' a (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) v' (serialise_num (VAL_int64 (Z_to_i64 (to_Z n))))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
         }
         now subst fr. }
