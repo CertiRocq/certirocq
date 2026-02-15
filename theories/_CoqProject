@@ -69,6 +69,7 @@ LambdaANF/LambdaBoxLocal_to_LambdaANF.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_util.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_corresp.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_correct.v
+LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v
