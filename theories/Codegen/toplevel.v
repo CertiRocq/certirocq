@@ -1,4 +1,4 @@
-From Coq Require Import ZArith. 
+From Stdlib Require Import ZArith.
 From CertiCoq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight Codegen.LambdaANF_to_Clight_stack.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -84,7 +84,7 @@ Definition compile_Clight (prims : list (kername * string * bool * nat * positiv
     opts <- get_options ;;
     let args := c_args opts in
     let cps := negb (direct opts) in
-    if cps then 
+    if cps then
       LiftErrorCertiCoqTrans "Codegen" (Clight_trans opts.(body_name) prims args) s
     else
       LiftErrorLogCertiCoqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
