@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   Program.Equality
   Logic.Decidable Lists.ListDec
   Relations.Relations Relations.Relation_Operators Lia
@@ -16,7 +16,7 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_primitives
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
-From MetaCoq Require Import Common.Kernames.
+From MetaRocq Require Import Common.Kernames.
 
 From compcert Require Import
   Coqlib common.Memory.
@@ -1598,7 +1598,7 @@ Proof with eassumption.
   have Hs2m := update_global_preserves_memory _ _ _ _ _ Hupd2. symmetry in Hs2m. rewrite Hs1m in Hs2m.
   assert (HINV2 : INV fenv nenv s2 fr). {
     eapply update_global_preserves_INV; eauto; cbn=>//. tauto. }
-  clear Hw. 
+  clear Hw.
 
   assert (sglob_val s0 (f_inst fr) glob_tmp1 = Some (VAL_num (VAL_int64 (Int64.repr xh0')))). {
     eapply update_global_get_other with (sr:=sr) (j:=glob_tmp2); eauto. discriminate. }

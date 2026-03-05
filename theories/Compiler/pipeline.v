@@ -2,15 +2,15 @@ From Wasm Require Import binary_format_printer.
 
 Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel CodegenWasm.toplevel.
 Require Import compcert.lib.Maps.
-Require Import ZArith.
+From Stdlib Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
-Require Import List.
+From Stdlib Require Import List.
 Require Import maps_util.
 Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
-Require Import MetaCoq.Common.BasicAst.
-From MetaCoq.Utils Require Import MCString.
+Require Import MetaRocq.Common.BasicAst.
+From MetaRocq.Utils Require Import MRString.
 
 Import Monads.
 Import MonadNotation.
@@ -124,7 +124,7 @@ End Pipeline.
 
 Definition next_id := 100%positive.
 
-(** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
+(** * The main CertiCoq pipeline, with MetaRocq's erasure and C-code generation *)
 
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
@@ -171,7 +171,7 @@ Definition make_opts
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
            (prims : list (kername * string * bool))  (* list of extracted constants *)
   : Options :=
-  {| erasure_config := erasure_config; 
+  {| erasure_config := erasure_config;
      inductives_mapping := im;
      direct := negb cps;
      c_args := args;
