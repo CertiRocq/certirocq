@@ -82,7 +82,7 @@ Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : 
   | Err s => failwith s
   end.
 
-(** * CertiCoq's Compilation Pipeline, without code generation *)
+(** * CertiRocq's Compilation Pipeline, without code generation *)
 
 Section Pipeline.
 
@@ -110,7 +110,7 @@ Section Pipeline.
       print_list string_of_kername ", " l)%bs
     end.
 
-  Definition CertiCoq_pipeline (p : Ast.Env.program) :=
+  Definition CertiRocq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
     p <- compile_LambdaBoxMut o.(erasure_config) o.(inductives_mapping) p ;;
     check_axioms p ;;
@@ -124,20 +124,20 @@ End Pipeline.
 
 Definition next_id := 100%positive.
 
-(** * The main CertiCoq pipeline, with MetaRocq's erasure and C-code generation *)
+(** * The main CertiRocq pipeline, with MetaRocq's erasure and C-code generation *)
 
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
 (*   p <- erase_PCUIC p ;;
- *)  p <- CertiCoq_pipeline next_id prs false p ;;
+ *)  p <- CertiRocq_pipeline next_id prs false p ;;
   compile_Clight prs p.
 
 Definition pipeline_Wasm (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
 (*   p <- erase_PCUIC p ;;
- *)  p <- CertiCoq_pipeline next_id prs false p ;;
+ *)  p <- CertiRocq_pipeline next_id prs false p ;;
      compile_LambdaANF_to_Wasm prs p.
 
 Definition default_opts : Options :=
@@ -199,7 +199,7 @@ Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error stri
       o <- get_options ;;
       '(prims, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
       (* The flag -dev 3 *)
-      (* p <- erase_PCUIC p ;; *) CertiCoq_pipeline next_id prims (dev o =? 3)%nat p
+      (* p <- erase_PCUIC p ;; *) CertiRocq_pipeline next_id prims (dev o =? 3)%nat p
   in
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with
