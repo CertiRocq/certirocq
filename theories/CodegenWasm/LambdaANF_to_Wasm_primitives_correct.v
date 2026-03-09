@@ -5,7 +5,7 @@ From Stdlib Require Import
   EqdepFacts
   List Nnat Uint63.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps
   LambdaANF.cps_util
   LambdaANF.eval

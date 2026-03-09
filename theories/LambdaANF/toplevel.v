@@ -1,11 +1,11 @@
 From Stdlib Require Import ZArith.
 Require Import Common.
-From CertiCoq Require Import
+From CertiRocq Require Import
      LambdaANF.cps LambdaANF.cps_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps LambdaANF.LambdaBoxLocal_to_LambdaANF
      LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
-From CertiCoq Require Import LambdaBoxLocal.toplevel.
-(* From CertiCoq.Codegen Require Import LambdaANF_to_Clight. *)
+From CertiRocq Require Import LambdaBoxLocal.toplevel.
+(* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
 
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -53,10 +53,10 @@ Section IDENT.
   Definition make_prim_env (prims : list (kername * string * bool * nat * positive)) : prim_env :=
     List.fold_left (fun map '(k, s, b, ar, p) => M.set p (k, s, b, ar) map) prims (M.empty _).
 
-  Definition compile_LambdaANF_CPS (prims : list (kername * string * bool * nat * positive)) : CertiCoqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_CPS (prims : list (kername * string * bool * nat * positive)) : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Translating from LambdaBoxLocal to LambdaANF (CPS)" ;;
-      LiftErrorCertiCoqTrans "LambdaANF CPS"
+      LiftErrorCertiRocqTrans "LambdaANF CPS"
                              (fun (p : toplevel.LambdaBoxLocalTerm) =>
                                 let prim_env := make_prim_env prims in
                                 match convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
@@ -66,10 +66,10 @@ Section IDENT.
                                 | (compM.Err s, _) => Err s
                                 end) src.
 
-  Definition compile_LambdaANF_ANF (prims : list (kername * string * bool * nat * positive)) : CertiCoqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_ANF (prims : list (kername * string * bool * nat * positive)) : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Translating from LambdaBoxLocal to LambdaANF (ANF)" ;;
-      LiftErrorCertiCoqTrans "LambdaANF ANF"
+      LiftErrorCertiRocqTrans "LambdaANF ANF"
                              (fun (p : toplevel.LambdaBoxLocalTerm) =>
                                 let prim_env := make_prim_env prims in
                                 match convert_top_anf prim_env fun_fun_tag default_ctor_tag default_ind_tag next_var p with
@@ -262,21 +262,21 @@ Section IDENT.
     |}.
 
 
-  Definition compile_LambdaANF : CertiCoqTrans LambdaANF_FullTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF : CertiRocqTrans LambdaANF_FullTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Compiling LambdaANF" ;;
       opts <- get_options ;;
       (* Make anf_options *)
       let anf_opts := make_anf_options opts in
-      LiftErrorLogCertiCoqTrans "LambdaANF Pipeline" (run_anf_pipeline anf_opts) src.
+      LiftErrorLogCertiRocqTrans "LambdaANF Pipeline" (run_anf_pipeline anf_opts) src.
 
 
-  Definition compile_LambdaANF_debug : CertiCoqTrans LambdaANF_FullTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_debug : CertiRocqTrans LambdaANF_FullTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Compiling LambdaANF" ;;
       opts <- get_options ;;
       (* Make anf_options *)
       let anf_opts := make_anf_options opts in
-      LiftErrorLogCertiCoqTrans "LambdaANF Pipeline" (run_anf_pipeline anf_opts) src.
+      LiftErrorLogCertiRocqTrans "LambdaANF Pipeline" (run_anf_pipeline anf_opts) src.
 
 End IDENT.
