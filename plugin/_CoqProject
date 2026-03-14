@@ -20,6 +20,7 @@ RocqMsgFFI.v
 PrimInt63.v
 PrimFloats.v
 PrimString.v
+GMP.v
 CertiRocq.v
 
 static/caml_nat.mli

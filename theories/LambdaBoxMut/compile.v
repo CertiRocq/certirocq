@@ -340,7 +340,7 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
 Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive :=
   trans_prim_val (existT _ primInt (primIntModel i)) => Some (existT _ AstCommon.primInt i) ;
   trans_prim_val (existT _ primFloat (primFloatModel i)) => Some (existT _ AstCommon.primFloat i) ;
-  trans_prim_val (existT _ primString _) => None ;
+  trans_prim_val (existT _ primString (primStringModel s)) => Some (existT _ AstCommon.primString s) ;
   trans_prim_val (existT _ primArray _) => None.
 
 Section LiftSize.

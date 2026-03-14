@@ -33,7 +33,7 @@ Set Implicit Arguments.
 Definition prim_flags :=
   {| has_primint := true;
      has_primfloat := true;
-     has_primstring := false ;
+     has_primstring := true ;
      has_primarray := false |}.
 
 (** Cofixpoints are not supported, Var and Evar don't actually appear
@@ -565,7 +565,6 @@ Proof.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
   - destruct p as [? []]; try constructor; eauto.
-    + simp trans_prim_val. cbn. now cbn in H.
     + simp trans_prim_val. cbn. now cbn in H.
   - specialize (H k H0). now eapply Crct_lift in H.
 Qed.

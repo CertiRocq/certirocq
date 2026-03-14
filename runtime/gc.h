@@ -1,5 +1,8 @@
 #include "values.h"
 
+#ifndef CERTIROCQ_GC_H
+#define CERTIROCQ_GC_H
+
 /* EXPLANATION OF THE CERTIROCQ GENERATIONAL GARBAGE COLLECTOR.
  Andrew W. Appel, September 2016
 
@@ -153,3 +156,5 @@ value* extract_answer(struct thread_info *ti);
 */
 
 void* export(struct thread_info *ti);
+
+#endif // CERTIROCQ_GC_H

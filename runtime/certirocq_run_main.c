@@ -7,6 +7,8 @@ extern void body(struct thread_info *);
 
 extern value args[];
 
+extern void init_gmp_alloc(struct thread_info *tinfo);
+
 int main(int argc, char *argv[]) {
   // value val;
   struct thread_info* tinfo;
@@ -15,6 +17,7 @@ int main(int argc, char *argv[]) {
 
   start = clock();
   tinfo = make_tinfo();
+  /* init_gmp_alloc(tinfo); */
   body(tinfo);
   end = clock();
 

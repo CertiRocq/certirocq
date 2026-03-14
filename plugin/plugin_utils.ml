@@ -26,6 +26,8 @@ type import =
     FromRelativePath of string
   | FromAbsolutePath of string
   | FromLibrary of string * string option
+  | LibraryPath of string
+  | Link of string
 
 let string_of_bytestring = caml_string_of_bytestring
 let bytestring_of_string = bytestring_of_caml_string

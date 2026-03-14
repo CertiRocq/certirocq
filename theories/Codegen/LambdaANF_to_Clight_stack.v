@@ -5,6 +5,64 @@ From Stdlib Require Import ZArith.ZArith
         Strings.String
         Lists.List Lia.
 Require Import List_util.
+From Stdlib Require PrimInt63 PrimString Uint63.
+Require Import List_util.
+
+Definition char_to_Z x := Uint63.to_Z x.
+Import ListNotations.
+Open Scope list_scope.
+
+(* Use the same byte-packing encoding as OCaml
+  https://ocaml.org/docs/memory-representation#string-values *)
+Fixpoint encode_list (l : list PrimString.char63) : list Z :=
+  match l with
+  | nil => [7 * two_power_pos 56]
+  | [ x ] =>
+      [6 * two_power_pos 56 + char_to_Z x]
+  | x :: y :: [] =>
+      [5 * two_power_pos 56 + char_to_Z x +
+      two_power_pos 8 * char_to_Z y]
+  | x :: y :: z :: [] =>
+      [4 * two_power_pos 56 + char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z]
+  | x :: y :: z :: w :: [] =>
+      [3 * two_power_pos 56 + char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z +
+      two_power_pos 24 * char_to_Z w]
+  | x :: y :: z :: w :: lx :: [] =>
+      [2 * two_power_pos 56 + char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z +
+      two_power_pos 24 * char_to_Z w +
+      two_power_pos 32 * char_to_Z lx]
+  | x :: y :: z :: w :: lx :: ly :: [] =>
+      [1 * two_power_pos 56 + char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z +
+      two_power_pos 24 * char_to_Z w +
+      two_power_pos 32 * char_to_Z lx +
+      two_power_pos 40 * char_to_Z ly]
+  | x :: y :: z :: w :: lx :: ly :: lz :: [] =>
+      [char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z +
+      two_power_pos 24 * char_to_Z w +
+      two_power_pos 32 * char_to_Z lx +
+      two_power_pos 40 * char_to_Z ly +
+      two_power_pos 48 * char_to_Z lz]
+  | x :: y :: z :: w :: lx :: ly :: lz :: lw :: l =>
+      (char_to_Z x +
+      two_power_pos 8 * char_to_Z y +
+      two_power_pos 16 * char_to_Z z +
+      two_power_pos 24 * char_to_Z w +
+      two_power_pos 32 * char_to_Z lx +
+      two_power_pos 40 * char_to_Z ly +
+      two_power_pos 48 * char_to_Z lz +
+      two_power_pos 56 * char_to_Z lw)
+      :: encode_list l
+  end%Z.
 
 Require Import ExtLib.Structures.Monads
         ExtLib.Data.Monads.OptionMonad
@@ -803,10 +861,25 @@ Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (
   Field(var x, -1) :::= tag ;
   *([floatPtr] (var x)) :::= Econst_float f floatType.
 
+Definition compile_string (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
+  (x : positive) (f : PrimString.string) :=
+  let len := Uint63.to_Z (PrimString.length f) in
+  let words := ((len / 8) + 1)%Z in
+  let tag := c_int (words * two_power_pos 10 + 252) (Tlong Unsigned noattr) in
+  x ::= [val] (allocPtr +' (c_int Z.one val)) ;
+  allocIdent ::= allocPtr +' (c_int (words + 1) val) ;
+  let acc := Field(var x, -1) :::= tag in
+  let l := PrimStringAxioms.to_list f in
+  MRList.fold_left_i
+    (fun acc i ch =>
+       acc ;
+       Field(var x, Z.of_nat i) :::= Econst_long (Int64.repr ch) (Tlong Unsigned noattr)) (encode_list l) acc.
+
 Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
   match projT1 p as tag return AstCommon.prim_value tag -> statement with
   | AstCommon.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
   | AstCommon.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
+  | AstCommon.primString => fun f => compile_string cenv ienv fenv map x f
   end (projT2 p).
 
 Section Translation.

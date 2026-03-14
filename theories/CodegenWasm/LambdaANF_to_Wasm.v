@@ -236,6 +236,7 @@ Definition translate_primitive_value (p : AstCommon.primitive) : error Wasm_int.
   match projT1 p as tag return prim_value tag -> error Wasm_int.Int64.T with
   | AstCommon.primInt => fun i => Ret (Wasm_int.Int64.repr (Uint63.to_Z i))
   | AstCommon.primFloat => fun f => Err "Extraction of floats to Wasm not yet supported"
+  | AstCommon.primString => fun f => Err "Extraction of strings to Wasm not yet supported"
   end (projT2 p).
 
 

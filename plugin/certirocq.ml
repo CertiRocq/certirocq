@@ -164,7 +164,7 @@ let get_global_inductives_constant_mapping () = !global_inductive_constant_regis
 type certirocq_run_function = unit -> Obj.t
 
 let certirocq_run_functions =
-  Summary.ref ~name:"CertiRocq Run Functions Table"
+  Summary.ref ~local:true ~name:"CertiRocq Run Functions Table"
     (CString.Map.empty : certirocq_run_function CString.Map.t)
 
 let certirocq_run_functions_name = "certirocq-run-functions-registration"
@@ -179,18 +179,17 @@ let cache_certirocq_run_function (s, s', fn) =
 let certirocq_run_function_input =
   let open Libobject in
   declare_object
-    (global_object_nodischarge certirocq_run_functions_name
-    ~cache:(fun r -> cache_certirocq_run_function r)
-    ~subst:None)
+    (local_object_nodischarge certirocq_run_functions_name
+    ~cache:(fun r -> cache_certirocq_run_function r))
 
 let register_certirocq_run s s' fn =
-  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run");
+  (* Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run"); *)
   Lib.add_leaf (certirocq_run_function_input (s, s', fn))
 
 let exists_certirocq_run s =
-  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions");
+  (* Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions"); *)
   let res = CString.Map.find_opt s !certirocq_run_functions in
-  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
+  (* if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found"); *)
   res
 
 let run_certirocq_run s =
@@ -408,9 +407,11 @@ module MLCompiler : CompilerInterface with
   type name_env = BasicAst.name Cps.M.t
   let compile = Pipeline.compile
   let printProg prog names (dest : string) (imports : import list) =
-    let imports' = List.map (fun i -> match i with
-      | FromRelativePath s -> "#include \"" ^ s ^ "\""
-      | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
+    let imports' = List.filter_map (fun i -> match i with
+      | FromRelativePath s -> Some ("#include \"" ^ s ^ "\"")
+      | FromLibrary (s, _) -> Some ("#include <" ^ s ^ ">")
+      | LibraryPath _ -> None
+      | Link _ -> None
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
@@ -618,6 +619,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | LibraryPath s -> ["-L"; s]
+        | Link s -> ["-l" ^ s]
         | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
       let l = make_rt_file "certirocq_run_main.o" :: imports' in
       String.concat " " l
@@ -784,6 +787,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Constr.mkFloat (Obj.magic v)
       else if Environ.is_int63_type env c then
         Constr.mkInt (Obj.magic v)
+      else if Environ.is_string_type env c then
+        Constr.mkString (Obj.magic v)
       else CErrors.user_err Pp.(str "Unsupported primitive type in CertiRocq reification")
     in aux ty v
 
@@ -849,6 +854,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | Link s -> ["-cclib"; "-l" ^ s]
+        | LibraryPath s -> ["-cclib"; "-L"; "-cclib"; s]
         | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
         | FromLibrary (s, None) -> [make_rt_file (oname s)]) imports) in
       let l = imports' in
@@ -884,10 +891,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     name_rec s
 
   let find_fresh s map =
-    Feedback.msg_debug Pp.(str "Looking for fresh " ++ str s ++ str " in " ++ prlist_with_sep spc str (CString.Set.elements map));
-    let freshs = next_string_away_from s (fun s -> CString.Set.mem s map) in
-    Feedback.msg_debug Pp.(str "Found " ++ str freshs);
-    freshs
+    next_string_away_from s (fun s -> CString.Set.mem s map)
 
   let toplevel_name_of_filename s =
     let comps = CString.split_on_char '.' s in

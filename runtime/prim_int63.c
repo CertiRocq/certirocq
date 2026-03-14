@@ -47,6 +47,22 @@ primint prim_int63_div(primint x, primint y)
   else return (Val_long (Unsigned_long_val(x) / Unsigned_long_val(y)));
 }
 
+primint prim_int63_mods(primint x, primint y)
+{
+  // trace("Calling prim_int63_mod\n");
+  signed long long yr = Long_val(y);
+  if (yr == 0) return x;
+  else return (Val_long (Unsigned_long_val(x) % Unsigned_long_val(y)));
+}
+
+primint prim_int63_divs(primint x, primint y)
+{
+  // trace("Calling prim_int63_div\n");
+  signed long long yr = Long_val(y);
+  if (yr == 0) return Val_long(0);
+  else return (Val_long (Long_val(x) / yr));
+}
+
 primint prim_int63_land(primint x, primint y)
 { 
   unsigned long long xr = Unsigned_long_val(x);
@@ -82,12 +98,10 @@ primint prim_int63_asr(primint x, primint y)
 
 primint prim_int63_lor(primint x, primint y)
 { 
-  trace("Calling prim_int63_lor\n");
   return (Val_long (Unsigned_long_val(x) | Unsigned_long_val(y)));
 }
 primint prim_int63_lxor(primint x, primint y)
 {
-  trace("Calling prim_int63_lxor\n");
   return (Val_long (Unsigned_long_val(x) ^ Unsigned_long_val(y)));
 }
 
@@ -139,10 +153,23 @@ primbool prim_int63_leb(primint x, primint y)
   trace("Calling prim_int63_leb\n");
   return (mk_bool (x <= y));
 }
+
+// Beware, the fact is is an arithmetic right shift is implementation dependent
+#define SLong_val(x) ((signed long long)(x) >> 1)
+primbool prim_int63_lesb(primint x, primint y)
+{
+  trace("Calling prim_int63_leb\n");
+  return (mk_bool (SLong_val(x) <= SLong_val(y)));
+}
 primbool prim_int63_ltb(primint x, primint y)
 {
   trace("Calling prim_int63_ltb\n");
   return (mk_bool (x < y));
+}
+primbool prim_int63_ltsb(primint x, primint y)
+{
+  trace("Calling prim_int63_ltsb\n");
+  return (mk_bool (SLong_val(x) < SLong_val(y)));
 }
 
 value prim_int63_compare(primint x, primint y)
@@ -152,6 +179,18 @@ value prim_int63_compare(primint x, primint y)
   register signed long long result = xr - yr;
   trace("Calling prim_int63_compare\n");
   trace("Calling prim_int63_compare on %llu and %llu: %lli \n", xr, yr, result);
+  if (result == 0) return 1;
+  else if (result < 0) return 3;
+  else return 5;
+}
+
+primbool prim_int63_compares(primint x, primint y)
+{
+  register signed long long xr = SLong_val(x);
+  register signed long long yr = SLong_val(y);
+  register signed long long result = xr - yr;
+  trace("Calling prim_int63_compares\n");
+  trace("Calling prim_int63_compares on %llu and %llu: %lli \n", xr, yr, result);
   if (result == 0) return 1;
   else if (result < 0) return 3;
   else return 5;

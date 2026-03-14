@@ -1,7 +1,10 @@
+
 type import =
     FromRelativePath of string
   | FromAbsolutePath of string
   | FromLibrary of string * string option
+  | LibraryPath of string
+  | Link of string
 
 val string_of_bytestring : Bytestring.String.t -> string
 

@@ -561,13 +561,14 @@ From Equations Require Import Equations.
 From MetaRocq.Erasure Require Import EPrimitive.
 
 Variant prim_tag : Set :=
-  | primInt | primFloat.
+  | primInt | primFloat | primString.
 Derive NoConfusion for prim_tag.
 
 Definition prim_value (p : prim_tag) : Set :=
  match p with
  | primInt => Uint63.int
  | primFloat => PrimFloat.float
+ | primString => PrimString.string
  end.
 
 Definition primitive : Set := { tag : prim_tag & prim_value tag }.
@@ -590,12 +591,14 @@ Definition string_of_prim (p : primitive) :=
   match projT1 p as tag return prim_value tag -> string with
   | primInt => Show.string_of_prim_int
   | primFloat => string_of_float
+  | primString => show
   end (projT2 p).
 
 Equations eqb_prim (p q : primitive) : bool :=
-  | (existT _ primInt i), (existT _ primInt i') := ReflectEq.eqb i i'
-  | (existT _ primFloat i), (existT _ primFloat i') := ReflectEq.eqb i i'
-  | _, _ => false.
+| (existT _ primInt i), (existT _ primInt i') := ReflectEq.eqb i i'
+| (existT _ primFloat i), (existT _ primFloat i') := ReflectEq.eqb i i'
+| (existT _ primString i), (existT _ primString i') := ReflectEq.eqb i i'
+| _, _ => false.
 Transparent eqb_prim.
 
 #[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive :=

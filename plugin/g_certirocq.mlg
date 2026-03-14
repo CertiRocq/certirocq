@@ -64,6 +64,9 @@ let constant_of_qualid ~loc (gr : Libnames.qualid) : Kernames.kername =
   | Kernames.IndRef(i) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found an inductive.")
   | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found a constructor.")
 
+let goal_counter = ref 0
+let next_goal () = let r = !goal_counter in incr goal_counter; r
+
 }
 
 ARGUMENT EXTEND cargs
@@ -110,6 +113,8 @@ END
 VERNAC ARGUMENT EXTEND cinclude
 | [ string(str) ] -> { FromRelativePath str }
 | [ "Library" string(str) string_opt(str') ] -> { FromLibrary (str, str') }
+| [ "LibraryPath" string(str) ] -> { LibraryPath str }
+| [ "Link" string(str) ] -> { Link str }
 | [ "Absolute" string(str) ] -> { FromAbsolutePath str }
 END
 
@@ -217,8 +222,9 @@ TACTIC EXTEND CertiRocq_eval
     Proofview.Goal.enter begin fun gl ->
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
-      let opts = Certirocq.make_options l [] "goal" in
-      let opts = Certirocq.{ opts with toplevel_name = "goal" } in
+      let goal = "goal" ^ string_of_int (next_goal ()) in
+      let opts = Certirocq.make_options l [] goal in
+      let opts = Certirocq.{ opts with toplevel_name = goal } in
       let c' = Certirocq.eval ~opaque_access:Library.indirect_accessor opts env sigma c [] in
       ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
   end }
