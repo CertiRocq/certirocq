@@ -225,7 +225,12 @@ Section Translate.
                  c')
 
         | EAst.tPrim p =>
-          failwith "Primitive values not yet supported in direct CPS"
+          match trans_prim_val p with
+          | Some pv =>
+            x <- get_named_str "prim" ;;
+            ret (Eprim_val x pv (Eapp k kon_tag (x :: nil)))
+          | None => failwith "Unsupported primitive type (arrays)"
+          end
 
         (* These should not occur *)
         | EAst.tVar _ => failwith "Var"

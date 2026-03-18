@@ -245,7 +245,12 @@ Section Translate.
           ret (y, comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
 
         | EAst.tPrim p =>
-          failwith "Primitive values not yet supported in direct ANF"
+          match trans_prim_val p with
+          | Some pv =>
+            x <- get_named_str "y"%bs ;;
+            ret (x, Eprim_val_c x pv Hole_c)
+          | None => failwith "Unsupported primitive type (arrays)"
+          end
 
         (* These should not occur *)
         | EAst.tVar _ => failwith "Var"
@@ -257,6 +262,189 @@ Section Translate.
 
     End Convert.
 
+
+    (** ** Declarative definition of ANF conversion used in proofs *)
+
+    Section RelationalSpec.
+
+      Context (tgm : conId_map).
+      Context (cmap : const_map).
+
+      Inductive anf_cvt_rel : Ensemble var -> (* Input fresh identifiers *)
+                              EAst.term ->    (* Input EAst term *)
+                              list var ->     (* de Bruijn index map *)
+                              Ensemble var -> (* Output fresh identifiers *)
+                              exp_ctx ->      (* ANF binding context *)
+                              var ->          (* Result variable *)
+                              Prop :=
+      | anf_Rel :
+          forall S v vn n,
+            nth_error vn n = Some v ->
+            anf_cvt_rel S (EAst.tRel n) vn S Hole_c v
+      | anf_Lam :
+          forall S S' na e1 C1 r1 x1 f vn,
+            x1 \in S ->
+            f \in (S \\ [set x1]) ->
+            anf_cvt_rel (S \\ [set x1] \\ [set f]) e1 (x1::vn) S' C1 r1 ->
+            anf_cvt_rel S
+                        (EAst.tLambda na e1)
+                        vn
+                        S'
+                        (Efun1_c (Fcons f func_tag [x1] (C1 |[ Ehalt r1 ]|) Fnil) Hole_c)
+                        f
+      | anf_App :
+          forall S1 S2 S3 u C1 x1 v C2 x2 r vn,
+            anf_cvt_rel S1 u vn S2 C1 x1 ->
+            anf_cvt_rel S2 v vn S3 C2 x2 ->
+            r \in S3 ->
+            anf_cvt_rel S1
+                        (EAst.tApp u v)
+                        vn
+                        (S3 \\ [set r])
+                        (comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)))
+                        r
+      | anf_Construct :
+          forall S1 S2 c_tag ind c args C xs x vn,
+            c_tag = dcon_to_tag default_tag (dcon_of_con ind c) tgm ->
+            x \in S1 ->
+            anf_cvt_rel_args (S1 \\ [set x]) args vn S2 C xs ->
+            anf_cvt_rel S1
+                        (EAst.tConstruct ind c args)
+                        vn
+                        S2
+                        (comp_ctx_f C (Econstr_c x c_tag xs Hole_c))
+                        x
+      | anf_LetIn :
+          forall S1 S2 S3 na b t C1 x1 C2 x2 vn,
+            anf_cvt_rel S1 b vn S2 C1 x1 ->
+            anf_cvt_rel S2 t (x1::vn) S3 C2 x2 ->
+            anf_cvt_rel S1
+                        (EAst.tLetIn na b t)
+                        vn
+                        S3
+                        (comp_ctx_f C1 C2)
+                        x2
+      | anf_Case :
+          forall S1 S2 S3 ind npars mch C1 x1 brs pats f y r vn,
+            f \in S1 ->
+            y \in (S1 \\ [set f]) ->
+            anf_cvt_rel (S1 \\ [set f] \\ [set y]) mch vn S2 C1 x1 ->
+            anf_cvt_rel_branches S2 ind brs 0%N vn y S3 pats ->
+            r \in S3 ->
+            anf_cvt_rel S1
+                        (EAst.tCase (ind, npars) mch brs)
+                        vn
+                        (S3 \\ [set r])
+                        (Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil)
+                                 (comp_ctx_f C1 (Eletapp_c r f func_tag [x1] Hole_c)))
+                        r
+      | anf_Fix :
+          forall S1 S2 mfix idx f fnames vn fdefs,
+            FromList fnames \subset S1 ->
+            NoDup fnames ->
+            List.length fnames = List.length mfix ->
+            anf_cvt_rel_mfix (S1 \\ (FromList fnames)) mfix (List.rev fnames ++ vn) fnames S2 fdefs ->
+            nth_error fnames idx = Some f ->
+            anf_cvt_rel S1
+                        (EAst.tFix mfix idx)
+                        vn
+                        S2
+                        (Efun1_c fdefs Hole_c)
+                        f
+      | anf_Box :
+          forall S vn x,
+            x \in S ->
+            anf_cvt_rel S EAst.tBox vn (S \\ [set x]) (Econstr_c x default_tag nil Hole_c) x
+      | anf_Const :
+          forall S vn s v,
+            lookup_const cmap s = Some v ->
+            anf_cvt_rel S (EAst.tConst s) vn S Hole_c v
+      | anf_Proj :
+          forall S1 S2 p c C x y vn c_tag,
+            c_tag = dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm ->
+            anf_cvt_rel S1 c vn S2 C x ->
+            y \in S2 ->
+            anf_cvt_rel S1
+                        (EAst.tProj p c)
+                        vn
+                        (S2 \\ [set y])
+                        (comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
+                        y
+      | anf_Prim :
+          forall S vn p pv x,
+            trans_prim_val p = Some pv ->
+            x \in S ->
+            anf_cvt_rel S (EAst.tPrim p) vn (S \\ [set x]) (Eprim_val_c x pv Hole_c) x
+
+      with anf_cvt_rel_args :
+             Ensemble var -> list EAst.term -> list var ->
+             Ensemble var -> exp_ctx -> list var -> Prop :=
+      | anf_Args_nil :
+          forall S vn,
+            anf_cvt_rel_args S [] vn S Hole_c []
+      | anf_Args_cons :
+          forall S1 S2 S3 vn t ts C1 x1 C2 xs,
+            anf_cvt_rel S1 t vn S2 C1 x1 ->
+            anf_cvt_rel_args S2 ts vn S3 C2 xs ->
+            anf_cvt_rel_args S1
+                             (t :: ts)
+                             vn
+                             S3
+                             (comp_ctx_f C1 C2)
+                             (x1 :: xs)
+
+      with anf_cvt_rel_mfix :
+             Ensemble var ->
+             list (EAst.def EAst.term) ->
+             list var ->    (* vn: variable name map *)
+             list var ->    (* function names *)
+             Ensemble var ->
+             fundefs ->
+             Prop :=
+      | anf_Mfix_nil :
+          forall S vn,
+            anf_cvt_rel_mfix S [] vn [] S Fnil
+      | anf_Mfix_cons :
+          forall S1 S2 S3 vn fnames d mfix' C1 r1 fdefs na e1 x1 f_name,
+            d.(EAst.dbody) = EAst.tLambda na e1 ->
+            x1 \in S1 ->
+            anf_cvt_rel (S1 \\ [set x1]) e1 (x1::vn) S2 C1 r1 ->
+            anf_cvt_rel_mfix S2 mfix' vn fnames S3 fdefs ->
+            anf_cvt_rel_mfix
+              S1 (d :: mfix') vn (f_name :: fnames) S3
+              (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs)
+
+      with anf_cvt_rel_branches :
+             Ensemble var ->
+             inductive ->
+             list (list name * EAst.term) ->
+             N ->           (* constructor index *)
+             list var ->    (* vn *)
+             var ->         (* scrutinee variable *)
+             Ensemble var ->
+             list (ctor_tag * exp) ->
+             Prop :=
+      | anf_Branches_nil :
+          forall S ind vn r,
+            anf_cvt_rel_branches S ind [] 0%N vn r S []
+      | anf_Branches_cons :
+          forall S1 S2 S3 ind vn r lnames e brs' pats' C1 r1 vars ctx_p tg n,
+            tg = dcon_to_tag default_tag (dcon_of_con ind (N.to_nat n)) tgm ->
+
+            anf_cvt_rel_branches S1 ind brs' (n + 1)%N vn r S2 pats' ->
+
+            FromList vars \subset S2 ->
+            NoDup vars ->
+            Datatypes.length vars = List.length lnames ->
+            ctx_bind_proj tg r vars (Datatypes.length vars) = ctx_p ->
+
+            anf_cvt_rel (S2 \\ (FromList vars)) e (vars ++ vn) S3 C1 r1 ->
+
+            anf_cvt_rel_branches
+              S1 ind ((lnames, e) :: brs') n vn r S3
+              ((tg, app_ctx_f ctx_p (C1 |[ Ehalt r1 ]|)) :: pats').
+
+    End RelationalSpec.
 
     (** * Top-level ANF conversion *)
 

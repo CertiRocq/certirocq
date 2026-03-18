@@ -3,7 +3,8 @@
 From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith.
 From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
 
-From MetaRocq.Erasure Require Import EAst.
+From MetaRocq.Erasure Require Import EAst EPrimitive.
+From MetaRocq.Common Require Import Primitive.
 From MetaRocq.Utils Require Import bytestring.
 
 Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.state.
@@ -169,6 +170,19 @@ Section InductiveEnv.
     convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
 
 End InductiveEnv.
+
+
+(** * Primitive value translation *)
+
+(** Translate MetaRocq's [prim_val] to CertiRocq's [primitive_value].
+    Arrays are not supported and return [None]. *)
+Definition trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive_value :=
+  match prim_val_model p in prim_model t return option primitive_value with
+  | primIntModel i => Some (existT _ AstCommon.primInt i)
+  | primFloatModel f => Some (existT _ AstCommon.primFloat f)
+  | primStringModel s => Some (existT _ AstCommon.primString s)
+  | primArrayModel _ => None
+  end.
 
 
 (** * Helper: pad name list to given length *)
