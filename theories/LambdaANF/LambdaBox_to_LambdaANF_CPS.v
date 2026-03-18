@@ -1,4 +1,4 @@
-(* Direct CPS conversion from MetaRocq Erasure (EAst.term) to LambdaANF.cps *)
+(* CPS conversion from MetaRocq Erasure (EAst.term) to LambdaANF.cps *)
 
 From Stdlib Require Import ZArith.ZArith Lists.List
         Sorting.Sorted Arith.Arith Sets.Ensembles.
@@ -10,6 +10,7 @@ From MetaRocq.Utils Require Import bytestring.
 
 Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx
         LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
+Require Import LambdaANF.LambdaBox_to_LambdaANF_common.
 Require Import compcert.lib.Coqlib compcert.lib.Maps.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -18,8 +19,6 @@ Import ListNotations.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 Open Scope bs_scope.
-
-Local Notation string := bytestring.string.
 
 (** This file defines CPS conversion from MetaRocq's erased terms
     (EAst.term) to LambdaANF (cps.exp).
@@ -35,157 +34,14 @@ Section Translate.
           (next_id : positive).
 
 
-  (** * Common definitions (shared with ANF) *)
-
-  Definition dcon : Set := inductive * N.
-
-  Definition conId_map := list (dcon * ctor_tag).
-
-  Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
-  Proof.
-    intros. destruct x,y.
-    assert (H:= AstCommon.inductive_dec i i0).
-    destruct H.
-    - destruct (classes.eq_dec n n0).
-      + subst. left. auto.
-      + right. intro. apply n1. inversion H. auto.
-    - right; intro; apply n1. inversion H; auto.
-  Defined.
-
-  Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
-    match sig with
-    | nil => default_tag
-    | ((cId, inf)::sig') => match conId_dec a cId with
-                            | left _ => inf
-                            | right _ => dcon_to_info a sig'
-                            end
-    end.
-
-  Definition constr_env : Type := conId_map.
-
-  Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
-    dcon_to_info a sig.
-
-  Definition dcon_of_con (i : inductive) (n : nat) : dcon := (i, N.of_nat n).
-
-
-  (** * Global constant environment *)
-
-  Definition const_map := list (kername * var).
-
-  Fixpoint lookup_const (cm : const_map) (k : kername) : option var :=
-    match cm with
-    | [] => None
-    | (k', v) :: cm' =>
-      if eq_kername k k' then Some v else lookup_const cm' k
-    end.
-
-  Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
-    match prims with
-    | [] => None
-    | (prim, pos) :: prims =>
-      if eq_kername n prim.(prim_name) then Some pos else find_prim prims n
-    end.
-
-
-  (** * Inductive environment processing *)
-
-  Definition ienv := list (Kernames.kername * AstCommon.itypPack).
-
-  Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
-    match m with
-    | O => (nil, n)
-    | S m' =>
-      let (l, nm) := (fromN (n+1) (m')) in
-      (n::l, nm)
-    end.
-
-  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (args:nat)
-    : exp_ctx :=
-    match vars with
-    | [] => Hole_c
-    | v :: vars =>
-      let ctx_p' := ctx_bind_proj tg r vars (args - 1) in
-      (Eproj_c v tg (N.of_nat (args - 1)) r ctx_p')
-    end.
-
-  Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr)
-           (ind:Kernames.inductive) (nCon:N) (unboxed : N) (boxed : N)
-           (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
-    match (cct, itC) with
-    | (cn::cct', cst::icT') =>
-      let (cname, ccn) := cst in
-      let is_unboxed := Nat.eqb ccn 0 in
-      let info := {| ctor_name := BasicAst.nNamed cname
-                     ; ctor_ind_name := BasicAst.nNamed tyname
-                     ; ctor_ind_tag := niT
-                     ; ctor_arity := N.of_nat ccn
-                     ; ctor_ordinal := if is_unboxed then unboxed else boxed
-                  |} in
-      convert_cnstrs tyname cct' icT' ind (nCon+1)%N
-                     (if is_unboxed then unboxed + 1 else unboxed)
-                     (if is_unboxed then boxed else boxed + 1)
-                     niT
-                     (M.set cn info ce)
-                     (((ind,nCon), cn)::dcm)
-    | (_, _) => (ce, dcm)
-    end.
-
-  Fixpoint convert_typack typ (idBundle:Kernames.kername) (n:nat)
-           (ice : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map))
-    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
-    let '(ie, ce, ncT, niT, dcm) := ice in
-    match typ with
-    | nil => ice
-    | (AstCommon.mkItyp itN itC) :: typ' =>
-      let (cct, ncT') := fromN ncT (List.length itC) in
-      let (ce', dcm') :=
-          convert_cnstrs itN cct itC (Kernames.mkInd idBundle n) 0 0 0 niT ce dcm
-      in
-      let ityi :=
-          combine cct (map (fun (c:AstCommon.Cnstr) =>
-                              let (_, n) := c in N.of_nat n) itC)
-      in
-      convert_typack typ' idBundle (n+1)
-                     (M.set niT ityi ie, ce', ncT', (Pos.succ niT), dcm')
-    end.
-
-  Fixpoint convert_env' (g:ienv) (ice:ind_env * ctor_env * ctor_tag * ind_tag * conId_map)
-    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
-    let '(ie, ce, ncT, niT, dcm) := ice in
-    match g with
-    | nil => ice
-    | (id, ty)::g' =>
-      convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
-    end.
-
-  Definition convert_env (g:ienv): (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
-    let default_ind_env := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty ind_ty_info) in
-    let info := {| ctor_name := BasicAst.nAnon
-                   ; ctor_ind_name := BasicAst.nAnon
-                   ; ctor_ind_tag := default_itag
-                   ; ctor_arity := 0%N
-                   ; ctor_ordinal := 0%N
-                |} in
-    let default_ctor_env := M.set default_tag info (M.empty ctor_ty_info) in
-    convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
-
-
   (** * CPS conversion *)
 
   Section CPS.
 
     Definition cpsM := @compM' unit.
 
-    Definition get_named_str_lst (s : list string) : cpsM (list var) :=
+    Definition get_named_str_lst (s : list bytestring.string) : cpsM (list var) :=
       mapM get_named_str s.
-
-    Fixpoint names_lst_len (ns : list name) (m : nat) : list name :=
-      match ns, m with
-      | _, 0%nat => []
-      | [], S _ => repeat nAnon m
-      | n :: ns, S m => n :: names_lst_len ns m
-      end.
 
     (** CPS conversion for primitive operations *)
     Fixpoint convert_prim (n : nat) (prim : positive) (args : list var) (kont : var)
@@ -261,7 +117,7 @@ Section Translate.
            | [] => ret nil
            | (lnames, e) :: brs' =>
              let dc := dcon_of_con ind (N.to_nat n) in
-             let tg := dcon_to_tag dc tgm in
+             let tg := dcon_to_tag default_tag dc tgm in
              cbl <- go brs' (n + 1)%N ;;
              vars <- get_named_lst (names_lst_len (List.rev lnames) (List.length lnames)) ;;
              let ctx_p := ctx_bind_proj tg r vars (List.length vars) in
@@ -333,7 +189,7 @@ Section Translate.
           end
 
         | EAst.tConstruct ind c args =>
-          let c_tag := dcon_to_tag (dcon_of_con ind c) tgm in
+          let c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm in
           x' <- get_named_str "x'" ;;
           xs <- get_named_str_lst (map (fun _ => "x") args) ;;
           ks <- get_named_str_lst (map (fun _ => "k") args) ;;
@@ -356,14 +212,8 @@ Section Translate.
           | None => failwith "Unknown function index"
           end
 
-        | EAst.tPrim p =>
-          failwith "Primitive values not yet supported in direct CPS"
-
-        (* These should not occur *)
-        | EAst.tVar _ => failwith "Var"
-        | EAst.tEvar _ _ => failwith "Evar"
         | EAst.tProj p c =>
-          let c_tag := dcon_to_tag (dcon_of_con p.(proj_ind) 0) tgm in
+          let c_tag := dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm in
           x1 <- get_named_str "x1" ;;
           k1 <- get_named_str "k1" ;;
           y <- get_named_str "y" ;;
@@ -373,6 +223,13 @@ Section Translate.
                         (Eproj y c_tag (N.of_nat p.(proj_arg)) x1
                                (Eapp k kon_tag (y::nil))) Fnil)
                  c')
+
+        | EAst.tPrim p =>
+          failwith "Primitive values not yet supported in direct CPS"
+
+        (* These should not occur *)
+        | EAst.tVar _ => failwith "Var"
+        | EAst.tEvar _ _ => failwith "Evar"
         | EAst.tCoFix _ _ => failwith "CoFix"
         | EAst.tLazy _ => failwith "Lazy"
         | EAst.tForce _ => failwith "Force"
@@ -394,9 +251,9 @@ Section Translate.
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
              (cps.Eapp f kon_tag (k::nil))).
 
-    Definition convert_top_cps (ienv : ienv) (prims : list (primitive * positive))
+    Definition convert_top_cps (ie : ienv) (prims : list (primitive * positive))
                (cmap : const_map) (e : EAst.term) : error cps.exp * comp_data :=
-      let '(_, cenv, ctag, itag, dcm) := convert_env ienv in
+      let '(_, cenv, ctag, itag, dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil))
                                   (M.set kon_tag (1%N, (0%N::nil)) (M.empty _)) in
