@@ -1,11 +1,11 @@
-From Coq Require Import
+From Stdlib Require Import
   Program.Equality
   Logic.Decidable Lists.ListDec
   Relations.Relations Relations.Relation_Operators Lia
   EqdepFacts
   List Nnat Uint63.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps
   LambdaANF.cps_util
   LambdaANF.eval
@@ -16,7 +16,7 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_primitives
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
-From MetaCoq Require Import Common.Kernames.
+From MetaRocq Require Import Common.Kernames.
 
 From compcert Require Import
   Coqlib common.Memory.
@@ -1226,7 +1226,7 @@ Qed.
  *)
 Definition prim_funs_env_wellformed (cenv : ctor_env) (penv : prim_env) (prim_funs : M.t (list cps.val -> option cps.val)) : Prop :=
   forall p op_name s b n op f vs v,
-    M.get p penv = Some (op_name, s, b, n) ->       (* penv = primitive function environment obtained from previous pipeline stage *)
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name s b n) ->       (* penv = primitive function environment obtained from previous pipeline stage *)
     KernameMap.find op_name primop_map = Some op -> (* primop_map = environment of supported primitive operations *)
     M.get p prim_funs = Some f ->                   (* from lambdaANF operational semantics *)
     f vs = Some v ->
@@ -1248,7 +1248,7 @@ Lemma primop_value_not_funval :
   forall p pfs f' vs v op op_name str b op_arr,
     prim_funs_env_wellformed cenv penv pfs ->
     M.get p pfs = Some f' ->
-    M.get p penv = Some (op_name, str, b, op_arr) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name str b op_arr) ->
     KernameMap.find op_name primop_map = Some op ->
     f' vs = Some v ->
     forall rho fds f0, ~ subval_or_eq (Vfun rho fds f0) v.
@@ -1598,7 +1598,7 @@ Proof with eassumption.
   have Hs2m := update_global_preserves_memory _ _ _ _ _ Hupd2. symmetry in Hs2m. rewrite Hs1m in Hs2m.
   assert (HINV2 : INV fenv nenv s2 fr). {
     eapply update_global_preserves_INV; eauto; cbn=>//. tauto. }
-  clear Hw. 
+  clear Hw.
 
   assert (sglob_val s0 (f_inst fr) glob_tmp1 = Some (VAL_num (VAL_int64 (Int64.repr xh0')))). {
     eapply update_global_get_other with (sr:=sr) (j:=glob_tmp2); eauto. discriminate. }

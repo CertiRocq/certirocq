@@ -1,15 +1,15 @@
--R Compiler             CertiCoq.Compiler
--R common               CertiCoq.Common
--R LambdaBoxMut         CertiCoq.LambdaBoxMut
--R LambdaBoxLocal       CertiCoq.LambdaBoxLocal
--R LambdaANF            CertiCoq.LambdaANF
--R ../libraries         CertiCoq.Libraries
--R Codegen              CertiCoq.Codegen
--R CodegenWasm          CertiCoq.CodegenWasm
--R Glue                 CertiCoq.Glue
--R Extraction           CertiCoq.extraction
-# -R Runtime              CertiCoq.runtime
--R ExtractionVanilla    CertiCoq.extraction_vanilla
+-R Compiler             CertiRocq.Compiler
+-R common               CertiRocq.Common
+-R LambdaBoxMut         CertiRocq.LambdaBoxMut
+-R LambdaBoxLocal       CertiRocq.LambdaBoxLocal
+-R LambdaANF            CertiRocq.LambdaANF
+-R ../libraries         CertiRocq.Libraries
+-R Codegen              CertiRocq.Codegen
+-R CodegenWasm          CertiRocq.CodegenWasm
+-R Glue                 CertiRocq.Glue
+-R Extraction           CertiRocq.extraction
+# -R Runtime              CertiRocq.runtime
+-R ExtractionVanilla    CertiRocq.extraction_vanilla
 
 
 # common
