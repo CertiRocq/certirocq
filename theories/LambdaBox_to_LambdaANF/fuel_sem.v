@@ -247,4 +247,8 @@ Section FUEL_SEM.
         eval_env_step rho e r f t ->
         eval_env_fuel rho e r (f <+> (one_i e)) (t <+> (one_i e)).
 
+  Scheme eval_env_step_ind' := Minimality for eval_env_step Sort Prop
+    with eval_fuel_many_ind' := Minimality for eval_fuel_many Sort Prop
+    with eval_env_fuel_ind' := Minimality for eval_env_fuel Sort Prop.
+
 End FUEL_SEM.
