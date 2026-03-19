@@ -283,8 +283,8 @@ Section Correct.
         (* Source terminates *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
                       preord_exp cenv
-                                 (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
-                                            (t <+> @one_i _ _ trace_resource_LambdaBox e))
+                                 (anf_bound (f <+> @one_i _ _ (@HRes _ LambdaBox_resource_fuel) e)
+                                            (t <+> @one_i _ _ (@HRes _ LambdaBox_resource_trace) e))
                                  eq_fuel i
                                  (e_k, M.set x v' rho)
                                  (C |[ e_k ]|, rho)) /\
@@ -457,8 +457,12 @@ Section Correct.
       + intros _.
         eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
-    - (* eval_step: forwards to IH from eval_env_step *)
-      admit. (* Technical: needs unfolding alignment between _exp and _exp_step *)
+    - (* eval_step: forwards to IH from eval_env_step.
+         P1 is applied to (vs, e, r, f+one_i e, t+one_i e).
+         IH : anf_cvt_correct_exp_step vs e r f t, which internally uses
+         anf_bound (f + one_i e) (t + one_i e). So IH is exactly the goal. *)
+      intros vs1 e1 r1 f1 t1 Hstep IH.
+      admit. (* eval_step: need to align instance resolution *)
 
   Admitted.
 
