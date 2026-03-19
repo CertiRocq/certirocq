@@ -114,4 +114,115 @@ Section ANF_Val.
   Definition anf_env_rel : list var -> list value -> M.t val -> Prop :=
     anf_env_rel' anf_val_rel.
 
+
+  (** ** Fix relation helper lemmas *)
+
+  Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list mfix Bs S2 :
+    anf_fix_rel fnames names S1 fnames_list mfix Bs S2 ->
+    List.length fnames_list = List.length mfix.
+  Proof.
+    intros Hrel. induction Hrel; simpl; congruence.
+  Qed.
+
+  (** Extract a specific function definition from a fix relation bundle.
+      Given the idx-th function name and the idx-th source body (which must
+      be a lambda), [find_def] locates the corresponding ANF function. *)
+  Lemma anf_fix_rel_find_def :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f na e_body d,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      nth_error mfix idx = Some d ->
+      d.(EAst.dbody) = EAst.tLambda na e_body ->
+      NoDup fnames_list ->
+      exists x_pc C_body r_body S_body1 S_body2,
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel' cnstrs cmap S_body1 e_body
+                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body.
+  Proof.
+    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f na e_body d
+      Hrel Hnth_f Hnth_d Hbody Hnd.
+    revert idx f na e_body d Hnth_f Hnth_d Hbody Hnd.
+    induction Hrel; intros idx0 f0 na0 e_body0 d0 Hnth_f Hnth_d Hbody0 Hnd.
+    - (* anf_fix_fnil *)
+      destruct idx0; discriminate.
+    - (* anf_fix_fcons *)
+      destruct idx0 as [ | idx'].
+      + (* idx = 0: this function *)
+        simpl in Hnth_f. inv Hnth_f.
+        simpl in Hnth_d. inv Hnth_d.
+        rewrite Hbody0 in H. inv H.
+        do 5 eexists. split.
+        * simpl. destruct (M.elt_eq f0 f0); [ reflexivity | congruence ].
+        * eassumption.
+      + (* idx = S idx': later function *)
+        simpl in Hnth_f. simpl in Hnth_d.
+        inversion Hnd as [ | ? ? Hnotin Hnd']; subst.
+        edestruct IHHrel as (x_pc' & C_body' & r_body' & S_body1' & S_body2' & Hfind' & Hcvt').
+        * exact Hnth_f.
+        * exact Hnth_d.
+        * exact Hbody0.
+        * assumption.
+        * do 5 eexists. split.
+          -- simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
+             ++ exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth_f.
+             ++ exact Hfind'.
+          -- exact Hcvt'.
+  Qed.
+
+  (** Extended version that also provides the disjointness and freshness
+      properties for the function's parameter variable. *)
+  Lemma anf_fix_rel_find_def_ext :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f na e_body d,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      nth_error mfix idx = Some d ->
+      d.(EAst.dbody) = EAst.tLambda na e_body ->
+      NoDup fnames_list ->
+      exists x_pc C_body r_body S_body1 S_body2,
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel' cnstrs cmap S_body1 e_body
+                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body /\
+        Disjoint _ (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
+        ~ x_pc \in (FromList fnames0 :|: FromList names0).
+  Proof.
+    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f na e_body d
+      Hrel Hnth_f Hnth_d Hbody0 Hnd.
+    revert idx f na e_body d Hnth_f Hnth_d Hbody0 Hnd.
+    induction Hrel; intros idx0 f0 na0 e_body0 d0 Hnth_f Hnth_d Hbody0 Hnd.
+    - destruct idx0; discriminate.
+    - destruct idx0 as [ | idx'].
+      + simpl in Hnth_f. inv Hnth_f.
+        simpl in Hnth_d. inv Hnth_d.
+        rewrite Hbody0 in H. inv H.
+        do 5 eexists. split; [ | split; [ | split ] ].
+        * simpl. destruct (M.elt_eq f0 f0); [ reflexivity | congruence ].
+        * eassumption.
+        * eapply Disjoint_Included_r; [ eassumption | ].
+          eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l. intros Hc. destruct Hc as [_ Hc]. apply Hc. constructor.
+          -- eapply Disjoint_Included_r; [ eapply Setminus_Included | ].
+             eapply Disjoint_sym. assumption.
+        * intros Habs.
+          match goal with
+          | [ Hdis : Disjoint _ _ (_ :|: _),
+              Hin : _ \in _ |- _ ] =>
+            eapply Hdis; constructor; [ exact Hin | exact Habs ]
+          end.
+      + simpl in Hnth_f. simpl in Hnth_d.
+        inversion Hnd as [ | ? ? Hnotin Hnd']; subst.
+        edestruct IHHrel as (x_pc' & C_body' & r_body' & S_body1' & S_body2' &
+                              Hfind' & Hcvt' & Hdis' & Hfresh').
+        * exact Hnth_f.
+        * exact Hnth_d.
+        * exact Hbody0.
+        * assumption.
+        * do 5 eexists. split; [ | split; [ | split ] ].
+          -- simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
+             ++ exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth_f.
+             ++ exact Hfind'.
+          -- exact Hcvt'.
+          -- exact Hdis'.
+          -- exact Hfresh'.
+  Qed.
+
 End ANF_Val.

@@ -468,6 +468,11 @@ Section ANF.
             S1 ind ((lnames, e) :: brs') n vn r S3
             ((tg, app_ctx_f ctx_p (C1 |[ Ehalt r1 ]|)) :: pats').
 
+    Scheme anf_cvt_rel_ind' := Minimality for anf_cvt_rel Sort Prop
+      with anf_cvt_rel_args_ind' := Minimality for anf_cvt_rel_args Sort Prop
+      with anf_cvt_rel_mfix_ind' := Minimality for anf_cvt_rel_mfix Sort Prop
+      with anf_cvt_rel_branches_ind' := Minimality for anf_cvt_rel_branches Sort Prop.
+
   End Spec.
 
 End ANF.
