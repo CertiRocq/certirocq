@@ -14,7 +14,7 @@ Import Monads.
 
 Import MonadNotation.
 
-Definition prim_env := M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *)).
+Definition prim_env := M.t primitive.
 
 Definition LambdaANFenv : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
 
@@ -50,10 +50,10 @@ Section IDENT.
   Definition kon_fun_tag := 2%positive.
 
 
-  Definition make_prim_env (prims : list (kername * string * bool * nat * positive)) : prim_env :=
-    List.fold_left (fun map '(k, s, b, ar, p) => M.set p (k, s, b, ar) map) prims (M.empty _).
+  Definition make_prim_env (prims : list (primitive * positive)) : prim_env :=
+    List.fold_left (fun map '(p, pos) => M.set pos p map) prims (M.empty _).
 
-  Definition compile_LambdaANF_CPS (prims : list (kername * string * bool * nat * positive)) : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_CPS prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Translating from LambdaBoxLocal to LambdaANF (CPS)" ;;
       LiftErrorCertiRocqTrans "LambdaANF CPS"
@@ -66,7 +66,7 @@ Section IDENT.
                                 | (compM.Err s, _) => Err s
                                 end) src.
 
-  Definition compile_LambdaANF_ANF (prims : list (kername * string * bool * nat * positive)) : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_ANF prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
     fun src =>
       debug_msg "Translating from LambdaBoxLocal to LambdaANF (ANF)" ;;
       LiftErrorCertiRocqTrans "LambdaANF ANF"

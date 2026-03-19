@@ -23,71 +23,27 @@ Axiom (print : String.string -> Datatypes.unit).
 
 (** * Constants realized in the target code *)
 
-(* Each constant that is realized in the backend must have an associated arity.
- * We find the arity of the extracted constant from its type in [global_env]
- * after reification. Assumes that the type is in some normal form.
- *)
-
-Fixpoint find_arity (tau : Ast.term) : nat :=
-  match tau with
-  | Ast.tProd na ty body => 1 + find_arity body
-  | _ => 0
-  end.
-
-Definition find_global_decl_arity (gd : Ast.Env.global_decl) : error nat :=
-  match gd with
-  | Ast.Env.ConstantDecl bd => Ret (find_arity (Ast.Env.cst_type bd))
-  | Ast.Env.InductiveDecl _ => Err ("Expected ConstantDecl but found InductiveDecl")
-  end.
-
-Fixpoint find_prim_arity (env : Ast.Env.global_declarations) (pr : kername) : error nat :=
-  match env with
-  | [] => Err ("Constant " ++ string_of_kername pr ++ " not found in environment")
-  | (n, gd) :: env =>
-    if eq_kername pr n then find_global_decl_arity  gd
-    else find_prim_arity env pr
-  end.
-
-Fixpoint find_prim_arities (env : Ast.Env.global_declarations) (prs : list (kername * string * bool)) : error (list (kername * string * bool * nat * positive)) :=
-  match prs with
-  | [] => Ret []
-  | ((pr, s), b) :: prs =>
-    match find_prim_arity env pr with
-    | Err _ => (* Be lenient, if a declared primitive is not part of the environment, just skip it *)
-      prs' <- find_prim_arities env prs ;;
-      Ret prs'
-    | Ret arity =>
-      prs' <- find_prim_arities env prs ;;
-      Ret ((pr, s, b, arity, 1%positive) :: prs')
-    end
-  end.
-
 (* Picks an identifier for each primitive for internal representation *)
-Fixpoint pick_prim_ident (id : positive) (prs : list (kername * string * bool * nat * positive))
-: (list (kername * string * bool * nat * positive) * positive) :=
+Fixpoint pick_prim_ident (id : positive) (prs : primitives)
+  : list (primitive * positive) * positive :=
   match prs with
   | [] => ([], id)
-  | (pr, s, b, a, _) :: prs =>
+  | pr :: prs =>
     let next_id := (id + 1)%positive in
     let (prs', id') := pick_prim_ident next_id prs in
-    ((pr, s, b, a, id) :: prs', id')
+    ((pr, id) :: prs', id')
   end.
 
-
-Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (kername * string * bool * nat * positive) * positive) :=
+Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : pipelineM (list (primitive * positive) * positive) :=
   o <- get_options ;;
-  match find_prim_arities env (prims o) with
-  | Ret prs =>
-    ret (pick_prim_ident id prs)
-  | Err s => failwith s
-  end.
+  ret (pick_prim_ident id (prims o)).
 
 (** * CertiRocq's Compilation Pipeline, without code generation *)
 
 Section Pipeline.
 
   Context (next_id : positive)
-          (prims : list (kername * string * bool * nat * positive))
+          (prims : list (primitive * positive))
           (debug : bool).
 
   Fixpoint find_axioms {T} acc (env : environ T) :=
@@ -97,7 +53,7 @@ Section Pipeline.
       match d with
       | ecTrm _ => find_axioms acc decls
       | ecTyp 0 [] =>
-        if List.find (fun prim => ReflectEq.eqb kn (fst (fst (fst (fst prim))))) prims then find_axioms acc decls
+        if List.find (fun prim => ReflectEq.eqb kn (fst prim).(prim_name)) prims then find_axioms acc decls
         else find_axioms (kn :: acc) decls
       | ecTyp _ _ => find_axioms acc decls
       end
@@ -169,7 +125,7 @@ Definition make_opts
            (dev : nat)                               (* Extra flag for development purposes *)
            (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
-           (prims : list (kername * string * bool))  (* list of extracted constants *)
+           (prims : list primitive)  (* list of extracted constants *)
   : Options :=
   {| erasure_config := erasure_config;
      inductives_mapping := im;

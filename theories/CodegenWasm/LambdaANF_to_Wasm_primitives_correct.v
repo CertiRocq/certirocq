@@ -1226,7 +1226,7 @@ Qed.
  *)
 Definition prim_funs_env_wellformed (cenv : ctor_env) (penv : prim_env) (prim_funs : M.t (list cps.val -> option cps.val)) : Prop :=
   forall p op_name s b n op f vs v,
-    M.get p penv = Some (op_name, s, b, n) ->       (* penv = primitive function environment obtained from previous pipeline stage *)
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name s b n) ->       (* penv = primitive function environment obtained from previous pipeline stage *)
     KernameMap.find op_name primop_map = Some op -> (* primop_map = environment of supported primitive operations *)
     M.get p prim_funs = Some f ->                   (* from lambdaANF operational semantics *)
     f vs = Some v ->
@@ -1248,7 +1248,7 @@ Lemma primop_value_not_funval :
   forall p pfs f' vs v op op_name str b op_arr,
     prim_funs_env_wellformed cenv penv pfs ->
     M.get p pfs = Some f' ->
-    M.get p penv = Some (op_name, str, b, op_arr) ->
+    M.get p penv = Some (Pipeline_utils.mk_primitive op_name str b op_arr) ->
     KernameMap.find op_name primop_map = Some op ->
     f' vs = Some v ->
     forall rho fds f0, ~ subval_or_eq (Vfun rho fds f0) v.
