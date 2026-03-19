@@ -21,9 +21,7 @@ Import ListNotations.
 
 (** * Source value type for EAst.term evaluation *)
 
-(** Values produced by environment-based big-step evaluation of EAst.term.
-    Structurally identical to LambdaBoxLocal.fuel_sem.value but with
-    EAst.term bodies in closures instead of expression.exp. *)
+(** Values produced by environment-based big-step evaluation of EAst.term. *)
 
 Inductive value :=
 | Con_v : dcon -> list value -> value

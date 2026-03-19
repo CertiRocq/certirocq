@@ -1,6 +1,6 @@
 # LambdaBox to LambdaANF
 
-Direct transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF (`cps.exp`), bypassing the LambdaBoxMut and LambdaBoxLocal intermediate representations.
+Transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF (`cps.exp`).
 
 ## Files
 
