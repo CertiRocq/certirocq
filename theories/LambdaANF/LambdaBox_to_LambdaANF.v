@@ -263,8 +263,6 @@ Section Translate.
     End Convert.
 
 
-    (** ** Declarative definition of ANF conversion used in proofs *)
-
     Section RelationalSpec.
 
       Context (tgm : conId_map).
