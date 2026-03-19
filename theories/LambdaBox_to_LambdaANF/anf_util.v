@@ -14,42 +14,9 @@ From compcert Require lib.Maps.
 
 (** CertiRocq *)
 From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
 
 Import ListNotations.
-
-
-(** * Source value type for EAst.term evaluation *)
-
-(** Values produced by environment-based big-step evaluation of EAst.term. *)
-
-Inductive value :=
-| Con_v : dcon -> list value -> value
-| Clos_v : list value -> name -> EAst.term -> value
-| ClosFix_v : list value -> list (EAst.def EAst.term) -> nat -> value.
-
-(** Source environment *)
-Definition env := list value.
-
-(** Induction principle for value *)
-Lemma value_ind' (P : value -> Prop) :
-  (forall dc vs, Forall P vs -> P (Con_v dc vs)) ->
-  (forall vs na e, Forall P vs -> P (Clos_v vs na e)) ->
-  (forall vs mfix n, Forall P vs -> P (ClosFix_v vs mfix n)) ->
-  (forall v, P v).
-Proof.
-  intros H1 H2 H3.
-  fix IHv 1; intros v. destruct v.
-  - eapply H1. induction l.
-    constructor.
-    constructor. eapply IHv. eassumption.
-  - eapply H2. induction l.
-    constructor.
-    constructor. eapply IHv. eassumption.
-  - eapply H3. induction l.
-    constructor.
-    constructor. eapply IHv. eassumption.
-Qed.
 
 
 (** * ANF Value Relation *)
