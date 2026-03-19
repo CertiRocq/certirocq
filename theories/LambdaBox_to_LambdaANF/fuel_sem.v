@@ -4,7 +4,7 @@
 From Stdlib Require Import Arith.Arith Lists.List.
 
 (** MetaRocq *)
-From MetaRocq.Erasure Require Import EAst EPrimitive.
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EPrimitive.
 From MetaRocq.Common Require Import Primitive BasicAst Kernames.
 
 (** CertiRocq *)
@@ -99,27 +99,13 @@ Section Util.
 End Util.
 
 
-(** * Global environment *)
-
-(** The global environment maps constant names to values.
-    We assume all definitions in the global env have been evaluated to values. *)
-Definition global_env := list (kername * value).
-
-Fixpoint lookup_global (ge : global_env) (k : kername) : option value :=
-  match ge with
-  | [] => None
-  | (k', v) :: ge' =>
-    if eq_kername k k' then Some v else lookup_global ge' k
-  end.
-
-
 Section FUEL_SEM.
 
   Context {trace : Type}
           {Hf : @LambdaBox_resource nat}
           {Ht : @LambdaBox_resource trace}.
 
-  Context (ge : global_env).
+  Context (Σ : EAst.global_context).
 
 
   (** * Big-step resource semantics for EAst.term *)
@@ -174,6 +160,13 @@ Section FUEL_SEM.
         dc = dcon_of_con ind c ->
         eval_fuel_many rho args vs fs ts ->
         eval_env_step rho (EAst.tConstruct ind c args) (Val (Con_v dc vs)) fs ts
+  | eval_Construct_step_OOT :
+      forall (ind : inductive) (c : nat) (args args_done args_rest : list EAst.term)
+             (e : EAst.term) (vs : list value) (rho : env) fs f t ts,
+        args = args_done ++ e :: args_rest ->
+        eval_fuel_many rho args_done vs fs ts ->
+        eval_env_fuel rho e OOT f t ->
+        eval_env_step rho (EAst.tConstruct ind c args) OOT (fs <+> f) (ts <+> t)
 
   (** ** Case analysis *)
   | eval_Case_step :
@@ -203,11 +196,14 @@ Section FUEL_SEM.
         eval_env_fuel rho c OOT f1 t1 ->
         eval_env_step rho (EAst.tProj p c) OOT f1 t1
 
-  (** ** Constant lookup (delta reduction) *)
+  (** ** Constant (delta reduction) *)
   | eval_Const_step :
-      forall (k : kername) (v : value) (rho : env),
-        lookup_global ge k = Some v ->
-        eval_env_step rho (EAst.tConst k) (Val v) <0> <0>
+      forall (k : kername) (body : EAst.term) (decl : EAst.constant_body)
+             (rho : env) r f t,
+        declared_constant Σ k decl ->
+        decl.(EAst.cst_body) = Some body ->
+        eval_env_fuel [] body r f t ->
+        eval_env_step rho (EAst.tConst k) r f t
 
   (** ** Mutual evaluation of argument lists *)
   with eval_fuel_many : env -> list EAst.term -> list value -> nat -> trace -> Prop :=
