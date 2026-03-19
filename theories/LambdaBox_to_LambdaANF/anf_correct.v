@@ -19,7 +19,7 @@ From CertiRocq.LambdaANF Require Import
   tactics identifiers bounds stemctx set_util.
 
 From CertiRocq.LambdaBox_to_LambdaANF Require Import
-  common ANF fuel_sem anf_util.
+  common ANF fuel_sem anf_util wf.
 
 Import ListNotations.
 Open Scope list_scope.
@@ -35,6 +35,41 @@ Section Correct.
           (cenv : ctor_env).
 
   Context (Σ : EAst.global_context).
+
+  (** Term/environment flags for our pipeline:
+      no CoFix, Lazy/Force, Var, Evar. *)
+  Definition certirocq_prim_flags :=
+    {| has_primint := true;
+       has_primfloat := true;
+       has_primstring := true;
+       has_primarray := false |}.
+
+  Definition certirocq_term_flags : ETermFlags :=
+    {| has_tBox := true
+     ; has_tRel := true
+     ; has_tVar := false
+     ; has_tEvar := false
+     ; has_tLambda := true
+     ; has_tLetIn := true
+     ; has_tApp := true
+     ; has_tConst := true
+     ; has_tConstruct := true
+     ; has_tCase := true
+     ; has_tProj := true
+     ; has_tFix := true
+     ; has_tCoFix := false
+     ; has_tPrim := certirocq_prim_flags
+     ; has_tLazy_Force := false
+    |}.
+
+  Definition certirocq_env_flags : EEnvFlags :=
+    {| has_axioms := false
+     ; has_cstr_params := false
+     ; term_switches := certirocq_term_flags
+     ; cstr_as_blocks := true
+    |}.
+
+  Local Existing Instance certirocq_env_flags.
 
   Context (dcon_to_tag_inj :
     forall tgm dc dc',
@@ -158,6 +193,31 @@ Section Correct.
   Definition anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
 
 
+  (** ** Global environment invariant *)
+
+  (** Connects the MetaRocq global context [Σ], the [const_map] produced
+      by conversion, and the LambdaANF environment [rho].
+      For each constant in [cmap]:
+      - it is declared in [Σ] with some body
+      - its variable is bound in [rho] to an ANF value
+      - that ANF value is related to any source value the body evaluates to *)
+  Definition global_env_inv (rho : M.t val) : Prop :=
+    forall k v,
+      lookup_const cmap k = Some v ->
+      exists decl body anf_v,
+        declared_constant Σ k decl /\
+        decl.(EAst.cst_body) = Some body /\
+        M.get v rho = Some anf_v /\
+        (forall src_v f t,
+           @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                          Σ [] body (fuel_sem.Val src_v) f t ->
+           anf_val_rel' src_v anf_v).
+
+  (** Variables from [cmap] that appear in [rho] *)
+  Definition cmap_vars : Ensemble var :=
+    fun v => exists k, lookup_const cmap k = Some v.
+
+
   (** ** Helper: set_many *)
   Fixpoint set_many (xs : list var) (vs : list val) (rho : M.t val) : M.t val :=
     match xs, vs with
@@ -175,11 +235,16 @@ Section Correct.
   Definition anf_cvt_correct_exp
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
+      wf.well_formed_env Σ vs ->
+      wellformed Σ (List.length vnames) e = true ->
+
       anf_util.env_consistent vnames vs ->
 
       Disjoint _ (FromList vnames) S ->
+      Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
+      global_env_inv rho ->
 
       anf_cvt_rel' S e vnames S' C x ->
 
@@ -199,11 +264,16 @@ Section Correct.
   Definition anf_cvt_correct_exp_step
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
+      wf.well_formed_env Σ vs ->
+      wellformed Σ (List.length vnames) e = true ->
+
       anf_util.env_consistent vnames vs ->
 
       Disjoint _ (FromList vnames) S ->
+      Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
+      global_env_inv rho ->
 
       anf_cvt_rel' S e vnames S' C x ->
 
@@ -227,11 +297,16 @@ Section Correct.
              (vs : fuel_sem.env) (args : list EAst.term)
              (vals : list value) (f t : nat) :=
     forall rho vnames C xs S S' i,
+      wf.well_formed_env Σ vs ->
+      Forall (fun t => wellformed Σ (List.length vnames) t = true) args ->
+
       anf_util.env_consistent vnames vs ->
 
       Disjoint _ (FromList vnames) S ->
+      Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
+      global_env_inv rho ->
 
       anf_cvt_rel_args' S args vnames S' C xs ->
 
