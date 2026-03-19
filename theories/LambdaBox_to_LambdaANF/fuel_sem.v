@@ -10,11 +10,40 @@ From MetaRocq.Common Require Import Primitive BasicAst Kernames.
 (** CertiRocq *)
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq.LambdaANF Require Import algebra.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_util.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
 
 Import ListNotations.
 
 Open Scope alg_scope.
+
+
+(** * Source values *)
+
+Inductive value :=
+| Con_v : dcon -> list value -> value
+| Clos_v : list value -> name -> EAst.term -> value
+| ClosFix_v : list value -> list (EAst.def EAst.term) -> nat -> value.
+
+Definition env := list value.
+
+Lemma value_ind' (P : value -> Prop) :
+  (forall dc vs, Forall P vs -> P (Con_v dc vs)) ->
+  (forall vs na e, Forall P vs -> P (Clos_v vs na e)) ->
+  (forall vs mfix n, Forall P vs -> P (ClosFix_v vs mfix n)) ->
+  (forall v, P v).
+Proof.
+  intros H1 H2 H3.
+  fix IHv 1; intros v. destruct v.
+  - eapply H1. induction l.
+    constructor.
+    constructor. eapply IHv. eassumption.
+  - eapply H2. induction l.
+    constructor.
+    constructor. eapply IHv. eassumption.
+  - eapply H3. induction l.
+    constructor.
+    constructor. eapply IHv. eassumption.
+Qed.
 
 
 (** * Result type *)
