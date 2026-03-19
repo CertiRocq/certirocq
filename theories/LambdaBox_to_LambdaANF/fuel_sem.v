@@ -9,10 +9,8 @@ From MetaRocq.Common Require Import Primitive BasicAst Kernames.
 
 (** CertiRocq *)
 From CertiRocq.Common Require Import AstCommon.
-From CertiRocq.LambdaANF Require Import
-  algebra
-  LambdaBox_to_LambdaANF_common
-  LambdaBox_to_LambdaANF_anf_util.
+From CertiRocq.LambdaANF Require Import algebra.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_util.
 
 Import ListNotations.
 

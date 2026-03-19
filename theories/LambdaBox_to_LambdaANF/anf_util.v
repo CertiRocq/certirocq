@@ -13,10 +13,8 @@ From MetaRocq.Common Require Import BasicAst.
 From compcert Require lib.Maps.
 
 (** CertiRocq *)
-From CertiRocq.LambdaANF Require Import
-  cps ctx Ensembles_util
-  LambdaBox_to_LambdaANF_common
-  LambdaBox_to_LambdaANF.
+From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF.
 
 Import ListNotations.
 
@@ -66,13 +64,13 @@ Section ANF_Val.
 
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=
-    LambdaBox_to_LambdaANF.anf_cvt_rel func_tag default_tag tgm cmap.
+    ANF.anf_cvt_rel func_tag default_tag tgm cmap.
   Definition anf_cvt_rel_args' (tgm : conId_map) (cmap : const_map) :=
-    LambdaBox_to_LambdaANF.anf_cvt_rel_args func_tag default_tag tgm cmap.
+    ANF.anf_cvt_rel_args func_tag default_tag tgm cmap.
   Definition anf_cvt_rel_mfix' (tgm : conId_map) (cmap : const_map) :=
-    LambdaBox_to_LambdaANF.anf_cvt_rel_mfix func_tag default_tag tgm cmap.
+    ANF.anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Definition anf_cvt_rel_branches' (tgm : conId_map) (cmap : const_map) :=
-    LambdaBox_to_LambdaANF.anf_cvt_rel_branches func_tag default_tag tgm cmap.
+    ANF.anf_cvt_rel_branches func_tag default_tag tgm cmap.
 
 
   (** ** Environment and consistency relations *)

@@ -17,8 +17,8 @@ From compcert Require Import lib.Coqlib lib.Maps.
 From CertiRocq.Common Require Import AstCommon compM.
 From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
-  cps cps_show eval ctx List_util Ensembles_util state
-  LambdaBox_to_LambdaANF_common.
+  cps cps_show eval ctx List_util Ensembles_util state.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
 
 Import ListNotations.
 Import Monad.MonadNotation.
