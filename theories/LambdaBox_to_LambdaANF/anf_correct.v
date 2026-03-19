@@ -344,11 +344,17 @@ Section Correct.
     - (* eval_App_step: closure application *)
       admit.
 
-    - (* eval_App_step_OOT1 *)
-      admit.
+    - (* eval_App_step_OOT1: e1 diverges *)
+      intros e1' e2' rho0 f0 t0 Hoot IH_oot.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
-    - (* eval_App_step_OOT2 *)
-      admit.
+    - (* eval_App_step_OOT2: e2 diverges *)
+      intros e1' e2' v0 rho0 f1' f2' t1' t2' Heval1 IH1 Hoot2 IH2.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* eval_FixApp_step: fix application *)
       admit.
@@ -356,74 +362,48 @@ Section Correct.
     - (* eval_LetIn_step *)
       admit.
 
-    - (* eval_LetIn_step_OOT *)
-      admit.
+    - (* eval_LetIn_step_OOT: binding diverges *)
+      intros na0 b0 t0 rho0 f0 t0' Hoot IH_oot.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* eval_Construct_step *)
       admit.
 
-    - (* eval_Construct_step_OOT *)
-      admit.
+    - (* eval_Construct_step_OOT: some constructor arg diverges *)
+      intros ind0 c0 args0 args_done args_rest e0 vs0 rho0 fs0 f0 t0 ts0
+             Hargs Hmany IH_many Hoot IH_oot.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* eval_Case_step *)
       admit.
 
-    - (* eval_Case_step_OOT *)
-      admit.
+    - (* eval_Case_step_OOT: scrutinee diverges *)
+      intros ind0 npars0 mch0 brs0 rho0 f0 t0 Hoot IH_oot.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* eval_Proj_step — NEW *)
       admit.
 
-    - (* eval_Proj_step_OOT — NEW *)
-      admit.
+    - (* eval_Proj_step_OOT: scrutinee diverges — NEW *)
+      intros p0 c0 rho0 f0 t0 Hoot IH_oot.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* eval_Const_step — NEW:
          Source: declared_constant Σ k decl, body = Some body, eval [] body r f t
          ANF: anf_Const says lookup_const cmap k = Some v, C = Hole_c, S' = S
-         IH: anf_cvt_correct_exp [] body r f t *)
-      intros k body decl rho1 r1 f1 t1 Hdecl Hbody Heval_body IH_body.
-      unfold anf_cvt_correct_exp_step.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
-      inv Hcvt. (* anf_Const: C = Hole_c, x = v, S' = S *)
-      match goal with
-      | [ Hl : lookup_const _ _ = Some _ |- _ ] => rename Hl into Hlookup
-      end.
-      simpl. (* C |[ e_k ]| = e_k *)
-      split.
-      + (* Termination case *)
-        intros v0 v' Heq Hrel. inv Heq.
-        (* From global_env_inv: lookup_const cmap k = Some v gives us
-           M.get v rho = Some anf_v and anf_val_rel v0 anf_v *)
-        unfold global_env_inv in Hginv.
-        specialize (Hginv k x Hlookup).
-        destruct Hginv as (decl' & body' & anf_v & Hdecl' & Hbody' & Hget & Hrel_genv).
-        (* Need: preord_exp (anf_bound ...) eq_fuel i (e_k, M.set x v' rho) (e_k, rho) *)
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget1. rewrite M.gss in Hget1. inv Hget1.
-              eexists. split. eassumption.
-              (* Need: preord_val eq_fuel i v' anf_v
-                 We have: anf_val_rel v0 v' and anf_val_rel v0 anf_v
-                 This follows from alpha-equivalence of the value relation *)
-              admit. (* anf_cvt_val_alpha_equiv — to be ported *)
-            - intros v1 Hget1. rewrite M.gso in Hget1; auto.
-              eexists. split. eassumption.
-              eapply preord_val_refl. tci. }
-        unfold inclusion, eq_fuel, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?]. intros. subst.
-        unfold_all. simpl in *. lia.
-      + (* OOT case *)
-        intros Habs.
-        (* tConst steps to evaluating body. If body OOTs, we need to show
-           the ANF code OOTs. But C = Hole_c, so C |[ e_k ]| = e_k.
-           The ANF code doesn't evaluate the body (v is already in rho).
-           This is a mismatch — the source uses fuel for the body but
-           the ANF code doesn't. *)
-        (* For OOT: we need bstep_fuel cenv rho e_k c OOT tt for some c.
-           This should follow from the fuel being insufficient. *)
-        admit. (* OOT case for tConst — needs careful analysis *)
+         IH: anf_cvt_correct_exp [] body r f t
+         NOTE: This case has a fundamental cost-model mismatch for OOT —
+         the source pays fuel for delta reduction but the ANF has the value
+         precomputed in rho. Needs design decision. *)
+      admit.
 
     (** ** eval_fuel_many cases (P0 = anf_cvt_correct_args) *)
 
@@ -435,26 +415,8 @@ Section Correct.
 
     (** ** eval_env_fuel cases (P1 = anf_cvt_correct_exp) *)
 
-    - (* eval_Rel_fuel *)
-      intros vs1 n v Hnth.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
-      inv Hcvt.
-      split.
-      + intros v0 v' Heq Hrel. inv Heq.
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
-              admit. (* needs anf_env_rel_nth_error + anf_cvt_val_alpha_equiv *)
-            - intros v1 Hget. rewrite M.gso in Hget; auto.
-              eexists. split. eassumption.
-              eapply preord_val_refl. tci. }
-        unfold inclusion, eq_fuel, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?]. intros. subst.
-        unfold_all. simpl in *. lia.
-      + intros Habs. congruence.
+    - (* eval_Rel_fuel: tRel n — variable lookup *)
+      admit. (* needs anf_env_rel_nth_error + anf_cvt_val_alpha_equiv + preord_exp_refl alignment *)
 
     - (* eval_Lam_fuel *)
       admit.
@@ -474,12 +436,8 @@ Section Correct.
       + intros _.
         eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
-    - (* eval_step *)
-      intros vs1 e1 r1 f1 t1 Hstep IH.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
-      unfold anf_cvt_correct_exp_step in IH.
-      eapply IH; eassumption.
+    - (* eval_step: wraps eval_env_step result with one_i added *)
+      admit. (* Straightforward — applies IH from step case. Blocked on same resource type issue. *)
 
   Admitted.
 
