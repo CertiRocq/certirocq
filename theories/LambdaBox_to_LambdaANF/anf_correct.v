@@ -416,7 +416,20 @@ Section Correct.
     (** ** eval_env_fuel cases (P1 = anf_cvt_correct_exp) *)
 
     - (* eval_Rel_fuel: tRel n — variable lookup *)
-      admit. (* needs anf_env_rel_nth_error + anf_cvt_val_alpha_equiv + preord_exp_refl alignment *)
+      intros vs1 n v Hnth.
+      unfold anf_cvt_correct_exp.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      inv Hcvt.
+      split.
+      + intros v0 v' Heq Hrel. inv Heq.
+        simpl. (* C = Hole_c, so C |[ e_k ]| = e_k *)
+        (* Goal: preord_exp cenv (anf_bound 0 0) eq_fuel i (e_k, M.set x v' rho) (e_k, rho) *)
+        intros v1 cin cout Hleq Hstep.
+        (* Step e_k in (M.set x v' rho) to get v1.
+           Need to step e_k in rho to the same result. *)
+        (* For now admit the core — this needs env equivalence machinery *)
+        admit.
+      + intros Habs. congruence.
 
     - (* eval_Lam_fuel *)
       admit.
