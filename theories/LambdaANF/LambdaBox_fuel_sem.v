@@ -1,14 +1,18 @@
 (* Environment-based big-step resource semantics for MetaRocq's EAst.term *)
 
-From Stdlib Require Import Arith.Arith NArith.BinNat micromega.Lia Strings.String
-        Lists.List.
+(** Stdlib *)
+From Stdlib Require Import Arith.Arith Lists.List.
+
+(** MetaRocq *)
 From MetaRocq.Erasure Require Import EAst EPrimitive.
 From MetaRocq.Common Require Import Primitive BasicAst Kernames.
 
-Require Import Common.AstCommon.
-Require Import LambdaANF.algebra LambdaANF.tactics.
-Require Import LambdaANF.LambdaBox_to_LambdaANF_common.
-Require Import LambdaANF.LambdaBox_to_LambdaANF_anf_util.
+(** CertiRocq *)
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq.LambdaANF Require Import
+  algebra
+  LambdaBox_to_LambdaANF_common
+  LambdaBox_to_LambdaANF_anf_util.
 
 Import ListNotations.
 

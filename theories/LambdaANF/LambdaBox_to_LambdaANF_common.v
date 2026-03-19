@@ -1,20 +1,22 @@
 (* Common definitions for converting MetaRocq Erasure (EAst.term) to LambdaANF *)
 
+(** Stdlib *)
 From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith.
-From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
 
+(** MetaRocq *)
 From MetaRocq.Erasure Require Import EAst EPrimitive.
-From MetaRocq.Common Require Import Primitive.
+From MetaRocq.Common Require Import Primitive Kernames.
 From MetaRocq.Utils Require Import bytestring.
 
-Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.state.
-Require Import compcert.lib.Maps.
+(** CompCert *)
+From compcert Require Import lib.Maps.
 
-Require Import ExtLib.Structures.Monads.
+(** CertiRocq *)
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq Require Import Pipeline_utils.
+From CertiRocq.LambdaANF Require Import cps ctx.
 
 Import ListNotations.
-Import Monad.MonadNotation.
-Open Scope monad_scope.
 Open Scope bs_scope.
 
 Local Notation string := bytestring.string.

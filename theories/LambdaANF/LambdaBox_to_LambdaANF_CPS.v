@@ -1,19 +1,23 @@
 (* CPS conversion from MetaRocq Erasure (EAst.term) to LambdaANF.cps *)
 
-From Stdlib Require Import ZArith.ZArith Lists.List
-        Sorting.Sorted Arith.Arith Sets.Ensembles.
-Require Import ExtLib.Data.String.
-From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
+(** Stdlib *)
+From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Sets.Ensembles.
 
-From MetaRocq.Erasure Require Import EAst EGlobalEnv.
+(** MetaRocq *)
+From MetaRocq.Erasure Require Import EAst.
 From MetaRocq.Utils Require Import bytestring.
 
-Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx
-        LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
-Require Import LambdaANF.LambdaBox_to_LambdaANF_common.
-Require Import compcert.lib.Coqlib compcert.lib.Maps.
+(** ExtLib *)
+From ExtLib Require Import Data.Monads.OptionMonad Structures.Monads.
 
-Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
+(** CompCert *)
+From compcert Require Import lib.Maps.
+
+(** CertiRocq *)
+From CertiRocq.Common Require Import AstCommon compM.
+From CertiRocq Require Import Pipeline_utils.
+From CertiRocq.LambdaANF Require Import
+  cps ctx state LambdaBox_to_LambdaANF_common.
 
 Import ListNotations.
 Import Monad.MonadNotation.

@@ -2,31 +2,23 @@
    Defines source value type, value relations between EAst evaluation
    results and LambdaANF values. *)
 
-Require Import MetaRocq.Utils.bytestring.
-From MetaRocq.Erasure Require Import EAst EPrimitive.
-From MetaRocq.Common Require Import Primitive.
+(** Stdlib *)
+From Stdlib Require Import ZArith.ZArith Lists.List Arith Ensembles.
 
-From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
-     Ensembles Relations.Relation_Definitions.
-Require Import Common.AstCommon.
-Require compcert.lib.Maps compcert.lib.Coqlib.
-Require Import set_util.
+(** MetaRocq *)
+From MetaRocq.Erasure Require Import EAst.
+From MetaRocq.Common Require Import BasicAst.
+
+(** CompCert *)
+From compcert Require lib.Maps.
+
+(** CertiRocq *)
+From CertiRocq.LambdaANF Require Import
+  cps ctx Ensembles_util
+  LambdaBox_to_LambdaANF_common
+  LambdaBox_to_LambdaANF.
 
 Import ListNotations.
-Open Scope list_scope.
-
-Require Import cps cps_show eval ctx logical_relations
-        List_util algebra alpha_conv functions Ensembles_util
-        LambdaANF.tactics identifiers bounds cps_util rename.
-
-Require Import LambdaANF.LambdaBox_to_LambdaANF_common.
-Require Import LambdaANF.LambdaBox_to_LambdaANF.
-
-Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
-
-Import Monad.MonadNotation.
-
-Open Scope monad_scope.
 
 
 (** * Source value type for EAst.term evaluation *)
