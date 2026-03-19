@@ -457,8 +457,8 @@ Section Correct.
       + intros _.
         eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
-    - (* eval_step: wraps eval_env_step result with one_i added *)
-      admit. (* Straightforward — applies IH from step case. Blocked on same resource type issue. *)
+    - (* eval_step: forwards to IH from eval_env_step *)
+      admit. (* Technical: needs unfolding alignment between _exp and _exp_step *)
 
   Admitted.
 
