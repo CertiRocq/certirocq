@@ -1,0 +1,338 @@
+(* Correctness of the ANF transformation from EAst.term to LambdaANF *)
+
+(** Stdlib *)
+From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
+     Ensembles Relations.Relation_Definitions.
+
+(** MetaRocq *)
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed.
+From MetaRocq.Common Require Import BasicAst Kernames.
+
+(** CompCert *)
+From compcert Require Import lib.Maps lib.Coqlib.
+
+(** CertiRocq *)
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq.LambdaANF Require Import
+  cps cps_util eval ctx logical_relations
+  List_util algebra functions Ensembles_util
+  tactics identifiers bounds stemctx set_util.
+
+From CertiRocq.LambdaBox_to_LambdaANF Require Import
+  common ANF fuel_sem anf_util.
+
+Import ListNotations.
+Open Scope list_scope.
+
+
+(** * ANF Correctness *)
+
+Section Correct.
+
+  Context (func_tag kon_tag default_tag default_itag : positive)
+          (cnstrs : conId_map)
+          (cmap : const_map)
+          (cenv : ctor_env).
+
+  Context (Σ : EAst.global_context).
+
+  Context (dcon_to_tag_inj :
+    forall tgm dc dc',
+      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+
+
+  (** ** Source fuel and trace *)
+
+  Definition fuel_exp (e : EAst.term) : nat :=
+    match e with
+    | EAst.tLetIn _ _ _ => 0
+    | _ => 1
+    end.
+
+  Fixpoint max_m_branches (brs : list (list name * EAst.term)) : nat :=
+    match brs with
+    | [] => 0
+    | (names, _) :: brs' => max (List.length names) (max_m_branches brs')
+    end.
+
+  Definition anf_trace_exp (e : EAst.term) : nat :=
+    match e with
+    | EAst.tRel _ => 1
+    | EAst.tLambda _ _ => 2
+    | EAst.tApp _ _ => 2
+    | EAst.tLetIn _ _ _ => 0
+    | EAst.tFix _ _ => 2
+    | EAst.tConstruct _ _ _ => 2
+    | EAst.tCase _ _ brs => 4 + max_m_branches brs
+    | EAst.tBox => 2
+    | EAst.tConst _ => 1
+    | EAst.tProj _ _ => 2
+    | EAst.tPrim _ => 2
+    | _ => 0
+    end.
+
+  Program Instance fuel_resource_LambdaBox : @resource EAst.term nat :=
+    { zero := 0;
+      one_i := fuel_exp;
+      plus := Nat.add
+    }.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+
+  Program Instance trace_resource_LambdaBox : @resource EAst.term nat :=
+    { zero := 0;
+      one_i := anf_trace_exp;
+      plus := Nat.add
+    }.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+
+  Global Instance LambdaBox_resource_fuel : @LambdaBox_resource nat.
+  Proof. constructor. eapply fuel_resource_LambdaBox. Defined.
+
+  Global Instance LambdaBox_resource_trace : @LambdaBox_resource nat.
+  Proof. constructor. eapply trace_resource_LambdaBox. Defined.
+
+
+  (** ** LambdaANF fuel and trace *)
+
+  Global Program Instance trace_res_pre : @resource fin unit :=
+    { zero := tt;
+      one_i fin := tt;
+      plus x y := tt; }.
+  Next Obligation. destruct x. reflexivity. Qed.
+  Next Obligation. destruct x; destruct y. reflexivity. Qed.
+
+  Global Program Instance trace_res_exp : @exp_resource unit :=
+    { HRes := trace_res_pre }.
+
+  Global Instance trace_res : @trace_resource unit.
+  Proof. econstructor. eapply trace_res_exp. Defined.
+
+  Definition eq_fuel : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => f1 = f2.
+
+  Definition anf_bound (f_src t_src : nat) : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) =>
+      (f1 + f_src <= f2)%nat /\
+      (f2 <= f1 + t_src)%nat.
+
+  Ltac unfold_all :=
+    try unfold zero in *;
+    try unfold one_ctx in *;
+    try unfold algebra.one in *;
+    try unfold one_i in *;
+    try unfold algebra.HRes in *;
+    try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
+    try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
+
+  Global Instance eq_fuel_compat :
+    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel.
+  Proof.
+    unfold eq_fuel. constructor; try now (intro; intros; intro; intros; unfold_all; simpl; lia).
+    - intro; intros. unfold post_base'. unfold_all; simpl. lia.
+    - firstorder.
+  Qed.
+
+  Lemma eq_fuel_idemp :
+    inclusion _ (comp eq_fuel eq_fuel) eq_fuel.
+  Proof.
+    unfold comp, eq_fuel. intro; intros.
+    destruct x as [[[? ?] ?] ?].
+    destruct y as [[[? ?] ?] ?]. destructAll.
+    destruct x as [[[? ?] ?] ?]. congruence.
+  Qed.
+
+
+  (** ** Shorthands *)
+
+  Definition anf_cvt_rel' := ANF.anf_cvt_rel func_tag default_tag cnstrs cmap.
+  Definition anf_cvt_rel_args' := ANF.anf_cvt_rel_args func_tag default_tag cnstrs cmap.
+  Definition anf_cvt_rel_mfix' := ANF.anf_cvt_rel_mfix func_tag default_tag cnstrs cmap.
+  Definition anf_cvt_rel_branches' := ANF.anf_cvt_rel_branches func_tag default_tag cnstrs cmap.
+
+  Definition anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
+  Definition anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
+  Definition anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
+
+
+  (** ** Helper: set_many *)
+  Fixpoint set_many (xs : list var) (vs : list val) (rho : M.t val) : M.t val :=
+    match xs, vs with
+    | x :: xs', v :: vs' => M.set x v (set_many xs' vs' rho)
+    | _, _ => rho
+    end.
+
+
+  (** ** Main correctness statement *)
+
+  (** For an expression that evaluates via [eval_env_fuel]:
+      - if it terminates with value [v] and [v] is related to [v'] by [anf_val_rel],
+        then the ANF code [C |[ e_k ]|] is related to [e_k{x := v'}] by [preord_exp]
+      - if it diverges, the ANF code diverges too *)
+  Definition anf_cvt_correct_exp
+             (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
+    forall rho vnames C x S S' i,
+      anf_util.env_consistent vnames vs ->
+
+      Disjoint _ (FromList vnames) S ->
+
+      anf_env_rel' vnames vs rho ->
+
+      anf_cvt_rel' S e vnames S' C x ->
+
+      forall e_k,
+        Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
+
+        (* Source terminates *)
+        (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
+         preord_exp cenv (anf_bound f t) eq_fuel i
+                    (e_k, M.set x v' rho)
+                    (C |[ e_k ]|, rho)) /\
+        (* Source diverges *)
+        (r = fuel_sem.OOT ->
+         exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
+
+
+  Definition anf_cvt_correct_exp_step
+             (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
+    forall rho vnames C x S S' i,
+      anf_util.env_consistent vnames vs ->
+
+      Disjoint _ (FromList vnames) S ->
+
+      anf_env_rel' vnames vs rho ->
+
+      anf_cvt_rel' S e vnames S' C x ->
+
+      forall e_k,
+        Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
+
+        (* Source terminates *)
+        (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
+                      preord_exp cenv
+                                 (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
+                                            (t <+> @one_i _ _ trace_resource_LambdaBox e))
+                                 eq_fuel i
+                                 (e_k, M.set x v' rho)
+                                 (C |[ e_k ]|, rho)) /\
+        (* Source diverges *)
+        (r = fuel_sem.OOT ->
+         exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
+
+
+  Definition anf_cvt_correct_args
+             (vs : fuel_sem.env) (args : list EAst.term)
+             (vals : list value) (f t : nat) :=
+    forall rho vnames C xs S S' i,
+      anf_util.env_consistent vnames vs ->
+
+      Disjoint _ (FromList vnames) S ->
+
+      anf_env_rel' vnames vs rho ->
+
+      anf_cvt_rel_args' S args vnames S' C xs ->
+
+      NoDup xs ->
+
+      forall e_k,
+        Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList xs) ->
+
+        (forall vs',
+           Forall2 anf_val_rel' vals vs' ->
+           preord_exp cenv (anf_bound f t) eq_fuel i
+                      (e_k, set_many xs vs' rho)
+                      (C |[ e_k ]|, rho)) /\
+        True. (* OOT case omitted for now *)
+
+
+  (** ** Main correctness theorem *)
+
+  Lemma anf_cvt_correct :
+    forall vs e r f t,
+      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ vs e r f t ->
+      anf_cvt_correct_exp vs e r f t.
+  Proof.
+    intros vs e r f t Heval.
+    eapply eval_env_fuel_ind' with
+      (P := anf_cvt_correct_exp_step)
+      (P0 := anf_cvt_correct_args)
+      (P1 := anf_cvt_correct_exp);
+      try eassumption.
+
+    (* Each case of the mutual induction follows. *)
+
+    (** ** eval_env_step cases (P = anf_cvt_correct_exp_step) *)
+
+    - (* eval_App_step: closure application *)
+      admit.
+
+    - (* eval_App_step_OOT1 *)
+      admit.
+
+    - (* eval_App_step_OOT2 *)
+      admit.
+
+    - (* eval_FixApp_step: fix application *)
+      admit.
+
+    - (* eval_LetIn_step *)
+      admit.
+
+    - (* eval_LetIn_step_OOT *)
+      admit.
+
+    - (* eval_Construct_step *)
+      admit.
+
+    - (* eval_Construct_step_OOT *)
+      admit.
+
+    - (* eval_Case_step *)
+      admit.
+
+    - (* eval_Case_step_OOT *)
+      admit.
+
+    - (* eval_Proj_step — NEW *)
+      admit.
+
+    - (* eval_Proj_step_OOT — NEW *)
+      admit.
+
+    - (* eval_Const_step — NEW *)
+      admit.
+
+    (** ** eval_fuel_many cases (P0 = anf_cvt_correct_args) *)
+
+    - (* eval_many_nil *)
+      admit.
+
+    - (* eval_many_cons *)
+      admit.
+
+    (** ** eval_env_fuel cases (P1 = anf_cvt_correct_exp) *)
+
+    - (* eval_Rel_fuel *)
+      admit.
+
+    - (* eval_Lam_fuel *)
+      admit.
+
+    - (* eval_Fix_fuel *)
+      admit.
+
+    - (* eval_Box_fuel *)
+      admit.
+
+    - (* eval_OOT *)
+      admit.
+
+    - (* eval_step *)
+      admit.
+
+  Admitted.
+
+End Correct.

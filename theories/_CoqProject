@@ -79,6 +79,7 @@ LambdaBox_to_LambdaANF/ANF.v
 LambdaBox_to_LambdaANF/CPS.v
 LambdaBox_to_LambdaANF/fuel_sem.v
 LambdaBox_to_LambdaANF/anf_util.v
+LambdaBox_to_LambdaANF/anf_correct.v
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v
