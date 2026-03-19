@@ -124,10 +124,10 @@ Section Correct.
   Next Obligation. lia. Qed.
   Next Obligation. lia. Qed.
 
-  Global Instance LambdaBox_resource_fuel : @LambdaBox_resource nat.
+  Instance LambdaBox_resource_fuel : @LambdaBox_resource nat.
   Proof. constructor. eapply fuel_resource_LambdaBox. Defined.
 
-  Global Instance LambdaBox_resource_trace : @LambdaBox_resource nat.
+  Instance LambdaBox_resource_trace : @LambdaBox_resource nat.
   Proof. constructor. eapply trace_resource_LambdaBox. Defined.
 
 
@@ -416,19 +416,15 @@ Section Correct.
     (** ** eval_env_fuel cases (P1 = anf_cvt_correct_exp) *)
 
     - (* eval_Rel_fuel: tRel n — variable lookup *)
-      intros vs1 n v Hnth.
+      intros n vs1 v Hnth.
       unfold anf_cvt_correct_exp.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
       inv Hcvt.
+      simpl.
       split.
-      + intros v0 v' Heq Hrel. inv Heq.
-        simpl. (* C = Hole_c, so C |[ e_k ]| = e_k *)
-        (* Goal: preord_exp cenv (anf_bound 0 0) eq_fuel i (e_k, M.set x v' rho) (e_k, rho) *)
-        intros v1 cin cout Hleq Hstep.
-        (* Step e_k in (M.set x v' rho) to get v1.
-           Need to step e_k in rho to the same result. *)
-        (* For now admit the core — this needs env equivalence machinery *)
-        admit.
+      + (* Termination: C = Hole_c, x = v0, S' = S *)
+        intros v0 v' Heq Hrel. inv Heq.
+        admit. (* needs preord_exp_refl with env equivalence — instance resolution issue *)
       + intros Habs. congruence.
 
     - (* eval_Lam_fuel *)
