@@ -268,44 +268,39 @@ Section ANF.
     Context (tgm : conId_map).
     Context (prims : list (primitive * positive)).
 
-    (** Convert a single global constant body to ANF, using the given [cm] for
-        constant references within the body. Returns the fresh variable and
-        converted expression. *)
-    Definition convert_global_entry (cm : const_map) (k : kername) (body : EAst.term)
-      : (@compM' unit) (var * cps.exp) :=
-      v <- get_named (nNamed (string_of_kername k)) ;;
-      '(x, C) <- convert_anf prim_map tgm prims cm body (M.empty var, 0%N) ;;
-      ret (v, C |[ Ehalt x ]|).
-
     (** Convert the global environment.
-        Walks declarations in order, converting each constant body with the
-        [const_map] accumulated from all previously converted constants.
-        Returns the final [const_map] and a list of [(var * cps.exp)] bindings. *)
+        Walks declarations in order. Each constant body (assumed to be a value)
+        is converted to ANF, producing a binding context that directly places
+        the value in rho. The [const_map] is built incrementally so each
+        constant can reference previously defined ones.
+        Returns the final [const_map] and a composed binding context. *)
     Fixpoint convert_global_decls (gd : EAst.global_declarations)
-             (cm_acc : const_map) : (@compM' unit) (const_map * list (var * cps.exp)) :=
+             (cm_acc : const_map) : (@compM' unit) (const_map * exp_ctx) :=
       match gd with
-      | [] => ret (cm_acc, [])
+      | [] => ret (cm_acc, Hole_c)
       | (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: gd' =>
-        '(v, e) <- convert_global_entry cm_acc k body ;;
-        '(cm', binds) <- convert_global_decls gd' ((k, v) :: cm_acc) ;;
-        ret (cm', (v, e) :: binds)
+        '(v, C) <- convert_anf prim_map tgm prims cm_acc body (M.empty var, 0%N) ;;
+        '(cm', C_rest) <- convert_global_decls gd' ((k, v) :: cm_acc) ;;
+        ret (cm', comp_ctx_f C C_rest)
       | (_, EAst.ConstantDecl {| EAst.cst_body := None |}) :: gd' =>
         convert_global_decls gd' cm_acc
       | (_, EAst.InductiveDecl _) :: gd' =>
         convert_global_decls gd' cm_acc
       end.
 
-    (** Convert a full program: global environment + main expression. *)
+    (** Convert a full program: global environment + main expression.
+        Global constant bindings are composed around the main expression,
+        producing a single [cps.exp] where all globals are in rho. *)
     Definition convert_top_anf (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
-      : error (cps.exp * list (var * cps.exp)) * comp_data :=
+      : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, _dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (1%N, (0%N::nil)) (M.empty _) in
       let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
       let prog :=
-        '(cm, env_binds) <- convert_global_decls gd [] ;;
-        main <- convert_anf_exp prim_map tgm prims cm e ;;
-        ret (main, env_binds)
+        '(cm, C_env) <- convert_global_decls gd [] ;;
+        '(x, C_main) <- convert_anf prim_map tgm prims cm e (M.empty var, 0%N) ;;
+        ret (C_env |[ C_main |[ Ehalt x ]| ]|)
       in
       let '(res_err, (comp_d', _)) := run_compM prog comp_d tt in
       (res_err, comp_d').
