@@ -424,7 +424,7 @@ Section Correct.
       split.
       + (* Termination: C = Hole_c, x = v0, S' = S *)
         intros v0 v' Heq Hrel. inv Heq.
-        admit. (* needs preord_exp_refl with env equivalence — instance resolution issue *)
+        admit. (* needs preord_exp_refl — to be fixed *)
       + intros Habs. congruence.
 
     - (* eval_Lam_fuel *)
