@@ -77,6 +77,7 @@ LambdaANF/LambdaBox_to_LambdaANF_common.v
 LambdaANF/LambdaBox_to_LambdaANF.v
 LambdaANF/LambdaBox_to_LambdaANF_CPS.v
 LambdaANF/LambdaBox_to_LambdaANF_anf_util.v
+LambdaANF/LambdaBox_fuel_sem.v
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v
