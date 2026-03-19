@@ -17,7 +17,7 @@ Large parts of the CertiRocq compiler have been verified whereas others are in t
 
 ## Documentation
 
-The [CertiRocq Wiki](https://github.com/PrincetonUniversity/certirocq/wiki) has instructions for using the [CertiRocq plugin](https://github.com/PrincetonUniversity/certirocq/wiki/The-CertiRocq-plugin) to compile Gallina to C and interfacing with the generated C code.
+The [CertiRocq Wiki](https://github.com/certirocq/certirocq/wiki) has instructions for using the [CertiRocq plugin](https://github.com/certirocq/certirocq/wiki/The-CertiRocq-plugin) to compile Gallina to C and interfacing with the generated C code.
 
 You can also find some demos [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/tests.v) and [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/axioms/tests.v).
 
