@@ -424,7 +424,19 @@ Section Correct.
       split.
       + (* Termination: C = Hole_c, x = v0, S' = S *)
         intros v0 v' Heq Hrel. inv Heq.
-        admit. (* needs preord_exp_refl — to be fixed *)
+        change (preord_exp cenv (anf_bound 0 0) eq_fuel i (e_k, M.set x v' rho) (e_k, rho)).
+        eapply preord_exp_post_monotonic with (P1 := eq_fuel).
+        { unfold inclusion, eq_fuel, anf_bound.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?]. intros. subst.
+          unfold_all. simpl in *. lia. }
+        eapply preord_exp_refl. now eapply eq_fuel_compat.
+        intros y Hy.
+        destruct (Pos.eq_dec y x) as [Heq | Hneq].
+        * subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
+          admit. (* needs anf_env_rel_nth_error + anf_cvt_val_alpha_equiv *)
+        * intros v1 Hget. rewrite M.gso in Hget; auto.
+          eexists. split. eassumption.
+          eapply preord_val_refl. tci.
       + intros Habs. congruence.
 
     - (* eval_Lam_fuel *)
