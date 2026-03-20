@@ -271,6 +271,107 @@ Section Correct.
         * intros k Hnth. exact (Hdup (S k) Hnth).
   Qed.
 
+  (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
+  Local Ltac anf_result_in_S :=
+    match goal with
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor; [ exact Hin | exact Hmem ]
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S2,
+        Hsub : ?S2 \subset ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor; [ exact Hin | eapply Hsub; exact Hmem ]
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S3,
+        Hsub2 : ?S3 \subset ?S2,
+        Hsub1 : ?S2 \subset ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor;
+      [ exact Hin | eapply Hsub1; eapply Hsub2; exact Hmem ]
+    end.
+
+  (** If the result variable of an ANF conversion equals vn[i],
+      then the evaluation result equals rho[i]. *)
+  Lemma anf_cvt_rel_var_lookup :
+    forall rho e r f t,
+      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ rho e r f t ->
+      forall v, r = fuel_sem.Val v ->
+      forall S vn S' C x i,
+        ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
+        Disjoint _ (FromList vn) S ->
+        Disjoint _ (fun v => exists kn, lookup_const cmap kn = Some v) S ->
+        anf_util.env_consistent vn rho ->
+        nth_error vn i = Some x ->
+        nth_error rho i = Some v.
+  Proof.
+    pose (Plookup := fun (rho : fuel_sem.env) (e : EAst.term)
+                          (r : fuel_sem.result) (f : nat) (t : nat) =>
+      forall v, r = fuel_sem.Val v ->
+      forall S vn S' C x i,
+        ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
+        Disjoint _ (FromList vn) S ->
+        Disjoint _ (fun v => exists kn, lookup_const cmap kn = Some v) S ->
+        anf_util.env_consistent vn rho ->
+        nth_error vn i = Some x ->
+        nth_error rho i = Some v).
+    intros rho e r f t Heval.
+    eapply (eval_env_fuel_ind'
+              (Hf := LambdaBox_resource_fuel)
+              (Ht := LambdaBox_resource_trace))
+      with (P := Plookup) (P0 := fun _ _ _ _ _ => True) (P1 := Plookup);
+    unfold Plookup; clear Plookup; try eassumption.
+
+    all: try (intros; congruence).
+    all: try (intros; exact I).
+
+    (* Most step cases: result x ∈ S leads to contradiction with Disjoint (FromList vn) S *)
+    (* eval_App_step, eval_FixApp_step, eval_Construct_step, eval_Case_step, eval_Proj_step, eval_Const_step *)
+    all: try (intros; subst;
+              match goal with
+              | [ H : ANF.anf_cvt_rel _ _ _ _ _ _ _ _ _ |- _ ] => inv H
+              end;
+              match goal with
+              | [ Hnth : nth_error ?vn _ = Some ?x |- _ ] =>
+                assert (Hin : x \in FromList vn) by (eapply nth_error_In; exact Hnth)
+              end;
+              try anf_result_in_S;
+              try (match goal with
+                   | [ H1 : ANF.anf_cvt_rel _ _ _ _ _ ?S2 _ _ _,
+                       H2 : ANF.anf_cvt_rel _ _ _ _ _ _ ?S3 _ _ |- _ ] =>
+                     assert (S3 \subset S2) by (eapply anf_util.anf_cvt_exp_subset; eassumption);
+                     assert (S2 \subset _) by (eapply anf_util.anf_cvt_exp_subset; eassumption)
+                   end; anf_result_in_S)).
+
+    (* eval_LetIn_step — the key case: use IH2 with extended env *)
+    - admit. (* needs careful LetIn handling with env_consistent_extend *)
+
+    (* eval_Rel_fuel *)
+    - (* eval_Rel_fuel: nth_error rho n = Some v, anf_cvt_rel for tRel *)
+      intros n0 rho0 v0 Hnth_rho v Hv S vn S' C x i Hcvt Hdis Hdis_cm Hcons Hnth_vn.
+      subst. inversion Hcvt; subst.
+      erewrite Hcons; [ exact Hnth_rho | exact Hnth_vn | ].
+      match goal with | [ H : nth_error _ _ = Some _ |- _ ] => exact H end.
+
+    (* eval_Lam_fuel, eval_Fix_fuel, eval_Box_fuel: result x ∈ S, contradiction *)
+    all: try (intros; subst;
+              match goal with
+              | [ H : fuel_sem.Val _ = fuel_sem.Val _ |- _ ] => inv H
+              end;
+              match goal with
+              | [ H : ANF.anf_cvt_rel _ _ _ _ _ _ _ _ _ |- _ ] => inv H
+              end;
+              match goal with
+              | [ Hnth : nth_error ?vn _ = Some ?x |- _ ] =>
+                assert (Hin : x \in FromList vn) by (eapply nth_error_In; exact Hnth)
+              end;
+              try anf_result_in_S).
+
+    - (* eval_step *) intros ????? ? IH. exact IH.
+  Admitted.
+
+
   (** ** One-step reduction lemmas for preord_exp *)
 
   Definition one_step : @PostT nat unit :=
