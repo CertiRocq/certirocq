@@ -181,6 +181,132 @@ Section Correct.
   Qed.
 
 
+  (** ** Environment relation helpers *)
+
+  Lemma anf_env_rel_weaken vnames vs x v rho :
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    ~ x \in FromList vnames ->
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs (M.set x v rho).
+  Proof.
+    unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
+    intros Henv Hnin.
+    revert vnames Henv Hnin. induction vs; intros vnames Henv Hnin.
+    - inv Henv. constructor.
+    - destruct vnames as [ | y vnames']; [ inv Henv | ].
+      inv Henv. constructor.
+      + destruct H2 as [v' [Hget Hrel]].
+        eexists. split; [ | eassumption ].
+        rewrite M.gso; [ eassumption | ].
+        intros Heq. subst. apply Hnin. left. reflexivity.
+      + eapply IHvs; [ eassumption | ].
+        intros Hin. apply Hnin. right. exact Hin.
+  Qed.
+
+  Lemma anf_env_rel_extend_weaken vnames vs x v v' rho :
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v' ->
+    ~ x \in FromList vnames ->
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap (x :: vnames) (v :: vs) (M.set x v' rho).
+  Proof.
+    unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
+    intros Henv Hval Hnin.
+    constructor.
+    - eexists. split; [ rewrite M.gss; reflexivity | eassumption ].
+    - eapply anf_env_rel_weaken; eassumption.
+  Qed.
+
+
+  Lemma env_consistent_extend vn rho x1 v1 :
+    anf_util.env_consistent vn rho ->
+    (forall k, nth_error vn k = Some x1 -> nth_error rho k = Some v1) ->
+    anf_util.env_consistent (x1 :: vn) (v1 :: rho).
+  Proof.
+    intros Hcons Hx1 i j y Hi Hj.
+    destruct i as [ | i'], j as [ | j']; simpl in *.
+    - reflexivity.
+    - inv Hi. specialize (Hx1 j' Hj). rewrite Hx1. reflexivity.
+    - inv Hj. specialize (Hx1 i' Hi). rewrite Hx1. reflexivity.
+    - eapply Hcons; eassumption.
+  Qed.
+
+  Lemma anf_env_rel_extend vnames vs x v v' rho :
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    M.get x rho = Some v' ->
+    anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v' ->
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap (x :: vnames) (v :: vs) rho.
+  Proof.
+    unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
+    intros Henv Hget Hval. constructor; eauto.
+  Qed.
+
+  (** Setting a variable preserves env_rel when the value is related
+      at every position where the variable appears in vnames. *)
+  Lemma anf_env_rel_set vnames vs x v' rho :
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    (forall k, nth_error vnames k = Some x ->
+      exists v, nth_error vs k = Some v /\
+                anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v') ->
+    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs (M.set x v' rho).
+  Proof.
+    unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
+    intros Henv Hdup.
+    revert vs Henv Hdup.
+    induction vnames as [ | y vnames' IH]; intros vs Henv Hdup.
+    - inv Henv. constructor.
+    - destruct vs as [ | v_s vs']; [inv Henv | ].
+      inv Henv. constructor.
+      + destruct (Pos.eq_dec y x) as [-> | Hneq].
+        * rewrite M.gss.
+          destruct (Hdup 0%nat eq_refl) as [v_src [Hnth Hrel]].
+          simpl in Hnth. inv Hnth.
+          eexists; eauto.
+        * rewrite M.gso; [ | auto].
+          match goal with
+          | [ H : exists _, _ |- _ ] => exact H
+          end.
+      + eapply IH.
+        * match goal with
+          | [ H : Forall2 _ _ _ |- _ ] => exact H
+          end.
+        * intros k Hnth. exact (Hdup (S k) Hnth).
+  Qed.
+
+  (** ** One-step reduction lemmas for preord_exp *)
+
+  Definition one_step : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + 1)%nat = f2.
+
+  Lemma preord_exp_Efun_red k e B rho :
+    preord_exp cenv one_step eq_fuel k (e, def_funs B B rho rho) (Efun B e, rho).
+  Proof.
+    intros r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor. eassumption.
+    split. simpl. unfold_all. lia.
+    eapply preord_res_refl; tci.
+  Qed.
+
+  Lemma preord_exp_Econstr_red k x ctag ys e rho vs :
+    get_list ys rho = Some vs ->
+    preord_exp cenv one_step eq_fuel k (e, M.set x (Vconstr ctag vs) rho) (Econstr x ctag ys e, rho).
+  Proof.
+    intros Hgvs r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor; eauto.
+    split. simpl. unfold_all. lia.
+    eapply preord_res_refl; tci.
+  Qed.
+
+  Lemma preord_exp_Eproj_red k x ctag n y e rho v vs :
+    M.get y rho = Some (Vconstr ctag vs) ->
+    nthN vs n = Some v ->
+    preord_exp cenv one_step eq_fuel k (e, M.set x v rho) (Eproj x ctag n y e, rho).
+  Proof.
+    intros Hget Hnth r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor; eauto.
+    split. simpl. unfold_all. lia.
+    eapply preord_res_refl; tci.
+  Qed.
+
+
   (** ** Shorthands *)
 
   Definition anf_cvt_rel' := ANF.anf_cvt_rel func_tag default_tag cnstrs cmap.
@@ -449,9 +575,12 @@ Section Correct.
       inv Hcvt. simpl.
       split.
       + intros v0 v' Heq Hrel. inv Heq.
-        admit. (* needs preord_exp chain: post_monotonic + trans via Efun step
-                  + env bridging between M.set x v' rho and def_funs B B rho rho
-                  + alpha-equiv for the x ↦ v' vs x ↦ Vfun rho B x case *)
+        (* Prove entirely at the bstep level *)
+        intros v1 cin cout Hleq Hstep.
+        (* e_k steps in M.set x v' rho. The ANF side does Efun_red then steps in def_funs rho.
+           def_funs (Fcons x ...) rho = M.set x (Vfun rho (Fcons x ...) x) rho.
+           Need to bridge M.set x v' rho and M.set x (Vfun ...) rho. *)
+        admit. (* needs alpha-equiv + preord_exp machinery *)
       + intros Habs. congruence.
 
     - (* eval_Fix_fuel: tFix mfix idx → ClosFix_v vs mfix idx
