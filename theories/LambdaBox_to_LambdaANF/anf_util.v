@@ -225,4 +225,183 @@ Section ANF_Val.
           -- exact Hfresh'.
   Qed.
 
+  (** ** Subset lemma: ANF conversion shrinks the fresh set *)
+
+  Lemma anf_cvt_exp_subset S e vn S' C x :
+    anf_cvt_rel' cnstrs cmap S e vn S' C x -> S' \subset S.
+  Proof.
+    unfold anf_cvt_rel'.
+    intros H.
+    eapply (ANF.anf_cvt_rel_ind' func_tag default_tag cnstrs cmap
+      (fun S e vn S' C x => S' \subset S)
+      (fun S args vn S' C xs => S' \subset S)
+      (fun S mfix vn fnames S' fdefs => S' \subset S)
+      (fun S ind brs n vn r S' pats => S' \subset S));
+    try eassumption; clear; intros.
+    (* anf_Rel *)
+    - eapply Included_refl.
+    (* anf_Lam *)
+    - eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; eapply Setminus_Included.
+    (* anf_App *)
+    - eapply Included_trans; [ eapply Setminus_Included | ].
+      eapply Included_trans; eassumption.
+    (* anf_Construct *)
+    - eapply Included_trans; [ eassumption | eapply Setminus_Included ].
+    (* anf_LetIn *)
+    - eapply Included_trans; eassumption.
+    (* anf_Case *)
+    - eapply Included_trans; [ eapply Setminus_Included | ].
+      eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; eapply Setminus_Included.
+    (* anf_Fix *)
+    - eapply Included_trans; [ eassumption | eapply Setminus_Included ].
+    (* anf_Box *)
+    - eapply Setminus_Included.
+    (* anf_Const *)
+    - eapply Included_refl.
+    (* anf_Proj *)
+    - eapply Included_trans; [ eapply Setminus_Included | eassumption ].
+    (* anf_Prim *)
+    - eapply Setminus_Included.
+    (* anf_Args_nil *)
+    - eapply Included_refl.
+    (* anf_Args_cons *)
+    - eapply Included_trans; eassumption.
+    (* anf_Mfix_nil *)
+    - eapply Included_refl.
+    (* anf_Mfix_cons *)
+    - eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; [ eassumption | eapply Setminus_Included ].
+    (* anf_Branches_nil *)
+    - eapply Included_refl.
+    (* anf_Branches_cons:
+       IH_branches: S2 ⊆ S1, IH_body: S3 ⊆ S2 \\ FromList vars.
+       Need: S3 ⊆ S1. *)
+    - eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; [ eapply Setminus_Included | eassumption ].
+  Qed.
+
+  Lemma anf_cvt_args_subset S args vn S' C xs :
+    anf_cvt_rel_args' cnstrs cmap S args vn S' C xs -> S' \subset S.
+  Proof.
+    unfold anf_cvt_rel_args'. intros H.
+    induction H.
+    - eapply Included_refl.
+    - eapply Included_trans; [ eassumption | ].
+      eapply anf_cvt_exp_subset. eassumption.
+  Qed.
+
+  Lemma anf_cvt_mfix_subset S mfix vn fnames S' fdefs :
+    anf_cvt_rel_mfix' cnstrs cmap S mfix vn fnames S' fdefs -> S' \subset S.
+  Proof.
+    unfold anf_cvt_rel_mfix'. intros H.
+    induction H.
+    - eapply Included_refl.
+    - eapply Included_trans; [ eassumption | ].
+      eapply Included_trans; [ eapply anf_cvt_exp_subset; eassumption | ].
+      eapply Setminus_Included.
+  Qed.
+
+  Lemma anf_cvt_branches_subset S ind brs n vn r S' pats :
+    anf_cvt_rel_branches' cnstrs cmap S ind brs n vn r S' pats -> S' \subset S.
+  Proof.
+    unfold anf_cvt_rel_branches'. intros H.
+    induction H.
+    - eapply Included_refl.
+    - eapply Included_trans; [ eapply anf_cvt_exp_subset; eassumption | ].
+      eapply Included_trans; [ eapply Setminus_Included | eassumption ].
+  Qed.
+
+
+  (** ** Result variable is consumed from S *)
+
+  Lemma anf_cvt_result_not_in_output S e vn S' C x :
+    anf_cvt_rel' cnstrs cmap S e vn S' C x ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (fun v => exists k, lookup_const cmap k = Some v) S ->
+    ~ x \in S'.
+  Proof.
+    unfold anf_cvt_rel'. intros Hcvt Hdis Hdis_cm.
+    induction Hcvt; intros Hin.
+    - (* anf_Rel *)
+      eapply Hdis. constructor; [ eapply nth_error_In; eassumption | exact Hin ].
+    - (* anf_Lam *)
+      assert (Hsub : S' \subset S \\ [set x1] \\ [set f])
+        by (eapply anf_cvt_exp_subset; eassumption).
+      apply Hsub in Hin. destruct Hin as [_ Habs]. apply Habs. constructor.
+    - (* anf_App *)
+      inv Hin. eauto.
+    - (* anf_Construct *)
+      assert (Hsub : S2 \subset S1 \\ [set x])
+        by (eapply anf_cvt_args_subset; eassumption).
+      apply Hsub in Hin. destruct Hin as [_ Habs]. apply Habs. constructor.
+    - (* anf_LetIn *)
+      eapply IHHcvt2; [ | | exact Hin ].
+      + rewrite FromList_cons. eapply Union_Disjoint_l.
+        * eapply Disjoint_Singleton_l.
+          eapply IHHcvt1; eassumption.
+        * eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; eassumption | exact Hdis ].
+      + eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm ].
+    - (* anf_Case *)
+      inv Hin. eauto.
+    - (* anf_Fix *)
+      assert (Hsub : S2 \subset S1 \\ FromList fnames)
+        by (eapply anf_cvt_mfix_subset; eassumption).
+      apply Hsub in Hin. destruct Hin as [_ Habs].
+      apply Habs. eapply nth_error_In. eassumption.
+    - (* anf_Box *)
+      inv Hin. eauto.
+    - (* anf_Const: x = v from cmap, S' = S *)
+      eapply Hdis_cm. constructor; [ | exact Hin ].
+      match goal with
+      | [ Hl : lookup_const _ ?kn = Some _ |- _ ] => exists kn; exact Hl
+      end.
+    - (* anf_Proj *)
+      inv Hin. eauto.
+    - (* anf_Prim *)
+      inv Hin. eauto.
+  Qed.
+
+
+  (** ** Lookup in related environments *)
+
+  Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
+    Forall2 R l1 l2 ->
+    nth_error l1 k = Some a ->
+    exists b, nth_error l2 k = Some b /\ R a b.
+  Proof.
+    intros HF. revert k. induction HF; intros k Hn.
+    - destruct k; discriminate.
+    - destruct k as [ | k']; simpl in Hn.
+      + inv Hn. eexists. split; [reflexivity | assumption].
+      + eapply IHHF. exact Hn.
+  Qed.
+
+  Lemma anf_env_rel_nth_error vnames vs rho n v x :
+    anf_env_rel' anf_val_rel vnames vs rho ->
+    nth_error vs n = Some v ->
+    nth_error vnames n = Some x ->
+    exists v', M.get x rho = Some v' /\ anf_val_rel v v'.
+  Proof.
+    revert vnames n. induction vs as [ | v0 vs' IH]; intros vnames n Henv Hnth_v Hnth_x.
+    - destruct n; discriminate.
+    - inv Henv. destruct n as [ | n'].
+      + simpl in Hnth_v, Hnth_x. inv Hnth_v. inv Hnth_x.
+        match goal with
+        | [ H : exists _, _ |- _ ] => destruct H as [v' [Hget Hrel]]
+        end.
+        eexists. split; eassumption.
+      + simpl in Hnth_v, Hnth_x.
+        eapply IH; eassumption.
+  Qed.
+
+  Lemma anf_env_rel_length vnames vs rho :
+    anf_env_rel' anf_val_rel vnames vs rho ->
+    List.length vnames = List.length vs.
+  Proof.
+    intros H. symmetry. eapply Forall2_length. exact H.
+  Qed.
+
 End ANF_Val.
