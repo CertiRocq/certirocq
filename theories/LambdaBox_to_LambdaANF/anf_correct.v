@@ -449,11 +449,9 @@ Section Correct.
       inv Hcvt. simpl.
       split.
       + intros v0 v' Heq Hrel. inv Heq.
-        (* The goal is preord_exp (anf_bound 0 trace) eq_fuel i
-           (e_k, M.set x v' rho) (Efun (Fcons x ...) e_k, rho).
-           Strategy: monotonicity from eq_fuel, then trans via Efun_red,
-           then refl with env bridging. *)
-        admit. (* TODO: port from old proof once preord_exp_trans + Efun_red are aligned *)
+        admit. (* needs preord_exp chain: post_monotonic + trans via Efun step
+                  + env bridging between M.set x v' rho and def_funs B B rho rho
+                  + alpha-equiv for the x ↦ v' vs x ↦ Vfun rho B x case *)
       + intros Habs. congruence.
 
     - (* eval_Fix_fuel: tFix mfix idx → ClosFix_v vs mfix idx
