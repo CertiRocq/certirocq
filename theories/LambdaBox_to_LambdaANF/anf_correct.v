@@ -439,13 +439,33 @@ Section Correct.
           eapply preord_val_refl. tci.
       + intros Habs. congruence.
 
-    - (* eval_Lam_fuel *)
+    - (* eval_Lam_fuel: tLambda na body → Clos_v vs na body
+         ANF: Efun (Fcons f func_tag [x1] (C1|[Ehalt r1]|) Fnil) e_k
+         After Efun_red, f ↦ Vfun rho (Fcons f ...) f in rho.
+         Need preord_val v' (Vfun ...) via anf_rel_Clos + alpha-equiv. *)
+      intros body0 vs1 na0.
+      unfold anf_cvt_correct_exp.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      inv Hcvt. simpl.
+      split.
+      + intros v0 v' Heq Hrel. inv Heq.
+        (* The goal is preord_exp (anf_bound 0 trace) eq_fuel i
+           (e_k, M.set x v' rho) (Efun (Fcons x ...) e_k, rho).
+           Strategy: monotonicity from eq_fuel, then trans via Efun_red,
+           then refl with env bridging. *)
+        admit. (* TODO: port from old proof once preord_exp_trans + Efun_red are aligned *)
+      + intros Habs. congruence.
+
+    - (* eval_Fix_fuel: tFix mfix idx → ClosFix_v vs mfix idx
+         ANF: Efun fdefs e_k
+         After Efun_red, f ↦ Vfun rho fdefs f in rho.
+         Need preord_val v' (Vfun ...) via anf_rel_ClosFix + alpha-equiv. *)
       admit.
 
-    - (* eval_Fix_fuel *)
-      admit.
-
-    - (* eval_Box_fuel *)
+    - (* eval_Box_fuel: tBox → Con_v box_dc []
+         ANF: Econstr x default_tag [] e_k
+         After Econstr_red, x ↦ Vconstr default_tag [] in rho.
+         Need preord_val v' (Vconstr default_tag []) via anf_rel_Con + alpha-equiv. *)
       admit.
 
     - (* eval_OOT *)
