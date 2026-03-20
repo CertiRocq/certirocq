@@ -75,6 +75,12 @@ Section Correct.
     forall tgm dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
+  Context (cmap_inj :
+    forall k1 k2 v,
+      lookup_const cmap k1 = Some v ->
+      lookup_const cmap k2 = Some v ->
+      k1 = k2).
+
 
   (** ** Source fuel and trace *)
 
@@ -272,6 +278,10 @@ Section Correct.
   Qed.
 
   (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
+  (** Variables from [cmap] that appear in [rho] *)
+  Definition cmap_vars : Ensemble var :=
+    fun v => exists k, lookup_const cmap k = Some v.
+
   Local Ltac anf_result_in_S :=
     match goal with
     | [ Hin : _ \in FromList ?vn,
@@ -301,7 +311,8 @@ Section Correct.
       forall S vn S' C x i,
         ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
         Disjoint _ (FromList vn) S ->
-        Disjoint _ (fun v => exists kn, lookup_const cmap kn = Some v) S ->
+        Disjoint _ cmap_vars S ->
+        Disjoint _ (FromList vn) cmap_vars ->
         anf_util.env_consistent vn rho ->
         nth_error vn i = Some x ->
         nth_error rho i = Some v.
@@ -312,7 +323,8 @@ Section Correct.
       forall S vn S' C x i,
         ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
         Disjoint _ (FromList vn) S ->
-        Disjoint _ (fun v => exists kn, lookup_const cmap kn = Some v) S ->
+        Disjoint _ cmap_vars S ->
+        Disjoint _ (FromList vn) cmap_vars ->
         anf_util.env_consistent vn rho ->
         nth_error vn i = Some x ->
         nth_error rho i = Some v).
@@ -323,52 +335,41 @@ Section Correct.
       with (P := Plookup) (P0 := fun _ _ _ _ _ => True) (P1 := Plookup);
     unfold Plookup; clear Plookup; try eassumption.
 
-    all: try (intros; congruence).
-    all: try (intros; exact I).
+    (* 20 goals from the induction scheme. Handle each one. *)
 
-    (* Most step cases: result x ∈ S leads to contradiction with Disjoint (FromList vn) S *)
-    (* eval_App_step, eval_FixApp_step, eval_Construct_step, eval_Case_step, eval_Proj_step, eval_Const_step *)
-    all: try (intros; subst;
-              match goal with
-              | [ H : ANF.anf_cvt_rel _ _ _ _ _ _ _ _ _ |- _ ] => inv H
-              end;
-              match goal with
-              | [ Hnth : nth_error ?vn _ = Some ?x |- _ ] =>
-                assert (Hin : x \in FromList vn) by (eapply nth_error_In; exact Hnth)
-              end;
-              try anf_result_in_S;
-              try (match goal with
-                   | [ H1 : ANF.anf_cvt_rel _ _ _ _ _ ?S2 _ _ _,
-                       H2 : ANF.anf_cvt_rel _ _ _ _ _ _ ?S3 _ _ |- _ ] =>
-                     assert (S3 \subset S2) by (eapply anf_util.anf_cvt_exp_subset; eassumption);
-                     assert (S2 \subset _) by (eapply anf_util.anf_cvt_exp_subset; eassumption)
-                   end; anf_result_in_S)).
-
-    (* eval_LetIn_step — the key case: use IH2 with extended env *)
-    - admit. (* needs careful LetIn handling with env_consistent_extend *)
-
-    (* eval_Rel_fuel *)
-    - (* eval_Rel_fuel: nth_error rho n = Some v, anf_cvt_rel for tRel *)
-      intros n0 rho0 v0 Hnth_rho v Hv S vn S' C x i Hcvt Hdis Hdis_cm Hcons Hnth_vn.
-      subst. inversion Hcvt; subst.
-      erewrite Hcons; [ exact Hnth_rho | exact Hnth_vn | ].
-      match goal with | [ H : nth_error _ _ = Some _ |- _ ] => exact H end.
-
-    (* eval_Lam_fuel, eval_Fix_fuel, eval_Box_fuel: result x ∈ S, contradiction *)
-    all: try (intros; subst;
-              match goal with
-              | [ H : fuel_sem.Val _ = fuel_sem.Val _ |- _ ] => inv H
-              end;
-              match goal with
-              | [ H : ANF.anf_cvt_rel _ _ _ _ _ _ _ _ _ |- _ ] => inv H
-              end;
-              match goal with
-              | [ Hnth : nth_error ?vn _ = Some ?x |- _ ] =>
-                assert (Hin : x \in FromList vn) by (eapply nth_error_In; exact Hnth)
-              end;
-              try anf_result_in_S).
-
-    - (* eval_step *) intros ????? ? IH. exact IH.
+    (* 1. eval_App_step *)
+    - intros.
+      match goal with
+      | [ H : context[EAst.tApp] |- _ ] => inversion H; subst
+      end.
+      Set Printing All. admit.
+    (* 2. eval_App_step_OOT1 *) - intros; congruence.
+    (* 3. eval_App_step_OOT2 *) - intros; congruence.
+    (* 4. eval_FixApp_step *) - intros; congruence.
+    (* 5. eval_LetIn_step *) - admit.
+    (* 6. eval_LetIn_step_OOT *) - intros; congruence.
+    (* 7. eval_Construct_step *) - intros; congruence.
+    (* 8. eval_Construct_step_OOT *) - intros; congruence.
+    (* 9. eval_Case_step *) - intros; congruence.
+    (* 10. eval_Case_step_OOT *) - intros; congruence.
+    (* 11. eval_Proj_step *) - intros; congruence.
+    (* 12. eval_Proj_step_OOT *) - intros; congruence.
+    (* 13. eval_Const_step *) - intros; congruence.
+    (* 14. eval_many_nil *) - intros; exact I.
+    (* 15. eval_many_cons *) - intros; exact I.
+    (* 16. eval_Rel_fuel *)
+    - intros n0 rho0 v0 Hnth_rho v' Hval S0 vn S' C x i Hcvt Hdis Hdis_cm Hdis_vn_cm Hcons Hnth_vn.
+      assert (Heq : v0 = v') by congruence. subst v0.
+      pose proof Hcons as Hcons_saved.
+      inversion Hcvt; subst.
+      erewrite Hcons_saved. exact Hnth_rho.
+      exact Hnth_vn. assumption.
+    (* 17. eval_Lam_fuel *) - intros; congruence.
+    (* 18. eval_Fix_fuel *) - intros; congruence.
+    (* 19. eval_Box_fuel *) - intros; congruence.
+    (* 20. eval_OOT *) - intros; congruence.
+    (* 21. eval_step *)
+    - intros ? ? ? ? ? ? IH. exact IH.
   Admitted.
 
 
@@ -439,11 +440,6 @@ Section Correct.
            @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
                           Σ [] body (fuel_sem.Val src_v) f t ->
            anf_val_rel' src_v anf_v).
-
-  (** Variables from [cmap] that appear in [rho] *)
-  Definition cmap_vars : Ensemble var :=
-    fun v => exists k, lookup_const cmap k = Some v.
-
 
   (** ** Helper: set_many *)
   Fixpoint set_many (xs : list var) (vs : list val) (rho : M.t val) : M.t val :=
@@ -670,17 +666,6 @@ Section Correct.
          ANF: Efun (Fcons f func_tag [x1] (C1|[Ehalt r1]|) Fnil) e_k
          After Efun_red, f ↦ Vfun rho (Fcons f ...) f in rho.
          Need preord_val v' (Vfun ...) via anf_rel_Clos + alpha-equiv. *)
-      intros body0 vs1 na0.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
-      inv Hcvt. simpl.
-      split.
-      + intros v0 v' Heq Hrel. inv Heq.
-        (* Prove entirely at the bstep level *)
-        intros v1 cin cout Hleq Hstep.
-        (* e_k steps in M.set x v' rho. The ANF side does Efun_red then steps in def_funs rho.
-           def_funs (Fcons x ...) rho = M.set x (Vfun rho (Fcons x ...) x) rho.
-           Need to bridge M.set x v' rho and M.set x (Vfun ...) rho. *)
         admit. (* needs alpha-equiv + preord_exp machinery *)
       + intros Habs. congruence.
 

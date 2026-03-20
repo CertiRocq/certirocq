@@ -3,17 +3,20 @@
    results and LambdaANF values. *)
 
 (** Stdlib *)
-From Stdlib Require Import ZArith.ZArith Lists.List Arith Ensembles.
+From Stdlib Require Import ZArith.ZArith Lists.List Arith Ensembles
+     Relations.Relation_Definitions micromega.Lia.
 
 (** MetaRocq *)
 From MetaRocq.Erasure Require Import EAst.
 From MetaRocq.Common Require Import BasicAst.
 
 (** CompCert *)
-From compcert Require lib.Maps.
+From compcert Require lib.Maps lib.Coqlib.
 
 (** CertiRocq *)
-From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util.
+From CertiRocq.LambdaANF Require Import
+  cps ctx eval Ensembles_util logical_relations alpha_conv
+  rename List_util identifiers algebra tactics functions.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
 
 Import ListNotations.
@@ -403,5 +406,331 @@ Section ANF_Val.
   Proof.
     intros H. symmetry. eapply Forall2_length. exact H.
   Qed.
+
+  (** ** Helper: all_fun_name agrees with fnames *)
+
+  Lemma anf_cvt_mfix_all_fun_name S mfix vn fnames S' fdefs :
+    anf_cvt_rel_mfix' cnstrs cmap S mfix vn fnames S' fdefs ->
+    all_fun_name fdefs = fnames.
+  Proof.
+    unfold anf_cvt_rel_mfix'. intros H.
+    induction H.
+    - reflexivity.
+    - simpl. f_equal. exact IHanf_cvt_rel_mfix.
+  Qed.
+
+  (** ** Helper: extract find_def from anf_cvt_rel_mfix *)
+
+  Lemma anf_cvt_mfix_find_def S mfix vn fnames S' fdefs :
+    anf_cvt_rel_mfix' cnstrs cmap S mfix vn fnames S' fdefs ->
+    NoDup fnames ->
+    forall i fi,
+      nth_error fnames i = Some fi ->
+      exists d na e_body xi C_body ri Si1 Si2,
+        nth_error mfix i = Some d /\
+        d.(EAst.dbody) = EAst.tLambda na e_body /\
+        find_def fi fdefs = Some (func_tag, [xi], C_body |[ Ehalt ri ]|) /\
+        anf_cvt_rel' cnstrs cmap (Si1 \\ [set xi]) e_body (xi :: vn) Si2 C_body ri /\
+        xi \in Si1 /\ Si1 \subset S.
+  Proof.
+    unfold anf_cvt_rel_mfix', anf_cvt_rel'. intros Hrel Hnd.
+    induction Hrel; intros i fi Hnth.
+    - destruct i; discriminate.
+    - inversion Hnd as [ | ? ? Hnotin Hnd']; subst.
+      destruct i as [ | i'].
+      + simpl in Hnth. inv Hnth.
+        do 8 eexists. split; [ | split; [ | split; [ | split; [ | split ] ] ] ].
+        * reflexivity.
+        * eassumption.
+        * simpl. rewrite Coqlib.peq_true. reflexivity.
+        * eassumption.
+        * eassumption.
+        * eapply Included_refl.
+      + simpl in Hnth.
+        edestruct IHHrel as (d' & na' & e_body' & xi' & C_body' & ri' & Si1' & Si2' &
+                              Hmfix & Hbody' & Hfind & Hcvt_body & Hxi & Hsub).
+        * eassumption.
+        * exact Hnth.
+        * do 8 eexists. split; [ | split; [ | split; [ | split; [ | split ] ] ] ].
+          -- simpl. exact Hmfix.
+          -- exact Hbody'.
+          -- simpl.
+             destruct (M.elt_eq fi f_name) as [Heq | Hneq].
+             ++ exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth.
+             ++ exact Hfind.
+          -- exact Hcvt_body.
+          -- exact Hxi.
+          -- eapply Included_trans; [ exact Hsub | ].
+             eapply Included_trans; [ eapply anf_cvt_exp_subset; eassumption | ].
+             eapply Setminus_Included.
+  Qed.
+
+  (** ** Helper: branches ctor_tag agreement *)
+
+  Lemma anf_cvt_branches_ctor_tag S1 S2 S3 S4 ind brs n vn1 vn2 y1 y2 pats1 pats2 :
+    anf_cvt_rel_branches' cnstrs cmap S1 ind brs n vn1 y1 S2 pats1 ->
+    anf_cvt_rel_branches' cnstrs cmap S3 ind brs n vn2 y2 S4 pats2 ->
+    Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') pats1 pats2.
+  Proof.
+    unfold anf_cvt_rel_branches'.
+    revert S1 S2 S3 S4 n vn1 vn2 y1 y2 pats1 pats2.
+    induction brs; intros S1 S2 S3 S4 n vn1 vn2 y1 y2 pats1 pats2 Hrel1 Hrel2.
+    - inv Hrel1; inv Hrel2; constructor.
+    - destruct a. inv Hrel1; inv Hrel2. constructor.
+      + simpl. congruence.
+      + eapply IHbrs; eassumption.
+  Qed.
+
+  (** ** Utility: Forall2 from pointwise nth_error *)
+
+  Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
+        (l1 : list A) (l2 : list B) :
+      Datatypes.length l1 = Datatypes.length l2 ->
+      (forall k a b, nth_error l1 k = Some a -> nth_error l2 k = Some b -> R a b) ->
+      Forall2 R l1 l2.
+  Proof.
+    revert l2. induction l1 as [ | x xs IH]; intros l2 Hlen Hnth.
+    - destruct l2; [constructor | simpl in Hlen; discriminate].
+    - destruct l2 as [ | y ys]; [simpl in Hlen; discriminate | ].
+      constructor.
+      + apply (Hnth 0%nat); reflexivity.
+      + apply IH.
+        * simpl in Hlen. lia.
+        * intros k a b Hk1 Hk2. apply (Hnth (S k)); assumption.
+  Qed.
+
+
+  (** ** Alpha-equivalence for ANF values *)
+
+  Section Alpha_Equiv.
+
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel}
+          {trace : Type} {Htrace : @trace_resource trace}.
+  Context (P1 : @PostT fuel trace) (PG : @PostGT fuel trace)
+          (cenv : ctor_env)
+          (Hprops : Post_properties cenv P1 P1 PG)
+          (HpropsG : Post_properties cenv PG PG PG)
+          (Hincl : inclusion _ (comp P1 P1) P1)
+          (HinclG : inclusion _ P1 PG).
+  Context (dcon_to_tag_inj :
+            forall tgm dc dc',
+              dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+
+  Definition anf_cvt_val_alpha_equiv_statement k :=
+    forall v v1 v2,
+      anf_val_rel v v1 -> anf_val_rel v v2 ->
+      preord_val cenv PG k v1 v2.
+
+  Definition anf_cvt_env_alpha_equiv_statement k :=
+    forall names1 names2 vs rho1 rho2 f,
+      anf_env_rel names1 vs rho1 ->
+      anf_env_rel names2 vs rho2 ->
+      preord_env_P_inj cenv PG (FromList names1) k (f <{ names1 ~> names2 }>) rho1 rho2.
+
+  Lemma preord_env_P_inj_get S k f rho1 rho2 x y v1 v2 :
+    preord_env_P_inj cenv PG (S \\ [set x]) k f rho1 rho2 ->
+    M.get x rho1 = Some v1 ->
+    M.get y rho2 = Some v2 ->
+    preord_val cenv PG k v1 v2 ->
+    preord_env_P_inj cenv PG S k (f {x ~> y}) rho1 rho2.
+  Proof.
+    intros Henv Hg1 Hg2 Hval z HS v Hgetz. destruct (Coqlib.peq x z).
+    - subst. repeat subst_exp. rewrite extend_gss. eauto.
+    - rewrite extend_gso; eauto. eapply Henv; eauto.
+      constructor; eauto. intros Hc; inv Hc; eauto.
+  Qed.
+
+  Lemma anf_cvt_env_alpha_equiv_pre k :
+    anf_cvt_val_alpha_equiv_statement k ->
+    anf_cvt_env_alpha_equiv_statement k.
+  Proof.
+    intros IH n1 n2 vs.
+    revert n1 n2. induction vs; intros n1 n2 rho1 rho2 f Hrel1 Hrel2.
+    - inv Hrel1; inv Hrel2. simpl. repeat normalize_sets.
+      intros x Hin. inv Hin.
+    - inv Hrel1; inv Hrel2. destructAll.
+      simpl. eapply preord_env_P_inj_get; eauto.
+      repeat normalize_sets. eapply preord_env_P_inj_antimon.
+      eapply IHvs. eassumption. eassumption. sets.
+  Qed.
+
+  Lemma Forall2_preord_var_env_monotonic k j rho1 rho2 vars1 vars2 :
+    (j <= k)%nat ->
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    Forall2 (preord_var_env cenv PG j rho1 rho2) vars1 vars2.
+  Proof.
+    intros Hle. eapply Forall2_monotonic.
+    intros x y Hpve. eapply preord_var_env_monotonic; eassumption.
+  Qed.
+
+  Lemma Forall2_preord_var_env_set k rho1 rho2 x1 x2 v1 v2 vars1 vars2 :
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    ~ x1 \in FromList vars1 ->
+    ~ x2 \in FromList vars2 ->
+    Forall2 (preord_var_env cenv PG k (M.set x1 v1 rho1) (M.set x2 v2 rho2))
+            vars1 vars2.
+  Proof.
+    intros HF Hni1 Hni2. induction HF.
+    - constructor.
+    - constructor.
+      + eapply preord_var_env_extend_neq.
+        * exact H.
+        * intros Heq. apply Hni1. subst. now left.
+        * intros Heq. apply Hni2. subst. now left.
+      + eapply IHHF.
+        * intros Hc. apply Hni1. now right.
+        * intros Hc. apply Hni2. now right.
+  Qed.
+
+  Lemma Forall2_preord_var_env_def_funs k B1 B2 rho1 rho2 vars1 vars2 :
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    Disjoint _ (FromList vars1) (name_in_fundefs B1) ->
+    Disjoint _ (FromList vars2) (name_in_fundefs B2) ->
+    Forall2 (preord_var_env cenv PG k
+               (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+            vars1 vars2.
+  Proof.
+    intros HF Hd1 Hd2. induction HF.
+    - constructor.
+    - constructor.
+      + eapply preord_var_env_def_funs_not_In_r.
+        * intros Hc. eapply Hd2. constructor. now left. exact Hc.
+        * eapply preord_var_env_def_funs_not_In_l.
+          -- intros Hc. eapply Hd1. constructor. now left. exact Hc.
+          -- exact H.
+      + eapply IHHF.
+        * eapply Disjoint_Included_l; [ | exact Hd1 ]. intros z Hz. now right.
+        * eapply Disjoint_Included_l; [ | exact Hd2 ]. intros z Hz. now right.
+  Qed.
+
+  Lemma anf_cvt_env_alpha_equiv_Forall2 k :
+    anf_cvt_val_alpha_equiv_statement k ->
+    forall vs nms_a nms_b rho_a rho_b,
+      anf_env_rel' anf_val_rel nms_a vs rho_a ->
+      anf_env_rel' anf_val_rel nms_b vs rho_b ->
+      Forall2 (preord_var_env cenv PG k rho_a rho_b) nms_a nms_b.
+  Proof.
+    intros Hval. induction vs; intros nms_a nms_b rho_a rho_b Hrel1 Hrel2.
+    - inv Hrel1. inv Hrel2. constructor.
+    - inv Hrel1. inv Hrel2. destructAll. constructor.
+      + intros v1 Hget1.
+        match goal with
+        | [ H1 : M.get ?x1 rho_a = Some ?w1,
+            H2 : M.get ?x2 rho_b = Some ?w2,
+            Hv1 : anf_val_rel a ?w1,
+            Hv2 : anf_val_rel a ?w2 |- _ ] =>
+          rewrite H1 in Hget1; inv Hget1;
+          eexists; split; [ exact H2 | eapply Hval; eassumption ]
+        end.
+      + eapply IHvs; eassumption.
+  Qed.
+
+  (** The main alpha-equiv theorems. These require mutual induction
+      over the relational spec combined with well-founded induction on k.
+      The proofs follow the structure of the old LambdaBoxLocal version. *)
+
+  (* Statements for the four mutual parts *)
+  Definition anf_cvt_exp_alpha_equiv k :=
+    forall e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel' cnstrs cmap S1 e vars1 S2 C1 r1 ->
+      anf_cvt_rel' cnstrs cmap S3 e vars2 S4 C2 r2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  Definition anf_cvt_alpha_equiv_statement k :=
+    anf_cvt_exp_alpha_equiv k.
+
+  Lemma anf_cvt_alpha_equiv :
+    forall k, anf_cvt_alpha_equiv_statement k.
+  Proof.
+    (* This proof requires ~800 lines of mutual induction.
+       It follows the old proof at LambdaBoxLocal_to_LambdaANF_anf_util.v:899-1667.
+       The proof uses well-founded induction on k, then induction on the
+       first anf_cvt_rel derivation. Each case inverts the second derivation
+       and uses compatibility lemmas from logical_relations.v. *)
+    admit.
+  Admitted.
+
+  Lemma anf_cvt_val_alpha_equiv :
+    forall k, anf_cvt_val_alpha_equiv_statement k.
+  Proof.
+    intro k. induction k as [k IHk] using lt_wf_rec1.
+    unfold anf_cvt_val_alpha_equiv_statement.
+    intros v. induction v using value_ind'; intros v1 v2 Hrel1 Hrel2.
+    - (* Con_v dc vs *)
+      inv Hrel1. inv Hrel2.
+      rewrite preord_val_eq. simpl.
+      split; [ congruence | ].
+      (* H : Forall (fun v => forall v1 v2, anf_val_rel v v1 -> anf_val_rel v v2 -> preord_val cenv PG k v1 v2) vs
+         H2 : Forall2 anf_val_rel vs vs'
+         H3 : Forall2 anf_val_rel vs vs'0
+         Goal : Forall2 (preord_val cenv PG k) vs' vs'0
+
+         Proof: induct on H2, invert H3 at each step to get the pair of
+         anf_val_rel hypotheses, invert H to get the componentwise IH,
+         then apply the IH to produce preord_val for each component. *)
+      clear -H H2 H3.
+      revert vs' vs'0 H2 H3.
+      induction vs as [| v0 vs_tl IHvs]; intros vs1 vs2 Hrel1 Hrel2.
+      + inv Hrel1. inv Hrel2. constructor.
+      + inv Hrel1. inv Hrel2. inv H. constructor.
+        * match goal with
+          | [ IH_head : forall v1 v2, anf_val_rel ?v v1 -> anf_val_rel ?v v2 -> _,
+              Ha : anf_val_rel ?v ?a, Hb : anf_val_rel ?v ?b |- _ ] =>
+            eapply IH_head; [ exact Ha | exact Hb ]
+          end.
+        * eapply IHvs; eassumption.
+    - (* Clos_v vs na e:
+         Both anf_val_rel inversions give Vfun with Fcons structure.
+         preord_val for Vfun requires: when called with related args at j < k,
+         the bodies produce related results.
+         The body proof uses anf_cvt_alpha_equiv at step j < k, which relates
+         the two ANF conversions of the closure body e. *)
+      inv Hrel1. inv Hrel2.
+      rewrite preord_val_eq. simpl.
+      (* Goal: for all related args at j < k, find_def matches and
+         bodies are related after set_lists + def_funs *)
+      intros vs1 vs2 j t xs1' e1' rho1' Hlen Hfind1 Hset1.
+      (* find_def for Fcons f func_tag [x] body Fnil = Some (func_tag, [x], body) when queried at f *)
+      simpl in Hfind1.
+      destruct (M.elt_eq _ _) as [_ | Hneq]; [ | congruence ].
+      inv Hfind1.
+      (* set_lists [x1] vs1 (def_funs ... rho1 rho1) = Some rho1' *)
+      destruct vs1 as [ | v_arg1 [ | ? ?]]; simpl in Hset1; try congruence.
+      inv Hset1.
+      (* Now find corresponding f2 side *)
+      simpl.
+      destruct (M.elt_eq _ _) as [_ | Hneq2]; [ | congruence ].
+      destruct vs2 as [ | v_arg2 [ | ? ?]]; [ simpl in Hlen; congruence | | simpl in Hlen; lia ].
+      simpl.
+      do 3 eexists. split; [ reflexivity | ]. split; [ reflexivity | ].
+      intros Hlt Hargs.
+      (* Remaining: apply anf_cvt_alpha_equiv j (j < k) with
+         - body conversions H6 and H15 for expression e
+         - vars1 = x :: names, vars2 = x0 :: names0
+         - rho1' = M.set x v_arg1 (M.set f (Vfun ...) rho)
+         - rho2' = M.set x0 v_arg2 (M.set f0 (Vfun ...) rho0)
+         - Build Forall2 preord_var_env using:
+           * Head (x, x0): preord_var_env from v_arg1/v_arg2 via M.gss + Hargs
+           * Tail (names, names0): via Forall2_preord_var_env_set +
+             Forall2_preord_var_env_def_funs + anf_cvt_env_alpha_equiv_Forall2 (IHk j)
+         - Continuation: preord_exp_halt_compat for Ehalt r1 / Ehalt r0 *)
+      admit.
+    - (* ClosFix_v vs mfix n *)
+      admit.
+  Admitted.
+
+  End Alpha_Equiv.
 
 End ANF_Val.
