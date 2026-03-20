@@ -124,11 +124,11 @@ Section Correct.
   Next Obligation. lia. Qed.
   Next Obligation. lia. Qed.
 
-  Instance LambdaBox_resource_fuel : @LambdaBox_resource nat.
-  Proof. constructor. eapply fuel_resource_LambdaBox. Defined.
+  Instance LambdaBox_resource_fuel : @LambdaBox_resource nat :=
+    {| HRes := fuel_resource_LambdaBox |}.
 
-  Instance LambdaBox_resource_trace : @LambdaBox_resource nat.
-  Proof. constructor. eapply trace_resource_LambdaBox. Defined.
+  Instance LambdaBox_resource_trace : @LambdaBox_resource nat :=
+    {| HRes := trace_resource_LambdaBox |}.
 
 
   (** ** LambdaANF fuel and trace *)
@@ -283,8 +283,8 @@ Section Correct.
         (* Source terminates *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
                       preord_exp cenv
-                                 (anf_bound (f <+> @one_i _ _ (@HRes _ LambdaBox_resource_fuel) e)
-                                            (t <+> @one_i _ _ (@HRes _ LambdaBox_resource_trace) e))
+                                 (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
+                                            (t <+> @one_i _ _ trace_resource_LambdaBox e))
                                  eq_fuel i
                                  (e_k, M.set x v' rho)
                                  (C |[ e_k ]|, rho)) /\
@@ -331,7 +331,7 @@ Section Correct.
       anf_cvt_correct_exp vs e r f t.
   Proof.
     intros vs e r f t Heval.
-    eapply eval_env_fuel_ind' with
+    eapply (eval_env_fuel_ind' (Hf := LambdaBox_resource_fuel) (Ht := LambdaBox_resource_trace)) with
       (P := anf_cvt_correct_exp_step)
       (P0 := anf_cvt_correct_args)
       (P1 := anf_cvt_correct_exp);
@@ -462,7 +462,10 @@ Section Correct.
          IH : anf_cvt_correct_exp_step vs e r f t, which internally uses
          anf_bound (f + one_i e) (t + one_i e). So IH is exactly the goal. *)
       intros vs1 e1 r1 f1 t1 Hstep IH.
-      admit. (* eval_step: need to align instance resolution *)
+      intros.
+      cbv beta iota delta [HRes LambdaBox_resource_fuel LambdaBox_resource_trace
+                            one_i plus fuel_resource_LambdaBox trace_resource_LambdaBox] in *.
+      assumption.
 
   Admitted.
 
