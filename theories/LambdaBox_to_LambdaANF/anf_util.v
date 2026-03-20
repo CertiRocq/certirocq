@@ -14,6 +14,7 @@ From MetaRocq.Common Require Import BasicAst.
 From compcert Require lib.Maps lib.Coqlib.
 
 (** CertiRocq *)
+From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaANF Require Import
   cps ctx eval Ensembles_util logical_relations alpha_conv
   rename List_util identifiers algebra tactics functions.
@@ -226,6 +227,44 @@ Section ANF_Val.
           -- exact Hcvt'.
           -- exact Hdis'.
           -- exact Hfresh'.
+  Qed.
+
+  (** Given [anf_fix_rel] and a valid function-name index, extract the
+      corresponding [mfix] entry and show its body is a lambda. *)
+  Lemma anf_fix_rel_nth_lambda :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      exists d na e_body,
+        nth_error mfix idx = Some d /\
+        d.(EAst.dbody) = EAst.tLambda na e_body.
+  Proof.
+    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f Hrel.
+    revert idx f.
+    induction Hrel; intros idx0 f0 Hnth.
+    - destruct idx0; discriminate.
+    - destruct idx0 as [ | idx'].
+      + simpl in Hnth. inv Hnth. do 3 eexists. split; [ reflexivity | eassumption ].
+      + simpl in Hnth. edestruct IHHrel as (d' & na' & e_body' & Hm & Hb).
+        * exact Hnth.
+        * do 3 eexists. split; [ simpl; exact Hm | exact Hb ].
+  Qed.
+
+  (** [name_in_fundefs] of a bundle built by [anf_fix_rel] equals [FromList]
+      of the function-name list. *)
+  Lemma anf_fix_rel_name_in_fundefs :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      Same_set _ (name_in_fundefs Bs) (FromList fnames_list).
+  Proof.
+    intros fnames0 names0 S1 fnames_list mfix Bs S2 Hrel.
+    induction Hrel.
+    - simpl. split; intros z Hz; inv Hz.
+    - simpl. rewrite FromList_cons.
+      destruct IHHrel as [Hsub1 Hsub2]. split; intros z Hz; inv Hz;
+        try (left; assumption);
+        try (left; constructor);
+        try (right; (apply Hsub1 + apply Hsub2); assumption).
   Qed.
 
   (** ** Subset lemma: ANF conversion shrinks the fresh set *)
@@ -716,20 +755,225 @@ Section ANF_Val.
       simpl.
       do 3 eexists. split; [ reflexivity | ]. split; [ reflexivity | ].
       intros Hlt Hargs.
-      (* Remaining: apply anf_cvt_alpha_equiv j (j < k) with
-         - body conversions H6 and H15 for expression e
-         - vars1 = x :: names, vars2 = x0 :: names0
-         - rho1' = M.set x v_arg1 (M.set f (Vfun ...) rho)
-         - rho2' = M.set x0 v_arg2 (M.set f0 (Vfun ...) rho0)
-         - Build Forall2 preord_var_env using:
-           * Head (x, x0): preord_var_env from v_arg1/v_arg2 via M.gss + Hargs
-           * Tail (names, names0): via Forall2_preord_var_env_set +
-             Forall2_preord_var_env_def_funs + anf_cvt_env_alpha_equiv_Forall2 (IHk j)
-         - Continuation: preord_exp_halt_compat for Ehalt r1 / Ehalt r0 *)
-      admit.
-    - (* ClosFix_v vs mfix n *)
-      admit.
-  Admitted.
+      (* Convert goal from preord_exp PG PG to preord_exp P1 PG *)
+      eapply preord_exp_post_monotonic. exact HinclG.
+      (* Now apply anf_cvt_alpha_equiv at step j (j < k, so j ≤ j) *)
+      eapply (anf_cvt_alpha_equiv j); [ lia | eassumption | eassumption | | | | ].
+      + (* Disjoint (FromList (x :: names)) S1
+           H5: Disjoint ({x} ∪ ({f} ∪ FromList names)) S1
+           FromList (x::names) = {x} ∪ FromList names ⊆ {x} ∪ ({f} ∪ FromList names) *)
+        rewrite FromList_cons.
+        eapply Disjoint_Included_l; [ | eassumption ].
+        intros z Hz. inv Hz.
+        * left. assumption.
+        * do 2 right. assumption.
+      + (* Disjoint (FromList (x0 :: names0)) S0 *)
+        rewrite FromList_cons.
+        eapply Disjoint_Included_l; [ | eassumption ].
+        intros z Hz. inv Hz.
+        * left. assumption.
+        * do 2 right. assumption.
+      + (* Forall2 (preord_var_env PG j rho1' rho2') (x :: names) (x0 :: names0)
+           rho1' = M.set x v_arg1 (M.set f vf1 rho)
+           rho2' = M.set x0 v_arg2 (M.set f0 vf2 rho0)
+           Head: x↦v_arg1 and x0↦v_arg2 are related (from Hargs)
+           Tail: names/names0 unaffected by the sets (disjointness),
+                 related via anf_cvt_env_alpha_equiv_Forall2 + IHk *)
+        inv Hargs.
+        constructor.
+        * (* preord_var_env PG j rho1' rho2' x x0 *)
+          intros v1' Hget1. rewrite M.gss in Hget1. inv Hget1.
+          eexists. split; [ rewrite M.gss; reflexivity | ].
+          eapply preord_val_monotonic; [ eassumption | lia ].
+        * (* Forall2 (preord_var_env PG j rho1' rho2') names names0 *)
+          eapply Forall2_preord_var_env_set.
+          2:{ intros Hc. match goal with [ H : ~ _ \in _ |: FromList _ |- _ ] => apply H; right; exact Hc end. }
+          2:{ intros Hc. match goal with [ H : ~ _ \in _ |: FromList _ |- _ ] => apply H; right; exact Hc end. }
+          eapply Forall2_preord_var_env_set; [ | assumption | assumption ].
+          eapply anf_cvt_env_alpha_equiv_Forall2.
+          -- eapply IHk. exact Hlt.
+          -- eassumption.
+          -- eassumption.
+      + (* Continuation: preord_exp P1 PG j0 (Ehalt r1, rho1') (Ehalt r0, rho2')
+           Follows from preord_exp_halt_compat since r1/r0 are related in rho1'/rho2'. *)
+        intros j0 rho1'' rho2'' Hle Hvar_r _ _.
+        eapply preord_exp_halt_compat.
+        * (* post_OOT' *)
+          eapply Hprops.
+        * (* post_base' *)
+          eapply Hprops.
+        * exact Hvar_r.
+    - (* ClosFix_v vs mfix n:
+         Both anf_val_rel inversions give Vfun rho Bs f where Bs are mutual
+         function definitions from anf_fix_rel. preord_val for Vfun requires
+         that when called with related args at j < k, the bodies produce
+         related results.
+         Strategy: invert both relations, extract the nth function via
+         anf_fix_rel_find_def_ext, then use anf_cvt_alpha_equiv + nested
+         well-founded induction on the fix index for the Forall2 of the
+         mutual functions. *)
+      inv Hrel1. inv Hrel2.
+      rewrite preord_val_eq. simpl.
+      (* Goal: for all related args at j < k, find_def matches and bodies related *)
+      intros vs1 vs2 j t xs1' e1' rho1' Hlen Hfind1 Hset1.
+      (* Extract nth mfix entry and its lambda body *)
+      match goal with
+      | [ Hfix1 : anf_fix_rel ?fn ?nm ?S1 ?fn ?mx ?Bs1 ?S2,
+          Hnth1 : nth_error ?fn ?n = Some ?f1 |- _ ] =>
+        edestruct (anf_fix_rel_nth_lambda _ _ _ _ _ _ _ _ _ Hfix1 Hnth1)
+          as (d_fix & na_fix & e_body_fix & Hmfix_nth & Hbody_lam)
+      end.
+      (* Use anf_fix_rel_find_def_ext on first side *)
+      match goal with
+      | [ Hfix1 : anf_fix_rel fnames names _ fnames mfix Bs _,
+          Hnth_fn : nth_error fnames n = Some f,
+          Hnd1 : NoDup fnames |- _ ] =>
+        edestruct (anf_fix_rel_find_def_ext _ _ _ _ _ _ _ _ _ _ _ _
+                     Hfix1 Hnth_fn Hmfix_nth Hbody_lam Hnd1)
+          as (x_pc1 & C_body1 & r_body1 & S_b1_1 & S_b1_2 &
+              Hfdef1 & Hcvt1 & Hdis_b1 & Hfresh1)
+      end.
+      (* Match find_def result with Hfind1 *)
+      rewrite Hfdef1 in Hfind1. inv Hfind1.
+      (* Process set_lists on first side: xs1' = [x_pc1], vs1 must be singleton *)
+      destruct vs1 as [ | v_arg1 [ | ? ?]]; simpl in Hset1; try congruence.
+      inv Hset1.
+      (* Use anf_fix_rel_find_def_ext on second side *)
+      match goal with
+      | [ Hfix2 : anf_fix_rel fnames0 names0 _ fnames0 mfix Bs0 _,
+          Hnth_fn2 : nth_error fnames0 n = Some f0,
+          Hnd2 : NoDup fnames0 |- _ ] =>
+        edestruct (anf_fix_rel_find_def_ext _ _ _ _ _ _ _ _ _ _ _ _
+                     Hfix2 Hnth_fn2 Hmfix_nth Hbody_lam Hnd2)
+          as (x_pc2 & C_body2 & r_body2 & S_b2_1 & S_b2_2 &
+              Hfdef2 & Hcvt2 & Hdis_b2 & Hfresh2)
+      end.
+      (* Provide existentials for second side *)
+      destruct vs2 as [ | v_arg2 [ | ? ?]]; [ simpl in Hlen; congruence | | simpl in Hlen; lia ].
+      simpl.
+      do 3 eexists. split; [ exact Hfdef2 | ]. split; [ reflexivity | ].
+      intros Hlt Hargs.
+      (* Convert goal from preord_exp PG PG to preord_exp P1 PG *)
+      eapply preord_exp_post_monotonic. exact HinclG.
+      (* Apply anf_cvt_alpha_equiv at step j *)
+      eapply (anf_cvt_alpha_equiv j); [ lia | eassumption | eassumption | | | | ].
+      + (* Disjoint (FromList (x_pc1 :: rev fnames ++ names)) S_b1_1 *)
+        eapply Disjoint_Included_l; [ | exact Hdis_b1 ].
+        intros z Hz. unfold FromList, In in Hz. simpl in Hz.
+        destruct Hz as [Heq | Hz].
+        * subst. left. constructor.
+        * right. apply in_app_iff in Hz. destruct Hz as [Hz | Hz].
+          -- left. unfold FromList, In. apply in_rev. assumption.
+          -- right. unfold FromList, In. assumption.
+      + (* Disjoint (FromList (x_pc2 :: rev fnames0 ++ names0)) S_b2_1 *)
+        eapply Disjoint_Included_l; [ | exact Hdis_b2 ].
+        intros z Hz. unfold FromList, In in Hz. simpl in Hz.
+        destruct Hz as [Heq | Hz].
+        * subst. left. constructor.
+        * right. apply in_app_iff in Hz. destruct Hz as [Hz | Hz].
+          -- left. unfold FromList, In. apply in_rev. assumption.
+          -- right. unfold FromList, In. assumption.
+      + (* Forall2 (preord_var_env PG j rho1' rho2')
+              (x_pc1 :: rev fnames ++ names) (x_pc2 :: rev fnames0 ++ names0) *)
+        inv Hargs.
+        constructor.
+        * (* Head: x_pc1 ↦ v_arg1, x_pc2 ↦ v_arg2 *)
+          intros v1' Hget1. rewrite M.gss in Hget1. inv Hget1.
+          eexists. split; [ rewrite M.gss; reflexivity | ].
+          eapply preord_val_monotonic; [ eassumption | lia ].
+        * (* Tail: rev fnames ++ names / rev fnames0 ++ names0 *)
+          eapply Forall2_preord_var_env_set.
+          2:{ intros Hc. apply Hfresh1.
+              unfold FromList, In in Hc. apply in_app_iff in Hc.
+              destruct Hc as [Hc | Hc].
+              - left. unfold FromList, In. apply in_rev. assumption.
+              - right. unfold FromList, In. assumption. }
+          2:{ intros Hc. apply Hfresh2.
+              unfold FromList, In in Hc. apply in_app_iff in Hc.
+              destruct Hc as [Hc | Hc].
+              - left. unfold FromList, In. apply in_rev. assumption.
+              - right. unfold FromList, In. assumption. }
+          (* Now need Forall2 over (rev fnames ++ names) (rev fnames0 ++ names0)
+             in def_funs environment *)
+          eapply Forall2_app.
+          -- (* rev fnames / rev fnames0: mutual fixpoints *)
+             (* Each fname maps to a ClosFix_v value via anf_val_rel on both sides,
+                so we can use IHk to get preord_val *)
+             eapply All_Forall.Forall2_rev.
+             eapply Forall2_from_nth_error.
+             ++ match goal with
+                | [ Hfix1 : anf_fix_rel _ _ _ fnames mfix _ _,
+                    Hfix2 : anf_fix_rel _ _ _ fnames0 mfix _ _ |- _ ] =>
+                  pose proof (anf_fix_rel_fnames_length _ _ _ _ _ _ _ Hfix1) as Hlen1;
+                  pose proof (anf_fix_rel_fnames_length _ _ _ _ _ _ _ Hfix2) as Hlen2;
+                  lia
+                end.
+             ++ intros idx fi1 fi2 Hnth_fi1 Hnth_fi2.
+                intros v1' Hget1.
+                (* fi1 is a fname, so in def_funs Bs Bs rho rho, M.get fi1 = Some (Vfun rho Bs fi1) *)
+                assert (Hget1' : M.get fi1 (def_funs Bs Bs rho rho) = Some (Vfun rho Bs fi1)).
+                { eapply def_funs_eq.
+                  match goal with
+                  | [ Hfix1 : anf_fix_rel _ _ _ fnames mfix Bs _ |- _ ] =>
+                    eapply (anf_fix_rel_name_in_fundefs _ _ _ _ _ _ _ Hfix1)
+                  end.
+                  eapply nth_error_In. exact Hnth_fi1. }
+                rewrite Hget1' in Hget1. inv Hget1.
+                eexists. split.
+                ** eapply def_funs_eq.
+                   match goal with
+                   | [ Hfix2 : anf_fix_rel _ _ _ fnames0 mfix Bs0 _ |- _ ] =>
+                     eapply (anf_fix_rel_name_in_fundefs _ _ _ _ _ _ _ Hfix2)
+                   end.
+                   eapply nth_error_In. exact Hnth_fi2.
+                ** eapply IHk; [ exact Hlt | | ].
+                   --- match goal with
+                       | [ He : anf_env_rel' _ names vs rho,
+                           Hec : env_consistent names vs,
+                           Hnd : NoDup fnames,
+                           Hd1 : Disjoint _ (FromList names :|: FromList fnames) _,
+                           Hd2 : Disjoint _ (FromList names) (FromList fnames),
+                           Hfr : anf_fix_rel fnames names _ fnames mfix Bs _ |- _ ] =>
+                         eapply (anf_rel_ClosFix _ _ _ _ _ _ _ _ idx fi1);
+                           [ exact He | exact Hec | exact Hnd | exact Hd1 | exact Hd2
+                           | exact Hnth_fi1 | exact Hfr ]
+                       end.
+                   --- match goal with
+                       | [ He : anf_env_rel' _ names0 vs rho0,
+                           Hec : env_consistent names0 vs,
+                           Hnd : NoDup fnames0,
+                           Hd1 : Disjoint _ (FromList names0 :|: FromList fnames0) _,
+                           Hd2 : Disjoint _ (FromList names0) (FromList fnames0),
+                           Hfr : anf_fix_rel fnames0 names0 _ fnames0 mfix Bs0 _ |- _ ] =>
+                         eapply (anf_rel_ClosFix _ _ _ _ _ _ _ _ idx fi2);
+                           [ exact He | exact Hec | exact Hnd | exact Hd1 | exact Hd2
+                           | exact Hnth_fi2 | exact Hfr ]
+                       end.
+          -- (* names / names0: environment variables *)
+             eapply Forall2_preord_var_env_def_funs.
+             ++ eapply anf_cvt_env_alpha_equiv_Forall2.
+                ** eapply IHk. exact Hlt.
+                ** match goal with [ H : anf_env_rel' _ names vs rho |- _ ] => exact H end.
+                ** match goal with [ H : anf_env_rel' _ names0 vs rho0 |- _ ] => exact H end.
+             ++ match goal with
+                | [ Hfix1 : anf_fix_rel _ _ _ fnames mfix Bs _,
+                    Hdis : Disjoint _ (FromList names) (FromList fnames) |- _ ] =>
+                  eapply Disjoint_Included_r;
+                    [ eapply (anf_fix_rel_name_in_fundefs _ _ _ _ _ _ _ Hfix1) | exact Hdis ]
+                end.
+             ++ match goal with
+                | [ Hfix2 : anf_fix_rel _ _ _ fnames0 mfix Bs0 _,
+                    Hdis : Disjoint _ (FromList names0) (FromList fnames0) |- _ ] =>
+                  eapply Disjoint_Included_r;
+                    [ eapply (anf_fix_rel_name_in_fundefs _ _ _ _ _ _ _ Hfix2) | exact Hdis ]
+                end.
+      + (* Continuation: Ehalt *)
+        intros j0 rho1'' rho2'' Hle Hvar_r _ _.
+        eapply preord_exp_halt_compat.
+        * eapply Hprops.
+        * eapply Hprops.
+        * exact Hvar_r.
+  Qed.
 
   End Alpha_Equiv.
 
