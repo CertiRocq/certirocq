@@ -7,8 +7,8 @@ From Stdlib Require Import ZArith.ZArith Lists.List Arith Ensembles
      Relations.Relation_Definitions micromega.Lia.
 
 (** MetaRocq *)
-From MetaRocq.Erasure Require Import EAst.
-From MetaRocq.Common Require Import BasicAst.
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EAstUtils.
+From MetaRocq.Common Require Import BasicAst Kernames.
 
 (** CompCert *)
 From compcert Require lib.Maps lib.Coqlib.
@@ -30,6 +30,9 @@ Section ANF_Val.
   Context (func_tag default_tag : positive)
           (cnstrs : conId_map)
           (cmap : const_map).
+
+  Context (Hf Ht : @LambdaBox_resource nat).
+  Context (Σ : EAst.global_context).
 
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=
@@ -58,6 +61,25 @@ Section ANF_Val.
       nth_error rho i = nth_error rho j.
 
 
+  (** ** Global environment relation *)
+
+  (** Relates cmap variables to their ANF values in a target environment,
+      restricted to a set [D] of kernames. Parametric in the value relation
+      [val_rel] so it can be used inside [anf_val_rel] without circularity. *)
+  Definition global_env_rel (val_rel : value -> val -> Prop)
+             (D : kername -> Prop) (rho : M.t val) : Prop :=
+    forall k v,
+      D k ->
+      lookup_const cmap k = Some v ->
+      exists decl body anf_v,
+        declared_constant Σ k decl /\
+        decl.(EAst.cst_body) = Some body /\
+        M.get v rho = Some anf_v /\
+        (forall src_v f t,
+           @eval_env_fuel _ Hf Ht Σ [] body (fuel_sem.Val src_v) f t ->
+           val_rel src_v anf_v).
+
+
   (** ** Fix relation *)
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
@@ -79,6 +101,12 @@ Section ANF_Val.
                     (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) Bs) S3.
 
 
+  (** Global deps of a mutual fixpoint *)
+  Definition mfix_global_deps (mfix : list (EAst.def EAst.term)) : KernameSet.t :=
+    List.fold_left
+      (fun acc d => KernameSet.union (term_global_deps d.(EAst.dbody)) acc)
+      mfix KernameSet.empty.
+
   (** ** Value relation *)
 
   Inductive anf_val_rel : value -> val -> Prop :=
@@ -98,6 +126,8 @@ Section ANF_Val.
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
 
+        global_env_rel anf_val_rel (fun k => KernameSet.In k (term_global_deps e)) rho ->
+
         anf_cvt_rel' cnstrs cmap S1 e (x :: names) S2 C1 r1 ->
         anf_val_rel (Clos_v vs na e)
                     (Vfun rho (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) Fnil) f)
@@ -112,6 +142,8 @@ Section ANF_Val.
         Disjoint _ (FromList names) (FromList fnames) ->
 
         nth_error fnames n = Some f ->
+
+        global_env_rel anf_val_rel (fun k => KernameSet.In k (mfix_global_deps mfix)) rho ->
 
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
 
