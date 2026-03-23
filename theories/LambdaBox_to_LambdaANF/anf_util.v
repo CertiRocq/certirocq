@@ -29,8 +29,7 @@ Section ANF_Val.
 
   Context (func_tag default_tag : positive)
           (cnstrs : conId_map)
-          (cmap : const_map)
-          (cmap_src_vals : var -> option value).
+          (cmap : const_map).
 
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=
@@ -95,14 +94,6 @@ Section ANF_Val.
         env_consistent names vs ->
 
         Disjoint var (x |: (f |: FromList names)) S1 ->
-        Disjoint _ cmap_vars S1 ->
-        Disjoint _ cmap_vars
-                   (x |: (f |: FromList names)) ->
-
-        (* Every cmap variable in the environment is related to its source value *)
-        (forall cv, cmap_vars cv ->
-          exists src_v anf_v, cmap_src_vals cv = Some src_v /\
-            M.get cv rho = Some anf_v /\ anf_val_rel src_v anf_v) ->
 
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
@@ -118,15 +109,6 @@ Section ANF_Val.
         NoDup fnames ->
 
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
-        Disjoint _ cmap_vars S1 ->
-        Disjoint _ cmap_vars
-                   (FromList names :|: FromList fnames) ->
-
-        (* Every cmap variable in the environment is related to its source value *)
-        (forall cv, cmap_vars cv ->
-          exists src_v anf_v, cmap_src_vals cv = Some src_v /\
-            M.get cv rho = Some anf_v /\ anf_val_rel src_v anf_v) ->
-
         Disjoint _ (FromList names) (FromList fnames) ->
 
         nth_error fnames n = Some f ->
@@ -845,7 +827,13 @@ Section ANF_Val.
             eapply IH_head; [ exact Ha | exact Hb ]
           end.
         * eapply IHvs; eassumption.
-    - (* Clos_v vs na e *)
+    - (* Clos_v — needs global env invariant formulation *)
+      admit.
+    - (* ClosFix_v — needs global env invariant formulation *)
+      admit.
+  Admitted.
+
+  (*
       inversion Hrel1; subst.
       (* Rename side 1 hypotheses *)
       match goal with
@@ -960,9 +948,7 @@ Section ANF_Val.
         * eapply Hprops.
         * eapply Hprops.
         * exact Hvar_r.
-    - (* ClosFix_v vs mfix n — TODO *)
-      admit.
-  Admitted.
+  *)
 
   End Alpha_Equiv.
 
