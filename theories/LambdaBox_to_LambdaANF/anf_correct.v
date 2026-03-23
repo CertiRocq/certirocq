@@ -278,10 +278,6 @@ Section Correct.
   Qed.
 
   (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
-  (** Variables from [cmap] that appear in [rho] *)
-  Definition cmap_vars : Ensemble var :=
-    fun v => exists k, lookup_const cmap k = Some v.
-
   Local Ltac anf_result_in_S :=
     match goal with
     | [ Hin : _ \in FromList ?vn,
