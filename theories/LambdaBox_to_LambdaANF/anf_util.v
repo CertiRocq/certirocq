@@ -821,6 +821,71 @@ Section ANF_Val.
         * eapply Disjoint_Included_l; [ | exact Hd2 ]. intros z Hz. now right.
   Qed.
 
+  (** Projection bindings compatibility for case branches *)
+  Lemma ctx_bind_proj_Forall2_compat k rho1 rho2 x1 x2 ctag
+        proj_vars1 proj_vars2 acc1 acc2 e1 e2 n :
+    preord_var_env cenv PG k rho1 rho2 x1 x2 ->
+    Forall2 (preord_var_env cenv PG k rho1 rho2) acc1 acc2 ->
+    List.length proj_vars1 = List.length proj_vars2 ->
+    NoDup proj_vars1 -> NoDup proj_vars2 ->
+    Disjoint _ (FromList proj_vars1) (FromList acc1 :|: [set x1]) ->
+    Disjoint _ (FromList proj_vars2) (FromList acc2 :|: [set x2]) ->
+    (forall rho1' rho2' m',
+        (m' <= k)%nat ->
+        Forall2 (preord_var_env cenv PG m' rho1' rho2') proj_vars1 proj_vars2 ->
+        Forall2 (preord_var_env cenv PG m' rho1' rho2') acc1 acc2 ->
+        preord_var_env cenv PG m' rho1' rho2' x1 x2 ->
+        preord_exp cenv P1 PG m' (e1, rho1') (e2, rho2')) ->
+    preord_exp cenv P1 PG k
+               (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
+               (ctx_bind_proj ctag x2 proj_vars2 n |[ e2 ]|, rho2).
+  Proof.
+    revert k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n.
+    induction proj_vars1;
+      intros k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n
+             Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hexp.
+    - destruct proj_vars2 as [ | v proj_vars2]; [ | simpl in Hlen; congruence ].
+      cbn [ctx_bind_proj app_ctx_f].
+      eapply Hexp; [ lia | constructor | exact Hacc | exact Hvar ].
+    - destruct proj_vars2 as [ | v proj_vars2]; [ simpl in Hlen; congruence | ].
+      simpl in Hlen.
+      cbn [ctx_bind_proj app_ctx_f].
+      inv Hnd1. inv Hnd2.
+      eapply preord_exp_proj_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + exact Hvar.
+      + intros m v1 v2 Hlt Hval.
+        eapply IHproj_vars1 with (acc1 := a :: acc1) (acc2 := v :: acc2).
+        * eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_monotonic. exact Hvar. lia.
+          -- intros Heq. subst. eapply Hdis1. constructor. now left. right. constructor.
+          -- intros Heq. subst. eapply Hdis2. constructor. now left. right. constructor.
+        * constructor.
+          -- eapply preord_var_env_extend_eq. exact Hval.
+          -- eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_preord_var_env_monotonic; [ | exact Hacc ]. lia.
+             ++ intros Hc. eapply Hdis1. constructor. now left. left. exact Hc.
+             ++ intros Hc. eapply Hdis2. constructor. now left. left. exact Hc.
+        * congruence.
+        * eassumption.
+        * eassumption.
+        * rewrite FromList_cons. rewrite <- Union_assoc.
+          eapply Union_Disjoint_r.
+          -- eapply Disjoint_Singleton_r. eassumption.
+          -- eapply Disjoint_Included; [ | | eapply Hdis1 ]; now sets.
+        * rewrite FromList_cons. rewrite <- Union_assoc.
+          eapply Union_Disjoint_r.
+          -- eapply Disjoint_Singleton_r. eassumption.
+          -- eapply Disjoint_Included; [ | | eapply Hdis2 ]; now sets.
+        * intros rho1' rho2' m' Hle Hpvars Haccs Hvar'.
+          eapply Hexp.
+          -- lia.
+          -- inv Hpvars. constructor; eassumption.
+          -- inv Haccs. eassumption.
+          -- exact Hvar'.
+  Qed.
+
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
     anf_cvt_val_alpha_equiv_statement k ->
     forall vs nms_a nms_b rho_a rho_b,
@@ -1479,50 +1544,43 @@ Section ANF_Val.
                     intros Hlt Hall. inv Hall.
                     eapply preord_exp_post_monotonic. { now eapply HinclG. }
                     destruct (IHk j' ltac:(lia)) as [_ Hbrs_j].
-                    eapply Hbrs_j; try lia; try eassumption.
-                    (* Disjoint ([set y1] :|: FromList vars1) S_branches1 *)
-                    +++ eapply Disjoint_Included_r.
-                        { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
-                            eapply anf_cvt_exp_subset; eassumption end. }
+                    eapply (proj1 (proj2 (IHk j' ltac:(lia)))); try lia; try eassumption.
+                    (* Disjoint ([set y] :|: FromList vars1) S_mid *)
+                    +++ match goal with
+                        | [ Hcvt_scr : anf_cvt_rel' _ _ _ ?Smid _ _ _ |- Disjoint _ _ ?Smid ] =>
+                          eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; exact Hcvt_scr | ]
+                        end.
                         eapply Union_Disjoint_l.
-                        ---- eapply Disjoint_Singleton_l. intro Hc.
-                             destruct Hc as [_ Hn]. apply Hn. constructor.
-                        ---- eapply Disjoint_Included_r. apply Setminus_Included.
-                             eapply Disjoint_Included_r. apply Setminus_Included.
-                             exact Hdis1.
-                    (* Disjoint side 2 *)
-                    +++ eapply Disjoint_Included_r.
-                        { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
-                            eapply anf_cvt_exp_subset; eassumption end. }
+                        ---- eapply Disjoint_Singleton_l. intro Hc. destruct Hc as [_ Hn]. apply Hn. constructor.
+                        ---- eapply Disjoint_Included_r; [ apply Setminus_Included | ].
+                             eapply Disjoint_Included_r; [ apply Setminus_Included | exact Hdis1 ].
+                    +++ match goal with
+                        | [ Hcvt_scr : anf_cvt_rel' _ _ _ ?Smid _ _ _ |- Disjoint _ _ ?Smid ] =>
+                          eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; exact Hcvt_scr | ]
+                        end.
                         eapply Union_Disjoint_l.
-                        ---- eapply Disjoint_Singleton_l. intro Hc.
-                             destruct Hc as [_ Hn]. apply Hn. constructor.
-                        ---- eapply Disjoint_Included_r. apply Setminus_Included.
-                             eapply Disjoint_Included_r. apply Setminus_Included.
-                             exact Hdis2.
-                    (* Disjoint cmap_vars *)
-                    +++ eapply Disjoint_Included_r.
-                        { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
-                            eapply anf_cvt_exp_subset; eassumption end. }
+                        ---- eapply Disjoint_Singleton_l. intro Hc. destruct Hc as [_ Hn]. apply Hn. constructor.
+                        ---- eapply Disjoint_Included_r; [ apply Setminus_Included | ].
+                             eapply Disjoint_Included_r; [ apply Setminus_Included | exact Hdis2 ].
+                    +++ match goal with
+                        | [ Hcvt_scr : anf_cvt_rel' _ _ _ ?Smid _ _ _ |- Disjoint _ cmap_vars ?Smid ] =>
+                          eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; exact Hcvt_scr | ]
+                        end.
                         eapply Disjoint_Included_r; [ apply Setminus_Included | ].
                         eapply Disjoint_Included_r; [ apply Setminus_Included | exact Hdis_cm1 ].
-                    +++ eapply Disjoint_Included_r.
-                        { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
-                            eapply anf_cvt_exp_subset; eassumption end. }
+                    +++ match goal with
+                        | [ Hcvt_scr : anf_cvt_rel' _ _ _ ?Smid _ _ _ |- Disjoint _ cmap_vars ?Smid ] =>
+                          eapply Disjoint_Included_r; [ eapply anf_cvt_exp_subset; exact Hcvt_scr | ]
+                        end.
                         eapply Disjoint_Included_r; [ apply Setminus_Included | ].
                         eapply Disjoint_Included_r; [ apply Setminus_Included | exact Hdis_cm2 ].
-                    (* Forall2 vars in M.set y (M.set f .. rho) *)
                     +++ eapply Forall2_preord_var_env_set.
                         ---- eapply Forall2_preord_var_env_set.
-                             ++++ eapply Forall2_preord_var_env_monotonic with (k := mk);
-                                  [lia | exact Henv].
+                             ++++ eapply Forall2_preord_var_env_monotonic with (k := mk); [lia | exact Henv].
                              ++++ intro Hc. eapply Hdis1. constructor. exact Hc. eassumption.
                              ++++ intro Hc. eapply Hdis2. constructor. exact Hc. eassumption.
-                        ---- intro Hc. eapply Hdis1. constructor. exact Hc.
-                             eapply Setminus_Included. eassumption.
-                        ---- intro Hc. eapply Hdis2. constructor. exact Hc.
-                             eapply Setminus_Included. eassumption.
-                    (* preord_var_env y1 y2 *)
+                        ---- intro Hc. eapply Hdis1. constructor. exact Hc. eapply Setminus_Included. eassumption.
+                        ---- intro Hc. eapply Hdis2. constructor. exact Hc. eapply Setminus_Included. eassumption.
                     +++ eapply preord_var_env_extend_eq. eassumption.
              ++ intro Hc. destruct Hc as [Hc1 _]. destruct Hc1 as [_ Hn].
                 apply Hn. constructor.
@@ -1625,7 +1683,17 @@ Section ANF_Val.
            (def_funs fdefs fdefs rho1 rho1) (def_funs fdefs0 fdefs0 rho2 rho2))
         fnames fnames0).
       { eapply (proj2 (proj2 (IHk (mk - 1) ltac:(lia)))); try lia; try eassumption.
-        all: admit. }
+        - eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis1 ].
+        - eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis2 ].
+        - eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis_cm1 ].
+        - eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis_cm2 ].
+        - eapply Disjoint_Included_l; [ eassumption | eapply Disjoint_sym; exact Hdis1 ].
+        - eapply Disjoint_Included_l; [ eassumption | eapply Disjoint_sym; exact Hdis2 ].
+        - eapply Forall2_preord_var_env_monotonic with (k := mk); [ lia | exact Henv ]. }
       eapply preord_exp_fun_compat.
       + eapply Hprops.
       + eapply Hprops.
@@ -1690,14 +1758,86 @@ Section ANF_Val.
         eapply preord_exp_case_cons_compat.
         + eapply Hprops.
         + eapply Hprops.
-        + exact Hvar_y.
+        + eapply Hprops.
         + (* Forall2 ctor tags for tail *)
           eapply anf_cvt_branches_ctor_tag; eassumption.
+        + exact Hvar_y.
         + (* head branch body *)
-          admit.
+          intros m' Hlt.
+          eapply preord_exp_monotonic.
+          * eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
+            -- eapply preord_var_env_monotonic; [ exact Hvar_y | lia ].
+            -- eapply Forall2_preord_var_env_monotonic; [ | exact Henv ]. lia.
+            -- congruence.
+            -- eassumption.
+            -- eassumption.
+            -- eapply Disjoint_Included_l.
+               { match goal with [ H : FromList ?vs \subset _ |- _ ] =>
+                   eapply Included_trans; [ exact H | ] end.
+                 eapply anf_cvt_branches_subset. eassumption. }
+               eapply Disjoint_Included_r; [ | eapply Disjoint_sym; exact Hdis1 ].
+               rewrite Union_commut. eapply Included_refl.
+            -- eapply Disjoint_Included_l.
+               { match goal with [ H : FromList ?vs \subset _ |- _ ] =>
+                   eapply Included_trans; [ exact H | ] end.
+                 eapply anf_cvt_branches_subset. eassumption. }
+               eapply Disjoint_Included_r; [ | eapply Disjoint_sym; exact Hdis2 ].
+               rewrite Union_commut. eapply Included_refl.
+            -- intros rho1' rho2' m'' Hle Hpvs Hvars Hvar'.
+               eapply (proj1 (IHk m'' ltac:(lia))); try lia; try eassumption.
+               ++ rewrite FromList_app. eapply Union_Disjoint_l.
+                  ** eapply Disjoint_Setminus_r. eapply Included_refl.
+                  ** eapply Disjoint_Included_r.
+                     { eapply Included_trans. eapply Setminus_Included.
+                       eapply anf_cvt_branches_subset. eassumption. }
+                     eapply Disjoint_Included_l; [ | exact Hdis1 ].
+                     intros z Hz. right. exact Hz.
+               ++ rewrite FromList_app. eapply Union_Disjoint_l.
+                  ** eapply Disjoint_Setminus_r. eapply Included_refl.
+                  ** eapply Disjoint_Included_r.
+                     { eapply Included_trans. eapply Setminus_Included.
+                       eapply anf_cvt_branches_subset. eassumption. }
+                     eapply Disjoint_Included_l; [ | exact Hdis2 ].
+                     intros z Hz. right. exact Hz.
+               ++ eapply Disjoint_Included_r.
+                  { eapply Included_trans. eapply Setminus_Included.
+                    eapply anf_cvt_branches_subset. eassumption. }
+                  exact Hdis_cm1.
+               ++ eapply Disjoint_Included_r.
+                  { eapply Included_trans. eapply Setminus_Included.
+                    eapply anf_cvt_branches_subset. eassumption. }
+                  exact Hdis_cm2.
+               ++ eapply Forall2_app; eassumption.
+               ++ (* preord_env_P cmap_vars_of — cmap vars not affected by proj bindings.
+                     Needs extending ctx_bind_proj_Forall2_compat to propagate
+                     preord_env_P for variables outside proj_vars/acc/{x}. *)
+                  admit.
+               ++ intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
+                  eapply preord_exp_halt_compat;
+                    [ eapply Hprops | eapply Hprops | exact Hvar_r ].
+          * lia.
         + (* tail *)
           eapply IHbrs; try eassumption.
-          all: admit.
+          * eapply Disjoint_Included_l.
+            { intros z Hz. inv Hz; [ left; exact H | right; exact H ]. }
+            eapply Disjoint_Included_r.
+            { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
+                eapply Included_trans; [ eapply Setminus_Included | eapply anf_cvt_exp_subset; exact H ] end. }
+            exact Hdis1.
+          * eapply Disjoint_Included_l.
+            { intros z Hz. inv Hz; [ left; exact H | right; exact H ]. }
+            eapply Disjoint_Included_r.
+            { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
+                eapply Included_trans; [ eapply Setminus_Included | eapply anf_cvt_exp_subset; exact H ] end. }
+            exact Hdis2.
+          * eapply Disjoint_Included_r.
+            { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
+                eapply Included_trans; [ eapply Setminus_Included | eapply anf_cvt_exp_subset; exact H ] end. }
+            exact Hdis_cm1.
+          * eapply Disjoint_Included_r.
+            { match goal with [ H : anf_cvt_rel' _ _ _ _ _ _ _ |- _ ] =>
+                eapply Included_trans; [ eapply Setminus_Included | eapply anf_cvt_exp_subset; exact H ] end. }
+            exact Hdis_cm2.
     }
   Admitted.
 
