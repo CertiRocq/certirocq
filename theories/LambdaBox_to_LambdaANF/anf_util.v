@@ -32,11 +32,6 @@ Section ANF_Val.
           (cmap : const_map)
           (cmap_src_vals : var -> option value).
 
-  (** [cmap_src_vals] maps each cmap variable to its source-level value.
-      This is needed to relate two independent ANF translations that share
-      the same cmap: both environments must agree on source values for
-      cmap variables. *)
-
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=
     ANF.anf_cvt_rel func_tag default_tag tgm cmap.

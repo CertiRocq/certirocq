@@ -277,6 +277,18 @@ Section Correct.
         * intros k Hnth. exact (Hdup (S k) Hnth).
   Qed.
 
+  (** ** Shorthands *)
+
+  Definition anf_cvt_rel' := anf_cvt_rel'.
+  Definition anf_cvt_rel_args' := ANF.anf_cvt_rel_args func_tag default_tag cnstrs cmap.
+  Definition anf_cvt_rel_mfix' := ANF.anf_cvt_rel_mfix func_tag default_tag cnstrs cmap.
+  Definition anf_cvt_rel_branches' := ANF.anf_cvt_rel_branches func_tag default_tag cnstrs cmap.
+
+  Definition anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
+  Definition anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
+  Definition anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
+
+
   (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
   Local Ltac anf_result_in_S :=
     match goal with
@@ -305,7 +317,7 @@ Section Correct.
       @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ rho e r f t ->
       forall v, r = fuel_sem.Val v ->
       forall S vn S' C x i,
-        ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
+        anf_cvt_rel' S e vn S' C x ->
         Disjoint _ (FromList vn) S ->
         Disjoint _ cmap_vars S ->
         Disjoint _ (FromList vn) cmap_vars ->
@@ -317,7 +329,7 @@ Section Correct.
                           (r : fuel_sem.result) (f : nat) (t : nat) =>
       forall v, r = fuel_sem.Val v ->
       forall S vn S' C x i,
-        ANF.anf_cvt_rel func_tag default_tag cnstrs cmap S e vn S' C x ->
+        anf_cvt_rel' S e vn S' C x ->
         Disjoint _ (FromList vn) S ->
         Disjoint _ cmap_vars S ->
         Disjoint _ (FromList vn) cmap_vars ->
@@ -403,18 +415,6 @@ Section Correct.
     split. simpl. unfold_all. lia.
     eapply preord_res_refl; tci.
   Qed.
-
-
-  (** ** Shorthands *)
-
-  Definition anf_cvt_rel' := ANF.anf_cvt_rel func_tag default_tag cnstrs cmap.
-  Definition anf_cvt_rel_args' := ANF.anf_cvt_rel_args func_tag default_tag cnstrs cmap.
-  Definition anf_cvt_rel_mfix' := ANF.anf_cvt_rel_mfix func_tag default_tag cnstrs cmap.
-  Definition anf_cvt_rel_branches' := ANF.anf_cvt_rel_branches func_tag default_tag cnstrs cmap.
-
-  Definition anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
-  Definition anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
-  Definition anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
 
 
   (** ** Global environment invariant *)
