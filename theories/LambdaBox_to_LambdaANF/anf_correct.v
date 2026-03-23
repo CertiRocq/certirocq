@@ -321,7 +321,7 @@ Section Correct.
       then the evaluation result equals rho[i]. *)
   Lemma anf_cvt_rel_var_lookup :
     forall rho e r f t,
-      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ rho e r f t ->
+      eval_src rho e r f t ->
       forall v, r = fuel_sem.Val v ->
       forall S vn S' C x i,
         anf_cvt_rel' S e vn S' C x ->
@@ -360,16 +360,24 @@ Section Correct.
       Set Printing All. admit.
     (* 2. eval_App_step_OOT1 *) - intros; congruence.
     (* 3. eval_App_step_OOT2 *) - intros; congruence.
-    (* 4. eval_FixApp_step *) - intros; congruence.
+    (* 4. eval_FixApp_step *)
+    - admit.
     (* 5. eval_LetIn_step *) - admit.
     (* 6. eval_LetIn_step_OOT *) - intros; congruence.
-    (* 7. eval_Construct_step *) - intros; congruence.
-    (* 8. eval_Construct_step_OOT *) - intros; congruence.
-    (* 9. eval_Case_step *) - intros; congruence.
-    (* 10. eval_Case_step_OOT *) - intros; congruence.
-    (* 11. eval_Proj_step *) - intros; congruence.
-    (* 12. eval_Proj_step_OOT *) - intros; congruence.
-    (* 13. eval_Const_step *) - intros; congruence.
+    (* 7. eval_Construct_step *)
+    - admit.
+    (* 8. eval_Construct_step_OOT *)
+    - intros; congruence.
+    (* 9. eval_Case_step *)
+    - admit.
+    (* 10. eval_Case_step_OOT *)
+    - intros; congruence.
+    (* 11. eval_Proj_step *)
+    - admit.
+    (* 12. eval_Proj_step_OOT *)
+    - intros; congruence.
+    (* 13. eval_Const_step *)
+    - admit.
     (* 14. eval_many_nil *) - intros; exact I.
     (* 15. eval_many_cons *) - intros; exact I.
     (* 16. eval_Rel_fuel *)
@@ -379,9 +387,12 @@ Section Correct.
       inversion Hcvt; subst.
       erewrite Hcons_saved. exact Hnth_rho.
       exact Hnth_vn. assumption.
-    (* 17. eval_Lam_fuel *) - intros; congruence.
-    (* 18. eval_Fix_fuel *) - intros; congruence.
-    (* 19. eval_Box_fuel *) - intros; congruence.
+    (* 17. eval_Lam_fuel: result f ∈ S, contradiction *)
+    - admit.
+    (* 18. eval_Fix_fuel: result from fnames ⊆ S, contradiction *)
+    - admit.
+    (* 19. eval_Box_fuel: result x ∈ S, contradiction *)
+    - admit.
     (* 20. eval_OOT *) - intros; congruence.
     (* 21. eval_step *)
     - intros ? ? ? ? ? ? IH. exact IH.
@@ -444,41 +455,55 @@ Section Correct.
   Definition anf_cvt_correct_exp
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
-      wf.well_formed_env Σ vs ->             (* source env well-formed *)
-      wellformed Σ (List.length vnames) e = true -> (* source term well-formed *)
-      anf_util.env_consistent vnames vs ->   (* duplicate names → same values *)
-      Disjoint _ (FromList vnames) S ->      (* names disjoint from fresh set *)
-      Disjoint _ cmap_vars S ->              (* cmap vars disjoint from fresh set *)
-      anf_env_rel' vnames vs rho ->          (* source/target envs related *)
-      global_env_rel rho ->                  (* target env has correct constant values *)
-      anf_cvt_rel' S e vnames S' C x ->     (* ANF conversion of e *)
+      (* source well-formedness *)
+      wf.well_formed_env Σ vs ->
+      wellformed Σ (List.length vnames) e = true ->
+      (* source environment consistency *)
+      anf_util.env_consistent vnames vs ->
+      (* freshness *)
+      Disjoint _ (FromList vnames) S ->
+      Disjoint _ cmap_vars S ->
+      (* source/target environment relation *)
+      anf_env_rel' vnames vs rho ->
+      (* global constants correctly set up in target *)
+      global_env_rel rho ->
+      (* ANF conversion *)
+      anf_cvt_rel' S e vnames S' C x ->
       forall e_k,
+        (* continuation does not use consumed fresh variables *)
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
-        (* Termination *)
+        (* termination *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
          preord_exp cenv (anf_bound f t) eq_fuel i
                     (e_k, M.set x v' rho)
                     (C |[ e_k ]|, rho)) /\
-        (* Divergence *)
+        (* divergence *)
         (r = fuel_sem.OOT ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
-
   (** Correctness for [eval_env_step] (one reduction step).
-      Same as [anf_cvt_correct_exp] but with tighter fuel/trace bounds. *)
+      Same premises as [anf_cvt_correct_exp], tighter fuel/trace bounds. *)
   Definition anf_cvt_correct_exp_step
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
+      (* source well-formedness *)
       wf.well_formed_env Σ vs ->
       wellformed Σ (List.length vnames) e = true ->
+      (* source environment consistency *)
       anf_util.env_consistent vnames vs ->
+      (* freshness *)
       Disjoint _ (FromList vnames) S ->
       Disjoint _ cmap_vars S ->
+      (* source/target environment relation *)
       anf_env_rel' vnames vs rho ->
+      (* global constants correctly set up in target *)
       global_env_rel rho ->
+      (* ANF conversion *)
       anf_cvt_rel' S e vnames S' C x ->
       forall e_k,
+        (* continuation does not use consumed fresh variables *)
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
+        (* termination *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
                       preord_exp cenv
                                  (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
@@ -486,32 +511,34 @@ Section Correct.
                                  eq_fuel i
                                  (e_k, M.set x v' rho)
                                  (C |[ e_k ]|, rho)) /\
+        (* divergence *)
         (r = fuel_sem.OOT ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
-
+  (** Correctness for argument list evaluation. *)
   Definition anf_cvt_correct_args
              (vs : fuel_sem.env) (args : list EAst.term)
              (vals : list value) (f t : nat) :=
     forall rho vnames C xs S S' i,
+      (* source well-formedness *)
       wf.well_formed_env Σ vs ->
       Forall (fun t => wellformed Σ (List.length vnames) t = true) args ->
-
+      (* source environment consistency *)
       anf_util.env_consistent vnames vs ->
-
+      (* freshness *)
       Disjoint _ (FromList vnames) S ->
       Disjoint _ cmap_vars S ->
-
+      (* source/target environment relation *)
       anf_env_rel' vnames vs rho ->
+      (* global constants correctly set up in target *)
       global_env_rel rho ->
-
+      (* ANF conversion of argument list *)
       anf_cvt_rel_args' S args vnames S' C xs ->
-
       NoDup xs ->
-
       forall e_k,
+        (* continuation does not use consumed fresh variables *)
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList xs) ->
-
+        (* termination *)
         (forall vs',
            Forall2 anf_val_rel' vals vs' ->
            preord_exp cenv (anf_bound f t) eq_fuel i
@@ -524,7 +551,7 @@ Section Correct.
 
   Lemma anf_cvt_correct :
     forall vs e r f t,
-      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ vs e r f t ->
+      eval_src vs e r f t ->
       anf_cvt_correct_exp vs e r f t.
   Proof.
     intros vs e r f t Heval.
