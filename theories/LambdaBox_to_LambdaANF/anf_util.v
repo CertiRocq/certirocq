@@ -52,6 +52,10 @@ Section ANF_Val.
   Definition cmap_vars : Ensemble var :=
     fun v => exists k, lookup_const cmap k = Some v.
 
+  (** Image of a kername set under [cmap] *)
+  Definition cmap_vars_of (D : kername -> Prop) : Ensemble var :=
+    fun v => exists k, D k /\ lookup_const cmap k = Some v.
+
 
   (** ** Environment and consistency relations *)
 
@@ -719,7 +723,7 @@ Section ANF_Val.
       Disjoint _ cmap_vars S1 ->
       Disjoint _ cmap_vars S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      preord_env_P cenv PG cmap_vars m rho1 rho2 ->
+      preord_env_P cenv PG (cmap_vars_of (fun k => KernameSet.In k (term_global_deps e))) m rho1 rho2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
         preord_var_env cenv PG j rho1' rho2' r1 r2 ->
@@ -803,7 +807,8 @@ Section ANF_Val.
       eapply Hcmap_env.
       { match goal with
         | [ Hl : lookup_const _ ?s = Some ?vv |- _ ] =>
-          unfold cmap_vars; exists s; exact Hl
+          unfold cmap_vars_of; exists s; split;
+          [ apply KernameSet.singleton_spec; reflexivity | exact Hl ]
         end. }
       exact Hget_v.
 
