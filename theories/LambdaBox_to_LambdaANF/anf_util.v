@@ -27,12 +27,17 @@ Import ListNotations.
 
 Section ANF_Val.
 
-  Context (func_tag default_tag : positive)
-          (cnstrs : conId_map)
-          (cmap : const_map).
-
-  Context (Hf Ht : @LambdaBox_resource nat).
-  Context (Σ : EAst.global_context).
+  Context
+    (* LambdaANF tags *)
+    (func_tag default_tag : positive)
+    (* constructor tag map *)
+    (cnstrs : conId_map)
+    (* global constant map: kername → LambdaANF variable *)
+    (cmap : const_map)
+    (* source fuel and trace resource instances *)
+    (Hf Ht : @LambdaBox_resource nat)
+    (* MetaRocq erased global context *)
+    (Σ : EAst.global_context).
 
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=

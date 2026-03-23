@@ -29,19 +29,27 @@ Open Scope list_scope.
 
 Section Correct.
 
-  Context (func_tag kon_tag default_tag default_itag : positive)
-          (cnstrs : conId_map)
-          (cmap : const_map)
-          (cenv : ctor_env)
-          (Σ : EAst.global_context)
-          (dcon_to_tag_inj :
-            forall tgm dc dc',
-              dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc')
-          (cmap_inj :
-            forall k1 k2 v,
-              lookup_const cmap k1 = Some v ->
-              lookup_const cmap k2 = Some v ->
-              k1 = k2).
+  Context
+    (* LambdaANF tags *)
+    (func_tag kon_tag default_tag default_itag : positive)
+    (* constructor tag map *)
+    (cnstrs : conId_map)
+    (* global constant map: kername → LambdaANF variable *)
+    (cmap : const_map)
+    (* constructor environment *)
+    (cenv : ctor_env)
+    (* MetaRocq erased global context *)
+    (Σ : EAst.global_context)
+    (* constructor tags are injective *)
+    (dcon_to_tag_inj :
+      forall tgm dc dc',
+        dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc')
+    (* constant map is injective: different constants get different variables *)
+    (cmap_inj :
+      forall k1 k2 v,
+        lookup_const cmap k1 = Some v ->
+        lookup_const cmap k2 = Some v ->
+        k1 = k2).
 
   (** Term/environment flags for our pipeline:
       no CoFix, Lazy/Force, Var, Evar. *)
