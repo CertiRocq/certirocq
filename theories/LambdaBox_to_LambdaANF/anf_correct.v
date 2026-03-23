@@ -277,16 +277,17 @@ Section Correct.
         * intros k Hnth. exact (Hdup (S k) Hnth).
   Qed.
 
-  (** ** Shorthands *)
+  (** ** Shorthands — use the ones from anf_util *)
 
-  Definition anf_cvt_rel' := anf_cvt_rel'.
-  Definition anf_cvt_rel_args' := ANF.anf_cvt_rel_args func_tag default_tag cnstrs cmap.
-  Definition anf_cvt_rel_mfix' := ANF.anf_cvt_rel_mfix func_tag default_tag cnstrs cmap.
-  Definition anf_cvt_rel_branches' := ANF.anf_cvt_rel_branches func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel' := anf_util.anf_cvt_rel' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_args' := anf_util.anf_cvt_rel_args' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_mfix' := anf_util.anf_cvt_rel_mfix' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_branches' := anf_util.anf_cvt_rel_branches' func_tag default_tag cnstrs cmap.
 
-  Definition anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
-  Definition anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
-  Definition anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
+  Let anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
+  Let anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
+  Let anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
+  Let cmap_vars := anf_util.cmap_vars cmap.
 
 
   (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
