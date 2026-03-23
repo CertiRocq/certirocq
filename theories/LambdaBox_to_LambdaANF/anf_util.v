@@ -1554,10 +1554,31 @@ Section ANF_Val.
         * (* Forall2 preord_var_env vars1 vars2 in def_funs envs *)
           eapply Forall2_preord_var_env_def_funs.
           -- eapply Forall2_preord_var_env_monotonic with (k := mk); [ lia | exact Henv ].
-          -- admit. (* Disjoint (FromList vars1) (name_in_fundefs fdefs) *)
-          -- admit. (* Disjoint (FromList vars2) (name_in_fundefs fdefs0) *)
+          -- (* Disjoint (FromList vars1) (name_in_fundefs fdefs) *)
+             eapply Disjoint_Included_r.
+             { eapply Same_set_all_fun_name. }
+             erewrite anf_cvt_mfix_all_fun_name by eassumption.
+             eapply Disjoint_Included_r; [ eassumption | exact Hdis1 ].
+          -- (* Disjoint (FromList vars2) (name_in_fundefs fdefs0) *)
+             eapply Disjoint_Included_r.
+             { eapply Same_set_all_fun_name. }
+             erewrite anf_cvt_mfix_all_fun_name by eassumption.
+             eapply Disjoint_Included_r; [ eassumption | exact Hdis2 ].
         * (* old vars preserved through def_funs *)
-          admit.
+          intros a b Hvar Ha Hb.
+          eapply preord_var_env_def_funs_not_In_r.
+          { intros Hc.
+            apply (Same_set_all_fun_name fdefs0) in Hc.
+            erewrite anf_cvt_mfix_all_fun_name in Hc by eassumption.
+            eapply Hdis2. constructor; [ | eassumption ].
+            eapply Included_trans; [ | eassumption ]. intros z Hz. exact Hz. }
+          eapply preord_var_env_def_funs_not_In_l.
+          { intros Hc.
+            apply (Same_set_all_fun_name fdefs) in Hc.
+            erewrite anf_cvt_mfix_all_fun_name in Hc by eassumption.
+            eapply Hdis1. constructor; [ | eassumption ].
+            eapply Included_trans; [ | eassumption ]. intros z Hz. exact Hz. }
+          eapply preord_var_env_monotonic. exact Hvar. lia.
 
     (* tCoFix - impossible *)
     - (* tPrim -> anf_Prim *)
