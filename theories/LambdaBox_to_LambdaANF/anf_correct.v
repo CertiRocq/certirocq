@@ -438,61 +438,47 @@ Section Correct.
     end.
 
 
-  (** ** Main correctness statement *)
+  (** ** Main correctness statements *)
 
-  (** For an expression that evaluates via [eval_env_fuel]:
-      - if it terminates with value [v] and [v] is related to [v'] by [anf_val_rel],
-        then the ANF code [C |[ e_k ]|] is related to [e_k{x := v'}] by [preord_exp]
-      - if it diverges, the ANF code diverges too *)
+  (** Correctness for [eval_env_fuel] (top-level evaluation). *)
   Definition anf_cvt_correct_exp
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
-      wf.well_formed_env Σ vs ->
-      wellformed Σ (List.length vnames) e = true ->
-
-      anf_util.env_consistent vnames vs ->
-
-      Disjoint _ (FromList vnames) S ->
-      Disjoint _ cmap_vars S ->
-
-      anf_env_rel' vnames vs rho ->
-      global_env_rel rho ->
-
-      anf_cvt_rel' S e vnames S' C x ->
-
+      wf.well_formed_env Σ vs ->             (* source env well-formed *)
+      wellformed Σ (List.length vnames) e = true -> (* source term well-formed *)
+      anf_util.env_consistent vnames vs ->   (* duplicate names → same values *)
+      Disjoint _ (FromList vnames) S ->      (* names disjoint from fresh set *)
+      Disjoint _ cmap_vars S ->              (* cmap vars disjoint from fresh set *)
+      anf_env_rel' vnames vs rho ->          (* source/target envs related *)
+      global_env_rel rho ->                  (* target env has correct constant values *)
+      anf_cvt_rel' S e vnames S' C x ->     (* ANF conversion of e *)
       forall e_k,
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
-
-        (* Source terminates *)
+        (* Termination *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
          preord_exp cenv (anf_bound f t) eq_fuel i
                     (e_k, M.set x v' rho)
                     (C |[ e_k ]|, rho)) /\
-        (* Source diverges *)
+        (* Divergence *)
         (r = fuel_sem.OOT ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
 
+  (** Correctness for [eval_env_step] (one reduction step).
+      Same as [anf_cvt_correct_exp] but with tighter fuel/trace bounds. *)
   Definition anf_cvt_correct_exp_step
              (vs : fuel_sem.env) (e : EAst.term) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
       wf.well_formed_env Σ vs ->
       wellformed Σ (List.length vnames) e = true ->
-
       anf_util.env_consistent vnames vs ->
-
       Disjoint _ (FromList vnames) S ->
       Disjoint _ cmap_vars S ->
-
       anf_env_rel' vnames vs rho ->
       global_env_rel rho ->
-
       anf_cvt_rel' S e vnames S' C x ->
-
       forall e_k,
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
-
-        (* Source terminates *)
         (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
                       preord_exp cenv
                                  (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
@@ -500,7 +486,6 @@ Section Correct.
                                  eq_fuel i
                                  (e_k, M.set x v' rho)
                                  (C |[ e_k ]|, rho)) /\
-        (* Source diverges *)
         (r = fuel_sem.OOT ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
@@ -651,10 +636,13 @@ Section Correct.
           eapply preord_val_refl. tci.
       + intros Habs. congruence.
 
-    - (* eval_Lam_fuel: tLambda na body → Clos_v vs na body
-         ANF: Efun (Fcons f func_tag [x1] (C1|[Ehalt r1]|) Fnil) e_k
-         After Efun_red, f ↦ Vfun rho (Fcons f ...) f in rho.
-         Need preord_val v' (Vfun ...) via anf_rel_Clos + alpha-equiv. *)
+    - (* eval_Lam_fuel *)
+      intros body0 vs1 na0.
+      unfold anf_cvt_correct_exp.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hdis Hdis_cm Henv Hginv Hcvt e_k Hdis_ek.
+      inv Hcvt. simpl.
+      split.
+      + intros v0 v' Heq Hrel. inv Heq.
         admit. (* needs alpha-equiv + preord_exp machinery *)
       + intros Habs. congruence.
 
