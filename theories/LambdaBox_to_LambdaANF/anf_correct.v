@@ -136,6 +136,25 @@ Section Correct.
   Instance LambdaBox_resource_trace : @LambdaBox_resource nat :=
     {| HRes := trace_resource_LambdaBox |}.
 
+  (** Shorthand for source evaluation *)
+  Let eval_src := @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
+
+  (** ** Shorthands *)
+
+  Let anf_cvt_rel' := anf_util.anf_cvt_rel' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_args' := anf_util.anf_cvt_rel_args' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_mfix' := anf_util.anf_cvt_rel_mfix' func_tag default_tag cnstrs cmap.
+  Let anf_cvt_rel_branches' := anf_util.anf_cvt_rel_branches' func_tag default_tag cnstrs cmap.
+
+  Let anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap
+                        LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
+  Let anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap
+                        LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
+  Let anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
+  Let cmap_vars := anf_util.cmap_vars cmap.
+  Let global_env_rel' D rho := anf_util.global_env_rel cmap
+        LambdaBox_resource_fuel LambdaBox_resource_trace Σ anf_val_rel' D rho.
+
 
   (** ** LambdaANF fuel and trace *)
 
@@ -190,9 +209,9 @@ Section Correct.
   (** ** Environment relation helpers *)
 
   Lemma anf_env_rel_weaken vnames vs x v rho :
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    anf_env_rel' vnames vs rho ->
     ~ x \in FromList vnames ->
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs (M.set x v rho).
+    anf_env_rel' vnames vs (M.set x v rho).
   Proof.
     unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
     intros Henv Hnin.
@@ -209,10 +228,10 @@ Section Correct.
   Qed.
 
   Lemma anf_env_rel_extend_weaken vnames vs x v v' rho :
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
-    anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v' ->
+    anf_env_rel' vnames vs rho ->
+    anf_val_rel' v v' ->
     ~ x \in FromList vnames ->
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap (x :: vnames) (v :: vs) (M.set x v' rho).
+    anf_env_rel' (x :: vnames) (v :: vs) (M.set x v' rho).
   Proof.
     unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
     intros Henv Hval Hnin.
@@ -236,10 +255,10 @@ Section Correct.
   Qed.
 
   Lemma anf_env_rel_extend vnames vs x v v' rho :
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    anf_env_rel' vnames vs rho ->
     M.get x rho = Some v' ->
-    anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v' ->
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap (x :: vnames) (v :: vs) rho.
+    anf_val_rel' v v' ->
+    anf_env_rel' (x :: vnames) (v :: vs) rho.
   Proof.
     unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
     intros Henv Hget Hval. constructor; eauto.
@@ -248,11 +267,11 @@ Section Correct.
   (** Setting a variable preserves env_rel when the value is related
       at every position where the variable appears in vnames. *)
   Lemma anf_env_rel_set vnames vs x v' rho :
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs rho ->
+    anf_env_rel' vnames vs rho ->
     (forall k, nth_error vnames k = Some x ->
       exists v, nth_error vs k = Some v /\
-                anf_util.anf_val_rel func_tag default_tag cnstrs cmap v v') ->
-    anf_util.anf_env_rel func_tag default_tag cnstrs cmap vnames vs (M.set x v' rho).
+                anf_val_rel' v v') ->
+    anf_env_rel' vnames vs (M.set x v' rho).
   Proof.
     unfold anf_util.anf_env_rel, anf_util.anf_env_rel'.
     intros Henv Hdup.
@@ -276,19 +295,6 @@ Section Correct.
           end.
         * intros k Hnth. exact (Hdup (S k) Hnth).
   Qed.
-
-  (** ** Shorthands — use the ones from anf_util *)
-
-  Let anf_cvt_rel' := anf_util.anf_cvt_rel' func_tag default_tag cnstrs cmap.
-  Let anf_cvt_rel_args' := anf_util.anf_cvt_rel_args' func_tag default_tag cnstrs cmap.
-  Let anf_cvt_rel_mfix' := anf_util.anf_cvt_rel_mfix' func_tag default_tag cnstrs cmap.
-  Let anf_cvt_rel_branches' := anf_util.anf_cvt_rel_branches' func_tag default_tag cnstrs cmap.
-
-  Let anf_val_rel' := anf_util.anf_val_rel func_tag default_tag cnstrs cmap.
-  Let anf_env_rel' := anf_util.anf_env_rel func_tag default_tag cnstrs cmap.
-  Let anf_fix_rel' := anf_util.anf_fix_rel func_tag default_tag cnstrs cmap.
-  Let cmap_vars := anf_util.cmap_vars cmap.
-
 
   (** Tactic: derive contradiction when result var x ∈ FromList vn but x ∈ S *)
   Local Ltac anf_result_in_S :=
@@ -420,23 +426,9 @@ Section Correct.
 
   (** ** Global environment invariant *)
 
-  (** Connects the MetaRocq global context [Σ], the [const_map] produced
-      by conversion, and the LambdaANF environment [rho].
-      For each constant in [cmap]:
-      - it is declared in [Σ] with some body
-      - its variable is bound in [rho] to an ANF value
-      - that ANF value is related to any source value the body evaluates to *)
-  Definition global_env_inv (rho : M.t val) : Prop :=
-    forall k v,
-      lookup_const cmap k = Some v ->
-      exists decl body anf_v,
-        declared_constant Σ k decl /\
-        decl.(EAst.cst_body) = Some body /\
-        M.get v rho = Some anf_v /\
-        (forall src_v f t,
-           @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                          Σ [] body (fuel_sem.Val src_v) f t ->
-           anf_val_rel' src_v anf_v).
+  (** [global_env_rel] instantiated with [anf_val_rel] and all constants. *)
+  Definition global_env_rel (rho : M.t val) : Prop :=
+    global_env_rel' (fun _ => True) rho.
 
   (** ** Helper: set_many *)
   Fixpoint set_many (xs : list var) (vs : list val) (rho : M.t val) : M.t val :=
@@ -464,7 +456,7 @@ Section Correct.
       Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
-      global_env_inv rho ->
+      global_env_rel rho ->
 
       anf_cvt_rel' S e vnames S' C x ->
 
@@ -493,7 +485,7 @@ Section Correct.
       Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
-      global_env_inv rho ->
+      global_env_rel rho ->
 
       anf_cvt_rel' S e vnames S' C x ->
 
@@ -526,7 +518,7 @@ Section Correct.
       Disjoint _ cmap_vars S ->
 
       anf_env_rel' vnames vs rho ->
-      global_env_inv rho ->
+      global_env_rel rho ->
 
       anf_cvt_rel_args' S args vnames S' C xs ->
 
