@@ -32,9 +32,16 @@ Section Correct.
   Context (func_tag kon_tag default_tag default_itag : positive)
           (cnstrs : conId_map)
           (cmap : const_map)
-          (cenv : ctor_env).
-
-  Context (Σ : EAst.global_context).
+          (cenv : ctor_env)
+          (Σ : EAst.global_context)
+          (dcon_to_tag_inj :
+            forall tgm dc dc',
+              dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc')
+          (cmap_inj :
+            forall k1 k2 v,
+              lookup_const cmap k1 = Some v ->
+              lookup_const cmap k2 = Some v ->
+              k1 = k2).
 
   (** Term/environment flags for our pipeline:
       no CoFix, Lazy/Force, Var, Evar. *)
@@ -70,16 +77,6 @@ Section Correct.
     |}.
 
   Local Existing Instance certirocq_env_flags.
-
-  Context (dcon_to_tag_inj :
-    forall tgm dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
-  Context (cmap_inj :
-    forall k1 k2 v,
-      lookup_const cmap k1 = Some v ->
-      lookup_const cmap k2 = Some v ->
-      k1 = k2).
 
 
   (** ** Source fuel and trace *)
