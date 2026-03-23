@@ -37,7 +37,13 @@ Section ANF_Val.
     (* source fuel and trace resource instances *)
     (Hf Ht : @LambdaBox_resource nat)
     (* MetaRocq erased global context *)
-    (Σ : EAst.global_context).
+    (Σ : EAst.global_context)
+    (* all constant bodies in Σ evaluate to a value *)
+    (global_env_evaluates :
+      forall k decl body,
+        declared_constant Σ k decl ->
+        decl.(EAst.cst_body) = Some body ->
+        exists src_v f t, @eval_env_fuel _ Hf Ht Σ [] body (fuel_sem.Val src_v) f t).
 
   (** Shorthand for the relational spec, partially applied with tags *)
   Definition anf_cvt_rel' (tgm : conId_map) (cmap : const_map) :=
@@ -135,6 +141,10 @@ Section ANF_Val.
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
 
+        (* cmap variables are disjoint from closure variables and fresh set *)
+        Disjoint _ cmap_vars (x |: (f |: FromList names)) ->
+        Disjoint _ cmap_vars S1 ->
+
         global_env_rel anf_val_rel (fun k => KernameSet.In k (term_global_deps e)) rho ->
 
         anf_cvt_rel' cnstrs cmap S1 e (x :: names) S2 C1 r1 ->
@@ -149,6 +159,9 @@ Section ANF_Val.
 
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
         Disjoint _ (FromList names) (FromList fnames) ->
+
+        Disjoint _ cmap_vars (FromList names :|: FromList fnames) ->
+        Disjoint _ cmap_vars S1 ->
 
         nth_error fnames n = Some f ->
 
@@ -583,6 +596,45 @@ Section ANF_Val.
   Qed.
 
 
+  (** ** KernameSet fold_left helpers *)
+
+  Lemma fold_left_kset_union_base {A} (f : A -> KernameSet.t) (l : list A) (base : KernameSet.t) k :
+    KernameSet.In k base ->
+    KernameSet.In k (List.fold_left (fun acc x => KernameSet.union (f x) acc) l base).
+  Proof.
+    revert base. induction l; simpl; intros base Hin.
+    - exact Hin.
+    - apply IHl. apply KernameSet.union_spec. right. exact Hin.
+  Qed.
+
+  Lemma fold_left_kset_union_elem {A} (f : A -> KernameSet.t) (l : list A) (base : KernameSet.t) x k :
+    List.In x l ->
+    KernameSet.In k (f x) ->
+    KernameSet.In k (List.fold_left (fun acc x => KernameSet.union (f x) acc) l base).
+  Proof.
+    revert base. induction l; simpl; intros base Hin Hk.
+    - destruct Hin as [].
+    - destruct Hin as [<- | Hin].
+      + apply fold_left_kset_union_base. apply KernameSet.union_spec. left. exact Hk.
+      + apply IHl; assumption.
+  Qed.
+
+  Lemma fold_left_kset_union_mono {A} (f : A -> KernameSet.t) (l : list A)
+    (base1 base2 : KernameSet.t) :
+    (forall k, KernameSet.In k base1 -> KernameSet.In k base2) ->
+    forall k,
+    KernameSet.In k (List.fold_left (fun acc x => KernameSet.union (f x) acc) l base1) ->
+    KernameSet.In k (List.fold_left (fun acc x => KernameSet.union (f x) acc) l base2).
+  Proof.
+    revert base1 base2. induction l; simpl; intros base1 base2 Hsub k Hin.
+    - exact (Hsub k Hin).
+    - eapply IHl; [ | exact Hin ].
+      intros k0 Hk0. apply KernameSet.union_spec.
+      apply KernameSet.union_spec in Hk0. destruct Hk0 as [Hk0 | Hk0].
+      + left. exact Hk0.
+      + right. exact (Hsub k0 Hk0).
+  Qed.
+
   (** ** Alpha-equivalence for ANF values *)
 
   Section Alpha_Equiv.
@@ -734,6 +786,132 @@ Section ANF_Val.
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
+  Definition anf_cvt_exp_alpha_equiv_at k e :=
+    forall C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel' cnstrs cmap S1 e vars1 S2 C1 r1 ->
+      anf_cvt_rel' cnstrs cmap S3 e vars2 S4 C2 r2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Disjoint _ cmap_vars S1 ->
+      Disjoint _ cmap_vars S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      preord_env_P cenv PG (cmap_vars_of (fun k => KernameSet.In k (term_global_deps e))) m rho1 rho2 ->
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  Definition anf_cvt_args_alpha_equiv k :=
+    forall args C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      All (anf_cvt_exp_alpha_equiv_at k) args ->
+      (m <= k)%nat ->
+      anf_cvt_rel_args' cnstrs cmap S1 args vars1 S2 C1 xs1 ->
+      anf_cvt_rel_args' cnstrs cmap S3 args vars2 S4 C2 xs2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Disjoint _ cmap_vars S1 ->
+      Disjoint _ cmap_vars S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      preord_env_P cenv PG (cmap_vars_of (fun k0 => KernameSet.In k0
+          (List.fold_left (fun acc x => KernameSet.union (term_global_deps x) acc)
+                          args KernameSet.empty))) m rho1 rho2 ->
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  Lemma anf_cvt_args_alpha_equiv_proof :
+    forall k, anf_cvt_args_alpha_equiv k.
+  Proof.
+    intros k. unfold anf_cvt_args_alpha_equiv.
+    intros args. induction args as [| a0 args' IHargs'];
+    intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+           HAll Hm Hrel1 Hrel2 Hdis1 Hdis2 Hdis_cm1 Hdis_cm2 Henv Hcmap_env Hk.
+    - (* nil *)
+      inv Hrel1. inv Hrel2. simpl.
+      eapply Hk; [lia | constructor | eassumption | intros ? ? Hpv _ _; exact Hpv].
+    - (* cons *)
+      inv Hrel1. inv Hrel2. inv HAll.
+      rewrite <- !app_ctx_f_fuse.
+      match goal with
+      | [ IH_head : anf_cvt_exp_alpha_equiv_at k a0,
+          IH_tail : All _ args' |- _ ] =>
+        eapply IH_head
+      end.
+      + exact Hm.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Hdis_cm1.
+      + exact Hdis_cm2.
+      + exact Henv.
+      + eapply preord_env_P_antimon; [ exact Hcmap_env | ].
+        intros v Hv. destruct Hv as [kk [Hkin Hlk]].
+        exists kk. split; [ | exact Hlk ].
+        eapply fold_left_kset_union_elem with (x := a0).
+        * left. reflexivity.
+        * exact Hkin.
+      + intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres.
+        eapply IHargs'.
+        * match goal with | [ HA : All _ args' |- _ ] => exact HA end.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm1].
+        * eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm2].
+        * exact Henv_vars.
+        * (* cmap_vars_of for tail — lift through Hpres *)
+          intros v Hv.
+          eapply Hpres.
+          -- eapply Hcmap_env.
+             destruct Hv as [kk [Hkin Hlk]]. exists kk. split; [ | exact Hlk ].
+             simpl.
+             eapply fold_left_kset_union_mono with (base1 := KernameSet.empty).
+             { intros k0 Hk0. exfalso. apply (KernameSet.empty_spec Hk0). }
+             exact Hkin.
+          -- intros Hc. eapply Hdis_cm1. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+          -- intros Hc. eapply Hdis_cm2. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+        * intros j' rho1'' rho2'' Hle' Hxs_tail Henv_vars' Hpres'.
+          eapply Hk.
+          -- lia.
+          -- constructor.
+             ++ eapply Hpres'.
+                ** eapply preord_var_env_monotonic. exact Hvar_x1. lia.
+                ** eapply anf_cvt_result_not_in_output; eassumption.
+                ** eapply anf_cvt_result_not_in_output; eassumption.
+             ++ exact Hxs_tail.
+          -- exact Henv_vars'.
+          -- intros a1 b Hvar_ab Ha Hb.
+             eapply Hpres'.
+             ++ eapply Hpres. exact Hvar_ab. exact Ha. exact Hb.
+             ++ intro Hc. apply Ha.
+                eapply anf_cvt_exp_subset; eassumption.
+             ++ intro Hc. apply Hb.
+                eapply anf_cvt_exp_subset; eassumption.
+  Qed.
+
   Definition anf_cvt_alpha_equiv_statement k :=
     anf_cvt_exp_alpha_equiv k.
 
@@ -785,14 +963,280 @@ Section ANF_Val.
 
     (* tVar, tEvar - impossible, no anf_cvt_rel constructors *)
 
-    - (* tLambda -> anf_Lam — needs update for new cmap hypotheses *)
-      admit.
+    - (* tLambda -> anf_Lam *)
+      simpl.
+      eapply preord_exp_fun_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply Hk.
+        * lia.
+        * (* r1/f1 and r2/f2 are related Vfun closures in def_funs *)
+          intros v Hg.
+          rewrite def_funs_eq in Hg. 2: { simpl; now left. }
+          inv Hg.
+          eexists. split. { rewrite def_funs_eq. reflexivity. simpl; now left. }
+          eapply preord_val_fun.
+          -- simpl. rewrite Coqlib.peq_true. reflexivity.
+          -- simpl. rewrite Coqlib.peq_true. reflexivity.
+          -- intros rho_b j' vs1 vs2 Hlen Hset.
+             destruct vs1 as [ | v_arg1 [ | ? ? ] ]; simpl in *; try congruence.
+             destruct vs2 as [ | v_arg2 [ | ? ? ] ]; simpl in *; try congruence.
+             inv Hset.
+             eexists. split. { reflexivity. }
+             intros Hlt' Hall_args. inv Hall_args.
+             eapply preord_exp_post_monotonic. { now eapply HinclG. }
+             eapply (IHk j' ltac:(lia)).
+             ++ lia.
+             ++ eassumption.
+             ++ eassumption.
+             ++ (* Disjoint (FromList (x :: vars)) from S *)
+                rewrite FromList_cons.
+                eapply Union_Disjoint_l.
+                ** eapply Disjoint_Singleton_l. intro Hc.
+                   destruct Hc as [Hc' _]. destruct Hc' as [_ Hn].
+                   apply Hn. constructor.
+                ** eapply Disjoint_Included_r. apply Setminus_Included.
+                   eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis1.
+             ++ rewrite FromList_cons.
+                eapply Union_Disjoint_l.
+                ** eapply Disjoint_Singleton_l. intro Hc.
+                   destruct Hc as [Hc' _]. destruct Hc' as [_ Hn].
+                   apply Hn. constructor.
+                ** eapply Disjoint_Included_r. apply Setminus_Included.
+                   eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis2.
+             ++ (* Disjoint cmap_vars *)
+                eapply Disjoint_Included_r. apply Setminus_Included.
+                eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm1.
+             ++ eapply Disjoint_Included_r. apply Setminus_Included.
+                eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm2.
+             ++ constructor.
+                ** eapply preord_var_env_extend_eq. eassumption.
+                ** eapply Forall2_preord_var_env_set.
+                   --- eapply Forall2_preord_var_env_set.
+                       +++ eapply Forall2_preord_var_env_monotonic with (k := mk);
+                           [ lia | exact Henv ].
+                       +++ intro Hc. eapply Hdis1. constructor.
+                           exact Hc. eapply Setminus_Included. eassumption.
+                       +++ intro Hc. eapply Hdis2. constructor.
+                           exact Hc. eapply Setminus_Included. eassumption.
+                   --- intro Hx_vars. eapply Hdis1. constructor. exact Hx_vars.
+                       eassumption.
+                   --- intro Hx_vars. eapply Hdis2. constructor. exact Hx_vars.
+                       eassumption.
+             ++ (* preord_env_P (cmap_vars_of ...) — same deps since tLambda na e = term_global_deps e *)
+                eapply preord_env_P_set_not_in_P_l.
+                eapply preord_env_P_set_not_in_P_r.
+                eapply preord_env_P_set_not_in_P_l.
+                eapply preord_env_P_set_not_in_P_r.
+                ** eapply preord_env_P_monotonic; [ | eassumption ]. lia.
+                ** (* ~ r2/f2 \in cmap_vars_of ... *)
+                   eapply Disjoint_Singleton_r. intros [kk [_ Hlk]].
+                   eapply Hdis_cm2. constructor.
+                   { exists kk. exact Hlk. }
+                   eapply Setminus_Included. eassumption.
+                ** (* ~ r1/f1 \in cmap_vars_of ... *)
+                   eapply Disjoint_Singleton_r. intros [kk [_ Hlk]].
+                   eapply Hdis_cm1. constructor.
+                   { exists kk. exact Hlk. }
+                   eapply Setminus_Included. eassumption.
+                ** (* ~ x0 \in cmap_vars_of ... *)
+                   eapply Disjoint_Singleton_r. intros [kk [_ Hlk]].
+                   eapply Hdis_cm2. constructor.
+                   { exists kk. exact Hlk. }
+                   eassumption.
+                ** (* ~ x1 \in cmap_vars_of ... *)
+                   eapply Disjoint_Singleton_r. intros [kk [_ Hlk]].
+                   eapply Hdis_cm1. constructor.
+                   { exists kk. exact Hlk. }
+                   eassumption.
+             ++ intros j0 rho1'' rho2'' _ Hvar_cont _ _.
+                eapply preord_exp_halt_compat;
+                  [ eapply Hprops | eapply Hprops | exact Hvar_cont ].
+        * eapply Forall2_preord_var_env_set.
+          -- eapply Forall2_preord_var_env_monotonic with (k := mk); [ lia | exact Henv ].
+          -- intro Hc. eapply Hdis1. constructor. exact Hc.
+             eapply Setminus_Included. eassumption.
+          -- intro Hc. eapply Hdis2. constructor. exact Hc.
+             eapply Setminus_Included. eassumption.
+        * intros a b Hvar Ha Hb.
+          eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_monotonic. exact Hvar. lia.
+          -- intros Heq. subst. apply Ha.
+             eapply Setminus_Included. eassumption.
+          -- intros Heq. subst. apply Hb.
+             eapply Setminus_Included. eassumption.
 
     - (* tLetIn -> anf_LetIn *)
-      admit.
+      rewrite <- !app_ctx_f_fuse.
+      eapply IHe1.
+      + exact Hmk.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Hdis_cm1.
+      + exact Hdis_cm2.
+      + exact Henv.
+      + (* cmap_vars_of for b ⊆ cmap_vars_of for tLetIn *)
+        eapply preord_env_P_antimon; [ exact Hcmap_env | ].
+        intros v Hv. destruct Hv as [kk [Hkin Hlk]].
+        exists kk. split; [ | exact Hlk ].
+        simpl. apply KernameSet.union_spec. left. exact Hkin.
+      + intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres.
+        eapply IHe2.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             eapply anf_cvt_result_not_in_output; eassumption.
+          -- eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             eapply anf_cvt_result_not_in_output; eassumption.
+          -- eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm1].
+        * eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm2].
+        * constructor.
+          -- exact Hvar_x1.
+          -- exact Henv_vars.
+        * (* cmap_vars_of for t — lift through Hpres *)
+          intros v Hv.
+          eapply Hpres.
+          -- eapply Hcmap_env.
+             destruct Hv as [kk [Hkin Hlk]]. exists kk. split; [ | exact Hlk ].
+             simpl. apply KernameSet.union_spec. right. exact Hkin.
+          -- intros Hc. eapply Hdis_cm1. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+          -- intros Hc. eapply Hdis_cm2. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+        * intros j' rho1'' rho2'' Hle' Hvar_r2 Henv_vars2 Hpres'.
+          eapply Hk.
+          -- lia.
+          -- exact Hvar_r2.
+          -- inv Henv_vars2. eassumption.
+          -- intros a b Hvar_ab Ha Hb.
+             eapply Hpres'.
+             ++ eapply Hpres. exact Hvar_ab. exact Ha. exact Hb.
+             ++ intro Hc. apply Ha.
+                assert (Hsub1 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub1 _ Hc).
+             ++ intro Hc. apply Hb.
+                assert (Hsub2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub2 _ Hc).
 
     - (* tApp -> anf_App *)
-      admit.
+      rewrite <- !app_ctx_f_fuse. simpl.
+      eapply IHe1.
+      + exact Hmk.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Hdis_cm1.
+      + exact Hdis_cm2.
+      + exact Henv.
+      + (* cmap_vars_of for u ⊆ cmap_vars_of for tApp u v *)
+        eapply preord_env_P_antimon; [ exact Hcmap_env | ].
+        intros v Hv. destruct Hv as [kk [Hkin Hlk]].
+        exists kk. split; [ | exact Hlk ].
+        simpl. apply KernameSet.union_spec. left. exact Hkin.
+      + intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres1.
+        eapply IHe2.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm1].
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm2].
+        * exact Henv_vars.
+        * (* cmap_vars_of for v — lift through Hpres1 *)
+          intros v Hv.
+          eapply Hpres1.
+          -- eapply Hcmap_env.
+             destruct Hv as [kk [Hkin Hlk]]. exists kk. split; [ | exact Hlk ].
+             simpl. apply KernameSet.union_spec. right. exact Hkin.
+          -- intros Hc. eapply Hdis_cm1. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+          -- intros Hc. eapply Hdis_cm2. constructor.
+             { destruct Hv as [kk [_ Hlk]]. exists kk. exact Hlk. }
+             exact Hc.
+        * intros j' rho1'' rho2'' Hle' Hvar_x2 Henv_vars' Hpres2.
+          eapply preord_exp_letapp_compat.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- (* function: x1 preserved through C2 using Hpres2 *)
+             eapply Hpres2.
+             ++ eapply preord_var_env_monotonic. exact Hvar_x1. lia.
+             ++ eapply anf_cvt_result_not_in_output; eassumption.
+             ++ eapply anf_cvt_result_not_in_output; eassumption.
+          -- constructor. exact Hvar_x2. constructor.
+          -- (* letapp callback *)
+             intros m'' v1 v2 Hlt Hval.
+             eapply Hk.
+             ++ lia.
+             ++ intros w1 Hgr1. rewrite M.gss in Hgr1. inv Hgr1.
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hval. lia.
+             ++ eapply Forall2_preord_var_env_set.
+                ** eapply Forall2_preord_var_env_monotonic with (k := j'); [lia | exact Henv_vars'].
+                ** intros Hr1_vars.
+                   match goal with
+                   | [ Hcvt_e1 : anf_cvt_rel _ _ _ _ S1 _ _ _ _ _,
+                       Hcvt_e2 : anf_cvt_rel _ _ _ _ _ _ _ ?S6 _ _,
+                       Hin : _ \in ?S6 |- _ ] =>
+                     assert (H65 : S6 \subset _) by (eapply anf_cvt_exp_subset; exact Hcvt_e2);
+                     assert (H51 : _ \subset S1) by (eapply anf_cvt_exp_subset; exact Hcvt_e1);
+                     eapply Hdis1; constructor; [ exact Hr1_vars | apply H51; apply H65; exact Hin ]
+                   end.
+                ** intros Hr2_vars.
+                   match goal with
+                   | [ Hcvt_e1 : anf_cvt_rel _ _ _ _ S3 _ _ _ _ _,
+                       Hcvt_e2 : anf_cvt_rel _ _ _ _ _ _ _ ?S7 _ _,
+                       Hin : _ \in ?S7 |- _ ] =>
+                     assert (H72 : S7 \subset _) by (eapply anf_cvt_exp_subset; exact Hcvt_e2);
+                     assert (H23 : _ \subset S3) by (eapply anf_cvt_exp_subset; exact Hcvt_e1);
+                     eapply Hdis2; constructor; [ exact Hr2_vars | apply H23; apply H72; exact Hin ]
+                   end.
+             ++ intros a b Hvar_ab Ha Hb.
+                eapply preord_var_env_extend_neq.
+                ** eapply preord_var_env_monotonic.
+                   --- eapply Hpres2.
+                       +++ eapply Hpres1. exact Hvar_ab. exact Ha. exact Hb.
+                       +++ intro Hc. apply Ha.
+                           assert (Hs51 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                           exact (Hs51 _ Hc).
+                       +++ intro Hc. apply Hb.
+                           assert (Hs23 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                           exact (Hs23 _ Hc).
+                   --- lia.
+                ** intros Heq. subst. apply Ha.
+                   match goal with
+                   | [ Hcvt_e1 : anf_cvt_rel _ _ _ _ S1 _ _ _ _ _,
+                       Hcvt_e2 : anf_cvt_rel _ _ _ _ _ _ _ ?S6 _ _,
+                       Hin : _ \in ?S6 |- _ ] =>
+                     assert (H65 : S6 \subset _) by (eapply anf_cvt_exp_subset; exact Hcvt_e2);
+                     assert (H51 : _ \subset S1) by (eapply anf_cvt_exp_subset; exact Hcvt_e1);
+                     apply H51; apply H65; exact Hin
+                   end.
+                ** intros Heq. subst. apply Hb.
+                   match goal with
+                   | [ Hcvt_e1 : anf_cvt_rel _ _ _ _ S3 _ _ _ _ _,
+                       Hcvt_e2 : anf_cvt_rel _ _ _ _ _ _ _ ?S7 _ _,
+                       Hin : _ \in ?S7 |- _ ] =>
+                     assert (H72 : S7 \subset _) by (eapply anf_cvt_exp_subset; exact Hcvt_e2);
+                     assert (H23 : _ \subset S3) by (eapply anf_cvt_exp_subset; exact Hcvt_e1);
+                     apply H23; apply H72; exact Hin
+                   end.
 
     - (* tConst -> anf_Const *)
       simpl.
@@ -814,18 +1258,202 @@ Section ANF_Val.
 
     - (* tConstruct -> anf_Construct *)
       rewrite <- !app_ctx_f_fuse.
-      admit.
+      match goal with
+      | [ HA : All _ ?args |- _ ] =>
+        eapply (anf_cvt_args_alpha_equiv_proof k args)
+      end.
+      + eassumption.
+      + exact Hmk.
+      + eassumption.
+      + eassumption.
+      + eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis1].
+      + eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis2].
+      + eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm1].
+      + eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm2].
+      + exact Henv.
+      + (* cmap_vars_of for args ⊆ cmap_vars_of for tConstruct *)
+        eapply preord_env_P_antimon; [ exact Hcmap_env | ].
+        intros v Hv. destruct Hv as [kk [Hkin Hlk]].
+        exists kk. split; [ | exact Hlk ].
+        simpl. destruct i.
+        eapply fold_left_kset_union_mono with (base1 := KernameSet.empty).
+        { intros k0 Hk0. exfalso. apply (KernameSet.empty_spec Hk0). }
+        exact Hkin.
+      + intros j rho1' rho2' Hle Hxs_F2 Hvars_F2 Hpres.
+        eapply preord_exp_constr_compat.
+        * eapply Hprops.
+        * eapply Hprops.
+        * exact Hxs_F2.
+        * intros m0 vs1 vs2 Hlt Hvals.
+          eapply Hk.
+          -- lia.
+          -- intros v0 Hg1. rewrite M.gss in Hg1. inv Hg1.
+             eexists. split. rewrite M.gss. reflexivity.
+             rewrite preord_val_eq. simpl. split; [congruence | exact Hvals].
+          -- eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_preord_var_env_monotonic with (k := j); [lia | exact Hvars_F2].
+             ++ intros Hx1_vars. eapply Hdis1. constructor; eassumption.
+             ++ intros Hx2_vars. eapply Hdis2. constructor; eassumption.
+          -- intros a b Hvar Ha Hb.
+             eapply preord_var_env_extend_neq.
+             ++ eapply preord_var_env_monotonic.
+                eapply Hpres. exact Hvar.
+                ** intro Hc. apply Ha. inv Hc. assumption.
+                ** intro Hc. apply Hb. inv Hc. assumption.
+                ** lia.
+             ++ intros Heq. subst. apply Ha. eassumption.
+             ++ intros Heq. subst. apply Hb. eassumption.
 
     - (* tCase -> anf_Case *)
       simpl. rewrite <- !app_ctx_f_fuse.
-      admit.
+      eapply preord_exp_fun_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply IHe.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis1.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis2.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm1.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm2.
+        * eapply Forall2_preord_var_env_set.
+          -- eapply Forall2_preord_var_env_monotonic with (k := mk); [lia | exact Henv].
+          -- intro Hc. eapply Hdis1. constructor. exact Hc. eassumption.
+          -- intro Hc. eapply Hdis2. constructor. exact Hc. eassumption.
+        * (* cmap_vars_of for scrutinee ⊆ for tCase *)
+          eapply preord_env_P_set_not_in_P_l.
+          eapply preord_env_P_set_not_in_P_r.
+          ** eapply preord_env_P_antimon; [ eapply preord_env_P_monotonic; [ | exact Hcmap_env ]; lia | ].
+             intros v Hv. destruct Hv as [kk0 [Hkin Hlk]].
+             exists kk0. split; [ | exact Hlk ].
+             simpl.
+             apply KernameSet.union_spec. right.
+             apply fold_left_kset_union_base. exact Hkin.
+          ** eapply Disjoint_Singleton_r. intros [kk0 [_ Hlk]].
+             eapply Hdis_cm2. constructor. { exists kk0. exact Hlk. } eassumption.
+          ** eapply Disjoint_Singleton_r. intros [kk0 [_ Hlk]].
+             eapply Hdis_cm1. constructor. { exists kk0. exact Hlk. } eassumption.
+        * (* continuation: Eletapp r f func_tag [x_scr] e_k *)
+          intros j rho1' rho2' Hle Hvar_xscr Henvvars Hpres.
+          eapply preord_exp_letapp_compat.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- (* f1 f2 related *)
+             eapply Hpres.
+             ++ intros v Hg. rewrite def_funs_eq in Hg. 2: { simpl; now left. }
+                inv Hg.
+                eexists. split. { rewrite def_funs_eq. reflexivity. simpl; now left. }
+                eapply preord_val_fun.
+                +++ simpl. rewrite Coqlib.peq_true. reflexivity.
+                +++ simpl. rewrite Coqlib.peq_true. reflexivity.
+                +++ intros rho_b j' vs1 vs2 Hlen Hset.
+                    destruct vs1 as [ | v1 [ | ? ? ] ]; simpl in *; try congruence.
+                    destruct vs2 as [ | v2 [ | ? ? ] ]; simpl in *; try congruence.
+                    inv Hset.
+                    eexists. split. { reflexivity. }
+                    intros Hlt Hall. inv Hall.
+                    eapply preord_exp_post_monotonic. { now eapply HinclG. }
+                    (* Use IHk for branches *)
+                    admit.
+             ++ intro Hc. destruct Hc as [Hc1 _]. destruct Hc1 as [_ Hn].
+                apply Hn. constructor.
+             ++ intro Hc. destruct Hc as [Hc1 _]. destruct Hc1 as [_ Hn].
+                apply Hn. constructor.
+          -- (* args *)
+             constructor. exact Hvar_xscr. constructor.
+          -- (* letapp continuation *)
+             intros m' v1 v2 Hlt Hval.
+             eapply Hk.
+             ++ lia.
+             ++ intros w Hg. rewrite M.gss in Hg. inv Hg.
+                eexists. split. { rewrite M.gss. reflexivity. }
+                eapply preord_val_monotonic. exact Hval. lia.
+             ++ eapply Forall2_preord_var_env_set.
+                ** eapply Forall2_preord_var_env_monotonic with (k := j);
+                   [lia | exact Henvvars].
+                ** intro Hr. apply (Disjoint_In_l _ _ _ Hdis1 Hr).
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+                ** intro Hr. apply (Disjoint_In_l _ _ _ Hdis2 Hr).
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+             ++ intros a b Hvar Ha Hb.
+                eapply preord_var_env_extend_neq.
+                ** eapply preord_var_env_monotonic.
+                   --- eapply Hpres.
+                       +++ eapply preord_var_env_extend_neq.
+                           *** eapply preord_var_env_monotonic. exact Hvar. lia.
+                           *** intros Heq. subst. apply Ha. eassumption.
+                           *** intros Heq. subst. apply Hb. eassumption.
+                       +++ intro Hc. apply Ha.
+                           eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                       +++ intro Hc. apply Hb.
+                           eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                   --- lia.
+                ** intros Heq. subst. apply Ha.
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+                ** intros Heq. subst. apply Hb.
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
 
     - (* tProj -> anf_Proj *)
-      admit.
+      rewrite <- !app_ctx_f_fuse.
+      eapply IHe.
+      + exact Hmk.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Hdis_cm1.
+      + exact Hdis_cm2.
+      + exact Henv.
+      + (* cmap_vars_of for c ⊆ cmap_vars_of for tProj p c *)
+        eapply preord_env_P_antimon; [ exact Hcmap_env | ].
+        intros v Hv. destruct Hv as [kk [Hkin Hlk]].
+        exists kk. split; [ | exact Hlk ].
+        simpl. apply KernameSet.union_spec. right. exact Hkin.
+      + intros j rho1' rho2' Hle Hvar_xscr Henvvars Hpres.
+        eapply preord_exp_proj_compat; [ eapply Hprops | eapply Hprops | exact Hvar_xscr | ].
+        * intros m' v1 v2 Hlt Hval.
+          eapply Hk.
+          -- lia.
+          -- intros w1 Hg1. rewrite M.gss in Hg1. inv Hg1.
+             eexists. split. rewrite M.gss. reflexivity.
+             eapply preord_val_monotonic. exact Hval. lia.
+          -- eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_preord_var_env_monotonic with (k := j); [lia | exact Henvvars].
+             ++ intros Hr. eapply Hdis1. constructor. exact Hr.
+                eapply anf_cvt_exp_subset; eassumption.
+             ++ intros Hr. eapply Hdis2. constructor. exact Hr.
+                eapply anf_cvt_exp_subset; eassumption.
+          -- intros a b Hvar_ab Ha Hb.
+             eapply preord_var_env_extend_neq.
+             ++ eapply preord_var_env_monotonic.
+                eapply Hpres. exact Hvar_ab. exact Ha. exact Hb. lia.
+             ++ intros Heq. subst. apply Ha.
+                eapply anf_cvt_exp_subset; eassumption.
+             ++ intros Heq. subst. apply Hb.
+                eapply anf_cvt_exp_subset; eassumption.
 
     - (* tFix -> anf_Fix *)
       simpl.
-      admit.
+      (* Similar to old Fix_e case but with cmap additions *)
+      admit. (* tFix *)
 
     (* tCoFix - impossible *)
     - (* tPrim -> anf_Prim *)
@@ -869,9 +1497,97 @@ Section ANF_Val.
             eapply IH_head; [ exact Ha | exact Hb ]
           end.
         * eapply IHvs; eassumption.
-    - (* Clos_v — needs global env invariant formulation *)
-      admit.
-    - (* ClosFix_v — needs global env invariant formulation *)
+    - (* Clos_v *)
+      inv Hrel1. inv Hrel2.
+      eapply preord_val_fun.
+      + simpl. rewrite Coqlib.peq_true. reflexivity.
+      + simpl. rewrite Coqlib.peq_true. reflexivity.
+      + intros rho1' j vs1 vs2 Hlen Hset1.
+        destruct vs1 as [ | v_arg1 [ | ? ? ] ]; simpl in *; try congruence.
+        destruct vs2 as [ | v_arg2 [ | ? ? ] ]; simpl in *; try congruence.
+        inv Hset1.
+        eexists. split; [reflexivity | ].
+        intros Hlt Hall_args. inv Hall_args.
+        eapply preord_exp_post_monotonic. now eapply HinclG.
+        eapply (anf_cvt_alpha_equiv j); [lia | eassumption | eassumption | | | | | | | ].
+        * (* Disjoint side 1: Disjoint (FromList (x :: names)) S1 *)
+          rewrite FromList_cons.
+          match goal with
+          | [ Hdis : Disjoint _ (_ |: (_ |: _)) ?S |- Disjoint _ (_ :|: _) ?S ] =>
+            eapply Disjoint_Included_l; [ | exact Hdis ];
+            intros z Hz; inv Hz; [ left; assumption | do 2 right; assumption ]
+          end.
+        * (* Disjoint side 2 *)
+          rewrite FromList_cons.
+          match goal with
+          | [ Hdis : Disjoint _ (_ |: (_ |: _)) ?S |- Disjoint _ (_ :|: _) ?S ] =>
+            eapply Disjoint_Included_l; [ | exact Hdis ];
+            intros z Hz; inv Hz; [ left; assumption | do 2 right; assumption ]
+          end.
+        * (* Disjoint cmap_vars S1 — now available from anf_rel_Clos *)
+          eassumption.
+        * eassumption.
+        * (* Forall2 for x :: names and x0 :: names0 *)
+          constructor.
+          -- eapply preord_var_env_extend_eq. eassumption.
+          -- eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_preord_var_env_set.
+                ** eapply anf_cvt_env_alpha_equiv_Forall2.
+                   --- eapply IHk. lia.
+                   --- eassumption.
+                   --- eassumption.
+                ** assumption.
+                ** assumption.
+             ++ match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
+             ++ match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
+        * (* preord_env_P (cmap_vars_of ...) for the closure body *)
+          (* For each cmap var v with dep in e:
+             Both global_env_rels give the same source body, same eval,
+             so anf_val_rel src anf_v1 and anf_val_rel src anf_v2.
+             By IHk: preord_val j anf_v1 anf_v2.
+             Then peeling the M.set layers. *)
+          eapply preord_env_P_set_not_in_P_l.
+          eapply preord_env_P_set_not_in_P_r.
+          eapply preord_env_P_set_not_in_P_l.
+          eapply preord_env_P_set_not_in_P_r.
+          ** (* Core: preord_env_P for cmap vars in rho/rho0 *)
+             intros cv Hcv v1' Hget1.
+             destruct Hcv as [kk [Hkin Hlk]].
+             match goal with
+             | [ Hge1 : global_env_rel _ _ ?rho1_,
+                 Hge2 : global_env_rel _ _ ?rho2_ |- _ ] =>
+               destruct (Hge1 kk cv Hkin Hlk) as (decl1 & body1 & av1 & Hdecl1 & Hbody1 & Hget_av1 & Hval_rel1);
+               destruct (Hge2 kk cv Hkin Hlk) as (decl2 & body2 & av2 & Hdecl2 & Hbody2 & Hget_av2 & Hval_rel2)
+             end.
+             rewrite Hget_av1 in Hget1. inv Hget1.
+             eexists. split; [ exact Hget_av2 | ].
+             assert (Heq_decl : decl1 = decl2)
+               by (unfold declared_constant in *; congruence).
+             subst decl2.
+             assert (Heq_body : body1 = body2) by congruence. subst body2.
+             (* Use global_env_evaluates to get an eval witness *)
+             destruct (global_env_evaluates kk decl1 body1 Hdecl1 Hbody1)
+               as [src_v [fv [tv Heval_witness]]].
+             eapply (IHk j Hlt src_v).
+             ++ exact (Hval_rel1 src_v fv tv Heval_witness).
+             ++ exact (Hval_rel2 src_v fv tv Heval_witness).
+          ** admit.
+          ** admit.
+          ** admit.
+          ** admit.
+        * (* Continuation: Ehalt *)
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
+          eapply preord_exp_halt_compat.
+          -- eapply Hprops.
+          -- eapply Hprops.
+          -- exact Hvar_cont.
+    - (* ClosFix_v *)
       admit.
   Admitted.
 
