@@ -823,30 +823,35 @@ Section ANF_Val.
 
   (** Projection bindings compatibility for case branches *)
   Lemma ctx_bind_proj_Forall2_compat k rho1 rho2 x1 x2 ctag
-        proj_vars1 proj_vars2 acc1 acc2 e1 e2 n :
+        proj_vars1 proj_vars2 acc1 acc2 e1 e2 n
+        (S_extra : Ensemble var) :
     preord_var_env cenv PG k rho1 rho2 x1 x2 ->
     Forall2 (preord_var_env cenv PG k rho1 rho2) acc1 acc2 ->
+    preord_env_P cenv PG S_extra k rho1 rho2 ->
     List.length proj_vars1 = List.length proj_vars2 ->
     NoDup proj_vars1 -> NoDup proj_vars2 ->
     Disjoint _ (FromList proj_vars1) (FromList acc1 :|: [set x1]) ->
     Disjoint _ (FromList proj_vars2) (FromList acc2 :|: [set x2]) ->
+    Disjoint _ S_extra (FromList proj_vars1 :|: FromList proj_vars2) ->
     (forall rho1' rho2' m',
         (m' <= k)%nat ->
         Forall2 (preord_var_env cenv PG m' rho1' rho2') proj_vars1 proj_vars2 ->
         Forall2 (preord_var_env cenv PG m' rho1' rho2') acc1 acc2 ->
         preord_var_env cenv PG m' rho1' rho2' x1 x2 ->
+        preord_env_P cenv PG S_extra m' rho1' rho2' ->
         preord_exp cenv P1 PG m' (e1, rho1') (e2, rho2')) ->
     preord_exp cenv P1 PG k
                (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
                (ctx_bind_proj ctag x2 proj_vars2 n |[ e2 ]|, rho2).
   Proof.
-    revert k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n.
+    revert k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n S_extra.
     induction proj_vars1;
-      intros k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n
-             Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hexp.
+      intros k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n S_extra
+             Hvar Hacc Hextra Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hdis_extra Hexp.
     - destruct proj_vars2 as [ | v proj_vars2]; [ | simpl in Hlen; congruence ].
       cbn [ctx_bind_proj app_ctx_f].
-      eapply Hexp; [ lia | constructor | exact Hacc | exact Hvar ].
+      eapply Hexp; [ lia | constructor | exact Hacc | exact Hvar | ].
+      eapply preord_env_P_monotonic; [ | exact Hextra ]. lia.
     - destruct proj_vars2 as [ | v proj_vars2]; [ simpl in Hlen; congruence | ].
       simpl in Hlen.
       cbn [ctx_bind_proj app_ctx_f].
@@ -867,6 +872,14 @@ Section ANF_Val.
              ++ eapply Forall2_preord_var_env_monotonic; [ | exact Hacc ]. lia.
              ++ intros Hc. eapply Hdis1. constructor. now left. left. exact Hc.
              ++ intros Hc. eapply Hdis2. constructor. now left. left. exact Hc.
+        * (* preord_env_P S_extra preserved through M.set a/v *)
+          eapply preord_env_P_set_not_in_P_l.
+          eapply preord_env_P_set_not_in_P_r.
+          -- eapply preord_env_P_monotonic; [ | exact Hextra ]. lia.
+          -- eapply Disjoint_Singleton_r. intros Hc.
+             eapply Hdis_extra. constructor. exact Hc. right. now left.
+          -- eapply Disjoint_Singleton_r. intros Hc.
+             eapply Hdis_extra. constructor. exact Hc. left. now left.
         * congruence.
         * eassumption.
         * eassumption.
@@ -878,12 +891,16 @@ Section ANF_Val.
           eapply Union_Disjoint_r.
           -- eapply Disjoint_Singleton_r. eassumption.
           -- eapply Disjoint_Included; [ | | eapply Hdis2 ]; now sets.
-        * intros rho1' rho2' m' Hle Hpvars Haccs Hvar'.
+        * (* Disjoint S_extra from remaining proj vars *)
+          eapply Disjoint_Included_r; [ | exact Hdis_extra ].
+          intros z Hz. inv Hz; [ left; right; exact H | right; right; exact H ].
+        * intros rho1' rho2' m' Hle Hpvars Haccs Hvar' Hextra'.
           eapply Hexp.
           -- lia.
           -- inv Hpvars. constructor; eassumption.
           -- inv Haccs. eassumption.
           -- exact Hvar'.
+          -- exact Hextra'.
   Qed.
 
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
@@ -1765,9 +1782,12 @@ Section ANF_Val.
         + (* head branch body *)
           intros m' Hlt.
           eapply preord_exp_monotonic.
-          * eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
+          * eapply ctx_bind_proj_Forall2_compat with
+              (acc1 := vars1) (acc2 := vars2)
+              (S_extra := cmap_vars_of (fun k0 => KernameSet.In k0 (term_global_deps (EAst.tCase (ind, n0) (EAst.tRel 0) ((lnames, e_br) :: brs'))))).
             -- eapply preord_var_env_monotonic; [ exact Hvar_y | lia ].
             -- eapply Forall2_preord_var_env_monotonic; [ | exact Henv ]. lia.
+            -- eapply preord_env_P_monotonic; [ | exact Hcmap_env ]. lia.
             -- congruence.
             -- eassumption.
             -- eassumption.
@@ -1783,7 +1803,19 @@ Section ANF_Val.
                  eapply anf_cvt_branches_subset. eassumption. }
                eapply Disjoint_Included_r; [ | eapply Disjoint_sym; exact Hdis2 ].
                rewrite Union_commut. eapply Included_refl.
-            -- intros rho1' rho2' m'' Hle Hpvs Hvars Hvar'.
+            -- (* Disjoint cmap_vars_of from proj vars *)
+               eapply Disjoint_Included_l.
+               { intros z [kk [_ Hlk]]. exists kk. exact Hlk. }
+               eapply Disjoint_Included_r.
+               { intros z Hz. inv Hz.
+                 - match goal with [ H : FromList ?vs \subset _ |- _ ] =>
+                     eapply (Included_trans H); eapply anf_cvt_branches_subset; eassumption end.
+                   exact H.
+                 - match goal with [ H : FromList ?vs \subset _ |- _ ] =>
+                     eapply (Included_trans H); eapply anf_cvt_branches_subset; eassumption end.
+                   exact H. }
+               eapply Union_Disjoint_r; [ exact Hdis_cm1 | exact Hdis_cm2 ].
+            -- intros rho1' rho2' m'' Hle Hpvs Hvars Hvar' Hextra'.
                eapply (proj1 (IHk m'' ltac:(lia))); try lia; try eassumption.
                ++ rewrite FromList_app. eapply Union_Disjoint_l.
                   ** eapply Disjoint_Setminus_r. eapply Included_refl.
@@ -1808,10 +1840,8 @@ Section ANF_Val.
                     eapply anf_cvt_branches_subset. eassumption. }
                   exact Hdis_cm2.
                ++ eapply Forall2_app; eassumption.
-               ++ (* preord_env_P cmap_vars_of — cmap vars not affected by proj bindings.
-                     Needs extending ctx_bind_proj_Forall2_compat to propagate
-                     preord_env_P for variables outside proj_vars/acc/{x}. *)
-                  admit.
+               ++ eapply preord_env_P_antimon; [ exact Hextra' | ].
+                  intros v Hv. exact Hv.
                ++ intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
                   eapply preord_exp_halt_compat;
                     [ eapply Hprops | eapply Hprops | exact Hvar_r ].
@@ -1839,7 +1869,7 @@ Section ANF_Val.
                 eapply Included_trans; [ eapply Setminus_Included | eapply anf_cvt_exp_subset; exact H ] end. }
             exact Hdis_cm2.
     }
-  Admitted.
+  Qed.
 
   Lemma anf_cvt_val_alpha_equiv :
     forall k, anf_cvt_val_alpha_equiv_statement k.
@@ -2160,7 +2190,7 @@ Section ANF_Val.
           Hn2 : nth_error fnames0 ?n = Some ?f2 |- _ ] =>
         exact (Hfix_val k (Nat.le_refl k) n f1 f2 Hn1 Hn2)
       end.
-  Admitted.
+  Qed.
 
   (*
       inversion Hrel1; subst.
