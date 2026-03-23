@@ -1577,8 +1577,20 @@ Section ANF_Val.
              eapply (IHk j Hlt src_v).
              ++ exact (Hval_rel1 src_v fv tv Heval_witness).
              ++ exact (Hval_rel2 src_v fv tv Heval_witness).
-          ** admit.
-          ** admit.
+          Ltac solve_cmap_disj :=
+            constructor; intros z Hc; inversion Hc; subst; clear Hc;
+            match goal with [ Hs : Singleton _ _ _ |- _ ] => inv Hs end;
+            match goal with [ Hcv : cmap_vars_of _ _ |- _ ] => destruct Hcv as [?kk [_ ?Hlk]] end;
+            match goal with
+            | [ Hd1 : Disjoint _ cmap_vars (_ |: _), Hd2 : Disjoint _ cmap_vars (_ |: _) |- _ ] =>
+              first [
+                eapply Hd1; constructor; [ eexists; eassumption | left; reflexivity ] |
+                eapply Hd1; constructor; [ eexists; eassumption | right; left; reflexivity ] |
+                eapply Hd2; constructor; [ eexists; eassumption | left; reflexivity ] |
+                eapply Hd2; constructor; [ eexists; eassumption | right; left; reflexivity ] ]
+            end.
+          ** solve_cmap_disj.
+          ** solve_cmap_disj.
           ** admit.
           ** admit.
         * (* Continuation: Ehalt *)
