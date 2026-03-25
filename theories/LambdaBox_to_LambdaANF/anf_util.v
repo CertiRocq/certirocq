@@ -222,8 +222,61 @@ Section ANF_Val.
       Disjoint _ (cmap_vars cmap) S ->
       ~ x \in S'.
   Proof.
-    admit.
-  Admitted.
+    apply (anf_cvt_rel_ind' func_tag default_tag tgm cmap
+      (fun S0 _ vn S' _ x => Disjoint _ (FromList vn) S0 ->
+                              Disjoint _ (cmap_vars cmap) S0 -> ~ x \in S')
+      (fun _ _ _ _ _ _ => True)
+      (fun _ _ _ _ _ _ => True)
+      (fun _ _ _ _ _ _ _ _ => True)).
+    (* anf_Rel *)
+    - intros S0 v vn0 n Hnth Hdis Hdis_cm Hin.
+      eapply Hdis. constructor; [eapply nth_error_In; eassumption | exact Hin].
+    (* anf_Lam *)
+    - intros ? ? ? ? ? ? ? ? ? ? Hf Hcvt _ Hdis Hdis_cm Hin.
+      apply (anf_cvt_exp_subset _ _ _ _ _ _ Hcvt) in Hin. inv Hin.
+      match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_App *)
+    - intros S0 S2 S3 u C0 x0 v C1 x1 r vn0 _ IH1 _ IH2 Hr Hdis Hdis_cm Hin.
+      inv Hin. match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_Construct *)
+    - intros ? ? ? ? ? ? ? ? ? ? ? Hx Hargs _ Hdis Hdis_cm Hin.
+      eapply anf_cvt_args_subset in Hargs. eapply Hargs in Hin. inv Hin.
+      match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_LetIn *)
+    - intros ? ? ? ? ? ? ? ? ? ? ? Hcvt1 IH1 Hcvt2 IH2 Hdis Hdis_cm.
+      eapply IH2.
+      + rewrite FromList_cons. eapply Union_Disjoint_l.
+        * eapply Disjoint_Singleton_l. eapply IH1; assumption.
+        * eapply Disjoint_Included_r; [exact (anf_cvt_exp_subset _ _ _ _ _ _ Hcvt1) | assumption].
+      + eapply Disjoint_Included_r; [exact (anf_cvt_exp_subset _ _ _ _ _ _ Hcvt1) | assumption].
+    (* anf_Case *)
+    - intros S0 S2 S3 ind npars mch C0 x0 brs pats f y r vn0
+             Hf Hy _ IH_mch _ IH_brs Hr Hdis Hdis_cm Hin.
+      inv Hin. match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_Fix: f ∈ FromList fnames, S2 ⊆ S1 \\ FromList fnames, so f ∉ S2 *)
+    - intros ? ? ? ? ? ? ? ? _ _ _ Hmfix _ Hnth Hdis Hdis_cm Hin.
+      assert (Hsub_mfix : _ \subset _) by (eapply anf_cvt_mfix_subset; exact Hmfix).
+      apply Hsub_mfix in Hin. inv Hin.
+      match goal with H : ~ _ |- _ => apply H; eapply nth_error_In; eassumption end.
+    (* anf_Box *)
+    - intros S0 vn0 x0 Hx Hdis Hdis_cm Hin. inv Hin.
+      match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_Const *)
+    - intros S0 vn0 s v Hlookup Hdis Hdis_cm Hin.
+      eapply Hdis_cm. constructor; [exists s; eassumption | exact Hin].
+    (* anf_Proj *)
+    - intros S0 S2 p c C0 x0 y vn0 ctag Htag _ IH Hy Hdis Hdis_cm Hin.
+      inv Hin. match goal with H : ~ _ |- _ => apply H; constructor end.
+    (* anf_Prim *)
+    - intros S0 vn0 p pv x0 Hpv Hx Hdis Hdis_cm Hin. inv Hin.
+      match goal with H : ~ _ |- _ => apply H; constructor end.
+    - intros; exact I.
+    - intros; exact I.
+    - intros; exact I.
+    - intros; exact I.
+    - intros; exact I.
+    - intros; exact I.
+  Qed.
 
 (* ================================================================= *)
 (** * env_consistent                                                  *)
@@ -612,7 +665,44 @@ Section AlphaEquiv.
     (* tEvar — impossible *) 1: inv Hrel1.
 
     { (* tLambda *) admit. }
-    { (* tLetIn *) admit. }
+    { (* tLetIn na b t: comp_ctx_f C_b C_t *)
+      inv Hrel1. inv Hrel2.
+      rewrite <- !app_ctx_f_fuse.
+      (* IH1 for binding b *)
+      eapply IHe1; [lia | eassumption | eassumption | assumption | assumption
+                    | assumption | assumption | assumption | assumption |].
+      (* Continuation: after b converted, convert t in extended env *)
+      intros j rho1' rho2' Hj Hvar_x Henv' Htransfer.
+      eapply IHe2; [lia | eassumption | eassumption | | | | | | |].
+      - (* Disjoint (x1::vars1) S_mid1 *)
+        rewrite FromList_cons. eapply Union_Disjoint_l.
+        + eapply Disjoint_Singleton_l.
+          eapply anf_cvt_result_not_in_output; eassumption.
+        + eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
+      - rewrite FromList_cons. eapply Union_Disjoint_l.
+        + eapply Disjoint_Singleton_l.
+          eapply anf_cvt_result_not_in_output; eassumption.
+        + eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
+      - (* Disjoint cmap S_mid1 *)
+        eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
+      - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
+      - (* Forall2 (x1::vars1) (x2::vars2) *)
+        constructor; [exact Hvar_x | exact Henv'].
+      - (* preord_env_P cmap_vars *)
+        admit. (* TODO: need to show cmap_vars are preserved through the conversion *)
+      - (* Continuation for t: chain to Hcont *)
+        intros j' rho1'' rho2'' Hj' Hvar_r Henv'' Htransfer'.
+        eapply Hcont.
+        + lia.
+        + exact Hvar_r.
+        + match goal with H : Forall2 _ (_ :: _) (_ :: _) |- _ => inv H end. assumption.
+        + intros a b0 Hab Ha Hb.
+          eapply Htransfer'.
+          * eapply Htransfer; eassumption.
+          * intros Hc. apply Ha.
+            eapply anf_cvt_exp_subset in Hc; [exact Hc |]; eassumption.
+          * intros Hc. apply Hb.
+            eapply anf_cvt_exp_subset in Hc; [exact Hc |]; eassumption. }
     { (* tApp *) admit. }
 
     { (* tConst s *)
