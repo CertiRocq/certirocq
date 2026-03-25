@@ -240,3 +240,126 @@ Section ANF_Val.
   Qed.
 
 End ANF_Val.
+
+
+(** * Alpha-equivalence *)
+
+Section AlphaEquiv.
+
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel}
+          {trace : Type} {Htrace : @trace_resource trace}.
+
+  Context (P1 : PostT) (PG : PostGT)
+          (tgm : conId_map) (cmap : const_map)
+          (cenv : ctor_env)
+          (Hprops : Post_properties cenv P1 P1 PG)
+          (HpropsG : Post_properties cenv PG PG PG)
+          (Hincl : inclusion (comp P1 P1) P1)
+          (HinclG : inclusion P1 PG).
+
+  Context (func_tag default_tag : positive).
+
+  Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap.
+  Let anf_env_rel'' := anf_env_rel func_tag default_tag tgm cmap.
+
+  (** ** Value-level alpha-equivalence statements *)
+
+  Definition anf_cvt_val_alpha_equiv_statement k :=
+    forall v v1 v2,
+      anf_val_rel' v v1 -> anf_val_rel' v v2 ->
+      preord_val cenv PG k v1 v2.
+
+  Definition anf_cvt_env_alpha_equiv_statement k :=
+    forall names1 names2 vs rho1 rho2,
+      anf_env_rel'' names1 vs rho1 ->
+      anf_env_rel'' names2 vs rho2 ->
+      Forall2 (preord_var_env cenv PG k rho1 rho2) names1 names2.
+
+  (** ** Expression-level alpha-equivalence statements
+
+      Continuation-passing style: proves C1|[e_k1]| ~ C2|[e_k2]|
+      given that the continuations e_k1, e_k2 are related when
+      the result variables and environment are related. *)
+
+  Definition anf_cvt_exp_alpha_equiv k :=
+    forall e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel' S1 e vars1 S2 C1 r1 ->
+      anf_cvt_rel' S3 e vars2 S4 C2 r2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (* Continuation hypothesis: if results and env are related, continuations are related *)
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (* Variables not consumed by this conversion are transferred *)
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  Definition anf_cvt_args_alpha_equiv k :=
+    forall es C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel_args' S1 es vars1 S2 C1 xs1 ->
+      anf_cvt_rel_args' S3 es vars2 S4 C2 xs2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (* Continuation: given related result variable lists *)
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  Definition anf_cvt_mfix_alpha_equiv k :=
+    forall mfix B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2
+           S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_mfix' S1 mfix (List.rev fnames1 ++ outer_vars1) fnames1 S2 B1 ->
+      anf_cvt_rel_mfix' S3 mfix (List.rev fnames2 ++ outer_vars2) fnames2 S4 B2 ->
+      NoDup fnames1 -> NoDup fnames2 ->
+      List.length fnames1 = List.length fnames2 ->
+      List.length outer_vars1 = List.length outer_vars2 ->
+      Disjoint _ (FromList fnames1 :|: FromList outer_vars1) S1 ->
+      Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
+      Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
+      Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
+      Forall2 (preord_var_env cenv PG m
+                 (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+              fnames1 fnames2.
+
+  Definition anf_cvt_branches_alpha_equiv k :=
+    forall brs pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2
+           S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_branches' S1 (fst (fst brs)) (snd brs) (snd (fst brs))
+                             vars1 y1 S2 pats1 ->
+      anf_cvt_rel_branches' S3 (fst (fst brs)) (snd brs) (snd (fst brs))
+                             vars2 y2 S4 pats2 ->
+      Disjoint _ ([set y1] :|: FromList vars1) S1 ->
+      Disjoint _ ([set y2] :|: FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      preord_var_env cenv PG m rho1 rho2 y1 y2 ->
+      preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
+
+  Definition anf_cvt_alpha_equiv_statement k :=
+    anf_cvt_exp_alpha_equiv k /\
+    anf_cvt_args_alpha_equiv k /\
+    anf_cvt_mfix_alpha_equiv k /\
+    anf_cvt_branches_alpha_equiv k.
+
+End AlphaEquiv.
