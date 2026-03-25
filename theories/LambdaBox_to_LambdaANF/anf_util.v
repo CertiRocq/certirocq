@@ -13,12 +13,14 @@ From CertiRocq.LambdaANF Require Import
   cps cps_show eval ctx logical_relations
   List_util algebra alpha_conv functions Ensembles_util
   tactics identifiers bounds cps_util rename set_util.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem anf_corresp.
 
 Import ListNotations.
 
 
-(** * ANF Value Relation *)
+(* ================================================================= *)
+(** * Value and Environment Relations                                  *)
+(* ================================================================= *)
 
 Section ANF_Val.
 
@@ -26,22 +28,12 @@ Section ANF_Val.
           (tgm : conId_map)
           (cmap : const_map).
 
-  (* Shorthands for the relational specs from ANF.v *)
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
 
-  (** Generic environment relation: each source value at position i
-      is related (via P) to the target value stored at variable vn[i]. *)
   Definition anf_env_rel' (P : fuel_sem.value -> val -> Prop)
              (vn : list var) (vs : list fuel_sem.value) (rho : M.t val) :=
     Forall2 (fun v x => exists v', M.get x rho = Some v' /\ P v v') vs vn.
 
-  (** Fixpoint relation: relates a list of mutually recursive source definitions
-      (each of which must be a lambda) to ANF fundefs.
-      Each body is converted in a context extended with all fix names and
-      a fresh argument variable. *)
   Inductive anf_fix_rel (fnames : list var) (names : list var)
     : Ensemble var -> list var ->
       list (EAst.def EAst.term) -> fundefs -> Ensemble var -> Prop :=
@@ -61,18 +53,12 @@ Section ANF_Val.
                     (d :: mfix')
                     (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) B) S3.
 
-  (** Environment consistency: if the same variable appears at two positions
-      in the name list, the corresponding source values must be equal. *)
   Definition env_consistent (vn : list var) (rho : list fuel_sem.value) : Prop :=
     forall i j x,
       nth_error vn i = Some x ->
       nth_error vn j = Some x ->
       nth_error rho i = nth_error rho j.
 
-  (** Main value relation. Relates source values to ANF target values.
-      - Constructors: tag correspondence + recursive relation on fields
-      - Closures: body has a relational derivation in extended context
-      - Fix closures: all mutual bodies related via anf_fix_rel *)
   Inductive anf_val_rel : fuel_sem.value -> val -> Prop :=
   | anf_rel_Con :
       forall vs vs' dc c_tag,
@@ -104,7 +90,9 @@ Section ANF_Val.
     anf_env_rel' anf_val_rel.
 
 
-  (** * Helper lemmas for anf_fix_rel *)
+(* ================================================================= *)
+(** * Fix Relation Helpers                                            *)
+(* ================================================================= *)
 
   Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list mfix Bs S2 :
     anf_fix_rel fnames names S1 fnames_list mfix Bs S2 ->
@@ -120,7 +108,6 @@ Section ANF_Val.
     intros H. induction H; simpl; congruence.
   Qed.
 
-  (* Extract find_def from anf_fix_rel given nth_error on names and bodies *)
   Lemma anf_fix_rel_find_def :
     forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f d na e_body,
       anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
@@ -157,11 +144,10 @@ Section ANF_Val.
   Qed.
 
 
-  (** * Subset lemmas for anf_cvt_rel *)
+(* ================================================================= *)
+(** * Subset Lemmas                                                   *)
+(* ================================================================= *)
 
-  (* Shared tactic for all 17 cases of the subset proof.
-     Each case: S' ⊆ S by chaining IHs with Included_trans
-     and dropping Setminus via Setminus_Included. *)
   Local Ltac subset_case :=
     unfold Ensembles.In; intros;
     first [ reflexivity
@@ -170,18 +156,19 @@ Section ANF_Val.
           | (eapply Setminus_Included_preserv; eassumption)
           | (eapply Setminus_Included_preserv;
              eapply Included_trans; [eassumption | eassumption])
-          | (eapply Included_trans; [eassumption | eassumption])
-          | (eapply Included_trans; [eassumption | apply Setminus_Included])
-          | (eapply Included_trans; [eassumption |];
-             eapply Included_trans; apply Setminus_Included)
           | (eapply Setminus_Included_preserv;
              eapply Included_trans; [eassumption |];
              eapply Included_trans; [eassumption |];
              eapply Included_trans; apply Setminus_Included)
+          | (eapply Included_trans; [eassumption |]; apply Setminus_Included)
+          | (eapply Included_trans; [eassumption |]; eassumption)
           | (eapply Included_trans; [eassumption |];
              eapply Included_trans; [eassumption |]; apply Setminus_Included)
           | (eapply Included_trans; [eassumption |];
-             eapply Included_trans; [apply Setminus_Included | eassumption]) ].
+             eapply Included_trans; apply Setminus_Included)
+          | (eapply Setminus_Included_preserv; eassumption)
+          | (eapply Included_trans; [eassumption |];
+             eapply Included_trans; [apply Setminus_Included |]; eassumption) ].
 
   Local Notation P_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
   Local Notation P0_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
@@ -198,7 +185,7 @@ Section ANF_Val.
 
   Lemma anf_cvt_args_subset :
     forall S es vn S' C xs,
-      anf_cvt_rel_args' S es vn S' C xs -> S' \subset S.
+      anf_cvt_rel_args func_tag default_tag tgm cmap S es vn S' C xs -> S' \subset S.
   Proof.
     apply (anf_cvt_rel_args_ind' func_tag default_tag tgm cmap
              P_sub P0_sub P1_sub P2_sub); subset_case.
@@ -206,7 +193,7 @@ Section ANF_Val.
 
   Lemma anf_cvt_mfix_subset :
     forall S mfix vn fnames S' fdefs,
-      anf_cvt_rel_mfix' S mfix vn fnames S' fdefs -> S' \subset S.
+      anf_cvt_rel_mfix func_tag default_tag tgm cmap S mfix vn fnames S' fdefs -> S' \subset S.
   Proof.
     apply (anf_cvt_rel_mfix_ind' func_tag default_tag tgm cmap
              P_sub P0_sub P1_sub P2_sub); subset_case.
@@ -214,14 +201,16 @@ Section ANF_Val.
 
   Lemma anf_cvt_branches_subset :
     forall S ind brs n vn r S' pats,
-      anf_cvt_rel_branches' S ind brs n vn r S' pats -> S' \subset S.
+      anf_cvt_rel_branches func_tag default_tag tgm cmap S ind brs n vn r S' pats -> S' \subset S.
   Proof.
     apply (anf_cvt_rel_branches_ind' func_tag default_tag tgm cmap
              P_sub P0_sub P1_sub P2_sub); subset_case.
   Qed.
 
 
-  (** * env_consistent lemmas *)
+(* ================================================================= *)
+(** * env_consistent                                                  *)
+(* ================================================================= *)
 
   Lemma NoDup_env_consistent (vn : list var) (rho : list fuel_sem.value) :
     NoDup vn -> env_consistent vn rho.
@@ -242,7 +231,9 @@ Section ANF_Val.
 End ANF_Val.
 
 
-(** * Alpha-equivalence *)
+(* ================================================================= *)
+(** * Alpha-Equivalence                                               *)
+(* ================================================================= *)
 
 Section AlphaEquiv.
 
@@ -260,103 +251,12 @@ Section AlphaEquiv.
   Context (func_tag default_tag : positive).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
   Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap.
-  Let anf_env_rel'' := anf_env_rel func_tag default_tag tgm cmap.
 
-  (** ** Value-level alpha-equivalence statements *)
 
-  Definition anf_cvt_val_alpha_equiv_statement k :=
-    forall v v1 v2,
-      anf_val_rel' v v1 -> anf_val_rel' v v2 ->
-      preord_val cenv PG k v1 v2.
-
-  Definition anf_cvt_env_alpha_equiv_statement k :=
-    forall names1 names2 vs rho1 rho2,
-      anf_env_rel'' names1 vs rho1 ->
-      anf_env_rel'' names2 vs rho2 ->
-      Forall2 (preord_var_env cenv PG k rho1 rho2) names1 names2.
-
-  (** ** Expression-level alpha-equivalence statements
-
-      Continuation-passing style: proves C1|[e_k1]| ~ C2|[e_k2]|
-      given that the continuations e_k1, e_k2 are related when
-      the result variables and environment are related. *)
-
-  Definition anf_cvt_exp_alpha_equiv k :=
-    forall e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
-      (m <= k)%nat ->
-      anf_cvt_rel' S1 e vars1 S2 C1 r1 ->
-      anf_cvt_rel' S3 e vars2 S4 C2 r2 ->
-      Disjoint _ (FromList vars1) S1 ->
-      Disjoint _ (FromList vars2) S3 ->
-      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      (* Continuation hypothesis: if results and env are related, continuations are related *)
-      (forall j rho1' rho2',
-        (j <= m)%nat ->
-        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
-        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
-        (* Variables not consumed by this conversion are transferred *)
-        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
-                     ~ x \in S1 -> ~ y \in S3 ->
-                     preord_var_env cenv PG j rho1' rho2' x y) ->
-        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
-      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
-
-  Definition anf_cvt_args_alpha_equiv k :=
-    forall es C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
-      (m <= k)%nat ->
-      anf_cvt_rel_args' S1 es vars1 S2 C1 xs1 ->
-      anf_cvt_rel_args' S3 es vars2 S4 C2 xs2 ->
-      Disjoint _ (FromList vars1) S1 ->
-      Disjoint _ (FromList vars2) S3 ->
-      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      (* Continuation: given related result variable lists *)
-      (forall j rho1' rho2',
-        (j <= m)%nat ->
-        Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
-        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
-        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
-                     ~ x \in S1 -> ~ y \in S3 ->
-                     preord_var_env cenv PG j rho1' rho2' x y) ->
-        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
-      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
-
-  Definition anf_cvt_mfix_alpha_equiv k :=
-    forall mfix B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2
-           S1 S2 S3 S4,
-      (m <= k)%nat ->
-      anf_cvt_rel_mfix' S1 mfix (List.rev fnames1 ++ outer_vars1) fnames1 S2 B1 ->
-      anf_cvt_rel_mfix' S3 mfix (List.rev fnames2 ++ outer_vars2) fnames2 S4 B2 ->
-      NoDup fnames1 -> NoDup fnames2 ->
-      List.length fnames1 = List.length fnames2 ->
-      List.length outer_vars1 = List.length outer_vars2 ->
-      Disjoint _ (FromList fnames1 :|: FromList outer_vars1) S1 ->
-      Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
-      Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
-      Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
-      Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
-      Forall2 (preord_var_env cenv PG m
-                 (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
-              fnames1 fnames2.
-
-  Definition anf_cvt_branches_alpha_equiv k :=
-    forall brs pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2
-           S1 S2 S3 S4,
-      (m <= k)%nat ->
-      anf_cvt_rel_branches' S1 (fst (fst brs)) (snd brs) (snd (fst brs))
-                             vars1 y1 S2 pats1 ->
-      anf_cvt_rel_branches' S3 (fst (fst brs)) (snd brs) (snd (fst brs))
-                             vars2 y2 S4 pats2 ->
-      Disjoint _ ([set y1] :|: FromList vars1) S1 ->
-      Disjoint _ ([set y2] :|: FromList vars2) S3 ->
-      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      preord_var_env cenv PG m rho1 rho2 y1 y2 ->
-      preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
-
-  (** ** Helper lemmas for alpha-equivalence *)
+(* ----------------------------------------------------------------- *)
+(** ** Helper Lemmas                                                  *)
+(* ----------------------------------------------------------------- *)
 
   Lemma Forall2_preord_var_env_monotonic k j rho1 rho2 vars1 vars2 :
     (j <= k)%nat ->
@@ -409,30 +309,6 @@ Section AlphaEquiv.
           intros z Hz. now right.
   Qed.
 
-  (* Build Forall2 (preord_var_env) from two anf_env_rel' with same values *)
-  Lemma anf_cvt_env_alpha_equiv_Forall2 k :
-    anf_cvt_val_alpha_equiv_statement k ->
-    forall vs nms_a nms_b rho_a rho_b,
-      anf_env_rel' anf_val_rel' nms_a vs rho_a ->
-      anf_env_rel' anf_val_rel' nms_b vs rho_b ->
-      Forall2 (preord_var_env cenv PG k rho_a rho_b) nms_a nms_b.
-  Proof.
-    intros Hval. induction vs; intros nms_a nms_b rho_a rho_b Hrel1 Hrel2.
-    - inv Hrel1. inv Hrel2. constructor.
-    - inv Hrel1. inv Hrel2.
-      match goal with
-      | [ H1 : exists _, M.get ?x1 rho_a = Some _ /\ _,
-          H2 : exists _, M.get ?x2 rho_b = Some _ /\ _ |- _ ] =>
-        destruct H1 as [v1 [Hg1 Hv1]]; destruct H2 as [v2 [Hg2 Hv2]]
-      end.
-      constructor.
-      + intros w Hgetw. rewrite Hg1 in Hgetw. inv Hgetw.
-        eexists. split. exact Hg2. eapply Hval; eassumption.
-      + eapply IHvs; eassumption.
-  Qed.
-
-  (* ctx_bind_proj preserves Forall2 preord_var_env.
-     Handles iterative projection in pattern matching. *)
   Lemma ctx_bind_proj_Forall2_compat k rho1 rho2 x1 x2 ctag
         proj_vars1 proj_vars2 acc1 acc2 e1 e2 n :
     preord_var_env cenv PG k rho1 rho2 x1 x2 ->
@@ -458,12 +334,10 @@ Section AlphaEquiv.
     induction proj_vars1;
       intros k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n
              Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hexp.
-    - (* Base: no projections *)
-      destruct proj_vars2; [| simpl in Hlen; congruence].
+    - destruct proj_vars2; [| simpl in Hlen; congruence].
       cbn [ctx_bind_proj app_ctx_f].
       eapply Hexp; [lia | constructor | exact Hacc | exact Hvar].
-    - (* Step: project one field *)
-      destruct proj_vars2 as [| v proj_vars2]; [simpl in Hlen; congruence |].
+    - destruct proj_vars2 as [| v proj_vars2]; [simpl in Hlen; congruence |].
       simpl in Hlen. cbn [ctx_bind_proj app_ctx_f].
       inv Hnd1. inv Hnd2.
       eapply preord_exp_proj_compat.
@@ -485,8 +359,7 @@ Section AlphaEquiv.
         * congruence.
         * assumption.
         * assumption.
-        * (* Disjoint proj_vars1 from (a :: acc1 :|: {x1}) *)
-          eapply Disjoint_Included_r with
+        * eapply Disjoint_Included_r with
             (s2 := [set a] :|: (FromList acc1 :|: [set x1])).
           { rewrite FromList_cons. now sets. }
           eapply Union_Disjoint_r.
@@ -500,85 +373,90 @@ Section AlphaEquiv.
           -- eapply Disjoint_Singleton_r. assumption.
           -- eapply Disjoint_Included_l; [| exact Hdis2].
              repeat normalize_sets. now sets.
-        * (* Inner continuation: reconstruct args for Hexp *)
+        * (* Inner continuation *)
           intros rho1' rho2' m' Hm' Hpv Hacc' Hvar'.
-          (* Hacc' : Forall2 ... (a :: acc1) (v :: acc2) — head has a~v, tail has acc1~acc2 *)
           inversion Hacc' as [| ? ? ? ? Hhd Htl]; subst.
           eapply Hexp.
           -- lia.
-          -- (* Forall2 proj_vars: prepend head from Hacc' *)
-             constructor; [exact Hhd | exact Hpv].
-          -- (* Forall2 acc: tail of Hacc' *)
-             exact Htl.
+          -- constructor; [exact Hhd | exact Hpv].
+          -- exact Htl.
           -- exact Hvar'.
   Qed.
 
-  Definition anf_cvt_alpha_equiv_statement k :=
-    anf_cvt_exp_alpha_equiv k /\
-    anf_cvt_args_alpha_equiv k /\
-    anf_cvt_mfix_alpha_equiv k /\
-    anf_cvt_branches_alpha_equiv k.
 
-  (** ** Main alpha-equivalence theorem *)
+(* ----------------------------------------------------------------- *)
+(** ** Alpha-Equivalence Definitions and Main Theorem                 *)
+(* ----------------------------------------------------------------- *)
 
-  (* The exp-level alpha-equivalence, proved by induction on the first
-     relational derivation. The other 3 parts follow from separate
-     list-induction lemmas that use the exp part as IH. *)
+  Definition anf_cvt_exp_alpha_equiv_for (e : EAst.term) k :=
+    forall C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel' S1 e vars1 S2 C1 r1 ->
+      anf_cvt_rel' S3 e vars2 S4 C2 r2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
-  (* Main exp alpha-equiv, proved by well-founded induction on k.
-     Args, branches, mfix alpha-equiv are derived corollaries. *)
-  Lemma anf_cvt_exp_alpha_equiv_proof :
-    forall k, anf_cvt_exp_alpha_equiv k.
+  Definition anf_cvt_exp_alpha_equiv k :=
+    forall e, anf_cvt_exp_alpha_equiv_for e k.
+
+  Definition anf_cvt_val_alpha_equiv_statement k :=
+    forall v v1 v2,
+      anf_val_rel' v v1 -> anf_val_rel' v v2 ->
+      preord_val cenv PG k v1 v2.
+
+  Lemma anf_cvt_env_alpha_equiv_Forall2 k :
+    anf_cvt_val_alpha_equiv_statement k ->
+    forall vs nms_a nms_b rho_a rho_b,
+      anf_env_rel' anf_val_rel' nms_a vs rho_a ->
+      anf_env_rel' anf_val_rel' nms_b vs rho_b ->
+      Forall2 (preord_var_env cenv PG k rho_a rho_b) nms_a nms_b.
+  Proof.
+    intros Hval. induction vs; intros nms_a nms_b rho_a rho_b Hrel1 Hrel2.
+    - inv Hrel1. inv Hrel2. constructor.
+    - inv Hrel1. inv Hrel2.
+      match goal with
+      | [ H1 : exists _, M.get ?x1 rho_a = Some _ /\ _,
+          H2 : exists _, M.get ?x2 rho_b = Some _ /\ _ |- _ ] =>
+        destruct H1 as [v1 [Hg1 Hv1]]; destruct H2 as [v2 [Hg2 Hv2]]
+      end.
+      constructor.
+      + intros w Hgetw. rewrite Hg1 in Hgetw. inv Hgetw.
+        eexists. split. exact Hg2. eapply Hval; eassumption.
+      + eapply IHvs; eassumption.
+  Qed.
+
+  Lemma anf_cvt_alpha_equiv :
+    forall k e, anf_cvt_exp_alpha_equiv_for e k.
   Proof.
     intros k. induction k as [k IHk] using lt_wf_rec1.
-    unfold anf_cvt_exp_alpha_equiv.
-    intros e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont.
-    (* Case analysis on e by inverting the first derivation *)
+    intros e. induction e using term_ind_fix_body;
+    unfold anf_cvt_exp_alpha_equiv_for;
+    intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont;
     inv Hrel1;
-    (* For each case, invert the second derivation (same source e) *)
     try (inv Hrel2);
-    (* Simple cases where both contexts are Hole_c *)
+    (* Simple Hole_c cases (tRel, tConst) *)
     try (simpl;
          eapply Hcont; [lia | | assumption |];
          [| intros; assumption];
-         (* preord_var_env for result variables *)
          match goal with
          | [H1 : nth_error vars1 ?n = Some r1,
             H2 : nth_error vars2 ?n = Some r2,
             Henv : Forall2 _ vars1 vars2 |- _] =>
            eapply Forall2_nth_error in Henv; [| exact H1 | exact H2]; exact Henv
          end).
-    (* Remaining cases *)
+    (* Remaining non-trivial cases *)
     all: admit.
   Admitted.
-
-  (* Args alpha-equiv follows from exp alpha-equiv at same k *)
-  Lemma anf_cvt_args_alpha_equiv_proof :
-    forall k, anf_cvt_args_alpha_equiv k.
-  Proof. admit. Admitted.
-
-  (* Branches alpha-equiv follows from exp alpha-equiv at same k *)
-  Lemma anf_cvt_branches_alpha_equiv_proof :
-    forall k, anf_cvt_branches_alpha_equiv k.
-  Proof. admit. Admitted.
-
-  (* Mfix alpha-equiv needs exp at strictly smaller j for closure bodies *)
-  Lemma anf_cvt_mfix_alpha_equiv_proof k :
-    (forall j, (j < k)%nat -> anf_cvt_exp_alpha_equiv j) ->
-    anf_cvt_mfix_alpha_equiv k.
-  Proof. admit. Admitted.
-
-  Lemma anf_cvt_alpha_equiv :
-    forall k, anf_cvt_alpha_equiv_statement k.
-  Proof.
-    intros k. induction k as [k IHk] using lt_wf_rec1.
-    unfold anf_cvt_alpha_equiv_statement. repeat split.
-    - exact (anf_cvt_exp_alpha_equiv_proof k).
-    - exact (anf_cvt_args_alpha_equiv_proof k).
-    - eapply anf_cvt_mfix_alpha_equiv_proof.
-      intros j Hj. exact (proj1 (IHk j Hj)).
-    - exact (anf_cvt_branches_alpha_equiv_proof k).
-  Qed.
 
 End AlphaEquiv.
