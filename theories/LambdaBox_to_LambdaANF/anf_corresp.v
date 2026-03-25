@@ -264,11 +264,13 @@ Section Corresp.
   Context {efl : EEnvFlags}.
   Context (Σ : global_context).
 
-  (* Flags: our pipeline excludes tVar, tEvar, tCoFix, tLazy, tForce *)
+  (* Flags: our pipeline excludes tVar, tEvar, tCoFix, tLazy, tForce
+     and uses block constructors *)
   Context (HnoVar : has_tVar = false)
           (HnoEvar : has_tEvar = false)
           (HnoCoFix : has_tCoFix = false)
-          (HnoLazy : has_tLazy_Force = false).
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true).
 
   Let convert_anf' := convert_anf func_tag default_tag prim_map tgm prims cmap.
 
@@ -280,7 +282,7 @@ Section Corresp.
 
   (* Helper: args correspondence from per-term IH.
      Given All (per-term correspondence) args, prove the args triple. *)
-  Lemma args_corresp_from_all :
+  Lemma anf_cvt_args_corresp :
     forall args vn vm
       (Hall : All (fun t => forall vn vm S0
         (Hwf : wellformed Σ (List.length vn) t = true)
@@ -314,6 +316,30 @@ Section Corresp.
       eapply return_triple. intros _ s Hfr.
       eexists. split; [econstructor; eassumption | exact Hfr].
   Qed.
+
+  (* Helper: branches correspondence from per-branch IH *)
+  Lemma anf_cvt_branches_corresp :
+    forall ind brs n scrut vn vm
+      (Hall : All (fun br : list name * EAst.term => forall vn vm S0
+        (Hwf : wellformed Σ (List.length vn) (snd br) = true)
+        (Hvm : var_map_correct vm vn),
+        {{ fun _ s => fresh S0 (next_var (fst s)) }}
+          convert_anf' (snd br) vm
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 (snd br) vn S' C r /\
+           fresh S' (next_var (fst s')) }}) brs)
+      (Hwf : forallb (fun br : list name * EAst.term =>
+               wellformed Σ (List.length (fst br) + List.length vn) (snd br)) brs = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_branches default_tag tgm convert_anf' ind brs n scrut vm
+    {{ fun _ s pats s' =>
+       exists S', anf_cvt_rel_branches func_tag default_tag tgm cmap S0 ind brs n vn scrut S' pats /\
+       fresh S' (next_var (fst s')) }}.
+  Proof.
+    admit.
+  Admitted.
 
   (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
@@ -412,16 +438,22 @@ Section Corresp.
       intros x w. eapply pre_curry_l; intros Hx.
       eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
       eapply bind_triple.
-      { eapply args_corresp_from_all; [exact X | | exact Hvm].
-        admit. (* TODO: extract forallb wellformed for args from Hwf *) }
+      { eapply anf_cvt_args_corresp; [exact X | | exact Hvm].
+        (* Extract forallb (wellformed ...) args from Hwf *)
+        rewrite Hblocks in Hwf.
+        apply Bool.andb_true_iff in Hwf as [_ Hwf_args].
+        apply Bool.andb_true_iff in Hwf_args as [_ Hwf_args].
+        exact Hwf_args. }
       intros [ys C] w'.
       eapply pre_existential; intros S2.
       eapply pre_curry_l; intros Hcvt_args.
       eapply return_triple. intros _ s Hfr.
       eexists. split; [econstructor; [reflexivity | exact Hx | exact Hcvt_args] | exact Hfr].
 
-    - (* tCase — TODO *)
-      admit.
+    - (* tCase (ind, npars) mch brs *)
+      destruct p as [ind npars]. simpl.
+      (* Decompose wellformed for tCase *)
+      admit. (* TODO: decompose wellformed, use IHe for mch, anf_cvt_branches_corresp for brs *)
 
     - (* tProj p c *)
       apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_c].
