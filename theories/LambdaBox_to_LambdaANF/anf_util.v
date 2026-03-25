@@ -665,18 +665,71 @@ Section AlphaEquiv.
         * intros Hc. apply Hb. eapply anf_cvt_exp_subset; eassumption.
   Qed.
 
+  (* Two branches derivations for the same source produce matching constructor tags *)
+  Lemma anf_cvt_rel_branches_ctor_tag S1 S2 S3 S4 ind brs n vn1 vn2 y1 y2 pats1 pats2 :
+    anf_cvt_rel_branches' S1 ind brs n vn1 y1 S2 pats1 ->
+    anf_cvt_rel_branches' S3 ind brs n vn2 y2 S4 pats2 ->
+    Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') pats1 pats2.
+  Proof.
+    revert S1 S2 S3 S4 n vn1 vn2 y1 y2 pats1 pats2.
+    induction brs as [| [lnames e_br] brs' IH];
+      intros S1 S2 S3 S4 n vn1 vn2 y1 y2 pats1 pats2 Hrel1 Hrel2.
+    - inv Hrel1; inv Hrel2; constructor.
+    - inv Hrel1; inv Hrel2; constructor; [simpl; congruence | eapply IH; eassumption].
+  Qed.
+
   (* Derives branches alpha-equiv assuming exp alpha-equiv for each branch body *)
   Lemma anf_cvt_branches_alpha_from_all k ind brs n :
     All (fun br : list name * EAst.term =>
            anf_cvt_exp_alpha_equiv_for (snd br) k) brs ->
     anf_cvt_branches_alpha_equiv_for ind brs n k.
   Proof.
-    (* This requires a careful proof combining:
-       - List induction on brs consuming All IH
-       - ctx_bind_proj_Forall2_compat for each branch's projections
-       - preord_exp_case_cons/nil_compat for the Ecase
-       The proof follows the old Match_e branches case structure. *)
-    admit.
+    intros Hall. unfold anf_cvt_branches_alpha_equiv_for.
+    induction brs as [| [lnames e_br] brs' IHbrs];
+    intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Hdis_cm1 Hdis_cm2 Henv Hvar_y Hglob.
+    - (* nil *)
+      inv Hrel1. inv Hrel2.
+      eapply preord_exp_case_nil_compat. eapply Hprops.
+    - (* cons *)
+      inv Hrel1. inv Hrel2.
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst. simpl in IH_hd.
+      eapply preord_exp_case_cons_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply anf_cvt_rel_branches_ctor_tag; eassumption.
+      + exact Hvar_y.
+      + (* head branch body *)
+        intros m' Hlt.
+        eapply preord_exp_monotonic.
+        * eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
+          -- eapply preord_var_env_monotonic with (k := m). exact Hvar_y. lia.
+          -- eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          -- admit. (* length vars1 = length vars2 from derivations *)
+          -- admit. (* NoDup vars1 *)
+          -- admit. (* NoDup vars2 *)
+          -- admit. (* Disjoint pvars1 from vars1 :|: {y1} *)
+          -- admit. (* Disjoint pvars2 from vars2 :|: {y2} *)
+          -- (* continuation: body alpha equiv after projections *)
+             intros rho1' rho2' m'' Hle Hpvs Hvars Hvar'.
+             eapply IH_hd.
+             ++ lia.
+             ++ eassumption.
+             ++ eassumption.
+             ++ admit. (* Disjoint (pvars ++ vars) S_body *)
+             ++ admit.
+             ++ admit. (* Disjoint cmap S_body *)
+             ++ admit.
+             ++ eapply Forall2_app; eassumption.
+             ++ admit. (* preord_env_P cmap_vars *)
+             ++ (* body continuation: Ehalt *)
+                intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
+                eapply preord_exp_halt_compat;
+                  [eapply Hprops | eapply Hprops | exact Hvar_r].
+        * lia.
+      + (* tail: recursive *)
+        eapply IHbrs; try eassumption. exact IH_tl.
   Admitted.
 
   (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
