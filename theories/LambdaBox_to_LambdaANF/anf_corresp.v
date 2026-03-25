@@ -361,7 +361,8 @@ Section Corresp.
           (HnoEvar : has_tEvar = false)
           (HnoCoFix : has_tCoFix = false)
           (HnoLazy : has_tLazy_Force = false)
-          (Hblocks : cstr_as_blocks = true).
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
 
   Let convert_anf' := convert_anf func_tag default_tag prim_map tgm prims cmap.
 
@@ -484,8 +485,7 @@ Section Corresp.
         end) mfix)
       (Hlen : List.length fnames = List.length mfix)
       (Hwf_mfix : forallb (fun d => isLambda (EAst.dbody d)) mfix = true)
-      (k_wf : nat)
-      (Hwf_bodies : forallb (test_def (wellformed Σ k_wf)) mfix = true)
+      (Hwf_bodies : forallb (test_def (wellformed Σ (List.length vn))) mfix = true)
       (Hvm : var_map_correct vm vn)
       S0,
     {{ fun _ s => fresh S0 (next_var (fst s)) }}
@@ -498,7 +498,7 @@ Section Corresp.
            fresh S' (next_var (fst s')) }}.
   Proof.
     induction mfix as [| d mfix' IHmfix];
-    intros fnames idx vn vm Hall Hlen Hwf_mfix k_wf Hwf_bodies Hvm S0.
+    intros fnames idx vn vm Hall Hlen Hwf_mfix Hwf_bodies Hvm S0.
     - (* nil *)
       destruct fnames; [| simpl in Hlen; congruence].
       simpl. eapply return_triple. intros _ s Hfr.
@@ -526,10 +526,7 @@ Section Corresp.
       (* Step 2: convert body t with extended vm *)
       eapply bind_triple.
       { eapply (IH_hd (x :: vn)).
-        - (* Hwf_t : wellformed Σ (S k_wf) t = true
-             Need: wellformed Σ (S (length vn)) t = true
-             Requires k_wf = length vn, instantiated by caller. *)
-          admit.
+        - exact Hwf_t.
         - eapply var_map_correct_cons. exact Hvm. }
       intros [r1 C1] w'. eapply pre_existential; intros S2.
       eapply pre_curry_l; intros Hcvt_body.
@@ -548,7 +545,7 @@ Section Corresp.
         * simpl in Hf. congruence.
         * eapply Hfi_eq. exact Hf.
       + exact Hfr.
-  Admitted.
+  Qed.
 
   (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
@@ -707,8 +704,45 @@ Section Corresp.
       intros _ s0 [Hy [_ Hfr]].
       eexists. split; [econstructor; [reflexivity | exact Hcvt | exact Hy] | exact Hfr].
 
-    - (* tFix mfix idx — requires careful set/context threading *)
-      admit.
+    - (* tFix mfix idx *)
+      simpl.
+      (* Decompose wellformed: has_tFix && forallb isLambda && wf_fix_gen *)
+      apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_fix].
+      apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_lam].
+      (* wf_fix_gen gives: idx < length mfix && forallb test_def mfix *)
+      (* We need to extract these from Hwf_fix *)
+      (* Step 1: add_fix_names *)
+      eapply bind_triple. { eapply add_fix_names_spec. exact Hvm. }
+      intros [names vm'] w.
+      eapply pre_curry_l; intros Hnd.
+      eapply pre_curry_l; intros Hlen.
+      eapply pre_curry_l; intros Hsub.
+      eapply pre_curry_l; intros Hvm'.
+      (* Step 2: convert_anf_mfix *)
+      eapply bind_triple.
+      { eapply (anf_cvt_mfix_corresp _ _ _ (List.app (List.rev names) vn));
+          [exact X | exact Hlen | exact Hwf_lam | |exact Hvm'].
+        (* wellformed bodies: need forallb (test_def (wellformed Σ (length (rev names ++ vn)))) mfix *)
+        (* Extract forallb test_def from Hwf_fix *)
+        unfold wf_fix, wf_fix_gen in Hwf_fix.
+        apply Bool.andb_true_iff in Hwf_fix as [_ Hwf_bodies].
+        rewrite app_length, rev_length, Hlen. exact Hwf_bodies. }
+      intros [fi defs] w'.
+      eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_mfix.
+      eapply pre_curry_l; intros Hfi_eq.
+      eapply return_triple. intros _ s Hfr.
+      (* Determine fi from Hfi_eq *)
+      destruct (nth_error names idx) as [f_res |] eqn:Hnth.
+      2:{ exfalso. apply nth_error_None in Hnth.
+          (* idx < length names follows from wf_fix *)
+          unfold wf_fix, wf_fix_gen in Hwf_fix.
+          apply Bool.andb_true_iff in Hwf_fix as [Hidx _].
+          apply Nat.ltb_lt in Hidx. lia. }
+      assert (fi = f_res) as -> by (apply Hfi_eq; reflexivity).
+      eexists. split; [| exact Hfr].
+      eapply anf_Fix; [exact Hsub | exact Hnd | exact Hlen | exact Hcvt_mfix |].
+      exact Hnth.
 
     - (* tCoFix *) rewrite HnoCoFix in Hwf. discriminate.
 
@@ -719,11 +753,17 @@ Section Corresp.
         intros x w. eapply return_triple.
         intros _ s0 [Hx [_ [_ Hfr]]].
         eexists. split; [econstructor; [exact Hpv | exact Hx] | exact Hfr].
-      + (* Arrays — need contradiction from wellformed *)
-        admit.
+      + (* Arrays: trans_prim_val = None only for primArrayModel.
+           wellformed requires has_prim p = true, but has_primarray = false. *)
+        exfalso.
+        (* p is a prim_val with primArrayModel *)
+        destruct p as [tag model].
+        destruct model; simpl in Hpv; try discriminate.
+        (* model = primArrayModel, so has_prim = has_primarray = false *)
+        unfold has_prim in Hwf. simpl in Hwf. rewrite HnoArray in Hwf. discriminate.
 
     - (* tLazy *) rewrite HnoLazy in Hwf. discriminate.
     - (* tForce *) rewrite HnoLazy in Hwf. discriminate.
-  Admitted.
+  Qed.
 
 End Corresp.
