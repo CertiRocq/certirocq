@@ -519,4 +519,79 @@ Section AlphaEquiv.
     anf_cvt_mfix_alpha_equiv k /\
     anf_cvt_branches_alpha_equiv k.
 
+  (** ** Main alpha-equivalence theorem *)
+
+  (* The exp-level alpha-equivalence, proved by induction on the first
+     relational derivation. The other 3 parts follow from separate
+     list-induction lemmas that use the exp part as IH. *)
+
+  (* Args alpha-equiv from exp alpha-equiv *)
+  Lemma anf_cvt_args_alpha_equiv_from_exp k :
+    anf_cvt_exp_alpha_equiv k -> anf_cvt_args_alpha_equiv k.
+  Proof.
+    intros Hexp_ae.
+    unfold anf_cvt_args_alpha_equiv.
+    intros es. induction es as [| t es' IHes];
+    intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont.
+    - (* nil *)
+      inv Hrel1. inv Hrel2.
+      simpl. eapply Hcont; [lia | constructor | assumption |].
+      intros; assumption.
+    - (* cons *)
+      inv Hrel1. inv Hrel2.
+      (* C1 = comp_ctx_f C1_hd C1_tl, C2 = comp_ctx_f C2_hd C2_tl *)
+      rewrite !app_ctx_f_fuse.
+      (* First: convert head t using Hexp_ae *)
+      eapply Hexp_ae; [lia | eassumption | eassumption | assumption | assumption | assumption |].
+      (* Continuation: after head is converted, convert tail *)
+      intros j rho1' rho2' Hj Hvar_hd Henv' Htransfer.
+      eapply IHes; [lia | eassumption | eassumption | | | |].
+      + (* Disjoint vars1 S2' — subset of S1 *)
+        eapply Disjoint_Included_r.
+        eapply anf_cvt_exp_subset; eassumption. assumption.
+      + eapply Disjoint_Included_r.
+        eapply anf_cvt_exp_subset; eassumption. assumption.
+      + exact Henv'.
+      + (* Continuation: combine head and tail results *)
+        intros j' rho1'' rho2'' Hj' Hxs_tl Henv'' Htransfer'.
+        eapply Hcont; [lia | |  |].
+        * constructor; [| exact Hxs_tl].
+          admit. (* need preord_var_env for head at j' — from Hvar_hd monotonic *)
+        * exact Henv''.
+        * intros x y Hxy Hni1 Hni2.
+          eapply Htransfer'. eapply Htransfer; assumption.
+          admit. admit. (* disjoint reasoning *)
+  Admitted.
+
+  (* Branches alpha-equiv from exp alpha-equiv *)
+  Lemma anf_cvt_branches_alpha_equiv_from_exp k :
+    anf_cvt_exp_alpha_equiv k -> anf_cvt_branches_alpha_equiv k.
+  Proof. admit. Admitted.
+
+  (* Mfix alpha-equiv from exp alpha-equiv *)
+  Lemma anf_cvt_mfix_alpha_equiv_from_exp k :
+    (forall j, (j < k)%nat -> anf_cvt_alpha_equiv_statement j) ->
+    anf_cvt_exp_alpha_equiv k -> anf_cvt_mfix_alpha_equiv k.
+  Proof. admit. Admitted.
+
+  (* Main exp alpha-equiv *)
+  Lemma anf_cvt_exp_alpha_equiv_proof k :
+    (forall j, (j < k)%nat -> anf_cvt_alpha_equiv_statement j) ->
+    anf_cvt_exp_alpha_equiv k.
+  Proof. admit. Admitted.
+
+  Lemma anf_cvt_alpha_equiv :
+    forall k, anf_cvt_alpha_equiv_statement k.
+  Proof.
+    intros k. induction k as [k IHk] using lt_wf_rec1.
+    unfold anf_cvt_alpha_equiv_statement.
+    pose proof (anf_cvt_exp_alpha_equiv_proof k IHk) as Hexp.
+    repeat split.
+    - exact Hexp.
+    - exact (anf_cvt_args_alpha_equiv_from_exp k Hexp).
+    - exact (anf_cvt_mfix_alpha_equiv_from_exp k IHk Hexp).
+    - exact (anf_cvt_branches_alpha_equiv_from_exp k Hexp).
+  Qed.
+
 End AlphaEquiv.
