@@ -688,8 +688,12 @@ Section AlphaEquiv.
       - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
       - (* Forall2 (x1::vars1) (x2::vars2) *)
         constructor; [exact Hvar_x | exact Henv'].
-      - (* preord_env_P cmap_vars *)
-        admit. (* TODO: need to show cmap_vars are preserved through the conversion *)
+      - (* preord_env_P cmap_vars: transfer from Hglob via Htransfer *)
+        intros v Hv_in.
+        eapply Htransfer.
+        + eapply Hglob. exact Hv_in.
+        + intros Hc. eapply Hdis_cm1. constructor; eassumption.
+        + intros Hc. eapply Hdis_cm2. constructor; eassumption.
       - (* Continuation for t: chain to Hcont *)
         intros j' rho1'' rho2'' Hj' Hvar_r Henv'' Htransfer'.
         eapply Hcont.
