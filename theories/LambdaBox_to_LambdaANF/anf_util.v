@@ -393,17 +393,30 @@ Section AlphaEquiv.
 (* ----------------------------------------------------------------- *)
 
   (** Two ANF conversions of the same term [e], with different fresh
-      variables and name mappings, produce [preord_exp]-related results.
-      Continuation-passing: given related continuations [e_k1 ~ e_k2],
-      the composed contexts [C1|[e_k1]| ~ C2|[e_k2]|] are related. *)
+      variable sets and name mappings, produce [preord_exp]-related results.
+
+      The statement is continuation-passing: given that the continuations
+      [e_k1] and [e_k2] are related (under appropriate conditions on
+      results and environments), the full expressions [C1|[e_k1]|] and
+      [C2|[e_k2]|] are related. This generalization is needed to compose
+      contexts (e.g. [comp_ctx_f C1 C2] for [tLetIn] and [tApp]). *)
   Definition anf_cvt_exp_alpha_equiv_for (e : EAst.term) k :=
     forall C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (* Step index bound *)
       (m <= k)%nat ->
+      (* Two relational derivations for the same source term [e] *)
       anf_cvt_rel' S1 e vars1 S2 C1 r1 ->
       anf_cvt_rel' S3 e vars2 S4 C2 r2 ->
+      (* Local variable names are disjoint from the fresh sets *)
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
+      (* Local variable bindings are pairwise related *)
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (* Global constant bindings are related *)
+      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
+      (* Continuation hypothesis: if the result variables [r1 ~ r2] are
+         related, local bindings are preserved, and variables not consumed
+         by this conversion are transferred, then [e_k1 ~ e_k2] *)
       (forall j rho1' rho2',
         (j <= m)%nat ->
         preord_var_env cenv PG j rho1' rho2' r1 r2 ->
@@ -427,6 +440,7 @@ Section AlphaEquiv.
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
@@ -454,6 +468,7 @@ Section AlphaEquiv.
       Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
       Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
+      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
       Forall2 (preord_var_env cenv PG m
                  (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
               fnames1 fnames2.
@@ -470,6 +485,7 @@ Section AlphaEquiv.
       Disjoint _ ([set y2] :|: FromList vars2) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       preord_var_env cenv PG m rho1 rho2 y1 y2 ->
+      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
       preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
 
   (* Value-level alpha-equiv *)
@@ -527,7 +543,7 @@ Section AlphaEquiv.
 
 
 (* ----------------------------------------------------------------- *)
-(** ** Main Theorem                                                   *)
+(** ** Main Theorems                                                   *)
 (* ----------------------------------------------------------------- *)
 
   Lemma anf_cvt_alpha_equiv :

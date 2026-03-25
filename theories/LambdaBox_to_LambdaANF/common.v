@@ -1,7 +1,7 @@
 (* Common definitions for converting MetaRocq Erasure (EAst.term) to LambdaANF *)
 
 (** Stdlib *)
-From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith.
+From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Ensembles.
 
 (** MetaRocq *)
 From MetaRocq.Erasure Require Import EAst EPrimitive.
@@ -74,6 +74,10 @@ Fixpoint lookup_const (cm : const_map) (k : kername) : option var :=
   | (k', v) :: cm' =>
     if eq_kername k k' then Some v else lookup_const cm' k
   end.
+
+(** The set of variables in the range of a [const_map]. *)
+Definition cmap_vars (cm : const_map) : Ensemble var :=
+  fun v => exists s, lookup_const cm s = Some v.
 
 (** Primitive lookup *)
 Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
