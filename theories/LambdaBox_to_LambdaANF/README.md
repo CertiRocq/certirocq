@@ -12,8 +12,6 @@ Transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF (`cps.exp
 
 - **CPS.v** — CPS conversion (`cps_cvt`, `convert_top_cps`).
 
-- **anf_util.v** — Source value type (`value`: `Con_v`, `Clos_v`, `ClosFix_v`) and value relations (`anf_val_rel`, `anf_env_rel`, `anf_fix_rel`) connecting source evaluation results to LambdaANF values.
-
 - **fuel_sem.v** — Environment-based big-step resource semantics for `EAst.term` (`eval_env_fuel`, `eval_env_step`). Uses the same resource algebra framework as LambdaANF (`LambdaANF.algebra`).
 
 ## Design
@@ -22,4 +20,4 @@ Transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF (`cps.exp
 
 - `tLazy`, `tForce`, `tCoFix` are assumed absent (can be enforced via preconditions). `tProj` is handled as `Eproj` (record field extraction). `tPrim` is translated via `trans_prim_val` (int, float, string; arrays unsupported).
 
-- Global constant bodies are assumed to be values (lambdas, constructors, etc.), so their ANF conversion directly produces binding contexts without thunking.
+- Global constant bodies are assumed to be values, so their ANF conversion directly produces binding contexts without thunking.

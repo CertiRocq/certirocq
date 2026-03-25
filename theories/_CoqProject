@@ -40,6 +40,15 @@ LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal.v
 LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal_correct.v
 LambdaBoxLocal/toplevel.v
 
+# LambdaBox to LambdaANF
+LambdaBox_to_LambdaANF/common.v
+LambdaBox_to_LambdaANF/ANF.v
+LambdaBox_to_LambdaANF/CPS.v
+LambdaBox_to_LambdaANF/fuel_sem.v
+LambdaBox_to_LambdaANF/anf_util.v
+LambdaBox_to_LambdaANF/wf.v
+LambdaBox_to_LambdaANF/anf_correct.v
+
 # LambdaANF
 LambdaANF/Frame.v
 LambdaANF/Rewriting.v
@@ -74,16 +83,6 @@ LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_util.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_corresp.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_toplevel.v
-<<<<<<< HEAD
-=======
-LambdaBox_to_LambdaANF/common.v
-LambdaBox_to_LambdaANF/ANF.v
-LambdaBox_to_LambdaANF/CPS.v
-LambdaBox_to_LambdaANF/fuel_sem.v
-LambdaBox_to_LambdaANF/anf_util.v
-LambdaBox_to_LambdaANF/wf.v
-LambdaBox_to_LambdaANF/anf_correct.v
->>>>>>> f7ba0237080b911d429f44bb699efc81b0d8ccb0
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v
