@@ -621,7 +621,49 @@ Section AlphaEquiv.
   Lemma anf_cvt_args_alpha_from_all k args :
     All (fun t => anf_cvt_exp_alpha_equiv_for t k) args ->
     anf_cvt_args_alpha_equiv_for args k.
-  Proof. admit. Admitted.
+  Proof.
+    intros Hall. unfold anf_cvt_args_alpha_equiv_for.
+    induction args as [| t args' IHargs];
+    intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Hdis_cm1 Hdis_cm2 Henv Hglob Hcont.
+    - (* nil *)
+      inv Hrel1. inv Hrel2. simpl.
+      eapply Hcont; [lia | constructor | assumption | intros; assumption].
+    - (* cons *)
+      inv Hrel1. inv Hrel2.
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      rewrite <- !app_ctx_f_fuse.
+      (* IH for head t *)
+      eapply IH_hd; [lia | eassumption | eassumption | assumption | assumption
+                     | assumption | assumption | assumption | assumption |].
+      (* Continuation: after head, convert tail *)
+      intros j rho1' rho2' Hj Hvar_hd Henv' Htransfer.
+      eapply IHargs; [exact IH_tl | lia | eassumption | eassumption
+                      | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                      | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                      | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                      | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                      | exact Henv'
+                      | intros v0 Hv0; eapply Htransfer;
+                        [eapply Hglob; exact Hv0
+                        | intros Hc; eapply Hdis_cm1; constructor; eassumption
+                        | intros Hc; eapply Hdis_cm2; constructor; eassumption]
+                      |].
+      (* Continuation: combine head and tail results *)
+      intros j' rho1'' rho2'' Hj' Hxs_tl Henv'' Htransfer'.
+      eapply Hcont.
+      + lia.
+      + constructor; [| exact Hxs_tl].
+        eapply Htransfer'.
+        * eapply preord_var_env_monotonic with (k := j). exact Hvar_hd. lia.
+        * eapply anf_cvt_result_not_in_output; eassumption.
+        * eapply anf_cvt_result_not_in_output; eassumption.
+      + exact Henv''.
+      + intros a b0 Hab Ha Hb.
+        eapply Htransfer'. eapply Htransfer; eassumption.
+        * intros Hc. apply Ha. eapply anf_cvt_exp_subset; eassumption.
+        * intros Hc. apply Hb. eapply anf_cvt_exp_subset; eassumption.
+  Qed.
 
   (* Derives branches alpha-equiv assuming exp alpha-equiv for each branch body *)
   Lemma anf_cvt_branches_alpha_from_all k ind brs n :
@@ -892,7 +934,45 @@ Section AlphaEquiv.
       - assumption.
       - intros; assumption. }
 
-    { (* tConstruct *) admit. }
+    { (* tConstruct ind c args: comp_ctx_f C_args (Econstr_c x ctag xs Hole_c) *)
+      inv Hrel1. inv Hrel2.
+      rewrite <- !app_ctx_f_fuse.
+      (* Use args helper with X *)
+      eapply anf_cvt_args_alpha_from_all;
+        [exact X | lia | eassumption | eassumption
+        | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis1]
+        | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis2]
+        | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm1]
+        | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm2]
+        | exact Henv
+        | intros v0 Hv0; eapply Hglob; exact Hv0
+        |].
+      (* Continuation: after args converted, build constructor *)
+      intros j rho1' rho2' Hj Hxs Henvvars Htransfer.
+      eapply preord_exp_constr_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - exact Hxs.
+      - intros m0 vs1 vs2 Hlt Hvals.
+        eapply Hcont.
+        + lia.
+        + intros v0 Hg1. rewrite M.gss in Hg1. inv Hg1.
+          eexists. split; [rewrite M.gss; reflexivity |].
+          rewrite preord_val_eq. simpl. split; [reflexivity | exact Hvals].
+        + eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic with (k := j); [lia | exact Henvvars].
+          * intros Hin. eapply Hdis1. constructor; [exact Hin | eassumption].
+          * intros Hin. eapply Hdis2. constructor; [exact Hin | eassumption].
+        + intros a b0 Hab Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic with (k := j).
+            -- eapply Htransfer.
+               ++ exact Hab.
+               ++ intros Hc. apply Ha. inv Hc. assumption.
+               ++ intros Hc. apply Hb. inv Hc. assumption.
+            -- lia.
+          * intros Heq. subst. apply Ha. eassumption.
+          * intros Heq. subst. apply Hb. eassumption. }
     { (* tCase *) admit. }
     { (* tProj p c: comp_ctx_f C_c (Eproj_c y ctag n x Hole_c) *)
       inv Hrel1. inv Hrel2.
