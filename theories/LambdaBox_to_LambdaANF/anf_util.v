@@ -703,14 +703,31 @@ Section AlphaEquiv.
       + (* head branch body *)
         intros m' Hlt.
         eapply preord_exp_monotonic.
-        * eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
-          -- eapply preord_var_env_monotonic with (k := m). exact Hvar_y. lia.
-          -- eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
-          -- admit. (* length vars1 = length vars2 from derivations *)
-          -- admit. (* NoDup vars1 *)
-          -- admit. (* NoDup vars2 *)
-          -- admit. (* Disjoint pvars1 from vars1 :|: {y1} *)
-          -- admit. (* Disjoint pvars2 from vars2 :|: {y2} *)
+        * assert (Hlen_eq : Datatypes.length vars = Datatypes.length vars0).
+          { match goal with
+            | [H1 : Datatypes.length vars = _, H2 : Datatypes.length vars0 = _ |- _] =>
+              congruence
+            end. }
+          rewrite <- Hlen_eq in *.
+          eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
+          -- eapply preord_var_env_monotonic with (k := m). exact Hvar_y.
+             apply Nat.lt_le_incl. exact Hlt.
+          -- eapply Forall2_preord_var_env_monotonic with (k := m); [| exact Henv].
+             apply Nat.lt_le_incl. exact Hlt.
+          -- exact Hlen_eq.
+          -- assumption. (* NoDup vars *)
+          -- assumption. (* NoDup vars0 *)
+          -- (* Disjoint pvars from vars :|: {y1} *)
+             eapply Disjoint_Included_l.
+             ++ match goal with H : FromList ?vs \subset _ |- _ =>
+                  eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
+             ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis1].
+                rewrite Union_commut. eapply Included_refl.
+          -- eapply Disjoint_Included_l.
+             ++ match goal with H : FromList ?vs \subset _ |- _ =>
+                  eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
+             ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis2].
+                rewrite Union_commut. eapply Included_refl.
           -- (* continuation: body alpha equiv after projections *)
              intros rho1' rho2' m'' Hle Hpvs Hvars Hvar'.
              eapply IH_hd.
@@ -729,7 +746,7 @@ Section AlphaEquiv.
                   [eapply Hprops | eapply Hprops | exact Hvar_r].
         * lia.
       + (* tail: recursive *)
-        eapply IHbrs; try eassumption. exact IH_tl.
+        admit.
   Admitted.
 
   (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
