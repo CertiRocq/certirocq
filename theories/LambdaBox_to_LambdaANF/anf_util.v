@@ -382,6 +382,29 @@ Section AlphaEquiv.
           intros z Hz. now right.
   Qed.
 
+  (* preord_env_P is preserved through def_funs + M.set on both sides,
+     when S is disjoint from the fundefs names and the set variables. *)
+  Lemma preord_env_P_def_funs_set k S0 B1 B2 rho1 rho2 x1 x2 v1 v2 :
+    preord_env_P cenv PG S0 k rho1 rho2 ->
+    Disjoint _ S0 (name_in_fundefs B1) ->
+    Disjoint _ S0 (name_in_fundefs B2) ->
+    ~ x1 \in S0 ->
+    ~ x2 \in S0 ->
+    preord_env_P cenv PG S0 k
+      (M.set x1 v1 (def_funs B1 B1 rho1 rho1))
+      (M.set x2 v2 (def_funs B2 B2 rho2 rho2)).
+  Proof.
+    intros Henv Hdis_B1 Hdis_B2 Hni1 Hni2 z Hz.
+    eapply preord_var_env_extend_neq.
+    - eapply preord_var_env_def_funs_not_In_r.
+      + intros Hc. eapply Hdis_B2. constructor; eassumption.
+      + eapply preord_var_env_def_funs_not_In_l.
+        * intros Hc. eapply Hdis_B1. constructor; eassumption.
+        * eapply Henv. exact Hz.
+    - intros Heq. subst. contradiction.
+    - intros Heq. subst. contradiction.
+  Qed.
+
   Lemma ctx_bind_proj_Forall2_compat k rho1 rho2 x1 x2 ctag
         proj_vars1 proj_vars2 acc1 acc2 e1 e2 n :
     preord_var_env cenv PG k rho1 rho2 x1 x2 ->
@@ -664,7 +687,93 @@ Section AlphaEquiv.
     (* tVar — impossible *) 1: inv Hrel1.
     (* tEvar — impossible *) 1: inv Hrel1.
 
-    { (* tLambda *) admit. }
+    { (* tLambda na body: Efun1_c (Fcons f func_tag [x] (C|[Ehalt r]|) Fnil) Hole_c *)
+      inv Hrel1. inv Hrel2. simpl.
+      eapply preord_exp_fun_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - eapply Hcont.
+        + lia.
+        + (* preord_var_env for f1 ~ f2 as closures in def_funs *)
+          intros v Hg.
+          rewrite def_funs_eq in Hg. 2: { simpl; now left. }
+          inv Hg.
+          eexists. split. { rewrite def_funs_eq. reflexivity. simpl; now left. }
+          eapply preord_val_fun.
+          * simpl. rewrite Coqlib.peq_true. reflexivity.
+          * simpl. rewrite Coqlib.peq_true. reflexivity.
+          * intros rho_b j' vs1 vs2 Hlen Hset.
+            destruct vs1 as [| v_arg1 [| ? ?]]; simpl in *; try congruence.
+            destruct vs2 as [| v_arg2 [| ? ?]]; simpl in *; try congruence.
+            inv Hset.
+            eexists. split. { reflexivity. }
+            intros Hlt' Hall_args. inv Hall_args.
+            eapply preord_exp_post_monotonic. { now eapply HinclG. }
+            eapply IHe; [lia | eassumption | eassumption | | | | | | |].
+            -- rewrite FromList_cons. eapply Union_Disjoint_l.
+               ++ eapply Disjoint_Singleton_l. intros Hc.
+                  inv Hc. inv H. match goal with H : ~ _ |- _ => apply H; constructor end.
+               ++ eapply Disjoint_Included_r. apply Setminus_Included.
+                  eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis1.
+            -- rewrite FromList_cons. eapply Union_Disjoint_l.
+               ++ eapply Disjoint_Singleton_l. intros Hc.
+                  inv Hc. inv H. match goal with H : ~ _ |- _ => apply H; constructor end.
+               ++ eapply Disjoint_Included_r. apply Setminus_Included.
+                  eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis2.
+            -- eapply Disjoint_Included_r. apply Setminus_Included.
+               eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm1.
+            -- eapply Disjoint_Included_r. apply Setminus_Included.
+               eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis_cm2.
+            -- constructor.
+               ++ eapply preord_var_env_extend_eq. eassumption.
+               ++ eapply Forall2_preord_var_env_set.
+                  ** eapply Forall2_preord_var_env_set.
+                     --- eapply Forall2_preord_var_env_monotonic with (k := m);
+                           [lia | exact Henv].
+                     --- intros Hc. eapply Hdis1. constructor; [exact Hc |].
+                         eapply Setminus_Included. eassumption.
+                     --- intros Hc. eapply Hdis2. constructor; [exact Hc |].
+                         eapply Setminus_Included. eassumption.
+                  ** intros Hc. eapply Hdis1. constructor; [exact Hc | eassumption].
+                  ** intros Hc. eapply Hdis2. constructor; [exact Hc | eassumption].
+            -- (* preord_env_P cmap_vars in closure body env:
+                  rho_body = M.set x_arg v_arg (def_funs B B rho rho).
+                  cmap vars are in rho, preserved through def_funs and M.set
+                  because they're disjoint from fundefs names and arg var. *)
+               intros v0 Hv0.
+               (* Forward: Hglob → monotonic → def_funs_l → def_funs_r → extend_neq *)
+               assert (Hpv0 : preord_var_env cenv PG j' rho1 rho2 v0 v0).
+               { eapply preord_var_env_monotonic with (k := m).
+                 eapply Hglob. exact Hv0. lia. }
+               (* Goal: preord_var_env j' (M.set x1 v1 (M.set f1 vf1 rho1))
+                                           (M.set x2 v2 (M.set f2 vf2 rho2)) v0 v0
+                  v0 ∈ cmap_vars. v0 ≠ x1, x2 (disjoint from S ∋ x1,x2).
+                  v0 ≠ f1, f2 (disjoint from S \\ {x} ∋ f). So M.gso twice. *)
+               eapply preord_var_env_extend_neq;
+                 [| intros Heq; subst; eapply Hdis_cm1; constructor; [exact Hv0 | eassumption]
+                  | intros Heq; subst; eapply Hdis_cm2; constructor; [exact Hv0 | eassumption]].
+               eapply preord_var_env_extend_neq;
+                 [| intros Heq; subst; eapply Hdis_cm1; constructor; [exact Hv0 |];
+                    eapply Setminus_Included; eassumption
+                  | intros Heq; subst; eapply Hdis_cm2; constructor; [exact Hv0 |];
+                    eapply Setminus_Included; eassumption].
+               eapply preord_var_env_monotonic with (k := m).
+               eapply Hglob. exact Hv0. lia.
+            -- intros j0 rho1'' rho2'' _ Hvar_cont _ _.
+               eapply preord_exp_halt_compat;
+                 [eapply Hprops | eapply Hprops | exact Hvar_cont].
+        + (* Forall2 vars in def_funs env *)
+          eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          * intros Hc. eapply Hdis1. constructor; [exact Hc |].
+            eapply Setminus_Included. eassumption.
+          * intros Hc. eapply Hdis2. constructor; [exact Hc |].
+            eapply Setminus_Included. eassumption.
+        + intros a b0 Hab Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic with (k := m). exact Hab. lia.
+          * intros Heq. subst. apply Ha. eapply Setminus_Included. eassumption.
+          * intros Heq. subst. apply Hb. eapply Setminus_Included. eassumption. }
     { (* tLetIn na b t: comp_ctx_f C_b C_t *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse.
