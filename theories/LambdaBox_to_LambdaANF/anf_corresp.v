@@ -2,7 +2,8 @@
 
 From Stdlib Require Import ZArith.ZArith NArith.NArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed.
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed EInduction.
+From MetaRocq.Utils Require Import All_Forall.
 From MetaRocq.Common Require Import BasicAst Kernames.
 From MetaRocq.Utils Require Import bytestring.
 From compcert Require Import lib.Maps lib.Coqlib.
@@ -277,8 +278,44 @@ Section Corresp.
   Context (cmap_complete : forall s d,
     lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
 
-  (* Main correspondence: if e is well-formed, convert_anf produces a
-     result satisfying the relational spec anf_cvt_rel. *)
+  (* Helper: args correspondence from per-term IH.
+     Given All (per-term correspondence) args, prove the args triple. *)
+  Lemma args_corresp_from_all :
+    forall args vn vm
+      (Hall : All (fun t => forall vn vm S0
+        (Hwf : wellformed Σ (List.length vn) t = true)
+        (Hvm : var_map_correct vm vn),
+        {{ fun _ s => fresh S0 (next_var (fst s)) }}
+          convert_anf' t vm
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 t vn S' C r /\
+           fresh S' (next_var (fst s')) }}) args)
+      (Hwf : forallb (wellformed Σ (List.length vn)) args = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_args convert_anf' args vm
+    {{ fun _ s p s' => let '(xs, C) := p in
+       exists S', anf_cvt_rel_args func_tag default_tag tgm cmap S0 args vn S' C xs /\
+       fresh S' (next_var (fst s')) }}.
+  Proof.
+    induction args as [| t args' IHargs]; intros vn vm Hall Hwf Hvm S0.
+    - simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor | exact Hfr].
+    - simpl in Hwf. apply Bool.andb_true_iff in Hwf as [Hwf_hd Hwf_tl].
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      simpl.
+      eapply bind_triple. { eapply IH_hd; eassumption. }
+      intros [y C1] w. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt1.
+      eapply bind_triple. { eapply IHargs; eassumption. }
+      intros [ys C2] w'. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt2.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; eassumption | exact Hfr].
+  Qed.
+
+  (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
     forall e vn vm S0
       (Hwf : wellformed Σ (List.length vn) e = true)
@@ -302,9 +339,7 @@ Section Corresp.
       eexists. split; [econstructor; exact Hx_in | exact Hfr].
 
     - (* tRel n *)
-      simpl.
-      (* wellformed gives n < length vn, so get_var_name succeeds *)
-      rewrite (Hvm n).
+      simpl. rewrite (Hvm n).
       assert (Hn : (n < List.length vn)%nat).
       { apply Bool.andb_true_iff in Hwf as [_ Hlt].
         apply Nat.ltb_lt in Hlt. exact Hlt. }
@@ -313,15 +348,11 @@ Section Corresp.
       eapply return_triple. intros _ s Hfr.
       eexists. split; [econstructor; exact Hnth | exact Hfr].
 
-    - (* tVar — excluded by wellformed + HnoVar *)
-      rewrite HnoVar in Hwf. discriminate.
-
-    - (* tEvar — excluded by wellformed + HnoEvar *)
-      rewrite HnoEvar in Hwf. discriminate.
+    - (* tVar *) rewrite HnoVar in Hwf. discriminate.
+    - (* tEvar *) rewrite HnoEvar in Hwf. discriminate.
 
     - (* tLambda na body *)
-      simpl.
-      apply Bool.andb_true_iff in Hwf as [_ Hwf_body].
+      simpl. apply Bool.andb_true_iff in Hwf as [_ Hwf_body].
       eapply bind_triple. eapply get_named_fresh.
       intros x w. eapply pre_curry_l; intros Hx.
       eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
@@ -368,7 +399,6 @@ Section Corresp.
 
     - (* tConst s *)
       simpl. rewrite no_prims.
-      (* Extract that the constant exists from wellformed *)
       apply Bool.andb_true_iff in Hwf as [_ Hwf_const].
       destruct (lookup_constant Σ s) as [d |] eqn:Hd; [| discriminate].
       specialize (cmap_complete s d Hd).
@@ -377,8 +407,18 @@ Section Corresp.
       eexists. split; [econstructor; exact Hlookup | exact Hfr].
 
     - (* tConstruct ind c args *)
-      (* Need to use All IH (X) for args. Prove inline by list induction. *)
-      admit.
+      simpl.
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w. eapply pre_curry_l; intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple.
+      { eapply args_corresp_from_all; [exact X | | exact Hvm].
+        admit. (* TODO: extract forallb wellformed for args from Hwf *) }
+      intros [ys C] w'.
+      eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_args.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; [reflexivity | exact Hx | exact Hcvt_args] | exact Hfr].
 
     - (* tCase — TODO *)
       admit.
@@ -398,27 +438,20 @@ Section Corresp.
     - (* tFix — TODO *)
       admit.
 
-    - (* tCoFix — excluded by wellformed + HnoCoFix *)
-      rewrite HnoCoFix in Hwf. discriminate.
+    - (* tCoFix *) rewrite HnoCoFix in Hwf. discriminate.
 
     - (* tPrim p *)
       simpl.
       destruct (trans_prim_val p) as [pv |] eqn:Hpv.
-      + (* Supported primitive (int/float/string) *)
-        eapply bind_triple. eapply get_named_str_fresh.
+      + eapply bind_triple. eapply get_named_str_fresh.
         intros x w. eapply return_triple.
         intros _ s0 [Hx [_ [_ Hfr]]].
         eexists. split; [econstructor; [exact Hpv | exact Hx] | exact Hfr].
-      + (* Unsupported (arrays) — failwith; need contradiction from wellformed *)
-        (* wellformed gives has_prim p = true, but trans_prim_val = None for arrays.
-           This case needs an extra assumption linking has_prim and trans_prim_val. *)
+      + (* Arrays — need contradiction from wellformed *)
         admit.
 
-    - (* tLazy — excluded by wellformed + HnoLazy *)
-      rewrite HnoLazy in Hwf. discriminate.
-
-    - (* tForce — excluded by wellformed + HnoLazy *)
-      rewrite HnoLazy in Hwf. discriminate.
+    - (* tLazy *) rewrite HnoLazy in Hwf. discriminate.
+    - (* tForce *) rewrite HnoLazy in Hwf. discriminate.
   Admitted.
 
 End Corresp.
