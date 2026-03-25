@@ -2,7 +2,7 @@
 
 From Stdlib Require Import ZArith.ZArith NArith.NArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed EInduction.
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed EInduction EPrimitive.
 From MetaRocq.Utils Require Import All_Forall.
 From MetaRocq.Common Require Import BasicAst Kernames.
 From MetaRocq.Utils Require Import bytestring.
@@ -20,6 +20,97 @@ Import ListNotations.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 Open Scope bs_scope.
+
+
+(** Custom induction principle for EAst.term that, for tFix,
+    gives P on the lambda *body* (not the whole lambda).
+    Proved by well-founded induction on EInduction.size. *)
+Lemma term_ind_fix_body (P : EAst.term -> Type) :
+  (P EAst.tBox) ->
+  (forall n, P (EAst.tRel n)) ->
+  (forall i, P (EAst.tVar i)) ->
+  (forall n l, All P l -> P (EAst.tEvar n l)) ->
+  (forall na t, P t -> P (EAst.tLambda na t)) ->
+  (forall na b t, P b -> P t -> P (EAst.tLetIn na b t)) ->
+  (forall u v, P u -> P v -> P (EAst.tApp u v)) ->
+  (forall s, P (EAst.tConst s)) ->
+  (forall ind c args, All P args -> P (EAst.tConstruct ind c args)) ->
+  (forall p t, P t -> forall brs, All (fun x => P (snd x)) brs ->
+               P (EAst.tCase p t brs)) ->
+  (forall p t, P t -> P (EAst.tProj p t)) ->
+  (* tFix: gives P on the body of each lambda, not the whole lambda *)
+  (forall mfix idx,
+     All (fun d => match EAst.dbody d with
+                   | EAst.tLambda _ e1 => P e1
+                   | _ => True
+                   end) mfix ->
+     P (EAst.tFix mfix idx)) ->
+  (forall mfix idx, All (fun x => P (EAst.dbody x)) mfix ->
+                    P (EAst.tCoFix mfix idx)) ->
+  (forall p, primProp P p -> P (EAst.tPrim p)) ->
+  (forall t, P t -> P (EAst.tLazy t)) ->
+  (forall t, P t -> P (EAst.tForce t)) ->
+  forall t, P t.
+Proof.
+  intros Hbox Hrel Hvar Hevar Hlam Hletin Happ Hconst Hconstruct
+         Hcase Hproj Hfix Hcofix Hprim Hlazy Hforce.
+  (* Well-founded induction on size *)
+  intro t. induction t as [t IH]
+    using (well_founded_induction_type
+             (Wf_nat.well_founded_ltof _ EInduction.size)).
+  unfold Wf_nat.ltof in IH.
+  destruct t; try (apply Hbox || apply Hrel || apply Hvar || apply Hconst).
+  - (* tEvar *) apply Hevar. revert l IH. fix aux 1. intros [| t l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tLambda *) apply Hlam. apply IH. simpl. lia.
+  - (* tLetIn *) apply Hletin; apply IH; simpl; lia.
+  - (* tApp *) apply Happ; apply IH; simpl; lia.
+  - (* tConstruct *) apply Hconstruct. revert args IH. fix aux 1. intros [| t l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tCase *) apply Hcase.
+    + apply IH. simpl. lia.
+    + revert brs IH. fix aux 1. intros [| [lnames e] l'] IH.
+      * constructor.
+      * constructor.
+        -- simpl. apply IH. simpl. lia.
+        -- apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tProj *) apply Hproj. apply IH. simpl. lia.
+  - (* tFix — the key case: give P on lambda bodies *)
+    apply Hfix. revert mfix IH. fix aux 1. intros [| d l'] IH.
+    + constructor.
+    + constructor.
+      * destruct (EAst.dbody d) eqn:Hbody; try exact I.
+        (* dbody d = tLambda _ t: need P t *)
+        apply IH. simpl. rewrite Hbody. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tCoFix *) apply Hcofix. revert mfix IH. fix aux 1. intros [| d l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tPrim *)
+    apply Hprim.
+    (* pv is the prim_val variable from destruct t *)
+    match goal with |- primProp _ ?pv =>
+      destruct pv as [? [i | f | s | a]]; constructor end.
+    (* Only array case remains: need P (array_default a) × All P (array_value a) *)
+    split.
+    + apply IH. cbn in *. lia.
+    + destruct a as [def vals]. simpl.
+      revert vals IH. fix aux 1. intros [| t0 vals'] IH.
+      * constructor.
+      * constructor.
+        -- apply IH. cbn in *. lia.
+        -- apply aux. intros y Hy. apply IH. cbn in *. lia.
+  - (* tLazy *) apply Hlazy. apply IH. simpl. lia.
+  - (* tForce *) apply Hforce. apply IH. simpl. lia.
+Qed.
 
 
 Section Corresp.
@@ -373,20 +464,28 @@ Section Corresp.
          | exact Hlen | subst; reflexivity | exact Hcvt_body].
   Qed.
 
-  (* Helper: mfix correspondence from per-body IH *)
+  (* Helper: mfix correspondence from per-body IH.
+     Hall gives P on the lambda BODY (not the whole lambda),
+     matching term_ind_fix_body's tFix case. *)
   Lemma anf_cvt_mfix_corresp :
     forall mfix fnames idx vn vm
-      (Hall : All (fun d : EAst.def EAst.term => forall vn vm S0
-        (Hwf : wellformed Σ (List.length vn) (EAst.dbody d) = true)
-        (Hvm : var_map_correct vm vn),
-        {{ fun _ s => fresh S0 (next_var (fst s)) }}
-          convert_anf' (EAst.dbody d) vm
-        {{ fun _ s p s' => let '(r, C) := p in
-           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 (EAst.dbody d) vn S' C r /\
-           fresh S' (next_var (fst s')) }}) mfix)
+      (Hall : All (fun d : EAst.def EAst.term =>
+        match EAst.dbody d with
+        | EAst.tLambda _ e1 =>
+          forall vn vm S0
+            (Hwf : wellformed Σ (List.length vn) e1 = true)
+            (Hvm : var_map_correct vm vn),
+          {{ fun _ s => fresh S0 (next_var (fst s)) }}
+            convert_anf' e1 vm
+          {{ fun _ s p s' => let '(r, C) := p in
+             exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 e1 vn S' C r /\
+             fresh S' (next_var (fst s')) }}
+        | _ => True
+        end) mfix)
       (Hlen : List.length fnames = List.length mfix)
       (Hwf_mfix : forallb (fun d => isLambda (EAst.dbody d)) mfix = true)
-      (Hwf_bodies : forallb (test_def (wellformed Σ (List.length mfix + List.length vn))) mfix = true)
+      (k_wf : nat)
+      (Hwf_bodies : forallb (test_def (wellformed Σ k_wf)) mfix = true)
       (Hvm : var_map_correct vm vn)
       S0,
     {{ fun _ s => fresh S0 (next_var (fst s)) }}
@@ -398,7 +497,57 @@ Section Corresp.
            (forall f, nth_error fnames idx = Some f -> fi = f) /\
            fresh S' (next_var (fst s')) }}.
   Proof.
-    admit.
+    induction mfix as [| d mfix' IHmfix];
+    intros fnames idx vn vm Hall Hlen Hwf_mfix k_wf Hwf_bodies Hvm S0.
+    - (* nil *)
+      destruct fnames; [| simpl in Hlen; congruence].
+      simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor |].
+      split; [intros f Hf; destruct idx; discriminate | exact Hfr].
+    - (* cons *)
+      destruct fnames as [| f_name rest]; [simpl in Hlen; congruence |].
+      simpl in Hlen.
+      simpl in Hwf_mfix. apply Bool.andb_true_iff in Hwf_mfix as [Hislam Hwf_mfix'].
+      simpl in Hwf_bodies.
+      apply Bool.andb_true_iff in Hwf_bodies as [Hwf_d Hwf_bodies'].
+      (* d.(dbody) must be a tLambda *)
+      destruct (EAst.dbody d) eqn:Hbody; simpl in Hislam; try discriminate.
+      (* Extract wellformed for body t *)
+      unfold test_def in Hwf_d. rewrite Hbody in Hwf_d. simpl in Hwf_d.
+      apply Bool.andb_true_iff in Hwf_d as [_ Hwf_t].
+      (* Extract IH for body from All *)
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      rewrite Hbody in IH_hd.
+      simpl. rewrite Hbody.
+      (* Step 1: allocate argument variable x *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w. eapply pre_curry_l; intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      (* Step 2: convert body t with extended vm *)
+      eapply bind_triple.
+      { eapply (IH_hd (x :: vn)).
+        - (* Hwf_t : wellformed Σ (S k_wf) t = true
+             Need: wellformed Σ (S (length vn)) t = true
+             Requires k_wf = length vn, instantiated by caller. *)
+          admit.
+        - eapply var_map_correct_cons. exact Hvm. }
+      intros [r1 C1] w'. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_body.
+      (* Step 3: recurse on remaining mfix *)
+      eapply bind_triple.
+      { eapply (IHmfix rest); try eassumption. lia. }
+      intros [fi defs'] w''.
+      eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_rest.
+      eapply pre_curry_l; intros Hfi_eq.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [| split].
+      + eapply anf_Mfix_cons; [exact Hbody | exact Hx | exact Hcvt_body |].
+        exact Hcvt_rest.
+      + intros f Hf. destruct idx.
+        * simpl in Hf. congruence.
+        * eapply Hfi_eq. exact Hf.
+      + exact Hfr.
   Admitted.
 
   (* Main correspondence *)
@@ -414,7 +563,7 @@ Section Corresp.
            anf_cvt_rel func_tag default_tag tgm cmap S0 e vn S' C r /\
            fresh S' (next_var (fst s')) }}.
   Proof.
-    intros e. induction e using EInduction.term_forall_list_ind;
+    intros e. induction e using term_ind_fix_body;
     intros vn vm S0 Hwf Hvm; simpl in Hwf.
 
     - (* tBox *)
