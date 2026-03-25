@@ -734,12 +734,33 @@ Section AlphaEquiv.
              ++ lia.
              ++ eassumption.
              ++ eassumption.
-             ++ admit. (* Disjoint (pvars ++ vars) S_body *)
-             ++ admit.
-             ++ admit. (* Disjoint cmap S_body *)
-             ++ admit.
+             ++ (* Disjoint (pvars ++ vars1) S_body1 *)
+                rewrite FromList_app. eapply Union_Disjoint_l.
+                ** eapply Disjoint_Setminus_r. eapply Included_refl.
+                ** eapply Disjoint_Included_r.
+                   --- eapply Included_trans. eapply Setminus_Included.
+                       eapply anf_cvt_branches_subset. eassumption.
+                   --- eapply Disjoint_Included_l; [| exact Hdis1].
+                       intros z Hz. right. exact Hz.
+             ++ rewrite FromList_app. eapply Union_Disjoint_l.
+                ** eapply Disjoint_Setminus_r. eapply Included_refl.
+                ** eapply Disjoint_Included_r.
+                   --- eapply Included_trans. eapply Setminus_Included.
+                       eapply anf_cvt_branches_subset. eassumption.
+                   --- eapply Disjoint_Included_l; [| exact Hdis2].
+                       intros z Hz. right. exact Hz.
+             ++ (* Disjoint cmap S_body1 *)
+                eapply Disjoint_Included_r.
+                ** eapply Included_trans. eapply Setminus_Included.
+                   eapply anf_cvt_branches_subset. eassumption.
+                ** exact Hdis_cm1.
+             ++ eapply Disjoint_Included_r.
+                ** eapply Included_trans. eapply Setminus_Included.
+                   eapply anf_cvt_branches_subset. eassumption.
+                ** exact Hdis_cm2.
              ++ eapply Forall2_app; eassumption.
-             ++ admit. (* preord_env_P cmap_vars *)
+             ++ (* preord_env_P cmap_vars *)
+                admit. (* same pattern: transfer through proj bindings *)
              ++ (* body continuation: Ehalt *)
                 intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
                 eapply preord_exp_halt_compat;
