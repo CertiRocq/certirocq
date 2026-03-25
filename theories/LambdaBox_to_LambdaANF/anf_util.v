@@ -19,10 +19,6 @@ From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem anf_cor
 Import ListNotations.
 
 
-(* ================================================================= *)
-(** * Value and Environment Relations                                  *)
-(* ================================================================= *)
-
 Section ANF_Val.
 
   Context (func_tag default_tag : positive)
@@ -30,6 +26,10 @@ Section ANF_Val.
           (cmap : const_map).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
+
+(* ================================================================= *)
+(** * Value and Environment Relations                                  *)
+(* ================================================================= *)
 
   Definition anf_env_rel' (P : fuel_sem.value -> val -> Prop)
              (vn : list var) (vs : list fuel_sem.value) (rho : M.t val) :=
@@ -232,11 +232,11 @@ Section ANF_Val.
 End ANF_Val.
 
 
+Section AlphaEquiv.
+
 (* ================================================================= *)
 (** * Alpha-Equivalence                                               *)
 (* ================================================================= *)
-
-Section AlphaEquiv.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel}
           {trace : Type} {Htrace : @trace_resource trace}.
@@ -562,10 +562,6 @@ Section AlphaEquiv.
     (* tPrim *) - admit.
   Admitted.
 
-  Lemma anf_cvt_val_alpha_equiv :
-    forall k, anf_cvt_val_alpha_equiv_statement k.
-  Proof. admit. Admitted.
-
   Corollary anf_cvt_exp_alpha_equiv_holds :
     forall k, anf_cvt_exp_alpha_equiv k.
   Proof. intros k e. exact (anf_cvt_alpha_equiv k e). Qed.
@@ -580,6 +576,10 @@ Section AlphaEquiv.
 
   Corollary anf_cvt_mfix_alpha_equiv k :
     forall mfix, anf_cvt_mfix_alpha_equiv_for mfix k.
+  Proof. admit. Admitted.
+
+  Lemma anf_cvt_val_alpha_equiv :
+    forall k, anf_cvt_val_alpha_equiv_statement k.
   Proof. admit. Admitted.
 
 End AlphaEquiv.
