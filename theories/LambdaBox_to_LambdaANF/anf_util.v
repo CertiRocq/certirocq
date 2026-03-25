@@ -670,7 +670,14 @@ Section AlphaEquiv.
     All (fun br : list name * EAst.term =>
            anf_cvt_exp_alpha_equiv_for (snd br) k) brs ->
     anf_cvt_branches_alpha_equiv_for ind brs n k.
-  Proof. admit. Admitted.
+  Proof.
+    (* This requires a careful proof combining:
+       - List induction on brs consuming All IH
+       - ctx_bind_proj_Forall2_compat for each branch's projections
+       - preord_exp_case_cons/nil_compat for the Ecase
+       The proof follows the old Match_e branches case structure. *)
+    admit.
+  Admitted.
 
   (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
      and at strictly smaller step indices (for closure values) *)
