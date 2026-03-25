@@ -525,43 +525,12 @@ Section AlphaEquiv.
      relational derivation. The other 3 parts follow from separate
      list-induction lemmas that use the exp part as IH. *)
 
-  (* Args alpha-equiv from exp alpha-equiv *)
-  Lemma anf_cvt_args_alpha_equiv_from_exp k :
-    anf_cvt_exp_alpha_equiv k -> anf_cvt_args_alpha_equiv k.
+  (* Main exp alpha-equiv, proved by well-founded induction on k.
+     Args, branches, mfix alpha-equiv are derived corollaries. *)
+  Lemma anf_cvt_exp_alpha_equiv_proof :
+    forall k, anf_cvt_exp_alpha_equiv k.
   Proof.
-    intros Hexp_ae.
-    unfold anf_cvt_args_alpha_equiv.
-    intros es. induction es as [| t es' IHes];
-    intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont.
-    - (* nil *)
-      inv Hrel1. inv Hrel2.
-      simpl. eapply Hcont; [lia | constructor | assumption |].
-      intros; assumption.
-    - (* cons: need to invert both derivations, fuse contexts, chain IHs *)
-      (* This case is complex — uses Hexp_ae for head, IHes for tail,
-         Hcont to combine results. Needs careful disjointness and
-         monotonicity reasoning for the transfer function. *)
-      admit.
-  Admitted.
-
-  (* Branches alpha-equiv from exp alpha-equiv *)
-  Lemma anf_cvt_branches_alpha_equiv_from_exp k :
-    anf_cvt_exp_alpha_equiv k -> anf_cvt_branches_alpha_equiv k.
-  Proof. admit. Admitted.
-
-  (* Mfix alpha-equiv from exp alpha-equiv *)
-  Lemma anf_cvt_mfix_alpha_equiv_from_exp k :
-    (forall j, (j < k)%nat -> anf_cvt_alpha_equiv_statement j) ->
-    anf_cvt_exp_alpha_equiv k -> anf_cvt_mfix_alpha_equiv k.
-  Proof. admit. Admitted.
-
-  (* Main exp alpha-equiv *)
-  Lemma anf_cvt_exp_alpha_equiv_proof k :
-    (forall j, (j < k)%nat -> anf_cvt_alpha_equiv_statement j) ->
-    anf_cvt_exp_alpha_equiv k.
-  Proof.
-    intros IHk.
+    intros k. induction k as [k IHk] using lt_wf_rec1.
     unfold anf_cvt_exp_alpha_equiv.
     intros e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
            Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont.
@@ -584,17 +553,32 @@ Section AlphaEquiv.
     all: admit.
   Admitted.
 
+  (* Args alpha-equiv follows from exp alpha-equiv at same k *)
+  Lemma anf_cvt_args_alpha_equiv_proof :
+    forall k, anf_cvt_args_alpha_equiv k.
+  Proof. admit. Admitted.
+
+  (* Branches alpha-equiv follows from exp alpha-equiv at same k *)
+  Lemma anf_cvt_branches_alpha_equiv_proof :
+    forall k, anf_cvt_branches_alpha_equiv k.
+  Proof. admit. Admitted.
+
+  (* Mfix alpha-equiv needs exp at strictly smaller j for closure bodies *)
+  Lemma anf_cvt_mfix_alpha_equiv_proof k :
+    (forall j, (j < k)%nat -> anf_cvt_exp_alpha_equiv j) ->
+    anf_cvt_mfix_alpha_equiv k.
+  Proof. admit. Admitted.
+
   Lemma anf_cvt_alpha_equiv :
     forall k, anf_cvt_alpha_equiv_statement k.
   Proof.
     intros k. induction k as [k IHk] using lt_wf_rec1.
-    unfold anf_cvt_alpha_equiv_statement.
-    pose proof (anf_cvt_exp_alpha_equiv_proof k IHk) as Hexp.
-    repeat split.
-    - exact Hexp.
-    - exact (anf_cvt_args_alpha_equiv_from_exp k Hexp).
-    - exact (anf_cvt_mfix_alpha_equiv_from_exp k IHk Hexp).
-    - exact (anf_cvt_branches_alpha_equiv_from_exp k Hexp).
+    unfold anf_cvt_alpha_equiv_statement. repeat split.
+    - exact (anf_cvt_exp_alpha_equiv_proof k).
+    - exact (anf_cvt_args_alpha_equiv_proof k).
+    - eapply anf_cvt_mfix_alpha_equiv_proof.
+      intros j Hj. exact (proj1 (IHk j Hj)).
+    - exact (anf_cvt_branches_alpha_equiv_proof k).
   Qed.
 
 End AlphaEquiv.
