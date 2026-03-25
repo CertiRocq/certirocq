@@ -3,6 +3,7 @@
 -R LambdaBoxMut         CertiRocq.LambdaBoxMut
 -R LambdaBoxLocal       CertiRocq.LambdaBoxLocal
 -R LambdaANF            CertiRocq.LambdaANF
+-R LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF
 -R ../libraries         CertiRocq.Libraries
 -R Codegen              CertiRocq.Codegen
 -R CodegenWasm          CertiRocq.CodegenWasm
@@ -73,6 +74,16 @@ LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_util.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_corresp.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v
 LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_toplevel.v
+<<<<<<< HEAD
+=======
+LambdaBox_to_LambdaANF/common.v
+LambdaBox_to_LambdaANF/ANF.v
+LambdaBox_to_LambdaANF/CPS.v
+LambdaBox_to_LambdaANF/fuel_sem.v
+LambdaBox_to_LambdaANF/anf_util.v
+LambdaBox_to_LambdaANF/wf.v
+LambdaBox_to_LambdaANF/anf_correct.v
+>>>>>>> f7ba0237080b911d429f44bb699efc81b0d8ccb0
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v
