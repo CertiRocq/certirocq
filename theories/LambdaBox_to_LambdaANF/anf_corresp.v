@@ -362,11 +362,8 @@ Section Corresp.
       eapply pre_curry_l; intros Hvm'.
       (* Step 3: convert branch body with extended vm *)
       eapply bind_triple.
-      { eapply (IH_hd (vars ++ vn)); [| exact Hvm'].
-        (* wellformed for branch body: wellformed Σ (|lnames| + |vn|) e_br *)
-        (* vars has length = |lnames|, so |vars ++ vn| = |lnames| + |vn| *)
-        simpl in IH_hd.
-        rewrite length_app, Hlen. exact Hwf_hd. }
+      { eapply (IH_hd (List.app vars vn)); [| exact Hvm'].
+        rewrite app_length, Hlen. exact Hwf_hd. }
       intros [r1 C1] w3. eapply pre_existential; intros S3.
       eapply pre_curry_l; intros Hcvt_body.
       eapply return_triple. intros _ s Hfr.
