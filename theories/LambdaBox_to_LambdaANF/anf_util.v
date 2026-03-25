@@ -13,6 +13,7 @@ From CertiRocq.LambdaANF Require Import
   cps cps_show eval ctx logical_relations
   List_util algebra alpha_conv functions Ensembles_util
   tactics identifiers bounds cps_util rename set_util.
+From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem anf_corresp.
 
 Import ListNotations.
@@ -385,9 +386,15 @@ Section AlphaEquiv.
 
 
 (* ----------------------------------------------------------------- *)
-(** ** Alpha-Equivalence Definitions and Main Theorem                 *)
+(** ** Alpha-Equivalence Definitions                                  *)
 (* ----------------------------------------------------------------- *)
 
+  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
+
+  (* Exp alpha-equiv for a specific term e at step bound k.
+     Continuation-passing: C1|[e_k1]| ~ C2|[e_k2]| given related continuations. *)
   Definition anf_cvt_exp_alpha_equiv_for (e : EAst.term) k :=
     forall C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
       (m <= k)%nat ->
@@ -409,10 +416,68 @@ Section AlphaEquiv.
   Definition anf_cvt_exp_alpha_equiv k :=
     forall e, anf_cvt_exp_alpha_equiv_for e k.
 
+  (* Args alpha-equiv: given All (per-term IH) args *)
+  Definition anf_cvt_args_alpha_equiv_for (args : list EAst.term) k :=
+    forall C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
+      (m <= k)%nat ->
+      anf_cvt_rel_args' S1 args vars1 S2 C1 xs1 ->
+      anf_cvt_rel_args' S3 args vars2 S4 C2 xs2 ->
+      Disjoint _ (FromList vars1) S1 ->
+      Disjoint _ (FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      (forall j rho1' rho2',
+        (j <= m)%nat ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+
+  (* Mfix alpha-equiv: Forall2 on function names in def_funs environments *)
+  Definition anf_cvt_mfix_alpha_equiv_for
+             (mfix : list (EAst.def EAst.term)) k :=
+    forall B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2
+           S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_mfix' S1 mfix (List.rev fnames1 ++ outer_vars1) fnames1 S2 B1 ->
+      anf_cvt_rel_mfix' S3 mfix (List.rev fnames2 ++ outer_vars2) fnames2 S4 B2 ->
+      NoDup fnames1 -> NoDup fnames2 ->
+      List.length fnames1 = List.length fnames2 ->
+      List.length outer_vars1 = List.length outer_vars2 ->
+      Disjoint _ (FromList fnames1 :|: FromList outer_vars1) S1 ->
+      Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
+      Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
+      Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
+      Forall2 (preord_var_env cenv PG m
+                 (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+              fnames1 fnames2.
+
+  (* Branches alpha-equiv: Ecase with related patterns *)
+  Definition anf_cvt_branches_alpha_equiv_for
+             (ind : inductive) (brs : list (list name * EAst.term)) (n : N) k :=
+    forall pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_branches' S1 ind brs n vars1 y1 S2 pats1 ->
+      anf_cvt_rel_branches' S3 ind brs n vars2 y2 S4 pats2 ->
+      Disjoint _ ([set y1] :|: FromList vars1) S1 ->
+      Disjoint _ ([set y2] :|: FromList vars2) S3 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      preord_var_env cenv PG m rho1 rho2 y1 y2 ->
+      preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
+
+  (* Value-level alpha-equiv *)
   Definition anf_cvt_val_alpha_equiv_statement k :=
     forall v v1 v2,
       anf_val_rel' v v1 -> anf_val_rel' v v2 ->
       preord_val cenv PG k v1 v2.
+
+
+(* ----------------------------------------------------------------- *)
+(** ** Alpha-Equiv Helper Lemmas (using All IH)                       *)
+(* ----------------------------------------------------------------- *)
 
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
     anf_cvt_val_alpha_equiv_statement k ->
@@ -435,6 +500,35 @@ Section AlphaEquiv.
       + eapply IHvs; eassumption.
   Qed.
 
+  (* Args alpha-equiv from per-term All IH *)
+  Lemma anf_cvt_args_alpha_from_all k args :
+    All (fun t => anf_cvt_exp_alpha_equiv_for t k) args ->
+    anf_cvt_args_alpha_equiv_for args k.
+  Proof. admit. Admitted.
+
+  (* Branches alpha-equiv from per-branch All IH *)
+  Lemma anf_cvt_branches_alpha_from_all k ind brs n :
+    All (fun br : list name * EAst.term =>
+           anf_cvt_exp_alpha_equiv_for (snd br) k) brs ->
+    anf_cvt_branches_alpha_equiv_for ind brs n k.
+  Proof. admit. Admitted.
+
+  (* Mfix alpha-equiv from per-body All IH + IHk for closures *)
+  Lemma anf_cvt_mfix_alpha_from_all k mfix :
+    All (fun d : EAst.def EAst.term =>
+           match EAst.dbody d with
+           | EAst.tLambda _ e1 => anf_cvt_exp_alpha_equiv_for e1 k
+           | _ => True
+           end) mfix ->
+    (forall j, (j < k)%nat -> forall e, anf_cvt_exp_alpha_equiv_for e j) ->
+    anf_cvt_mfix_alpha_equiv_for mfix k.
+  Proof. admit. Admitted.
+
+
+(* ----------------------------------------------------------------- *)
+(** ** Main Theorem                                                   *)
+(* ----------------------------------------------------------------- *)
+
   Lemma anf_cvt_alpha_equiv :
     forall k e, anf_cvt_exp_alpha_equiv_for e k.
   Proof.
@@ -455,8 +549,22 @@ Section AlphaEquiv.
             Henv : Forall2 _ vars1 vars2 |- _] =>
            eapply Forall2_nth_error in Henv; [| exact H1 | exact H2]; exact Henv
          end).
-    (* Remaining non-trivial cases *)
-    all: admit.
+    (* tBox *) - admit.
+    (* tLambda *) - admit.
+    (* tLetIn *) - admit.
+    (* tApp *) - admit.
+    (* tConstruct *) - admit. (* uses anf_cvt_args_alpha_from_all with X *)
+    (* tCase *) - admit. (* uses anf_cvt_branches_alpha_from_all with X *)
+    (* tProj *) - admit.
+    (* tFix *) - admit. (* uses anf_cvt_mfix_alpha_from_all with X and IHk *)
+    (* tPrim *) - admit.
   Admitted.
+
+  (* Corollary: alpha-equiv for all terms *)
+  Corollary anf_cvt_exp_alpha_equiv_holds :
+    forall k, anf_cvt_exp_alpha_equiv k.
+  Proof.
+    intros k e. exact (anf_cvt_alpha_equiv k e).
+  Qed.
 
 End AlphaEquiv.
