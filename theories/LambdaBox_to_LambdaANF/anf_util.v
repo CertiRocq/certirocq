@@ -146,6 +146,22 @@ Section ANF_Val.
         * exact Hcvt.
   Qed.
 
+  (* Build Forall2 from pointwise proof + length equality *)
+  Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
+        (l1 : list A) (l2 : list B) :
+    Datatypes.length l1 = Datatypes.length l2 ->
+    (forall k a b, nth_error l1 k = Some a -> nth_error l2 k = Some b -> R a b) ->
+    Forall2 R l1 l2.
+  Proof.
+    revert l2. induction l1; intros l2 Hlen H.
+    - destruct l2; [constructor | simpl in Hlen; congruence].
+    - destruct l2 as [| b l2']; [simpl in Hlen; congruence |].
+      constructor.
+      + apply (H 0); reflexivity.
+      + apply IHl1.
+        * simpl in Hlen. congruence.
+        * intros k a' b' Ha' Hb'. exact (H (S k) a' b' Ha' Hb').
+  Qed.
 
 (* ================================================================= *)
 (** * Subset Lemmas                                                   *)
@@ -278,6 +294,56 @@ Section ANF_Val.
     - intros; exact I.
   Qed.
 
+(* ----------------------------------------------------------------- *)
+(** ** Relational Mfix Helpers                                        *)
+(* ----------------------------------------------------------------- *)
+
+  Lemma anf_cvt_rel_mfix_all_fun_name S mfix vn fnames S' fdefs :
+    anf_cvt_rel_mfix func_tag default_tag tgm cmap S mfix vn fnames S' fdefs ->
+    all_fun_name fdefs = fnames.
+  Proof.
+    intros H. induction H; simpl; congruence.
+  Qed.
+
+  Lemma anf_cvt_rel_mfix_find_def S mfix vn fnames S' fdefs :
+    anf_cvt_rel_mfix func_tag default_tag tgm cmap S mfix vn fnames S' fdefs ->
+    NoDup fnames ->
+    forall i fi,
+      nth_error fnames i = Some fi ->
+      exists d na e_body xi C_body ri Si1 Si2,
+        nth_error mfix i = Some d /\
+        d.(EAst.dbody) = EAst.tLambda na e_body /\
+        find_def fi fdefs = Some (func_tag, [xi], C_body |[ Ehalt ri ]|) /\
+        anf_cvt_rel func_tag default_tag tgm cmap
+                    (Si1 \\ [set xi]) e_body (xi :: vn) Si2 C_body ri /\
+        xi \in Si1 /\ Si1 \subset S.
+  Proof.
+    intros Hrel Hnd.
+    induction Hrel; intros i fi Hnth.
+    - destruct i; discriminate.
+    - destruct i as [| i'].
+      + simpl in Hnth. inv Hnth.
+        do 8 eexists.
+        repeat split; try eassumption.
+        * simpl. destruct (M.elt_eq fi fi); [reflexivity | congruence].
+        * eapply Included_refl.
+      + simpl in Hnth.
+        match goal with H : NoDup (_ :: _) |- _ =>
+          inversion H as [| ? ? Hnotin Hnd_tl]; subst end.
+        edestruct IHHrel as (d' & na' & e' & xi' & C' & ri' & Si1' & Si2' &
+                             Hnth_d & Hbody & Hfind & Hcvt & Hxi_in & Hsi_sub);
+          [exact Hnd_tl | exact Hnth |].
+        do 8 eexists.
+        repeat split; try eassumption.
+        * simpl. match goal with |- context [M.elt_eq fi ?f] =>
+            destruct (M.elt_eq fi f) as [Heq | Hneq] end.
+          -- exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth.
+          -- exact Hfind.
+        * eapply Included_trans; [exact Hsi_sub |].
+          eapply Included_trans; [eapply anf_cvt_exp_subset; eassumption |].
+          eapply Setminus_Included.
+  Qed.
+
 (* ================================================================= *)
 (** * env_consistent                                                  *)
 (* ================================================================= *)
@@ -406,7 +472,7 @@ Section AlphaEquiv.
   Qed.
 
   Lemma ctx_bind_proj_Forall2_compat k rho1 rho2 x1 x2 ctag
-        proj_vars1 proj_vars2 acc1 acc2 e1 e2 n :
+        proj_vars1 proj_vars2 acc1 acc2 e1 e2 n (S_extra : Ensemble var) :
     preord_var_env cenv PG k rho1 rho2 x1 x2 ->
     Forall2 (preord_var_env cenv PG k rho1 rho2) acc1 acc2 ->
     List.length proj_vars1 = List.length proj_vars2 ->
@@ -414,6 +480,10 @@ Section AlphaEquiv.
     NoDup proj_vars2 ->
     Disjoint _ (FromList proj_vars1) (FromList acc1 :|: [set x1]) ->
     Disjoint _ (FromList proj_vars2) (FromList acc2 :|: [set x2]) ->
+    (* Extra environment relation threaded through projection bindings *)
+    preord_env_P cenv PG S_extra k rho1 rho2 ->
+    Disjoint _ S_extra (FromList proj_vars1) ->
+    Disjoint _ S_extra (FromList proj_vars2) ->
     (forall rho1' rho2' m',
         (m' <= k)%nat ->
         Forall2 (preord_var_env cenv PG m' rho1' rho2')
@@ -421,11 +491,7 @@ Section AlphaEquiv.
         Forall2 (preord_var_env cenv PG m' rho1' rho2')
                 acc1 acc2 ->
         preord_var_env cenv PG m' rho1' rho2' x1 x2 ->
-        (* Variables outside proj_vars ∪ acc ∪ {x} are preserved *)
-        (forall a b, preord_var_env cenv PG k rho1 rho2 a b ->
-                     ~ a \in (FromList proj_vars1 :|: FromList acc1 :|: [set x1]) ->
-                     ~ b \in (FromList proj_vars2 :|: FromList acc2 :|: [set x2]) ->
-                     preord_var_env cenv PG m' rho1' rho2' a b) ->
+        preord_env_P cenv PG S_extra m' rho1' rho2' ->
         preord_exp cenv P1 PG m' (e1, rho1') (e2, rho2')) ->
     preord_exp cenv P1 PG k
                (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
@@ -434,12 +500,16 @@ Section AlphaEquiv.
     revert k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n.
     induction proj_vars1;
       intros k rho1 rho2 x1 x2 ctag proj_vars2 acc1 acc2 e1 e2 n
-             Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hexp.
-    - destruct proj_vars2; [| simpl in Hlen; congruence].
+             Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2
+             Henv_extra Hdis_e1 Hdis_e2 Hexp.
+    - (* Base: proj_vars1 = [] *)
+      destruct proj_vars2; [| simpl in Hlen; congruence].
       cbn [ctx_bind_proj app_ctx_f].
       eapply Hexp; [lia | constructor | exact Hacc | exact Hvar |].
-      intros a b Hab _ _. eapply preord_var_env_monotonic with (k := k); [exact Hab | lia].
-    - destruct proj_vars2 as [| v proj_vars2]; [simpl in Hlen; congruence |].
+      intros v0 Hv0.
+      eapply preord_var_env_monotonic; [eapply Henv_extra; exact Hv0 | lia].
+    - (* Step: a :: proj_vars1 *)
+      destruct proj_vars2 as [| v proj_vars2]; [simpl in Hlen; congruence |].
       simpl in Hlen. cbn [ctx_bind_proj app_ctx_f].
       inv Hnd1. inv Hnd2.
       eapply preord_exp_proj_compat.
@@ -475,42 +545,29 @@ Section AlphaEquiv.
           -- eapply Disjoint_Singleton_r. assumption.
           -- eapply Disjoint_Included_l; [| exact Hdis2].
              repeat normalize_sets. now sets.
+        * (* preord_env_P S_extra in extended env *)
+          intros v0 Hv0.
+          eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_monotonic.
+             ++ eapply Henv_extra. exact Hv0.
+             ++ lia.
+          -- intros Heq. subst. eapply Hdis_e1. constructor; [exact Hv0 | now left].
+          -- intros Heq. subst. eapply Hdis_e2. constructor; [exact Hv0 | now left].
+        * (* Disjoint S_extra (FromList proj_vars1) — tail *)
+          eapply Disjoint_Included_r; [| exact Hdis_e1].
+          intros z Hz. now right.
+        * (* Disjoint S_extra (FromList proj_vars2) — tail *)
+          eapply Disjoint_Included_r; [| exact Hdis_e2].
+          intros z Hz. now right.
         * (* Inner continuation *)
-          intros rho1' rho2' m' Hm' Hpv Hacc' Hvar' Htransfer_inner.
+          intros rho1' rho2' m' Hm' Hpv Hacc' Hvar' Henv_extra_inner.
           inversion Hacc' as [| ? ? ? ? Hhd Htl]; subst.
           eapply Hexp.
           -- lia.
           -- constructor; [exact Hhd | exact Hpv].
           -- exact Htl.
           -- exact Hvar'.
-          -- (* Transfer: chain extend_neq + inner transfer *)
-             intros a0 b0 Hab Hni1 Hni2.
-             eapply Htransfer_inner.
-             ++ (* preord_var_env in M.set env: extend_neq from original *)
-                eapply preord_var_env_extend_neq.
-                ** eapply preord_var_env_monotonic with (k := k). exact Hab. lia.
-                ** intros Heq. subst. apply Hni1. repeat normalize_sets. left. now left.
-                ** intros Heq. subst. apply Hni2. repeat normalize_sets. left. now left.
-             ++ intros Hc. apply Hni1.
-                repeat normalize_sets.
-                (* Hc: a0 ∈ (FromList proj_vars1 :|: (a |: FromList acc1)) :|: {x1}
-                   Goal: a0 ∈ ((a |: FromList proj_vars1) :|: FromList acc1) :|: {x1} *)
-                inv Hc.
-                ** inv H.
-                   --- left. left. right. assumption.
-                   --- inv H0.
-                       +++ left. left. left. assumption.
-                       +++ left. right. assumption.
-                ** right. assumption.
-             ++ intros Hc. apply Hni2.
-                repeat normalize_sets.
-                inv Hc.
-                ** inv H.
-                   --- left. left. right. assumption.
-                   --- inv H0.
-                       +++ left. left. left. assumption.
-                       +++ left. right. assumption.
-                ** right. assumption.
+          -- exact Henv_extra_inner.
   Qed.
 
 
@@ -598,6 +655,8 @@ Section AlphaEquiv.
       Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
       Disjoint _ (cmap_vars cmap) S1 ->
       Disjoint _ (cmap_vars cmap) S3 ->
+      Disjoint _ (cmap_vars cmap) (FromList fnames1) ->
+      Disjoint _ (cmap_vars cmap) (FromList fnames2) ->
       Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
       Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
@@ -719,8 +778,9 @@ Section AlphaEquiv.
     anf_cvt_branches_alpha_equiv_for ind brs n k.
   Proof.
     intros Hall. unfold anf_cvt_branches_alpha_equiv_for.
+    revert n Hall.
     induction brs as [| [lnames e_br] brs' IHbrs];
-    intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+    intros n Hall pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
            Hm Hrel1 Hrel2 Hdis1 Hdis2 Hdis_cm1 Hdis_cm2 Henv Hvar_y Hglob.
     - (* nil *)
       inv Hrel1. inv Hrel2.
@@ -743,7 +803,8 @@ Section AlphaEquiv.
               congruence
             end. }
           rewrite <- Hlen_eq in *.
-          eapply ctx_bind_proj_Forall2_compat with (acc1 := vars1) (acc2 := vars2).
+          eapply ctx_bind_proj_Forall2_compat
+            with (acc1 := vars1) (acc2 := vars2) (S_extra := cmap_vars cmap).
           -- eapply preord_var_env_monotonic with (k := m). exact Hvar_y.
              apply Nat.lt_le_incl. exact Hlt.
           -- eapply Forall2_preord_var_env_monotonic with (k := m); [| exact Henv].
@@ -751,19 +812,31 @@ Section AlphaEquiv.
           -- exact Hlen_eq.
           -- assumption. (* NoDup vars *)
           -- assumption. (* NoDup vars0 *)
-          -- (* Disjoint pvars from vars :|: {y1} *)
+          -- (* Disjoint pvars1 from vars1 :|: {y1} *)
              eapply Disjoint_Included_l.
              ++ match goal with H : FromList ?vs \subset _ |- _ =>
                   eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
              ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis1].
                 rewrite Union_commut. eapply Included_refl.
-          -- eapply Disjoint_Included_l.
+          -- (* Disjoint pvars2 from vars2 :|: {y2} *)
+             eapply Disjoint_Included_l.
              ++ match goal with H : FromList ?vs \subset _ |- _ =>
                   eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
              ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis2].
                 rewrite Union_commut. eapply Included_refl.
+          -- (* preord_env_P cmap_vars at step m' *)
+             intros v0 Hv0.
+             eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
+          -- (* Disjoint cmap_vars (FromList vars) *)
+             eapply Disjoint_Included_r; [| exact Hdis_cm1].
+             match goal with H : FromList ?vs \subset _ |- _ =>
+               eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
+          -- (* Disjoint cmap_vars (FromList vars0) *)
+             eapply Disjoint_Included_r; [| exact Hdis_cm2].
+             match goal with H : FromList ?vs \subset _ |- _ =>
+               eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
           -- (* continuation: body alpha equiv after projections *)
-             intros rho1' rho2' m'' Hle Hpvs Hvars Hvar' Htransfer_proj.
+             intros rho1' rho2' m'' Hle Hpvs Hvars Hvar' Henv_extra_proj.
              eapply IH_hd.
              ++ lia.
              ++ eassumption.
@@ -793,17 +866,15 @@ Section AlphaEquiv.
                    eapply anf_cvt_branches_subset. eassumption.
                 ** exact Hdis_cm2.
              ++ eapply Forall2_app; eassumption.
-             ++ (* preord_env_P cmap_vars: cmap vars not in proj_vars ∪ vars ∪ {y},
-                   so they're preserved through ctx_bind_proj *)
-                admit.
+             ++ exact Henv_extra_proj.
              ++ (* body continuation: Ehalt *)
                 intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
                 eapply preord_exp_halt_compat;
                   [eapply Hprops | eapply Hprops | exact Hvar_r].
         * lia.
-      + (* tail: recursive *)
-        admit.
-  Admitted.
+      + (* tail: same fresh sets, same environments *)
+        eapply (IHbrs (n + 1)%N IH_tl); try eassumption.
+  Qed.
 
   (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
      and at strictly smaller step indices (for closure values) *)
@@ -815,7 +886,158 @@ Section AlphaEquiv.
            end) mfix ->
     (forall j, (j < k)%nat -> forall e, anf_cvt_exp_alpha_equiv_for e j) ->
     anf_cvt_mfix_alpha_equiv_for mfix k.
-  Proof. admit. Admitted.
+  Proof.
+    intros Hall HIHk.
+    unfold anf_cvt_mfix_alpha_equiv_for.
+    intros B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2
+           S1 S2 S3 S4
+           Hm Hrel1 Hrel2 Hnd1 Hnd2 Hlen_fn Hlen_ov
+           Hdis1 Hdis2 Hdis_cm1 Hdis_cm2
+           Hdis_cm_fn1 Hdis_cm_fn2
+           Hdis_fn_ov1 Hdis_fn_ov2 Henv Hglob.
+    (* Well-founded induction on m *)
+    revert m Hm Henv Hglob.
+    induction m as [m IHm] using lt_wf_rec1.
+    intros Hm Henv Hglob.
+    (* Build Forall2 pointwise *)
+    eapply Forall2_from_nth_error.
+    - exact Hlen_fn.
+    - intros i fi fi' Hn_fi Hn_fi'.
+      (* fi ∈ name_in_fundefs B1, fi' ∈ name_in_fundefs B2 *)
+      assert (Hni1 : name_in_fundefs B1 fi).
+      { apply (proj2 (Same_set_all_fun_name _)).
+        erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+        unfold FromList, Ensembles.In. eapply nth_error_In. exact Hn_fi. }
+      assert (Hni2 : name_in_fundefs B2 fi').
+      { apply (proj2 (Same_set_all_fun_name _)).
+        erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+        unfold FromList, Ensembles.In. eapply nth_error_In. exact Hn_fi'. }
+      (* Unfold def_funs lookups *)
+      intros v1 Hget1.
+      rewrite (def_funs_eq _ _ _ _ _ Hni1) in Hget1. inv Hget1.
+      eexists. split. { exact (def_funs_eq _ _ _ _ _ Hni2). }
+      (* Extract find_def and body derivations *)
+      edestruct (anf_cvt_rel_mfix_find_def _ _ _ _ _ _ _ _ _ _ Hrel1 Hnd1 i fi Hn_fi)
+        as (d1 & na1 & e_body & xi1 & Ci1 & ri1 & Si1_1 & Si2_1 &
+            Hnth_d1 & Hbody1 & Hfind1 & Hcvt1 & Hxi1_in & Hsi1_sub).
+      edestruct (anf_cvt_rel_mfix_find_def _ _ _ _ _ _ _ _ _ _ Hrel2 Hnd2 i fi' Hn_fi')
+        as (d2 & na2 & e_body' & xi2 & Ci2 & ri2 & Si1_2 & Si2_2 &
+            Hnth_d2 & Hbody2 & Hfind2 & Hcvt2 & Hxi2_in & Hsi2_sub).
+      (* Both derivations convert the same source term *)
+      assert (Hd_eq : d1 = d2) by congruence. subst d2.
+      assert (Hbody_eq : e_body = e_body')
+        by (assert (Htmp : EAst.tLambda na1 e_body = EAst.tLambda na2 e_body') by congruence;
+            congruence).
+      subst e_body'.
+      (* preord_val via preord_val_fun *)
+      eapply preord_val_fun.
+      + exact Hfind1.
+      + exact Hfind2.
+      + intros rho1' j vs1 vs2 Hlen_vs Hset1.
+        (* xs = [xi], so vs must be singletons *)
+        destruct vs1 as [| v_arg1 [| ? ?]]; simpl in *; try congruence.
+        destruct vs2 as [| v_arg2 [| ? ?]]; simpl in *; try congruence.
+        inv Hset1.
+        eexists. split. { reflexivity. }
+        intros Hlt Hall_args. inv Hall_args.
+        match goal with H : Forall2 _ [] [] |- _ => clear H end.
+        (* rho1' = M.set xi1 v_arg1 (def_funs B1 B1 rho1 rho1)
+           rho2' = M.set xi2 v_arg2 (def_funs B2 B2 rho2 rho2) *)
+        eapply preord_exp_post_monotonic. { exact HinclG. }
+        (* Forall2 at step j for all function names *)
+        assert (Hfn_env_j :
+          Forall2 (preord_var_env cenv PG j
+                     (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+                  fnames1 fnames2).
+        { eapply IHm; [lia | lia
+                       | eapply Forall2_preord_var_env_monotonic; [| exact Henv]; lia
+                       | intros v0 Hv0; eapply preord_var_env_monotonic;
+                         [eapply Hglob; exact Hv0 | lia]]. }
+        (* Body alpha-equiv at step j *)
+        eapply (HIHk j ltac:(lia) e_body).
+        * lia.
+        * exact Hcvt1.
+        * exact Hcvt2.
+        * (* Disjoint (FromList (xi1 :: rev fnames1 ++ outer_vars1)) (Si1_1 \\ {xi1}) *)
+          rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l. intros [_ Hc]. apply Hc. constructor.
+          -- eapply Disjoint_Included_r.
+             ++ eapply Included_trans; [eapply Setminus_Included | exact Hsi1_sub].
+             ++ eapply Disjoint_Included_l; [| exact Hdis1].
+                intros z Hz. unfold FromList, Ensembles.In in *.
+                apply in_app_or in Hz. destruct Hz as [Hz | Hz].
+                ** left. apply in_rev in Hz. exact Hz.
+                ** right. exact Hz.
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l. intros [_ Hc]. apply Hc. constructor.
+          -- eapply Disjoint_Included_r.
+             ++ eapply Included_trans; [eapply Setminus_Included | exact Hsi2_sub].
+             ++ eapply Disjoint_Included_l; [| exact Hdis2].
+                intros z Hz. unfold FromList, Ensembles.In in *.
+                apply in_app_or in Hz. destruct Hz as [Hz | Hz].
+                ** left. apply in_rev in Hz. exact Hz.
+                ** right. exact Hz.
+        * (* Disjoint cmap (Si1_1 \\ {xi1}) *)
+          eapply Disjoint_Included_r; [| exact Hdis_cm1].
+          eapply Included_trans; [eapply Setminus_Included | exact Hsi1_sub].
+        * eapply Disjoint_Included_r; [| exact Hdis_cm2].
+          eapply Included_trans; [eapply Setminus_Included | exact Hsi2_sub].
+        * (* Forall2 for (xi1 :: rev fnames1 ++ outer_vars1) in extended envs *)
+          constructor.
+          -- (* xi1/xi2: argument binding *)
+             eapply preord_var_env_extend_eq. eassumption.
+          -- (* rev fnames ++ outer_vars *)
+             eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_app.
+                ** (* rev fnames: from Hfn_env_j through def_funs *)
+                   eapply All_Forall.Forall2_rev. exact Hfn_env_j.
+                ** (* outer_vars: from Henv through def_funs *)
+                   eapply Forall2_preord_var_env_def_funs.
+                   --- eapply Forall2_preord_var_env_monotonic; [| exact Henv]. lia.
+                   --- eapply Disjoint_Included_r.
+                       +++ exact (proj1 (Same_set_all_fun_name _)).
+                       +++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+                           eapply Disjoint_sym. exact Hdis_fn_ov1.
+                   --- eapply Disjoint_Included_r.
+                       +++ exact (proj1 (Same_set_all_fun_name _)).
+                       +++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+                           eapply Disjoint_sym. exact Hdis_fn_ov2.
+             ++ (* xi1 ∉ FromList (rev fnames1 ++ outer_vars1) *)
+                rewrite FromList_app.
+                intros Hin. inv Hin.
+                ** eapply Hdis1. constructor.
+                   --- left. unfold FromList, Ensembles.In in *. apply in_rev in H. exact H.
+                   --- exact (Hsi1_sub _ Hxi1_in).
+                ** eapply Hdis1. constructor.
+                   --- right. exact H.
+                   --- exact (Hsi1_sub _ Hxi1_in).
+             ++ rewrite FromList_app.
+                intros Hin. inv Hin.
+                ** eapply Hdis2. constructor.
+                   --- left. unfold FromList, Ensembles.In in *. apply in_rev in H. exact H.
+                   --- exact (Hsi2_sub _ Hxi2_in).
+                ** eapply Hdis2. constructor.
+                   --- right. exact H.
+                   --- exact (Hsi2_sub _ Hxi2_in).
+        * (* preord_env_P cmap_vars *)
+          eapply preord_env_P_def_funs_set.
+          -- intros v0 Hv0.
+             eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
+          -- eapply Disjoint_Included_r.
+             ++ exact (proj1 (Same_set_all_fun_name _)).
+             ++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+                       exact Hdis_cm_fn1.
+          -- eapply Disjoint_Included_r.
+             ++ exact (proj1 (Same_set_all_fun_name _)).
+             ++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+                       exact Hdis_cm_fn2.
+          -- intros Hc. eapply Hdis_cm1. constructor; [exact Hc | exact (Hsi1_sub _ Hxi1_in)].
+          -- intros Hc. eapply Hdis_cm2. constructor; [exact Hc | exact (Hsi2_sub _ Hxi2_in)].
+        * (* Continuation: Ehalt *)
+          intros j' rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
+          eapply preord_exp_halt_compat;
+            [eapply Hprops | eapply Hprops | exact Hvar_r].
+  Qed.
 
 
 (* ----------------------------------------------------------------- *)
@@ -1115,7 +1337,154 @@ Section AlphaEquiv.
       - eapply Hprops.
       - eapply Hprops.
       - (* IHe for scrutinee mch, in def_funs env with f bound *)
-        admit. (* ~80 lines: IHe + letapp + val_fun + branches *) }
+        eapply IHe.
+        + lia.
+        + eassumption.
+        + eassumption.
+        + eapply Disjoint_Included_r; [eapply Setminus_Included |].
+          eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis1].
+        + eapply Disjoint_Included_r; [eapply Setminus_Included |].
+          eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis2].
+        + eapply Disjoint_Included_r; [eapply Setminus_Included |].
+          eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm1].
+        + eapply Disjoint_Included_r; [eapply Setminus_Included |].
+          eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm2].
+        + (* Forall2 vars in M.set f (Vfun ..) rho — f ∉ vars *)
+          eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          * intro Hc. eapply Hdis1. constructor; [exact Hc | eassumption].
+          * intro Hc. eapply Hdis2. constructor; [exact Hc | eassumption].
+        + (* preord_env_P cmap in M.set f rho *)
+          intros v0 Hv0. eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
+          * intros Heq. subst. eapply Hdis_cm1. constructor; [exact Hv0 | eassumption].
+          * intros Heq. subst. eapply Hdis_cm2. constructor; [exact Hv0 | eassumption].
+        + (* Continuation: Eletapp r f func_tag [x_mch] e_k *)
+          intros j rho1' rho2' Hle Hvar_xscr Henvvars Hpres.
+          eapply preord_exp_letapp_compat.
+          * now eapply Hprops.
+          * now eapply Hprops.
+          * now eapply Hprops.
+          * (* f1 f2 related in continuation env *)
+            eapply Hpres.
+            -- (* preord_var_env in def_funs env for f *)
+               intros v Hg. rewrite def_funs_eq in Hg. 2: { simpl; now left. }
+               inv Hg.
+               eexists. split. { rewrite def_funs_eq. reflexivity. simpl; now left. }
+               eapply preord_val_fun.
+               ++ simpl. rewrite Coqlib.peq_true. reflexivity.
+               ++ simpl. rewrite Coqlib.peq_true. reflexivity.
+               ++ intros rho_b j' vs1 vs2 Hlen Hset.
+                  destruct vs1 as [| v1 [| ? ?]]; simpl in *; try congruence.
+                  destruct vs2 as [| v2 [| ? ?]]; simpl in *; try congruence.
+                  inv Hset.
+                  eexists. split. { reflexivity. }
+                  intros Hlt Hall. inv Hall.
+                  eapply preord_exp_post_monotonic. { exact HinclG. }
+                  (* Branches alpha-equiv at step j' *)
+                  assert (Hall_j : All (fun br : list name * EAst.term =>
+                            anf_cvt_exp_alpha_equiv_for (snd br) j') brs).
+                  { clear - IHk Hlt Hle Hm.
+                    induction brs; constructor; [eapply IHk; lia | eapply IHbrs]. }
+                  eapply (anf_cvt_branches_alpha_from_all j' ind brs 0%N Hall_j).
+                  ** lia.
+                  ** eassumption.
+                  ** eassumption.
+                  ** (* Disjoint ([set y] :|: FromList vars1) S_brs1 *)
+                     eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption |].
+                     eapply Union_Disjoint_l.
+                     --- eapply Disjoint_Singleton_l. intros [_ Hn]. apply Hn. constructor.
+                     --- eapply Disjoint_Included_r; [eapply Setminus_Included |].
+                         eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis1].
+                  ** eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption |].
+                     eapply Union_Disjoint_l.
+                     --- eapply Disjoint_Singleton_l. intros [_ Hn]. apply Hn. constructor.
+                     --- eapply Disjoint_Included_r; [eapply Setminus_Included |].
+                         eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis2].
+                  ** (* Disjoint cmap S_brs *)
+                     eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption |].
+                     eapply Disjoint_Included_r; [eapply Setminus_Included |].
+                     eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm1].
+                  ** eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption |].
+                     eapply Disjoint_Included_r; [eapply Setminus_Included |].
+                     eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm2].
+                  ** (* Forall2 vars in M.set y (M.set f rho) *)
+                     eapply Forall2_preord_var_env_set.
+                     --- eapply Forall2_preord_var_env_set.
+                         +++ eapply Forall2_preord_var_env_monotonic with (k := m);
+                               [lia | exact Henv].
+                         +++ intro Hc. eapply Hdis1. constructor; [exact Hc | eassumption].
+                         +++ intro Hc. eapply Hdis2. constructor; [exact Hc | eassumption].
+                     --- intro Hc. eapply Hdis1. constructor; [exact Hc |].
+                         match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
+                           eapply Setminus_Included; exact H end.
+                     --- intro Hc. eapply Hdis2. constructor; [exact Hc |].
+                         match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
+                           eapply Setminus_Included; exact H end.
+                  ** (* preord_var_env y1 y2 *)
+                     eapply preord_var_env_extend_eq. eassumption.
+                  ** (* preord_env_P cmap in M.set y (M.set f rho):
+                        v0 ≠ y, v0 ≠ f since both ∈ S1 and cmap ⊥ S1 *)
+                     intros v0 Hv0.
+                     eapply preord_var_env_extend_neq.
+                     --- eapply preord_var_env_extend_neq.
+                         +++ eapply preord_var_env_monotonic;
+                               [eapply Hglob; exact Hv0 | lia].
+                         +++ intros Heq. subst. eapply Hdis_cm1.
+                             constructor; [exact Hv0 | eassumption].
+                         +++ intros Heq. subst. eapply Hdis_cm2.
+                             constructor; [exact Hv0 | eassumption].
+                     --- intros Heq. subst. eapply Hdis_cm1.
+                         constructor; [exact Hv0 |].
+                         match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
+                           eapply Setminus_Included; exact H end.
+                     --- intros Heq. subst. eapply Hdis_cm2.
+                         constructor; [exact Hv0 |].
+                         match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
+                           eapply Setminus_Included; exact H end.
+            -- (* f ∉ S1 \\ {f} \\ {y} — absurd since f ∈ S1 but f ∉ S1\\{f} *)
+               intros [Hc _]. inv Hc. match goal with H : ~ _ |- _ => apply H; constructor end.
+            -- intros [Hc _]. inv Hc. match goal with H : ~ _ |- _ => apply H; constructor end.
+          * (* args: [x_scr] *)
+            constructor; [exact Hvar_xscr | constructor].
+          * (* letapp continuation: Hcont *)
+            intros m' v1 v2 Hlt' Hval.
+            eapply Hcont.
+            -- lia.
+            -- intros w Hg. rewrite M.gss in Hg. inv Hg.
+               eexists. split. { rewrite M.gss. reflexivity. }
+               eapply preord_val_monotonic. exact Hval. lia.
+            -- eapply Forall2_preord_var_env_set.
+               ++ eapply (Forall2_preord_var_env_monotonic j); [lia | exact Henvvars].
+               ++ intro Hr. apply (Disjoint_In_l _ _ _ Hdis1 Hr).
+                  eapply Setminus_Included. eapply Setminus_Included.
+                  eapply anf_cvt_exp_subset. eassumption.
+                  eapply anf_cvt_branches_subset. eassumption. eassumption.
+               ++ intro Hr. apply (Disjoint_In_l _ _ _ Hdis2 Hr).
+                  eapply Setminus_Included. eapply Setminus_Included.
+                  eapply anf_cvt_exp_subset. eassumption.
+                  eapply anf_cvt_branches_subset. eassumption. eassumption.
+            -- intros a b Hvar Ha Hb.
+               eapply preord_var_env_extend_neq.
+               ++ eapply preord_var_env_monotonic.
+                  ** eapply Hpres.
+                     --- eapply preord_var_env_extend_neq.
+                         +++ eapply preord_var_env_monotonic. exact Hvar. lia.
+                         +++ intros Heq. subst. apply Ha. eassumption.
+                         +++ intros Heq. subst. apply Hb. eassumption.
+                     --- intro Hc. apply Ha.
+                         eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                     --- intro Hc. apply Hb.
+                         eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                  ** lia.
+               ++ intros Heq. subst. apply Ha.
+                  eapply Setminus_Included. eapply Setminus_Included.
+                  eapply anf_cvt_exp_subset. eassumption.
+                  eapply anf_cvt_branches_subset. eassumption. eassumption.
+               ++ intros Heq. subst. apply Hb.
+                  eapply Setminus_Included. eapply Setminus_Included.
+                  eapply anf_cvt_exp_subset. eassumption.
+                  eapply anf_cvt_branches_subset. eassumption. eassumption. }
     { (* tProj p c: comp_ctx_f C_c (Eproj_c y ctag n x Hole_c) *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse. simpl.
@@ -1154,7 +1523,91 @@ Section AlphaEquiv.
           * intros Heq. subst. eapply Hb.
             match goal with H : _ \in ?S4 |- _ =>
               eapply anf_cvt_exp_subset in H; [exact H |]; eassumption end. }
-    { (* tFix *) admit. }
+    { (* tFix mfix idx: Efun1_c fdefs Hole_c, result = fnames[idx] *)
+      (* Save original derivations before inversion *)
+      pose proof Hrel1 as Horig1. pose proof Hrel2 as Horig2.
+      inv Hrel1. inv Hrel2. simpl.
+      (* Get Forall2 for all function names at step m-1 *)
+      assert (Hfn_env : Forall2 (preord_var_env cenv PG (m - 1)
+                (def_funs fdefs fdefs rho1 rho1) (def_funs fdefs0 fdefs0 rho2 rho2))
+                fnames fnames0).
+      { eapply anf_cvt_mfix_alpha_from_all.
+        - exact X.
+        - intros j0 Hj0 e0. eapply IHk. lia.
+        - lia.
+        - eassumption.
+        - eassumption.
+        - eassumption.
+        - eassumption.
+        - match goal with
+          | [H1 : Datatypes.length ?f1 = _, H2 : Datatypes.length ?f2 = _ |- _] => congruence
+          end.
+        - eapply Forall2_length. exact Henv.
+        - (* Disjoint (fnames :|: vars1) (S1 \\ FromList fnames) *)
+          eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis1].
+        - eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis2].
+        - (* Disjoint cmap (S1 \\ FromList fnames) *)
+          eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm1].
+        - eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm2].
+        - (* Disjoint cmap (FromList fnames) *)
+          match goal with H : FromList ?fn \subset _ |- _ =>
+            eapply Disjoint_Included_r; [exact H | exact Hdis_cm1] end.
+        - match goal with H : FromList ?fn \subset _ |- _ =>
+            eapply Disjoint_Included_r; [exact H | exact Hdis_cm2] end.
+        - (* Disjoint fnames vars1 *)
+          match goal with H : FromList ?fn \subset _ |- _ =>
+            eapply Disjoint_Included_l; [exact H | eapply Disjoint_sym; exact Hdis1] end.
+        - match goal with H : FromList ?fn \subset _ |- _ =>
+            eapply Disjoint_Included_l; [exact H | eapply Disjoint_sym; exact Hdis2] end.
+        - eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+        - intros v0 Hv0. eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia]. }
+      eapply preord_exp_fun_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - (* name_in_fundefs ⊆ FromList fnames for both sides *)
+        assert (Hafn1 : all_fun_name fdefs = fnames).
+        { match goal with H : anf_cvt_rel_mfix _ _ _ _ _ _ _ _ _ _ |- _ =>
+            exact (anf_cvt_rel_mfix_all_fun_name _ _ _ _ _ _ _ _ _ _ H) end. }
+        assert (Hafn2 : all_fun_name fdefs0 = fnames0).
+        { match goal with
+          | [H1 : anf_cvt_rel_mfix _ _ _ _ _ _ _ fnames _  _,
+             H2 : anf_cvt_rel_mfix _ _ _ _ _ _ _ fnames0 _ _ |- _] =>
+            exact (anf_cvt_rel_mfix_all_fun_name _ _ _ _ _ _ _ _ _ _ H2)
+          end. }
+        assert (Hni_sub1 : name_in_fundefs fdefs \subset FromList fnames).
+        { intros z Hz. apply (proj1 (Same_set_all_fun_name _)) in Hz.
+          rewrite Hafn1 in Hz. exact Hz. }
+        assert (Hni_sub2 : name_in_fundefs fdefs0 \subset FromList fnames0).
+        { intros z Hz. apply (proj1 (Same_set_all_fun_name _)) in Hz.
+          rewrite Hafn2 in Hz. exact Hz. }
+        eapply Hcont.
+        + lia.
+        + (* preord_var_env for result: extract from Hfn_env via nth_error *)
+          eapply Forall2_nth_error; [exact Hfn_env | eassumption | eassumption].
+        + (* Forall2 for vars1/vars2 under def_funs *)
+          eapply Forall2_preord_var_env_def_funs.
+          * eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          * eapply Disjoint_Included_r; [exact Hni_sub1 |].
+            match goal with H : FromList fnames \subset _ |- _ =>
+              eapply Disjoint_Included_r; [exact H | exact Hdis1] end.
+          * eapply Disjoint_Included_r; [exact Hni_sub2 |].
+            match goal with H : FromList fnames0 \subset _ |- _ =>
+              eapply Disjoint_Included_r; [exact H | exact Hdis2] end.
+        + (* transfer: def_funs_not_In since x ∉ S1 ⊇ fnames ⊇ name_in_fundefs *)
+          intros a b Hvar Ha Hb.
+          eapply preord_var_env_def_funs_not_In_r.
+          * intros Hc. apply Hb.
+            match goal with H : FromList fnames0 \subset _ |- _ => apply H end.
+            exact (Hni_sub2 _ Hc).
+          * eapply preord_var_env_def_funs_not_In_l.
+            -- intros Hc. apply Ha.
+               match goal with H : FromList fnames \subset _ |- _ => apply H end.
+               exact (Hni_sub1 _ Hc).
+            -- eapply preord_var_env_monotonic. exact Hvar. lia. }
 
     (* tCoFix — impossible *) 1: inv Hrel1.
 
@@ -1170,7 +1623,7 @@ Section AlphaEquiv.
 
     (* tLazy — impossible *) 1: inv Hrel1.
     (* tForce — impossible *) 1: inv Hrel1.
-  Admitted.
+  Qed.
 
   Corollary anf_cvt_exp_alpha_equiv_holds :
     forall k, anf_cvt_exp_alpha_equiv k.
@@ -1178,15 +1631,28 @@ Section AlphaEquiv.
 
   Corollary anf_cvt_args_alpha_equiv k :
     forall args, anf_cvt_args_alpha_equiv_for args k.
-  Proof. admit. Admitted.
+  Proof.
+    intros args. eapply anf_cvt_args_alpha_from_all.
+    induction args; constructor; [exact (anf_cvt_alpha_equiv k a) | exact IHargs].
+  Qed.
 
   Corollary anf_cvt_branches_alpha_equiv k :
     forall ind brs n, anf_cvt_branches_alpha_equiv_for ind brs n k.
-  Proof. admit. Admitted.
+  Proof.
+    intros ind brs n. eapply anf_cvt_branches_alpha_from_all.
+    induction brs; constructor; [exact (anf_cvt_alpha_equiv k (snd a)) | exact IHbrs].
+  Qed.
 
   Corollary anf_cvt_mfix_alpha_equiv k :
     forall mfix, anf_cvt_mfix_alpha_equiv_for mfix k.
-  Proof. admit. Admitted.
+  Proof.
+    intros mfix. eapply anf_cvt_mfix_alpha_from_all.
+    - induction mfix as [| d mfix' IH]; constructor.
+      + destruct (EAst.dbody d) eqn:Hd; try exact I.
+        exact (anf_cvt_alpha_equiv k t).
+      + exact IH.
+    - intros j _ e. exact (anf_cvt_alpha_equiv j e).
+  Qed.
 
   Lemma anf_cvt_val_alpha_equiv :
     forall k, anf_cvt_val_alpha_equiv_statement k.
