@@ -373,6 +373,34 @@ Section Corresp.
          | exact Hlen | subst; reflexivity | exact Hcvt_body].
   Qed.
 
+  (* Helper: mfix correspondence from per-body IH *)
+  Lemma anf_cvt_mfix_corresp :
+    forall mfix fnames idx vn vm
+      (Hall : All (fun d : EAst.def EAst.term => forall vn vm S0
+        (Hwf : wellformed Σ (List.length vn) (EAst.dbody d) = true)
+        (Hvm : var_map_correct vm vn),
+        {{ fun _ s => fresh S0 (next_var (fst s)) }}
+          convert_anf' (EAst.dbody d) vm
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 (EAst.dbody d) vn S' C r /\
+           fresh S' (next_var (fst s')) }}) mfix)
+      (Hlen : List.length fnames = List.length mfix)
+      (Hwf_mfix : forallb (fun d => isLambda (EAst.dbody d)) mfix = true)
+      (Hwf_bodies : forallb (test_def (wellformed Σ (List.length mfix + List.length vn))) mfix = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_mfix func_tag convert_anf' mfix fnames idx vm
+    {{ fun _ s (p : var * fundefs) s' =>
+         let '(fi, B) := p in
+         exists S',
+           anf_cvt_rel_mfix func_tag default_tag tgm cmap S0 mfix vn fnames S' B /\
+           (forall f, nth_error fnames idx = Some f -> fi = f) /\
+           fresh S' (next_var (fst s')) }}.
+  Proof.
+    admit.
+  Admitted.
+
   (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
     forall e vn vm S0
@@ -530,7 +558,7 @@ Section Corresp.
       intros _ s0 [Hy [_ Hfr]].
       eexists. split; [econstructor; [reflexivity | exact Hcvt | exact Hy] | exact Hfr].
 
-    - (* tFix — TODO *)
+    - (* tFix mfix idx — requires careful set/context threading *)
       admit.
 
     - (* tCoFix *) rewrite HnoCoFix in Hwf. discriminate.
