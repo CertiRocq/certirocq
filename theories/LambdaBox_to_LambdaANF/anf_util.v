@@ -480,10 +480,6 @@ Section AlphaEquiv.
       preord_val cenv PG k v1 v2.
 
 
-(* ----------------------------------------------------------------- *)
-(** ** Environment Alpha-Equivalence                                  *)
-(* ----------------------------------------------------------------- *)
-
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
     anf_cvt_val_alpha_equiv_statement k ->
     forall vs nms_a nms_b rho_a rho_b,
@@ -504,10 +500,6 @@ Section AlphaEquiv.
         eexists. split. exact Hg2. eapply Hval; eassumption.
       + eapply IHvs; eassumption.
   Qed.
-
-(* ----------------------------------------------------------------- *)
-(** ** Term-Level Alpha-Equiv for Lists                               *)
-(* ----------------------------------------------------------------- *)
 
   (* Derives args alpha-equiv assuming exp alpha-equiv for each element *)
   Lemma anf_cvt_args_alpha_from_all k args :
