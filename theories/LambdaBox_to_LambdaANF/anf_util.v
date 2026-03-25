@@ -481,7 +481,7 @@ Section AlphaEquiv.
 
 
 (* ----------------------------------------------------------------- *)
-(** ** Alpha-Equiv Helper Lemmas (using All IH)                       *)
+(** ** Environment Alpha-Equivalence                                  *)
 (* ----------------------------------------------------------------- *)
 
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
@@ -504,6 +504,10 @@ Section AlphaEquiv.
         eexists. split. exact Hg2. eapply Hval; eassumption.
       + eapply IHvs; eassumption.
   Qed.
+
+(* ----------------------------------------------------------------- *)
+(** ** Term-Level Alpha-Equiv for Lists                               *)
+(* ----------------------------------------------------------------- *)
 
   (* Derives args alpha-equiv assuming exp alpha-equiv for each element *)
   Lemma anf_cvt_args_alpha_from_all k args :
