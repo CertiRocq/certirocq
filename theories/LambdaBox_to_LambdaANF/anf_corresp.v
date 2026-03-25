@@ -338,8 +338,43 @@ Section Corresp.
        exists S', anf_cvt_rel_branches func_tag default_tag tgm cmap S0 ind brs n vn scrut S' pats /\
        fresh S' (next_var (fst s')) }}.
   Proof.
-    admit.
-  Admitted.
+    induction brs as [| [lnames e_br] brs' IHbrs];
+    intros n scrut vn vm Hall Hwf_brs Hvm S0.
+    - (* nil *)
+      simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor | exact Hfr].
+    - (* cons *)
+      simpl in Hwf_brs. apply Bool.andb_true_iff in Hwf_brs as [Hwf_hd Hwf_tl].
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      simpl.
+      (* Step 1: recurse on remaining branches *)
+      eapply bind_triple. { eapply IHbrs; eassumption. }
+      intros pats' w1. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_rest.
+      (* Step 2: proj_ctx for this branch *)
+      eapply bind_triple. { eapply proj_ctx_spec. exact Hvm. }
+      intros [Cproj vm'] w2.
+      eapply pre_existential; intros vars.
+      eapply pre_curry_l; intros Hnd.
+      eapply pre_curry_l; intros Hlen.
+      eapply pre_curry_l; intros Hsub.
+      eapply pre_curry_l; intros Hctx.
+      eapply pre_curry_l; intros Hvm'.
+      (* Step 3: convert branch body with extended vm *)
+      eapply bind_triple.
+      { eapply (IH_hd (vars ++ vn)); [| exact Hvm'].
+        (* wellformed for branch body: wellformed Σ (|lnames| + |vn|) e_br *)
+        (* vars has length = |lnames|, so |vars ++ vn| = |lnames| + |vn| *)
+        simpl in IH_hd.
+        rewrite length_app, Hlen. exact Hwf_hd. }
+      intros [r1 C1] w3. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_body.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [| exact Hfr].
+      eapply anf_Branches_cons;
+        [reflexivity | exact Hcvt_rest | exact Hsub | exact Hnd
+         | exact Hlen | subst; reflexivity | exact Hcvt_body].
+  Qed.
 
   (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
