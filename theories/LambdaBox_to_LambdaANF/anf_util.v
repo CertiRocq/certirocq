@@ -605,12 +605,57 @@ Section AlphaEquiv.
 
     { (* tConstruct *) admit. }
     { (* tCase *) admit. }
-    { (* tProj *) admit. }
+    { (* tProj p c: comp_ctx_f C_c (Eproj_c y ctag n x Hole_c) *)
+      inv Hrel1. inv Hrel2.
+      rewrite <- !app_ctx_f_fuse. simpl.
+      (* Use IHe for sub-expression c *)
+      eapply IHe; [lia | eassumption | eassumption | assumption | assumption | assumption | assumption |].
+      (* Continuation: after c is converted, project the field *)
+      intros j rho1' rho2' Hj Hvar_c Henv' Htransfer.
+      eapply preord_exp_proj_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - exact Hvar_c.
+      - (* After projection: call Hcont with extended env *)
+        intros m' v1 v2 Hlt Hval.
+        eapply Hcont.
+        + lia.
+        + (* r1 ~ r2: both bound to projected values *)
+          eapply preord_var_env_extend_eq. exact Hval.
+        + (* Forall2 vars: preserved since r1/r2 ∉ vars (r1 ∈ S_mid ⊆ S1, vars ⊥ S1) *)
+          eapply Forall2_preord_var_env_set.
+          * eapply (Forall2_preord_var_env_monotonic j); [lia | exact Henv'].
+          * intros Hin. eapply Hdis1. constructor; [exact Hin |].
+            match goal with H : _ \in ?S2 |- _ \in ?S1 =>
+              eapply anf_cvt_exp_subset in H; [exact H |]; eassumption end.
+          * intros Hin. eapply Hdis2. constructor; [exact Hin |].
+            match goal with H : _ \in ?S4 |- _ \in ?S3 =>
+              eapply anf_cvt_exp_subset in H; [exact H |]; eassumption end.
+        + (* Transfer: chain through IHe's transfer, then extend_neq *)
+          intros a b Hab Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic with (k := j).
+            -- eapply Htransfer; eassumption.
+            -- lia.
+          * intros Heq. subst. eapply Ha.
+            match goal with H : _ \in ?S2 |- _ =>
+              eapply anf_cvt_exp_subset in H; [exact H |]; eassumption end.
+          * intros Heq. subst. eapply Hb.
+            match goal with H : _ \in ?S4 |- _ =>
+              eapply anf_cvt_exp_subset in H; [exact H |]; eassumption end. }
     { (* tFix *) admit. }
 
     (* tCoFix — impossible *) 1: inv Hrel1.
 
-    { (* tPrim *) admit. }
+    { (* tPrim: Eprim_val_c x pv Hole_c *)
+      inv Hrel1. inv Hrel2. simpl.
+      (* Equate the two pv from trans_prim_val *)
+      match goal with
+      | [H1 : trans_prim_val ?p = Some ?pv1,
+         H2 : trans_prim_val ?p = Some ?pv2 |- _] =>
+        rewrite H1 in H2; inv H2
+      end.
+      eapply preord_exp_prim_val_compat. eapply Hprops. }
 
     (* tLazy — impossible *) 1: inv Hrel1.
     (* tForce — impossible *) 1: inv Hrel1.
