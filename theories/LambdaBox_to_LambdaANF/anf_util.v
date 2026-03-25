@@ -421,6 +421,11 @@ Section AlphaEquiv.
         Forall2 (preord_var_env cenv PG m' rho1' rho2')
                 acc1 acc2 ->
         preord_var_env cenv PG m' rho1' rho2' x1 x2 ->
+        (* Variables outside proj_vars ∪ acc ∪ {x} are preserved *)
+        (forall a b, preord_var_env cenv PG k rho1 rho2 a b ->
+                     ~ a \in (FromList proj_vars1 :|: FromList acc1 :|: [set x1]) ->
+                     ~ b \in (FromList proj_vars2 :|: FromList acc2 :|: [set x2]) ->
+                     preord_var_env cenv PG m' rho1' rho2' a b) ->
         preord_exp cenv P1 PG m' (e1, rho1') (e2, rho2')) ->
     preord_exp cenv P1 PG k
                (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
@@ -432,7 +437,8 @@ Section AlphaEquiv.
              Hvar Hacc Hlen Hnd1 Hnd2 Hdis1 Hdis2 Hexp.
     - destruct proj_vars2; [| simpl in Hlen; congruence].
       cbn [ctx_bind_proj app_ctx_f].
-      eapply Hexp; [lia | constructor | exact Hacc | exact Hvar].
+      eapply Hexp; [lia | constructor | exact Hacc | exact Hvar |].
+      intros a b Hab _ _. eapply preord_var_env_monotonic with (k := k); [exact Hab | lia].
     - destruct proj_vars2 as [| v proj_vars2]; [simpl in Hlen; congruence |].
       simpl in Hlen. cbn [ctx_bind_proj app_ctx_f].
       inv Hnd1. inv Hnd2.
@@ -470,14 +476,27 @@ Section AlphaEquiv.
           -- eapply Disjoint_Included_l; [| exact Hdis2].
              repeat normalize_sets. now sets.
         * (* Inner continuation *)
-          intros rho1' rho2' m' Hm' Hpv Hacc' Hvar'.
+          intros rho1' rho2' m' Hm' Hpv Hacc' Hvar' Htransfer_inner.
           inversion Hacc' as [| ? ? ? ? Hhd Htl]; subst.
           eapply Hexp.
           -- lia.
           -- constructor; [exact Hhd | exact Hpv].
           -- exact Htl.
           -- exact Hvar'.
-  Qed.
+          -- (* Transfer: chain extend_neq + inner transfer *)
+             intros a0 b0 Hab Hni1 Hni2.
+             eapply Htransfer_inner.
+             ++ (* preord_var_env in M.set env: extend_neq from original *)
+                eapply preord_var_env_extend_neq.
+                ** eapply preord_var_env_monotonic with (k := k). exact Hab. lia.
+                ** intros Heq. subst. apply Hni1. repeat normalize_sets. left. now left.
+                ** intros Heq. subst. apply Hni2. repeat normalize_sets. left. now left.
+             ++ (* Set rearrangement: moving a between FromList groups *)
+                intros Hc. apply Hni1.
+                admit.
+             ++ intros Hc. apply Hni2.
+                admit.
+  Admitted.
 
 
 (* ----------------------------------------------------------------- *)
@@ -729,7 +748,7 @@ Section AlphaEquiv.
              ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis2].
                 rewrite Union_commut. eapply Included_refl.
           -- (* continuation: body alpha equiv after projections *)
-             intros rho1' rho2' m'' Hle Hpvs Hvars Hvar'.
+             intros rho1' rho2' m'' Hle Hpvs Hvars Hvar' Htransfer_proj.
              eapply IH_hd.
              ++ lia.
              ++ eassumption.
@@ -759,8 +778,9 @@ Section AlphaEquiv.
                    eapply anf_cvt_branches_subset. eassumption.
                 ** exact Hdis_cm2.
              ++ eapply Forall2_app; eassumption.
-             ++ (* preord_env_P cmap_vars *)
-                admit. (* same pattern: transfer through proj bindings *)
+             ++ (* preord_env_P cmap_vars: cmap vars not in proj_vars ∪ vars ∪ {y},
+                   so they're preserved through ctx_bind_proj *)
+                admit.
              ++ (* body continuation: Ehalt *)
                 intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
                 eapply preord_exp_halt_compat;
