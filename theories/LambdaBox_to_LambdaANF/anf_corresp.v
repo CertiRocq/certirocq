@@ -484,8 +484,39 @@ Section Corresp.
 
     - (* tCase (ind, npars) mch brs *)
       destruct p as [ind npars]. simpl.
-      (* Decompose wellformed for tCase *)
-      admit. (* TODO: decompose wellformed, use IHe for mch, anf_cvt_branches_corresp for brs *)
+      (* Decompose wellformed:
+         has_tCase && ((wf_brs && wellformed mch) && forallb brs) = true *)
+      apply Bool.andb_true_iff in Hwf as [_ Hwf].
+      apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_brs].
+      apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_mch].
+      simpl.
+      (* Step 1-2: allocate f and y *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros f w. eapply pre_curry_l; intros Hf.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple. eapply get_named_fresh.
+      intros yv w'. eapply pre_curry_l; intros Hyv.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      (* Step 3: convert scrutinee *)
+      eapply bind_triple. { eapply IHe. apply Hwf_mch. apply Hvm. }
+      intros [x1 C1] w''. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_mch.
+      (* Step 4: convert branches *)
+      eapply bind_triple.
+      { eapply anf_cvt_branches_corresp; [exact X | exact Hwf_brs | exact Hvm]. }
+      intros pats w'''. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_brs.
+      (* Step 5: allocate result variable *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros r w4. eapply return_triple.
+      intros _ s [Hr [_ Hfr]].
+      eexists. split; [| exact Hfr].
+      eapply anf_Case.
+      + exact Hf.
+      + exact Hyv.
+      + exact Hcvt_mch.
+      + exact Hcvt_brs.
+      + exact Hr.
 
     - (* tProj p c *)
       apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_c].
