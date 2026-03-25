@@ -707,7 +707,68 @@ Section AlphaEquiv.
             eapply anf_cvt_exp_subset in Hc; [exact Hc |]; eassumption.
           * intros Hc. apply Hb.
             eapply anf_cvt_exp_subset in Hc; [exact Hc |]; eassumption. }
-    { (* tApp *) admit. }
+    { (* tApp u v: comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)) *)
+      inv Hrel1. inv Hrel2.
+      rewrite <- !app_ctx_f_fuse. simpl.
+      (* IH1 for function u *)
+      eapply IHe1; [lia | eassumption | eassumption | assumption | assumption
+                    | assumption | assumption | assumption | assumption |].
+      intros j rho1' rho2' Hj Hvar_x1 Henv' Htransfer1.
+      (* IH2 for argument v *)
+      eapply IHe2; [lia | eassumption | eassumption
+                    | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                    | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                    | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                    | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
+                    | exact Henv'
+                    | intros v0 Hv0; eapply Htransfer1;
+                      [eapply Hglob; exact Hv0
+                      | intros Hc; eapply Hdis_cm1; constructor; eassumption
+                      | intros Hc; eapply Hdis_cm2; constructor; eassumption]
+                    |].
+      intros j' rho1'' rho2'' Hj' Hvar_x2 Henv'' Htransfer2.
+      (* letapp compatibility *)
+      eapply preord_exp_letapp_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - eapply Hprops.
+      - (* function x1 preserved through C2 *)
+        eapply Htransfer2.
+        + eapply preord_var_env_monotonic with (k := j).
+          exact Hvar_x1. lia.
+        + eapply anf_cvt_result_not_in_output; eassumption.
+        + eapply anf_cvt_result_not_in_output; eassumption.
+      - (* arg list [x2] *)
+        constructor; [exact Hvar_x2 | constructor].
+      - (* callback: r bound to call result *)
+        intros m'' v1 v2 Hlt Hval.
+        eapply Hcont.
+        + lia.
+        + intros w1 Hgr1. rewrite M.gss in Hgr1. inv Hgr1.
+          eexists. split; [rewrite M.gss; reflexivity |].
+          eapply preord_val_monotonic; [exact Hval | lia].
+        + eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic with (k := j'); [lia | exact Henv''].
+          * intros Hin. eapply Hdis1. constructor; [exact Hin |].
+            eapply anf_cvt_exp_subset; [eassumption |].
+            eapply anf_cvt_exp_subset; eassumption.
+          * intros Hin. eapply Hdis2. constructor; [exact Hin |].
+            eapply anf_cvt_exp_subset; [eassumption |].
+            eapply anf_cvt_exp_subset; eassumption.
+        + intros a b0 Hab Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic with (k := j').
+            -- eapply Htransfer2;
+                 [eapply Htransfer1; eassumption
+                 | intros Hc; apply Ha; eapply anf_cvt_exp_subset; eassumption
+                 | intros Hc; apply Hb; eapply anf_cvt_exp_subset; eassumption].
+            -- lia.
+          * intros Heq. subst. apply Ha.
+            eapply anf_cvt_exp_subset; [eassumption |].
+            eapply anf_cvt_exp_subset; eassumption.
+          * intros Heq. subst. apply Hb.
+            eapply anf_cvt_exp_subset; [eassumption |].
+            eapply anf_cvt_exp_subset; eassumption. }
 
     { (* tConst s *)
       inv Hrel1. inv Hrel2. simpl.
