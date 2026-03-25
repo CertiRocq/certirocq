@@ -505,20 +505,21 @@ Section AlphaEquiv.
       + eapply IHvs; eassumption.
   Qed.
 
-  (* Args alpha-equiv from per-term All IH *)
+  (* Derives args alpha-equiv assuming exp alpha-equiv for each element *)
   Lemma anf_cvt_args_alpha_from_all k args :
     All (fun t => anf_cvt_exp_alpha_equiv_for t k) args ->
     anf_cvt_args_alpha_equiv_for args k.
   Proof. admit. Admitted.
 
-  (* Branches alpha-equiv from per-branch All IH *)
+  (* Derives branches alpha-equiv assuming exp alpha-equiv for each branch body *)
   Lemma anf_cvt_branches_alpha_from_all k ind brs n :
     All (fun br : list name * EAst.term =>
            anf_cvt_exp_alpha_equiv_for (snd br) k) brs ->
     anf_cvt_branches_alpha_equiv_for ind brs n k.
   Proof. admit. Admitted.
 
-  (* Mfix alpha-equiv from per-body All IH + IHk for closures *)
+  (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
+     and at strictly smaller step indices (for closure values) *)
   Lemma anf_cvt_mfix_alpha_from_all k mfix :
     All (fun d : EAst.def EAst.term =>
            match EAst.dbody d with
