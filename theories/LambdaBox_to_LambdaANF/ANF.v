@@ -453,8 +453,8 @@ Section ANF.
            N -> list var -> var ->
            Ensemble var -> list (ctor_tag * exp) -> Prop :=
     | anf_Branches_nil :
-        forall S ind vn r,
-          anf_cvt_rel_branches S ind [] 0%N vn r S []
+        forall S ind vn r n,
+          anf_cvt_rel_branches S ind [] n vn r S []
     | anf_Branches_cons :
         forall S1 S2 S3 ind vn r lnames e brs' pats' C1 r1 vars ctx_p tg n,
           tg = dcon_to_tag default_tag (dcon_of_con ind (N.to_nat n)) tgm ->
