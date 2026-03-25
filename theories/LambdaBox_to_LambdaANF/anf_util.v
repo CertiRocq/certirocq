@@ -553,28 +553,67 @@ Section AlphaEquiv.
     intros e. induction e using term_ind_fix_body;
     unfold anf_cvt_exp_alpha_equiv_for;
     intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont;
-    inv Hrel1;
-    try (inv Hrel2);
-    (* Simple Hole_c cases (tRel, tConst) *)
-    try (simpl;
-         eapply Hcont; [lia | | assumption |];
-         [| intros; assumption];
-         match goal with
-         | [H1 : nth_error vars1 ?n = Some r1,
-            H2 : nth_error vars2 ?n = Some r2,
-            Henv : Forall2 _ vars1 vars2 |- _] =>
-           eapply Forall2_nth_error in Henv; [| exact H1 | exact H2]; exact Henv
-         end).
-    (* tBox *) - admit.
-    (* tLambda *) - admit.
-    (* tLetIn *) - admit.
-    (* tApp *) - admit.
-    (* tConstruct *) - admit. (* uses anf_cvt_args_alpha_from_all with X *)
-    (* tCase *) - admit. (* uses anf_cvt_branches_alpha_from_all with X *)
-    (* tProj *) - admit.
-    (* tFix *) - admit. (* uses anf_cvt_mfix_alpha_from_all with X and IHk *)
-    (* tPrim *) - admit.
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hglob Hcont.
+
+    { (* tBox *)
+      inv Hrel1. inv Hrel2. simpl.
+      eapply preord_exp_constr_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - constructor.
+      - intros m0 vs1 vs2 Hlt Hvals.
+        eapply Hcont.
+        + lia.
+        + intros v1 Hg1. rewrite M.gss in Hg1. inv Hg1.
+          eexists. split. { rewrite M.gss. reflexivity. }
+          rewrite preord_val_eq. simpl. split; [reflexivity | eassumption].
+        + eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic; [| eassumption]. lia.
+          * intros Hin. eapply Hdis1. constructor; eassumption.
+          * intros Hin. eapply Hdis2. constructor; eassumption.
+        + intros a b Hvar Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic. eassumption. lia.
+          * intros Heq. subst. eapply Ha. eassumption.
+          * intros Heq. subst. eapply Hb. eassumption. }
+
+    { (* tRel *)
+      inv Hrel1. inv Hrel2. simpl.
+      eapply Hcont; [lia | | assumption |].
+      - eapply Forall2_nth_error in Henv; [exact Henv | |]; eassumption.
+      - intros; assumption. }
+
+    (* tVar — impossible *) 1: inv Hrel1.
+    (* tEvar — impossible *) 1: inv Hrel1.
+
+    { (* tLambda *) admit. }
+    { (* tLetIn *) admit. }
+    { (* tApp *) admit. }
+
+    { (* tConst s *)
+      inv Hrel1. inv Hrel2. simpl.
+      match goal with
+      | [H1 : lookup_const cmap ?s = Some ?v1,
+         H2 : lookup_const cmap ?s = Some ?v2 |- _] =>
+        rewrite H1 in H2; inv H2
+      end.
+      eapply Hcont.
+      - lia.
+      - eapply Hglob. exists s. eassumption.
+      - assumption.
+      - intros; assumption. }
+
+    { (* tConstruct *) admit. }
+    { (* tCase *) admit. }
+    { (* tProj *) admit. }
+    { (* tFix *) admit. }
+
+    (* tCoFix — impossible *) 1: inv Hrel1.
+
+    { (* tPrim *) admit. }
+
+    (* tLazy — impossible *) 1: inv Hrel1.
+    (* tForce — impossible *) 1: inv Hrel1.
   Admitted.
 
   Corollary anf_cvt_exp_alpha_equiv_holds :
