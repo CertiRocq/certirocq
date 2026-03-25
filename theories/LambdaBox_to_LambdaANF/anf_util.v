@@ -393,8 +393,10 @@ Section AlphaEquiv.
   Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
 
-  (* Exp alpha-equiv for a specific term e at step bound k.
-     Continuation-passing: C1|[e_k1]| ~ C2|[e_k2]| given related continuations. *)
+  (** Two ANF conversions of the same term [e], with different fresh
+      variables and name mappings, produce [preord_exp]-related results.
+      Continuation-passing: given related continuations [e_k1 ~ e_k2],
+      the composed contexts [C1|[e_k1]| ~ C2|[e_k2]|] are related. *)
   Definition anf_cvt_exp_alpha_equiv_for (e : EAst.term) k :=
     forall C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
       (m <= k)%nat ->
@@ -416,7 +418,8 @@ Section AlphaEquiv.
   Definition anf_cvt_exp_alpha_equiv k :=
     forall e, anf_cvt_exp_alpha_equiv_for e k.
 
-  (* Args alpha-equiv: given All (per-term IH) args *)
+  (** Same as [anf_cvt_exp_alpha_equiv_for] but for argument lists.
+      The continuation receives [Forall2] on the result variable lists. *)
   Definition anf_cvt_args_alpha_equiv_for (args : list EAst.term) k :=
     forall C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
       (m <= k)%nat ->
@@ -435,7 +438,8 @@ Section AlphaEquiv.
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
-  (* Mfix alpha-equiv: Forall2 on function names in def_funs environments *)
+  (** Two ANF conversions of the same mutual fixpoint produce
+      [Forall2 (preord_var_env ...)] on function names in [def_funs] environments. *)
   Definition anf_cvt_mfix_alpha_equiv_for
              (mfix : list (EAst.def EAst.term)) k :=
     forall B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2
@@ -455,7 +459,8 @@ Section AlphaEquiv.
                  (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
               fnames1 fnames2.
 
-  (* Branches alpha-equiv: Ecase with related patterns *)
+  (** Two ANF conversions of the same case branches produce
+      [preord_exp]-related [Ecase] expressions. *)
   Definition anf_cvt_branches_alpha_equiv_for
              (ind : inductive) (brs : list (list name * EAst.term)) (n : N) k :=
     forall pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
@@ -560,11 +565,20 @@ Section AlphaEquiv.
     (* tPrim *) - admit.
   Admitted.
 
-  (* Corollary: alpha-equiv for all terms *)
   Corollary anf_cvt_exp_alpha_equiv_holds :
     forall k, anf_cvt_exp_alpha_equiv k.
-  Proof.
-    intros k e. exact (anf_cvt_alpha_equiv k e).
-  Qed.
+  Proof. intros k e. exact (anf_cvt_alpha_equiv k e). Qed.
+
+  Corollary anf_cvt_args_alpha_equiv k :
+    forall args, anf_cvt_args_alpha_equiv_for args k.
+  Proof. admit. Admitted.
+
+  Corollary anf_cvt_branches_alpha_equiv k :
+    forall ind brs n, anf_cvt_branches_alpha_equiv_for ind brs n k.
+  Proof. admit. Admitted.
+
+  Corollary anf_cvt_mfix_alpha_equiv k :
+    forall mfix, anf_cvt_mfix_alpha_equiv_for mfix k.
+  Proof. admit. Admitted.
 
 End AlphaEquiv.
