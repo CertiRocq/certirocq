@@ -560,7 +560,29 @@ Section AlphaEquiv.
   Lemma anf_cvt_exp_alpha_equiv_proof k :
     (forall j, (j < k)%nat -> anf_cvt_alpha_equiv_statement j) ->
     anf_cvt_exp_alpha_equiv k.
-  Proof. admit. Admitted.
+  Proof.
+    intros IHk.
+    unfold anf_cvt_exp_alpha_equiv.
+    intros e C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hcont.
+    (* Case analysis on e by inverting the first derivation *)
+    inv Hrel1;
+    (* For each case, invert the second derivation (same source e) *)
+    try (inv Hrel2);
+    (* Simple cases where both contexts are Hole_c *)
+    try (simpl;
+         eapply Hcont; [lia | | assumption |];
+         [| intros; assumption];
+         (* preord_var_env for result variables *)
+         match goal with
+         | [H1 : nth_error vars1 ?n = Some r1,
+            H2 : nth_error vars2 ?n = Some r2,
+            Henv : Forall2 _ vars1 vars2 |- _] =>
+           eapply Forall2_nth_error in Henv; [| exact H1 | exact H2]; exact Henv
+         end).
+    (* Remaining cases *)
+    all: admit.
+  Admitted.
 
   Lemma anf_cvt_alpha_equiv :
     forall k, anf_cvt_alpha_equiv_statement k.
