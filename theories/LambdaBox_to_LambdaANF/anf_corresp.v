@@ -766,4 +766,89 @@ Section Corresp.
     - (* tForce *) rewrite HnoLazy in Hwf. discriminate.
   Qed.
 
+  (** * Auxiliary definitions *)
+
+  Fixpoint pos_seq (start : var) (n : nat) : list positive :=
+    match n with
+    | 0%nat => []
+    | S n => start :: (pos_seq (start + 1)%positive n)
+    end.
+
+  Lemma pos_seq_len start n :
+    List.length (pos_seq start n) = n.
+  Proof.
+    revert start. induction n; intros start; simpl; [reflexivity | rewrite IHn; reflexivity].
+  Qed.
+
+  Lemma pos_seq_In start n x :
+    List.In x (pos_seq start n) ->
+    (start <= x <= Pos.of_nat (Pos.to_nat start + n)%nat)%positive.
+  Proof.
+    revert start. induction n; intros start Hin.
+    - inv Hin.
+    - inv Hin; [lia |]. eapply IHn in H. lia.
+  Qed.
+
+  Lemma pos_seq_NoDup start n :
+    NoDup (pos_seq start n).
+  Proof.
+    revert start; induction n; intros start; simpl.
+    - constructor.
+    - constructor; [| eauto].
+      intros Hc. eapply pos_seq_In in Hc. lia.
+  Qed.
+
+  Lemma set_lists_Forall2 {A} xs (vs : list A) rho rho' :
+    set_lists xs vs rho = Some rho' ->
+    NoDup xs ->
+    Forall2 (fun x v => M.get x rho' = Some v) xs vs.
+  Proof.
+    revert vs rho rho'; induction xs; intros ys rho rho' Hset Hnd;
+      destruct ys; simpl in *; try congruence.
+    - constructor.
+    - destruct (set_lists xs ys rho) eqn:Hset'; try congruence.
+      inv Hset. constructor.
+      + rewrite M.gss. reflexivity.
+      + eapply Forall2_monotonic_strong.
+        2:{ eapply IHxs; eauto. inv Hnd. eassumption. }
+        intros. rewrite M.gso. eassumption.
+        intros Heq; subst. inv Hnd; eauto.
+  Qed.
+
+  (** * Existence of relational derivation *)
+
+  (* Given a well-formed term, there exists a relational derivation.
+     Proved by running convert_anf and applying correspondence. *)
+  Lemma anf_rel_exists e xs m :
+    wellformed Σ (List.length xs) e = true ->
+    exists C r S',
+      anf_cvt_rel func_tag default_tag tgm cmap
+        (fun x => (m <= x)%positive) e xs S' C r.
+  Proof.
+    intros Hwf.
+    set (S0 := fun x => (m <= x)%positive).
+    set (vm := List.fold_right (fun v vm' => add_var_name vm' v) new_var_map xs).
+
+    assert (Hvm : var_map_correct vm xs).
+    { unfold vm. rewrite <- (List.app_nil_r xs) at 2.
+      apply var_map_correct_fold_right. apply var_map_correct_nil. }
+
+    set (comp_d := pack_data m 1%positive 1%positive 1%positive
+                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
+
+    destruct (runState (convert_anf' e vm) tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hrun.
+
+    assert (Hf : fresh S0 m).
+    { unfold S0, fresh, Ensembles.In. lia. }
+
+    pose proof (anf_cvt_exp_corresp e xs vm S0 Hwf Hvm) as Hcorresp.
+    unfold triple in Hcorresp.
+    specialize (Hcorresp tt (comp_d, tt) Hf).
+    rewrite Hrun in Hcorresp.
+    destruct cvt_res as [msg | [r0 C0]].
+    - contradiction.
+    - simpl in Hcorresp. destruct Hcorresp as [S' [Hrel Hfr]].
+      exists C0, r0, S'. exact Hrel.
+  Qed.
+
 End Corresp.
