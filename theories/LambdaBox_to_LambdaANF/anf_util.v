@@ -562,6 +562,10 @@ Section AlphaEquiv.
     (* tPrim *) - admit.
   Admitted.
 
+  Lemma anf_cvt_val_alpha_equiv :
+    forall k, anf_cvt_val_alpha_equiv_statement k.
+  Proof. admit. Admitted.
+
   Corollary anf_cvt_exp_alpha_equiv_holds :
     forall k, anf_cvt_exp_alpha_equiv k.
   Proof. intros k e. exact (anf_cvt_alpha_equiv k e). Qed.
