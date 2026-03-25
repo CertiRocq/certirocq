@@ -71,6 +71,7 @@ Section ANF_Val.
         anf_env_rel' anf_val_rel names vs rho ->
         env_consistent names vs ->
         Disjoint var (x |: (f |: FromList names)) S1 ->
+        Disjoint _ (cmap_vars cmap) S1 ->
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
         anf_cvt_rel' S1 e (x :: names) S2 C1 r1 ->
@@ -82,6 +83,7 @@ Section ANF_Val.
         env_consistent names vs ->
         NoDup fnames ->
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
+        Disjoint _ (cmap_vars cmap) S1 ->
         Disjoint _ (FromList names) (FromList fnames) ->
         nth_error fnames n = Some f ->
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
@@ -208,6 +210,20 @@ Section ANF_Val.
              P_sub P0_sub P1_sub P2_sub); subset_case.
   Qed.
 
+
+  (* The result variable is NOT in the output fresh set.
+     For tRel: x ∈ vn and vn ⊥ S, so x ∉ S = S'.
+     For tConst: x ∈ cmap_vars and cmap_vars ⊥ S, so x ∉ S = S'.
+     For other cases: x ∈ S and S' ⊆ S \\ {x}. *)
+  Lemma anf_cvt_result_not_in_output :
+    forall S e vn S' C x,
+      anf_cvt_rel' S e vn S' C x ->
+      Disjoint _ (FromList vn) S ->
+      Disjoint _ (cmap_vars cmap) S ->
+      ~ x \in S'.
+  Proof.
+    admit.
+  Admitted.
 
 (* ================================================================= *)
 (** * env_consistent                                                  *)
@@ -410,6 +426,9 @@ Section AlphaEquiv.
       (* Local variable names are disjoint from the fresh sets *)
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
+      (* Global constant variables are disjoint from the fresh sets *)
+      Disjoint _ (cmap_vars cmap) S1 ->
+      Disjoint _ (cmap_vars cmap) S3 ->
       (* Local variable bindings are pairwise related *)
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       (* Global constant bindings are related *)
@@ -439,6 +458,8 @@ Section AlphaEquiv.
       anf_cvt_rel_args' S3 args vars2 S4 C2 xs2 ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
+      Disjoint _ (cmap_vars cmap) S1 ->
+      Disjoint _ (cmap_vars cmap) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
       (forall j rho1' rho2',
@@ -465,6 +486,8 @@ Section AlphaEquiv.
       List.length outer_vars1 = List.length outer_vars2 ->
       Disjoint _ (FromList fnames1 :|: FromList outer_vars1) S1 ->
       Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
+      Disjoint _ (cmap_vars cmap) S1 ->
+      Disjoint _ (cmap_vars cmap) S3 ->
       Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
       Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
@@ -483,6 +506,8 @@ Section AlphaEquiv.
       anf_cvt_rel_branches' S3 ind brs n vars2 y2 S4 pats2 ->
       Disjoint _ ([set y1] :|: FromList vars1) S1 ->
       Disjoint _ ([set y2] :|: FromList vars2) S3 ->
+      Disjoint _ (cmap_vars cmap) S1 ->
+      Disjoint _ (cmap_vars cmap) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       preord_var_env cenv PG m rho1 rho2 y1 y2 ->
       preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
@@ -553,7 +578,7 @@ Section AlphaEquiv.
     intros e. induction e using term_ind_fix_body;
     unfold anf_cvt_exp_alpha_equiv_for;
     intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-           Hm Hrel1 Hrel2 Hdis1 Hdis2 Henv Hglob Hcont.
+           Hm Hrel1 Hrel2 Hdis1 Hdis2 Hdis_cm1 Hdis_cm2 Henv Hglob Hcont.
 
     { (* tBox *)
       inv Hrel1. inv Hrel2. simpl.
@@ -609,7 +634,7 @@ Section AlphaEquiv.
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse. simpl.
       (* Use IHe for sub-expression c *)
-      eapply IHe; [lia | eassumption | eassumption | assumption | assumption | assumption | assumption |].
+      eapply IHe; [lia | eassumption | eassumption | assumption | assumption | assumption | assumption | assumption | assumption |].
       (* Continuation: after c is converted, project the field *)
       intros j rho1' rho2' Hj Hvar_c Henv' Htransfer.
       eapply preord_exp_proj_compat.
