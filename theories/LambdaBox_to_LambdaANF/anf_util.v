@@ -252,6 +252,9 @@ Section AlphaEquiv.
   Context (func_tag default_tag : positive).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
   Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap.
 
 
@@ -388,10 +391,6 @@ Section AlphaEquiv.
 (* ----------------------------------------------------------------- *)
 (** ** Alpha-Equivalence Definitions                                  *)
 (* ----------------------------------------------------------------- *)
-
-  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
-  Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
 
   (** Two ANF conversions of the same term [e], with different fresh
       variables and name mappings, produce [preord_exp]-related results.
