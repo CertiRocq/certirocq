@@ -491,12 +491,27 @@ Section AlphaEquiv.
                 ** eapply preord_var_env_monotonic with (k := k). exact Hab. lia.
                 ** intros Heq. subst. apply Hni1. repeat normalize_sets. left. now left.
                 ** intros Heq. subst. apply Hni2. repeat normalize_sets. left. now left.
-             ++ (* Set rearrangement: moving a between FromList groups *)
-                intros Hc. apply Hni1.
-                admit.
+             ++ intros Hc. apply Hni1.
+                repeat normalize_sets.
+                (* Hc: a0 ∈ (FromList proj_vars1 :|: (a |: FromList acc1)) :|: {x1}
+                   Goal: a0 ∈ ((a |: FromList proj_vars1) :|: FromList acc1) :|: {x1} *)
+                inv Hc.
+                ** inv H.
+                   --- left. left. right. assumption.
+                   --- inv H0.
+                       +++ left. left. left. assumption.
+                       +++ left. right. assumption.
+                ** right. assumption.
              ++ intros Hc. apply Hni2.
-                admit.
-  Admitted.
+                repeat normalize_sets.
+                inv Hc.
+                ** inv H.
+                   --- left. left. right. assumption.
+                   --- inv H0.
+                       +++ left. left. left. assumption.
+                       +++ left. right. assumption.
+                ** right. assumption.
+  Qed.
 
 
 (* ----------------------------------------------------------------- *)
