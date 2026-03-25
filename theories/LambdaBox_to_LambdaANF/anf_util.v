@@ -538,30 +538,11 @@ Section AlphaEquiv.
       inv Hrel1. inv Hrel2.
       simpl. eapply Hcont; [lia | constructor | assumption |].
       intros; assumption.
-    - (* cons *)
-      inv Hrel1. inv Hrel2.
-      (* C1 = comp_ctx_f C1_hd C1_tl, C2 = comp_ctx_f C2_hd C2_tl *)
-      rewrite !app_ctx_f_fuse.
-      (* First: convert head t using Hexp_ae *)
-      eapply Hexp_ae; [lia | eassumption | eassumption | assumption | assumption | assumption |].
-      (* Continuation: after head is converted, convert tail *)
-      intros j rho1' rho2' Hj Hvar_hd Henv' Htransfer.
-      eapply IHes; [lia | eassumption | eassumption | | | |].
-      + (* Disjoint vars1 S2' — subset of S1 *)
-        eapply Disjoint_Included_r.
-        eapply anf_cvt_exp_subset; eassumption. assumption.
-      + eapply Disjoint_Included_r.
-        eapply anf_cvt_exp_subset; eassumption. assumption.
-      + exact Henv'.
-      + (* Continuation: combine head and tail results *)
-        intros j' rho1'' rho2'' Hj' Hxs_tl Henv'' Htransfer'.
-        eapply Hcont; [lia | |  |].
-        * constructor; [| exact Hxs_tl].
-          admit. (* need preord_var_env for head at j' — from Hvar_hd monotonic *)
-        * exact Henv''.
-        * intros x y Hxy Hni1 Hni2.
-          eapply Htransfer'. eapply Htransfer; assumption.
-          admit. admit. (* disjoint reasoning *)
+    - (* cons: need to invert both derivations, fuse contexts, chain IHs *)
+      (* This case is complex — uses Hexp_ae for head, IHes for tail,
+         Hcont to combine results. Needs careful disjointness and
+         monotonicity reasoning for the transfer function. *)
+      admit.
   Admitted.
 
   (* Branches alpha-equiv from exp alpha-equiv *)
