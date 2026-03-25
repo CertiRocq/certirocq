@@ -1071,7 +1071,16 @@ Section AlphaEquiv.
             -- lia.
           * intros Heq. subst. apply Ha. eassumption.
           * intros Heq. subst. apply Hb. eassumption. }
-    { (* tCase *) admit. }
+    { (* tCase (ind,npars) mch brs:
+         Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil)
+                 (comp_ctx_f C_mch (Eletapp_c r f func_tag [x_mch] Hole_c)) *)
+      inv Hrel1. inv Hrel2. simpl. rewrite <- !app_ctx_f_fuse.
+      (* Efun1_c: case function *)
+      eapply preord_exp_fun_compat.
+      - eapply Hprops.
+      - eapply Hprops.
+      - (* IHe for scrutinee mch, in def_funs env with f bound *)
+        admit. (* ~80 lines: IHe + letapp + val_fun + branches *) }
     { (* tProj p c: comp_ctx_f C_c (Eproj_c y ctag n x Hole_c) *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse. simpl.
