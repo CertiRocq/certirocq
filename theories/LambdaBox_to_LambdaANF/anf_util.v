@@ -96,6 +96,8 @@ Section ANF_Val.
         env_consistent names vs ->
         Disjoint var (x |: (f |: FromList names)) S1 ->
         Disjoint _ (cmap_vars cmap) S1 ->
+        ~ x \in cmap_vars cmap ->
+        ~ f \in cmap_vars cmap ->
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
         anf_cvt_rel' S1 e (x :: names) S2 C1 r1 ->
@@ -110,6 +112,7 @@ Section ANF_Val.
         NoDup fnames ->
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
         Disjoint _ (cmap_vars cmap) S1 ->
+        Disjoint _ (cmap_vars cmap) (FromList fnames) ->
         Disjoint _ (FromList names) (FromList fnames) ->
         nth_error fnames n = Some f ->
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
@@ -176,6 +179,24 @@ Section ANF_Val.
           -- exact Hfind.
         * exact Hcvt.
   Qed.
+
+  (* Like [anf_fix_rel_find_def] but derives the [nth_error mfix] and
+     [dbody] facts from the [anf_fix_rel] induction. Also gives
+     disjointness and freshness for the lambda parameter. *)
+  Lemma anf_fix_rel_exists :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      NoDup fnames_list ->
+      exists (na : name) (e_body : EAst.term) (x_pc : var)
+             (C_body : exp_ctx) (r_body : var)
+             (S_body1 S_body2 : Ensemble var),
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel' S_body1 e_body
+                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body /\
+        Disjoint var (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
+        ~ x_pc \in (FromList fnames0 :|: FromList names0).
+  Proof. admit. Admitted.
 
   (* Build Forall2 from pointwise proof + length equality *)
   Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
@@ -1863,10 +1884,20 @@ Section AlphaEquiv.
                   |rewrite Hget2 in Hw; injection Hw as <-;
                    eexists; split; [exact Hget1 |];
                    eapply IHk; [lia | exact Hvrel2 | exact Hvrel1]].
-             ++ (* v0 ≠ f: cmap_vars ⊥ S, f ∈ S *) admit.
-             ++ admit.
-          -- (* v0 ≠ x: cmap_vars ⊥ S, x ∈ S \\ {f} *) admit.
-          -- admit.
+             ++ (* v0 ≠ f: from ~ f \in cmap_vars after inv *)
+                intros Heq. subst.
+                match goal with H : ~ Ensembles.In _ (cmap_vars _) _ |- _ =>
+                  exact (H Hv0_cmap) end.
+             ++ intros Heq. subst.
+                match goal with H : ~ Ensembles.In _ (cmap_vars _) _ |- _ =>
+                  exact (H Hv0_cmap) end.
+          -- (* v0 ≠ x: from ~ x \in cmap_vars after inv *)
+             intros Heq. subst.
+             match goal with H : ~ Ensembles.In _ (cmap_vars _) _ |- _ =>
+               exact (H Hv0_cmap) end.
+          -- intros Heq. subst.
+             match goal with H : ~ Ensembles.In _ (cmap_vars _) _ |- _ =>
+               exact (H Hv0_cmap) end.
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat.
@@ -1874,9 +1905,202 @@ Section AlphaEquiv.
           -- eapply Hprops.
           -- exact Hvar_cont.
 
-    - (* ClosFix_v — similar structure with inner WF induction *)
+    - (* ClosFix_v *)
       intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
-      admit.
+      inv Hrel1. inv Hrel2.
+
+      (* Extract find_def for the idx-th function from both fix relations *)
+      match goal with
+      | [Hf : anf_fix_rel _ _ _ _ _ _ _ _ _ ?Bs _,
+         Hn : nth_error _ _ = Some ?g
+         |- preord_val _ _ _ (Vfun _ ?Bs ?g) _] =>
+        rename Hf into Hfix1; rename Hn into Hnth1
+      end.
+      match goal with
+      | [Hf : anf_fix_rel _ _ _ _ _ _ _ _ _ ?Bs _,
+         Hn : nth_error _ _ = Some ?g
+         |- preord_val _ _ _ _ (Vfun _ ?Bs ?g)] =>
+        rename Hf into Hfix2; rename Hn into Hnth2
+      end.
+
+      edestruct anf_fix_rel_exists
+        as (na1 & e1 & x1 & C_1 & r_1 & S_b1 & S_b1' &
+            Hfind1 & Hcvt1 & Hdis_b1 & Hfresh_b1);
+        [exact Hfix1 | exact Hnth1 | eassumption |].
+      edestruct anf_fix_rel_exists
+        as (na2 & e2 & x2 & C_2 & r_2 & S_b2 & S_b2' &
+            Hfind2 & Hcvt2 & Hdis_b2 & Hfresh_b2);
+        [exact Hfix2 | exact Hnth2 | eassumption |].
+
+      eapply preord_val_fun.
+      + exact Hfind1.
+      + exact Hfind2.
+      + intros rho1' j vs1 vs2 Hlen Hset1.
+        destruct vs1 as [| v_arg1 [| ? ?]]; simpl in *; try congruence.
+        destruct vs2 as [| v_arg2 [| ? ?]]; simpl in *; try congruence.
+        inv Hset1. eexists. split. { reflexivity. }
+        intros Hlt Hall_args. inv Hall_args.
+        eapply preord_exp_post_monotonic. exact HinclG.
+
+        (* Use IHk j for body alpha-equiv *)
+        eapply (anf_cvt_alpha_equiv j).
+        * lia.
+        * eassumption.
+        * eassumption.
+        * (* Disjoint (FromList (x1 :: rev fnames ++ names)) S_b1 *)
+          rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             match goal with H : Ensembles.In _ _ x1 |- _ =>
+               intro Hc; destruct Hc as [_ Hn]; apply Hn; constructor end.
+          -- eapply Disjoint_Included_r.
+             ++ match goal with H : _ \subset _ |- _ => exact H end.
+             ++ rewrite FromList_app.
+                intros z Hz. unfold FromList, Ensembles.In in *.
+                apply in_app_or in Hz. destruct Hz as [Hz | Hz].
+                ** left. apply in_rev in Hz. exact Hz.
+                ** right. exact Hz.
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             match goal with H : Ensembles.In _ _ x2 |- _ =>
+               intro Hc; destruct Hc as [_ Hn]; apply Hn; constructor end.
+          -- eapply Disjoint_Included_r.
+             ++ match goal with H : _ \subset _ |- _ => exact H end.
+             ++ rewrite FromList_app.
+                intros z Hz. unfold FromList, Ensembles.In in *.
+                apply in_app_or in Hz. destruct Hz as [Hz | Hz].
+                ** left. apply in_rev in Hz. exact Hz.
+                ** right. exact Hz.
+        * (* Disjoint cmap S_b1: S_b1 ⊆ S1, cmap ⊥ S1 *)
+          eapply Disjoint_Included_r.
+          -- match goal with H : _ \subset _ |- _ =>
+               eapply Included_trans; [eapply Setminus_Included | exact H] end.
+          -- eassumption.
+        * eapply Disjoint_Included_r.
+          -- match goal with H : _ \subset _ |- _ =>
+               eapply Included_trans; [eapply Setminus_Included | exact H] end.
+          -- eassumption.
+        * (* Forall2 for x :: rev fnames ++ names *)
+          constructor.
+          -- (* x1/x2: argument values *)
+             eapply preord_var_env_extend_eq. eassumption.
+          -- (* rev fnames ++ names in def_funs + M.set env *)
+             eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_app.
+                ** (* rev fnames: fixpoint closures related via IHk j *)
+                   eapply All_Forall.Forall2_rev.
+                   match goal with
+                   | [Hn1 : anf_fix_rel _ _ _ _ _ _ ?Bs1 _,
+                      Hn2 : anf_fix_rel _ _ _ _ _ _ ?Bs2 _ |- _] =>
+                     assert (Hlen_fn : Datatypes.length (all_fun_name Bs1) =
+                                       Datatypes.length (all_fun_name Bs2))
+                       by (erewrite anf_fix_rel_fnames_length by exact Hn1;
+                           erewrite anf_fix_rel_fnames_length by exact Hn2;
+                           reflexivity)
+                   end.
+                   eapply Forall2_from_nth_error.
+                   --- exact Hlen_fn.
+                   --- intros i fi fi' Hni Hni'.
+                       intros w Hget_w.
+                       match goal with Hn1 : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
+                                       context [def_funs ?Bs ?Bs _ _] =>
+                         assert (Hni_fd : name_in_fundefs Bs fi)
+                           by (rewrite name_fds_same; eapply nth_error_In; eassumption);
+                         rewrite (def_funs_eq _ _ _ _ _ Hni_fd) in Hget_w;
+                         inv Hget_w
+                       end.
+                       match goal with Hn2 : anf_fix_rel _ _ _ _ _ _ ?Bs0 _ |-
+                                       context [def_funs ?Bs0 ?Bs0 _ _] =>
+                         assert (Hni_fd0 : name_in_fundefs Bs0 fi')
+                           by (rewrite name_fds_same; eapply nth_error_In; eassumption)
+                       end.
+                       eexists. split.
+                       { match goal with H : name_in_fundefs ?Bs fi' |- _ =>
+                           exact (def_funs_eq _ _ _ _ _ H) end. }
+                       (* preord_val j via IHk: reconstruct anf_rel_ClosFix *)
+                       eapply (IHk j Hlt (ClosFix_v vs_clos fnl i)).
+                       +++ econstructor; eassumption.
+                       +++ econstructor; eassumption.
+                ** (* names: captured env related via IHk j *)
+                   eapply Forall2_preord_var_env_def_funs.
+                   --- eapply anf_cvt_env_alpha_equiv_Forall2.
+                       +++ eapply IHk. lia.
+                       +++ eassumption.
+                       +++ eassumption.
+                   --- eapply Disjoint_Included_r;
+                         [exact (proj1 (Same_set_all_fun_name _)) |].
+                       match goal with H : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
+                                       Disjoint _ _ (name_in_fundefs ?Bs) =>
+                         erewrite anf_fix_rel_names by exact H end.
+                       eassumption.
+                   --- eapply Disjoint_Included_r;
+                         [exact (proj1 (Same_set_all_fun_name _)) |].
+                       match goal with H : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
+                                       Disjoint _ _ (name_in_fundefs ?Bs) =>
+                         erewrite anf_fix_rel_names by exact H end.
+                       eassumption.
+             ++ (* ~ x1 \in FromList (rev fnames ++ names) *)
+                rewrite FromList_app.
+                intros Hin. inv Hin.
+                ** match goal with
+                   | [H : Ensembles.In _ _ x1, Hd : Disjoint _ _ _ |- _] =>
+                     eapply Hd; constructor;
+                     [right; unfold FromList, Ensembles.In in *;
+                      apply in_rev in H; exact H
+                     | exact (Setminus_Included _ _ _ _ H)]
+                   end. admit.
+                ** admit.
+             ++ admit.
+             ++ admit.
+        * (* preord_env_P cmap_deps_mfix: same pattern as Clos_v *)
+          unfold cmap_deps_mfix, cmap_vars_of.
+          intros v0 [k0 [Hk0 Hlk0]].
+          assert (Hv0_cmap : v0 \in cmap_vars cmap)
+            by (exists k0; exact Hlk0).
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+            pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+            pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
+          destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
+          destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
+          assert (decl1 = decl2) by (unfold declared_constant in *; congruence).
+          subst decl2.
+          assert (body1 = body2) by congruence. subst body2.
+          destruct (globals_terminate _ _ _ Hdecl1 Hbody1)
+            as (src_v & f_ev & t_ev & Heval).
+          specialize (Hvrel1 _ _ _ Heval).
+          specialize (Hvrel2 _ _ _ Heval).
+          eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_extend_neq.
+             ++ intros w Hw.
+                first
+                  [rewrite Hget1 in Hw; injection Hw as <-;
+                   eexists; split; [exact Hget2 |];
+                   eapply IHk; [lia | exact Hvrel1 | exact Hvrel2]
+                  |rewrite Hget2 in Hw; injection Hw as <-;
+                   eexists; split; [exact Hget1 |];
+                   eapply IHk; [lia | exact Hvrel2 | exact Hvrel1]].
+             ++ (* v0 ≠ fi: Disjoint cmap fnames *)
+                intros Heq. subst.
+                match goal with H : Disjoint _ (cmap_vars _) (FromList _) |- _ =>
+                  eapply H; constructor; [exact Hv0_cmap |];
+                  eapply nth_error_In; eassumption end.
+             ++ intros Heq. subst.
+                match goal with H : Disjoint _ (cmap_vars _) (FromList _) |- _ =>
+                  eapply H; constructor; [exact Hv0_cmap |];
+                  eapply nth_error_In; eassumption end.
+          -- (* v0 ≠ x1: x1 ∈ S1, cmap ⊥ S1 *)
+             intros Heq. subst.
+             match goal with Hd : Disjoint _ (cmap_vars _) ?S,
+                             Hin : Ensembles.In _ ?S _ |- _ =>
+               eapply Hd; constructor; [exact Hv0_cmap | exact Hin] end.
+          -- intros Heq. subst.
+             match goal with Hd : Disjoint _ (cmap_vars _) ?S,
+                             Hin : Ensembles.In _ ?S _ |- _ =>
+               eapply Hd; constructor; [exact Hv0_cmap | exact Hin] end.
+        * (* Continuation: Ehalt *)
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
+          eapply preord_exp_halt_compat;
+            [eapply Hprops | eapply Hprops | exact Hvar_cont].
   Admitted.
 
 End AlphaEquiv.
