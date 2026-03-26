@@ -43,18 +43,21 @@ Section ANF_Val.
 
   (** Relates cmap variables to their ANF values in a target environment,
       restricted to a set [D] of kernames. Parametric in the value relation
-      [val_rel] so it can be used inside [anf_val_rel] (tie-the-knot pattern). *)
+      [val_rel] so it can be used inside [anf_val_rel] (tie-the-knot pattern).
+      States: if the global body evaluates to a value, that value is related
+      to the target binding. Termination is assumed separately. *)
   Definition global_env_rel' (val_rel : fuel_sem.value -> val -> Prop)
              (D : kername -> Prop) (rho : M.t val) : Prop :=
     forall k v,
       D k ->
       lookup_const cmap k = Some v ->
-      forall anf_v, M.get v rho = Some anf_v ->
-      exists decl body src_v f t,
+      exists decl body anf_v,
         declared_constant Σ k decl /\
         decl.(EAst.cst_body) = Some body /\
-        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t /\
-        val_rel src_v anf_v.
+        M.get v rho = Some anf_v /\
+        (forall src_v f t,
+           @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t ->
+           val_rel src_v anf_v).
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
     : Ensemble var -> list var ->
@@ -416,6 +419,13 @@ Section AlphaEquiv.
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
   Context (Σ : EAst.global_context).
+
+  Context (globals_terminate :
+    forall k decl body,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      exists src_v f t,
+        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t).
 
   Context (func_tag default_tag : positive).
 
@@ -1757,6 +1767,116 @@ Section AlphaEquiv.
 
   Lemma anf_cvt_val_alpha_equiv :
     forall k, anf_cvt_val_alpha_equiv_statement k.
-  Proof. admit. Admitted.
+  Proof.
+    intros k. induction k as [k IHk] using lt_wf_rec1. intros v.
+    set (P := fun (v : fuel_sem.value) =>
+      forall v1 v2 : val,
+        anf_val_rel' v v1 -> anf_val_rel' v v2 ->
+        preord_val cenv PG k v1 v2).
+    eapply value_ind' with (P := P); subst P; simpl.
+
+    - (* Con_v *)
+      intros dcon vs IH v1 v2 Hrel1 Hrel2.
+      inv Hrel1; inv Hrel2.
+      rewrite preord_val_eq. simpl. split.
+      + congruence.
+      + match goal with
+        | [ H1 : Forall2 _ vs ?vs1, H2 : Forall2 _ vs ?vs2 |- Forall2 _ ?vs1 ?vs2 ] =>
+          revert vs1 vs2 H1 H2;
+          induction IH; intros vs1 vs2 Hvs1 Hvs2;
+            [ inv Hvs1; inv Hvs2; constructor
+            | inv Hvs1; inv Hvs2; constructor; eauto ]
+        end.
+
+    - (* Clos_v *)
+      intros vs_clos na e_body Hall v1 v2 Hrel1 Hrel2.
+      inv Hrel1. inv Hrel2.
+      eapply preord_val_fun.
+      + simpl. rewrite Coqlib.peq_true. reflexivity.
+      + simpl. rewrite Coqlib.peq_true. reflexivity.
+      + intros rho1' j vs1 vs2 Hlen Hset1.
+        destruct vs1 as [ | v_arg1 [ | ? ? ] ]; simpl in *; try congruence.
+        destruct vs2 as [ | v_arg2 [ | ? ? ] ]; simpl in *; try congruence.
+        inv Hset1.
+        eexists. split; [reflexivity | ].
+        intros Hlt Hall_args. inv Hall_args.
+        eapply preord_exp_post_monotonic. exact HinclG.
+        eapply (anf_cvt_alpha_equiv j e_body).
+        * lia.
+        * eassumption.
+        * eassumption.
+        * (* Disjoint side 1 *)
+          match goal with H : Disjoint _ (_ |: (_ |: _)) _ |- _ =>
+            eapply Disjoint_Included_l; [| exact H];
+            normalize_sets; now sets end.
+        * match goal with H : Disjoint _ (_ |: (_ |: _)) _ |- _ =>
+            eapply Disjoint_Included_l; [| exact H];
+            normalize_sets; now sets end.
+        * eassumption.
+        * eassumption.
+        * (* Forall2 for x :: names *)
+          constructor.
+          -- eapply preord_var_env_extend_eq. eassumption.
+          -- eapply Forall2_preord_var_env_set.
+             ++ eapply Forall2_preord_var_env_set.
+                ** eapply anf_cvt_env_alpha_equiv_Forall2.
+                   --- eapply IHk. lia.
+                   --- eassumption.
+                   --- eassumption.
+                ** assumption.
+                ** assumption.
+             ++ match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
+             ++ match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
+        * (* preord_env_P (cmap_deps cmap e_body) from global_env_rel' *)
+          intros v0 Hv0.
+          destruct Hv0 as [k0 [Hk0 Hlk0]].
+          (* Save v0 ∈ cmap_vars before extraction modifies context *)
+          assert (Hv0_cmap : v0 \in cmap_vars cmap)
+            by (exists k0; exact Hlk0).
+          (* Extract from both global_env_rel' hypotheses *)
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+            pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+            pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
+          destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
+          destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
+          assert (decl1 = decl2) by (unfold declared_constant in *; congruence).
+          subst decl2.
+          assert (body1 = body2) by congruence. subst body2.
+          destruct (globals_terminate _ _ _ Hdecl1 Hbody1)
+            as (src_v & f_ev & t_ev & Heval).
+          specialize (Hvrel1 _ _ _ Heval).
+          specialize (Hvrel2 _ _ _ Heval).
+          eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_extend_neq.
+             ++ intros w Hw.
+                first
+                  [rewrite Hget1 in Hw; injection Hw as <-;
+                   eexists; split; [exact Hget2 |];
+                   eapply IHk; [lia | exact Hvrel1 | exact Hvrel2]
+                  |rewrite Hget2 in Hw; injection Hw as <-;
+                   eexists; split; [exact Hget1 |];
+                   eapply IHk; [lia | exact Hvrel2 | exact Hvrel1]].
+             ++ (* v0 ≠ f: cmap_vars ⊥ S, f ∈ S *) admit.
+             ++ admit.
+          -- (* v0 ≠ x: cmap_vars ⊥ S, x ∈ S \\ {f} *) admit.
+          -- admit.
+        * (* Continuation: Ehalt *)
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
+          eapply preord_exp_halt_compat.
+          -- eapply Hprops.
+          -- eapply Hprops.
+          -- exact Hvar_cont.
+
+    - (* ClosFix_v — similar structure with inner WF induction *)
+      intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
+      admit.
+  Admitted.
 
 End AlphaEquiv.
