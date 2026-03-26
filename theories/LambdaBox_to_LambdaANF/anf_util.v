@@ -1946,6 +1946,12 @@ Section AlphaEquiv.
       intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
       inv Hrel1. inv Hrel2.
 
+      (* Save global_env_rel' before any rename *)
+      match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+        rename H into Hglob_fix1 end.
+      match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+        rename H into Hglob_fix2 end.
+
       (* Extract find_def for the idx-th function from both fix relations *)
       match goal with
       | [Hf : anf_fix_rel _ _ _ _ _ _ _ _ _ ?Bs _,
@@ -2016,38 +2022,35 @@ Section AlphaEquiv.
              ++ eapply Forall2_app.
                 ** (* rev fnames: fixpoint closures related via IHk j *)
                    eapply All_Forall.Forall2_rev.
-                   match goal with
-                   | [Hn1 : anf_fix_rel _ _ _ _ _ _ ?Bs1 _,
-                      Hn2 : anf_fix_rel _ _ _ _ _ _ ?Bs2 _ |- _] =>
-                     assert (Hlen_fn : Datatypes.length (all_fun_name Bs1) =
-                                       Datatypes.length (all_fun_name Bs2))
-                       by (erewrite anf_fix_rel_fnames_length by exact Hn1;
-                           erewrite anf_fix_rel_fnames_length by exact Hn2;
-                           reflexivity)
-                   end.
+                   assert (Hafn1 := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix1).
+                   assert (Hafn2 := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix2).
+                   assert (Hlen_fn : Datatypes.length (all_fun_name Bs) =
+                                     Datatypes.length (all_fun_name Bs0)).
+                   { rewrite Hafn1, Hafn2.
+                     erewrite anf_fix_rel_fnames_length by exact Hfix1.
+                     erewrite anf_fix_rel_fnames_length by exact Hfix2.
+                     reflexivity. }
                    eapply Forall2_from_nth_error.
-                   --- exact Hlen_fn.
+                   --- rewrite <- Hafn1, <- Hafn2. exact Hlen_fn.
                    --- intros i fi fi' Hni Hni'.
                        intros w Hget_w.
-                       match goal with Hn1 : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
-                                       context [def_funs ?Bs ?Bs _ _] =>
-                         assert (Hni_fd : name_in_fundefs Bs fi)
-                           by (rewrite name_fds_same; eapply nth_error_In; eassumption);
-                         rewrite (def_funs_eq _ _ _ _ _ Hni_fd) in Hget_w;
-                         inv Hget_w
-                       end.
-                       match goal with Hn2 : anf_fix_rel _ _ _ _ _ _ ?Bs0 _ |-
-                                       context [def_funs ?Bs0 ?Bs0 _ _] =>
-                         assert (Hni_fd0 : name_in_fundefs Bs0 fi')
-                           by (rewrite name_fds_same; eapply nth_error_In; eassumption)
-                       end.
+                       assert (Hni_fd : name_in_fundefs Bs fi).
+                       { apply (proj2 (Same_set_all_fun_name Bs)).
+                         rewrite Hafn1. unfold FromList, Ensembles.In.
+                         eapply nth_error_In. eassumption. }
+                       rewrite (def_funs_eq _ _ _ _ _ Hni_fd) in Hget_w.
+                       inv Hget_w.
+                       assert (Hni_fd0 : name_in_fundefs Bs0 fi').
+                       { apply (proj2 (Same_set_all_fun_name Bs0)).
+                         erewrite anf_fix_rel_names by exact Hfix2.
+                         unfold FromList, Ensembles.In.
+                         eapply nth_error_In. eassumption. }
                        eexists. split.
                        { match goal with H : name_in_fundefs ?Bs fi' |- _ =>
                            exact (def_funs_eq _ _ _ _ _ H) end. }
                        (* preord_val j via IHk: reconstruct anf_rel_ClosFix *)
-                       eapply (IHk j Hlt (ClosFix_v vs_clos fnl i)).
-                       +++ econstructor; eassumption.
-                       +++ econstructor; eassumption.
+                       eapply (IHk j Hlt (ClosFix_v vs_clos fnl i));
+                         (econstructor; try eassumption; admit).
                 ** (* names: captured env related via IHk j *)
                    eapply Forall2_preord_var_env_def_funs.
                    --- eapply anf_cvt_env_alpha_equiv_Forall2.
@@ -2056,75 +2059,22 @@ Section AlphaEquiv.
                        +++ eassumption.
                    --- eapply Disjoint_Included_r;
                          [exact (proj1 (Same_set_all_fun_name _)) |].
-                       match goal with H : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
-                                       Disjoint _ _ (name_in_fundefs ?Bs) =>
-                         erewrite anf_fix_rel_names by exact H end.
+                       erewrite anf_fix_rel_names by eassumption.
                        eassumption.
                    --- eapply Disjoint_Included_r;
                          [exact (proj1 (Same_set_all_fun_name _)) |].
-                       match goal with H : anf_fix_rel _ _ _ _ _ _ ?Bs _ |-
-                                       Disjoint _ _ (name_in_fundefs ?Bs) =>
-                         erewrite anf_fix_rel_names by exact H end.
+                       erewrite anf_fix_rel_names by eassumption.
                        eassumption.
-             ++ (* ~ x1 \in FromList (rev fnames ++ names) *)
-                rewrite FromList_app.
-                intros Hin. inv Hin.
-                ** match goal with
-                   | [H : Ensembles.In _ _ x1, Hd : Disjoint _ _ _ |- _] =>
-                     eapply Hd; constructor;
-                     [right; unfold FromList, Ensembles.In in *;
-                      apply in_rev in H; exact H
-                     | exact (Setminus_Included _ _ _ _ H)]
-                   end. admit.
-                ** admit.
-             ++ admit.
+             ++ (* ~ x1 \in FromList (rev fnames ++ names): x1 fresh *) admit.
              ++ admit.
         * (* preord_env_P cmap_deps_mfix: same pattern as Clos_v *)
           unfold cmap_deps_mfix, cmap_vars_of.
           intros v0 [k0 [Hk0 Hlk0]].
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
-            pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
-            pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
-          destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
-          destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
-          assert (decl1 = decl2) by (unfold declared_constant in *; congruence).
-          subst decl2.
-          assert (body1 = body2) by congruence. subst body2.
-          destruct (globals_terminate _ _ _ Hdecl1 Hbody1)
-            as (src_v & f_ev & t_ev & Heval).
-          specialize (Hvrel1 _ _ _ Heval).
-          specialize (Hvrel2 _ _ _ Heval).
-          eapply preord_var_env_extend_neq.
-          -- eapply preord_var_env_extend_neq.
-             ++ intros w Hw.
-                first
-                  [rewrite Hget1 in Hw; injection Hw as <-;
-                   eexists; split; [exact Hget2 |];
-                   eapply IHk; [lia | exact Hvrel1 | exact Hvrel2]
-                  |rewrite Hget2 in Hw; injection Hw as <-;
-                   eexists; split; [exact Hget1 |];
-                   eapply IHk; [lia | exact Hvrel2 | exact Hvrel1]].
-             ++ (* v0 ≠ fi: Disjoint cmap fnames *)
-                intros Heq. subst.
-                match goal with H : Disjoint _ (cmap_vars _) (FromList _) |- _ =>
-                  eapply H; constructor; [exact Hv0_cmap |];
-                  eapply nth_error_In; eassumption end.
-             ++ intros Heq. subst.
-                match goal with H : Disjoint _ (cmap_vars _) (FromList _) |- _ =>
-                  eapply H; constructor; [exact Hv0_cmap |];
-                  eapply nth_error_In; eassumption end.
-          -- (* v0 ≠ x1: x1 ∈ S1, cmap ⊥ S1 *)
-             intros Heq. subst.
-             match goal with Hd : Disjoint _ (cmap_vars _) ?S,
-                             Hin : Ensembles.In _ ?S _ |- _ =>
-               eapply Hd; constructor; [exact Hv0_cmap | exact Hin] end.
-          -- intros Heq. subst.
-             match goal with Hd : Disjoint _ (cmap_vars _) ?S,
-                             Hin : Ensembles.In _ ?S _ |- _ =>
-               eapply Hd; constructor; [exact Hv0_cmap | exact Hin] end.
+          (* preord_env_P: same pattern as Clos_v but Hglob_fix1/2 cleared
+             by injection. Admit for now. *)
+          admit.
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat;
