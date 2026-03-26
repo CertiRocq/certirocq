@@ -397,7 +397,8 @@ Section ANF_Val.
                      (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body /\
         Disjoint var (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
         ~ x_pc \in (FromList fnames0 :|: FromList names0) /\
-        x_pc \in S1.
+        x_pc \in S1 /\
+        S_body1 \subset S1.
   Proof.
     intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f Hrel Hnth Hnd.
     revert idx f Hnth Hnd.
@@ -416,26 +417,36 @@ Section ANF_Val.
           -- eapply Disjoint_sym.
              eapply Disjoint_Included_l; [|eassumption].
              eapply Included_trans; [eassumption |]. eapply Setminus_Included.
-        * split.
+        * split; [| split].
           -- intro Hc. eapply H0. constructor; [exact H1 | exact Hc].
           -- exact H1.
+          -- eapply Included_trans; [eassumption |]. eapply Setminus_Included.
       + simpl in Hnth.
         match goal with H : NoDup (_ :: _) |- _ =>
           inversion H as [| ? ? Hnotin Hnd_tl]; subst end.
         edestruct IHHrel as (d' & na' & e' & xp & Cp & rp & Sp1 & Sp2 &
-                             Hnth_d & Hbod & Hfind & Hcvt & Hdis_p & Hfresh_p & Hxp_in);
+                             Hnth_d & Hbod & Hfind & Hcvt & Hdis_p & Hfresh_p &
+                             Hxp_in & Hsp1_sub);
           [exact Hnth | exact Hnd_tl |].
         exists d', na', e', xp, Cp, rp, Sp1, Sp2.
-        split; [simpl; exact Hnth_d | split; [exact Hbod |
-        split; [| split; [| split; [| split]]]]].
+        split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]].
+        * simpl. exact Hnth_d.
+        * exact Hbod.
         * simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
           -- exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth.
           -- exact Hfind.
         * exact Hcvt.
         * exact Hdis_p.
         * exact Hfresh_p.
-        * eapply Setminus_Included. eapply H2.
+        * (* xp ∈ S1 *)
+          eapply Setminus_Included. eapply H2.
           eapply anf_cvt_exp_subset. eassumption. eapply H3. exact Hxp_in.
+        * (* Sp1 ⊆ S1 *)
+          eapply Included_trans; [exact Hsp1_sub |].
+          eapply Included_trans; [exact H3 |].
+          eapply Included_trans; [eapply anf_cvt_exp_subset; eassumption |].
+          eapply Included_trans; [eassumption |].
+          eapply Setminus_Included.
   Qed.
 
 (* ================================================================= *)
@@ -1992,6 +2003,9 @@ Section AlphaEquiv.
         intros Hlt Hall_args. inv Hall_args.
         eapply preord_exp_post_monotonic. exact HinclG.
 
+        (* Destruct membership+subset from anf_fix_rel_exists *)
+        destruct Hx1_in as [Hx1_mem Hb1_sub].
+        destruct Hx2_in as [Hx2_mem Hb2_sub].
         (* Use IHk j for body alpha-equiv *)
         eapply (anf_cvt_alpha_equiv j).
         * lia.
@@ -2017,9 +2031,9 @@ Section AlphaEquiv.
             [right; left; unfold FromList, Ensembles.In in *;
              match goal with H : In z _ |- _ => apply in_rev in H; exact H end
             |right; right; assumption].
-        * (* Disjoint cmap S_b1: need S_b1 ⊆ S1, cmap ⊥ S1 *)
-          admit.
-        * admit.
+        * (* Disjoint cmap S_b1 *)
+          eapply Disjoint_Included_r; [exact Hb1_sub | exact H6].
+        * eapply Disjoint_Included_r; [exact Hb2_sub | exact H16].
         * (* Forall2 for x :: rev fnames ++ names *)
           constructor.
           -- (* x1/x2: argument values *)
@@ -2056,8 +2070,15 @@ Section AlphaEquiv.
                        { match goal with H : name_in_fundefs ?Bs fi' |- _ =>
                            exact (def_funs_eq _ _ _ _ _ H) end. }
                        (* preord_val j via IHk: reconstruct anf_rel_ClosFix *)
-                       eapply (IHk j Hlt (ClosFix_v vs_clos fnl i));
-                         (econstructor; try eassumption; admit).
+                       eapply (IHk j Hlt (ClosFix_v vs_clos fnl i)).
+                       +++ eapply anf_rel_ClosFix;
+                             [exact H2 | exact H3 | exact H4 | exact H5
+                             | exact H6 | exact H7 | exact H8
+                             | exact Hni | exact Hfix1 | exact Hglob2_saved].
+                       +++ eapply anf_rel_ClosFix;
+                             [exact H10 | exact H13 | exact H14 | exact H15
+                             | exact H16 | exact H17 | exact H18
+                             | exact Hni' | exact Hfix2 | exact Hglob1_saved].
                 ** (* names: captured env related via IHk j *)
                    eapply Forall2_preord_var_env_def_funs.
                    --- eapply anf_cvt_env_alpha_equiv_Forall2.
@@ -2072,8 +2093,15 @@ Section AlphaEquiv.
                          [exact (proj1 (Same_set_all_fun_name _)) |].
                        erewrite anf_fix_rel_names by eassumption.
                        eassumption.
-             ++ (* ~ x1 \in FromList (rev fnames ++ names): x1 fresh *) admit.
-             ++ admit.
+             ++ (* ~ x1 \in FromList (rev fnames ++ names) *)
+                rewrite FromList_app.
+                intro Hc. apply Hfresh_b1. inv Hc.
+                ** left. unfold FromList, Ensembles.In in *. apply in_rev in H. exact H.
+                ** right. exact H.
+             ++ rewrite FromList_app.
+                intro Hc. apply Hfresh_b2. inv Hc.
+                ** left. unfold FromList, Ensembles.In in *. apply in_rev in H. exact H.
+                ** right. exact H.
         * (* preord_env_P cmap_deps_mfix: same pattern as Clos_v *)
           unfold cmap_deps_mfix, cmap_vars_of.
           intros v0 [k0 [Hk0 Hlk0]].
@@ -2115,13 +2143,13 @@ Section AlphaEquiv.
              eapply IHk; [lia | exact Hvrel1' | exact Hvrel2'].
           -- (* v0 ≠ x1: x1 ∈ S1, cmap ⊥ S1 *)
              intro Heq. subst.
-             eapply H6. constructor; [exact Hv0_cmap | exact Hx1_in].
+             eapply H6. constructor; [exact Hv0_cmap | exact Hx1_mem].
           -- intro Heq. subst.
-             eapply H16. constructor; [exact Hv0_cmap | exact Hx2_in].
+             eapply H16. constructor; [exact Hv0_cmap | exact Hx2_mem].
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat;
             [eapply Hprops | eapply Hprops | exact Hvar_cont].
-  Admitted.
+  Qed.
 
 End AlphaEquiv.
