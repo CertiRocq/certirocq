@@ -138,9 +138,12 @@ Section Correct.
   Let anf_env_rel' := anf_env_rel func_tag default_tag tgm cmap Σ.
   Let global_env_rel' := global_env_rel func_tag default_tag tgm cmap Σ.
 
-  (* Shorthand for the source evaluation relation *)
-  Let src_eval := @eval_env_fuel _ LambdaBox_resource_fuel
-                                   LambdaBox_resource_trace Σ.
+  (* Shorthand for the source evaluation relation.
+     Must be explicit about both resource instances since both are
+     [@LambdaBox_resource nat] and Coq's instance resolution can't
+     distinguish them by type. *)
+  Let src_eval := @eval_env_fuel nat LambdaBox_resource_fuel
+                                     LambdaBox_resource_trace Σ.
 
 
   (** ** Helper: set_many *)
@@ -240,6 +243,53 @@ Section Correct.
     forall vs e r f t,
       src_eval vs e r f t ->
       anf_cvt_correct_exp vs e r f t.
-  Proof. admit. Admitted.
+  Proof.
+    intros vs e r f t Heval.
+    eapply (@eval_env_fuel_ind'
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ
+              (fun vs e r f t => anf_cvt_correct_exp_step vs e r f t)
+              (fun vs es vs1 f t => anf_cvt_correct_exps vs es vs1 f t)).
+
+    (* ================================================================ *)
+    (* P cases: eval_env_step (13 cases)                                *)
+    (* ================================================================ *)
+
+    (* eval_App_step *) 1: admit.
+    (* eval_App_step_OOT1 *) 1: admit.
+    (* eval_App_step_OOT2 *) 1: admit.
+    (* eval_FixApp_step *) 1: admit.
+    (* eval_LetIn_step *) 1: admit.
+    (* eval_LetIn_step_OOT *) 1: admit.
+    (* eval_Construct_step *) 1: admit.
+    (* eval_Construct_step_OOT *) 1: admit.
+    (* eval_Case_step *) 1: admit.
+    (* eval_Case_step_OOT *) 1: admit.
+    (* eval_Proj_step *) 1: admit.
+    (* eval_Proj_step_OOT *) 1: admit.
+    (* eval_Const_step *) 1: admit.
+
+    (* ================================================================ *)
+    (* P0 cases: eval_fuel_many (2 cases)                               *)
+    (* ================================================================ *)
+
+    (* eval_many_nil *) 1: admit.
+    (* eval_many_cons *) 1: admit.
+
+    (* ================================================================ *)
+    (* P1 cases: eval_env_fuel (6 cases)                                *)
+    (* ================================================================ *)
+
+    (* eval_Rel_fuel *) 1: admit.
+    (* eval_Lam_fuel *) 1: admit.
+    (* eval_Fix_fuel *) 1: admit.
+    (* eval_Box_fuel *) 1: admit.
+    (* eval_OOT *) 1: admit.
+    (* eval_step *)
+    - intros rho0 e0 r0 f0 t0 Hstep IH_step.
+      unfold anf_cvt_correct_exp, anf_cvt_correct_exp_step in *.
+      intros. eapply IH_step; eassumption.
+
+    - exact Heval.
+  Admitted.
 
 End Correct.
