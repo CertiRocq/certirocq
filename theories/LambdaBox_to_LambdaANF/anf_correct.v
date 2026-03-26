@@ -133,27 +133,39 @@ Section Correct.
   (** ** Shorthands *)
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
+  Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
   Let anf_env_rel' := anf_env_rel func_tag default_tag tgm cmap Σ.
   Let global_env_rel' := global_env_rel func_tag default_tag tgm cmap Σ.
 
+  (* Shorthand for the source evaluation relation *)
+  Let src_eval := @eval_env_fuel _ LambdaBox_resource_fuel
+                                   LambdaBox_resource_trace Σ.
+
+
+  (** ** Helper: set_many *)
+
+  Fixpoint set_many (xs : list var) (vs : list val) (rho : M.t val) : M.t val :=
+    match xs, vs with
+    | x :: xs', v :: vs' => M.set x v (set_many xs' vs' rho)
+    | _, _ => rho
+    end.
+
 
   (** ** Correctness predicates *)
 
-  (** Correctness for a single expression:
-      If the source evaluates to a result [r] consuming [f] fuel and [t] trace,
-      then for any target env [rho] related to the source env, and any
-      ANF conversion [C, x] of [e], the target simulates the source. *)
+  (** P_fuel: Correctness for a single expression at top level.
+      If the source evaluates to result [r] consuming [f] fuel and [t] trace,
+      then the ANF conversion [C, x] simulates the source. *)
   Definition anf_cvt_correct_exp
              (vs : fuel_sem.env) (e : EAst.term)
              (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames C x S S' i,
       well_formed_env Σ vs ->
-      @wellformed efl Σ (List.length vnames) e = true ->
+      wellformed Σ (List.length vnames) e = true ->
       env_consistent vnames vs ->
       Disjoint _ (FromList vnames) S ->
       anf_env_rel' vnames vs rho ->
-      (* Global env invariant for this rho *)
       global_env_rel' (fun _ => True) rho ->
       anf_cvt_rel' S e vnames S' C x ->
       forall e_k,
@@ -166,13 +178,67 @@ Section Correct.
         (r = fuel_sem.OOT ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
+  (** P_step: Correctness for a computation step.
+      Same as [anf_cvt_correct_exp] but the fuel bound accounts for
+      the step's own fuel consumption [one_i e]. *)
+  Definition anf_cvt_correct_exp_step
+             (vs : fuel_sem.env) (e : EAst.term)
+             (r : fuel_sem.result) (f t : nat) :=
+    forall rho vnames C x S S' i,
+      well_formed_env Σ vs ->
+      wellformed Σ (List.length vnames) e = true ->
+      env_consistent vnames vs ->
+      Disjoint _ (FromList vnames) S ->
+      anf_env_rel' vnames vs rho ->
+      global_env_rel' (fun _ => True) rho ->
+      anf_cvt_rel' S e vnames S' C x ->
+      forall e_k,
+        Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x]) ->
+        (* Source terminates *)
+        (forall v v', r = fuel_sem.Val v -> anf_val_rel' v v' ->
+         preord_exp cenv
+                    (anf_bound (f <+> @one_i _ _ fuel_resource_LambdaBox e)
+                               (t <+> @one_i _ _ trace_resource_LambdaBox e))
+                    eq_fuel i
+                    (e_k, M.set x v' rho) (C |[ e_k ]|, rho)) /\
+        (* Source diverges *)
+        (r = fuel_sem.OOT ->
+         exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
+
+  (** P_many: Correctness for argument lists.
+      If each argument evaluates, the ANF-converted arguments produce
+      related values in the target env via [set_many]. *)
+  Definition anf_cvt_correct_exps
+             (vs_env : fuel_sem.env) (es : list EAst.term)
+             (vs1 : list fuel_sem.value) (f t : nat) :=
+    forall rho vnames C xs S S' i,
+      well_formed_env Σ vs_env ->
+      Forall (fun e => wellformed Σ (List.length vnames) e = true) es ->
+      env_consistent vnames vs_env ->
+      Disjoint _ (FromList vnames) S ->
+      anf_env_rel' vnames vs_env rho ->
+      global_env_rel' (fun _ => True) rho ->
+      anf_cvt_rel_args' S es vnames S' C xs ->
+      forall e_k vs',
+        Forall2 anf_val_rel' vs1 vs' ->
+        Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList xs) ->
+        preord_exp cenv (anf_bound f t) eq_fuel i
+                   (e_k, set_many xs vs' rho)
+                   (C |[ e_k ]|, rho).
+
 
   (** ** Main correctness theorem *)
 
+  (** The proof proceeds by mutual induction using [eval_env_fuel_ind'].
+      The scheme generates goals in order:
+        P  (eval_env_step):  13 cases (App, FixApp, LetIn, Construct,
+                             Case, Proj, Const + OOT variants)
+        P0 (eval_fuel_many): 2 cases (nil, cons)
+        P1 (eval_env_fuel):  6 cases (Rel, Lam, Fix, Box, OOT, Step) *)
+
   Lemma anf_cvt_correct :
     forall vs e r f t,
-      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                     Σ vs e r f t ->
+      src_eval vs e r f t ->
       anf_cvt_correct_exp vs e r f t.
   Proof. admit. Admitted.
 
