@@ -2072,8 +2072,9 @@ Section AlphaEquiv.
           intros v0 [k0 [Hk0 Hlk0]].
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
-          (* preord_env_P: same pattern as Clos_v but Hglob_fix1/2 cleared
-             by injection. Admit for now. *)
+          (* preord_env_P cmap_deps_mfix: same as Clos_v *)
+          (* Goal is preord_var_env for a single v0.
+             v0, k0, Hk0, Hlk0, Hv0_cmap already in context. *)
           admit.
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
