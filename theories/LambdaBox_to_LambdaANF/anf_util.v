@@ -3,7 +3,7 @@
 
 From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-From MetaRocq.Erasure Require Import EAst.
+From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv.
 From MetaRocq.Common Require Import BasicAst Kernames.
 From MetaRocq.Utils Require Import bytestring.
 From compcert Require Import lib.Maps lib.Coqlib.
@@ -25,6 +25,12 @@ Section ANF_Val.
           (tgm : conId_map)
           (cmap : const_map).
 
+  Context {src_trace : Type}
+          {Hf_src : @LambdaBox_resource nat}
+          {Ht_src : @LambdaBox_resource src_trace}.
+
+  Context (Σ : EAst.global_context).
+
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
 
 (* ================================================================= *)
@@ -34,6 +40,21 @@ Section ANF_Val.
   Definition anf_env_rel' (P : fuel_sem.value -> val -> Prop)
              (vn : list var) (vs : list fuel_sem.value) (rho : M.t val) :=
     Forall2 (fun v x => exists v', M.get x rho = Some v' /\ P v v') vs vn.
+
+  (** Relates cmap variables to their ANF values in a target environment,
+      restricted to a set [D] of kernames. Parametric in the value relation
+      [val_rel] so it can be used inside [anf_val_rel] (tie-the-knot pattern). *)
+  Definition global_env_rel' (val_rel : fuel_sem.value -> val -> Prop)
+             (D : kername -> Prop) (rho : M.t val) : Prop :=
+    forall k v,
+      D k ->
+      lookup_const cmap k = Some v ->
+      forall anf_v, M.get v rho = Some anf_v ->
+      exists decl body src_v f t,
+        declared_constant Σ k decl /\
+        decl.(EAst.cst_body) = Some body /\
+        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t /\
+        val_rel src_v anf_v.
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
     : Ensemble var -> list var ->
@@ -75,6 +96,8 @@ Section ANF_Val.
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
         anf_cvt_rel' S1 e (x :: names) S2 C1 r1 ->
+        global_env_rel' anf_val_rel
+          (fun k => KernameSet.In k (term_global_deps e)) rho ->
         anf_val_rel (Clos_v vs na e)
                     (Vfun rho (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) Fnil) f)
   | anf_rel_ClosFix :
@@ -87,10 +110,15 @@ Section ANF_Val.
         Disjoint _ (FromList names) (FromList fnames) ->
         nth_error fnames n = Some f ->
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
+        global_env_rel' anf_val_rel
+          (fun k => Exists
+            (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix) rho ->
         anf_val_rel (ClosFix_v vs mfix n) (Vfun rho Bs f).
 
   Definition anf_env_rel : list var -> list fuel_sem.value -> M.t val -> Prop :=
     anf_env_rel' anf_val_rel.
+
+  Definition global_env_rel := global_env_rel' anf_val_rel.
 
 
 (* ================================================================= *)
@@ -384,13 +412,18 @@ Section AlphaEquiv.
           (Hincl : inclusion (comp P1 P1) P1)
           (HinclG : inclusion P1 PG).
 
+  Context {src_trace : Type}
+          {Hf_src : @LambdaBox_resource nat}
+          {Ht_src : @LambdaBox_resource src_trace}.
+  Context (Σ : EAst.global_context).
+
   Context (func_tag default_tag : positive).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
-  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
 
 
 (* ----------------------------------------------------------------- *)
@@ -598,8 +631,8 @@ Section AlphaEquiv.
       Disjoint _ (cmap_vars cmap) S3 ->
       (* Local variable bindings are pairwise related *)
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      (* Global constant bindings are related *)
-      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
+      (* Global constant bindings are related (restricted to deps of [e]) *)
+      preord_env_P cenv PG (cmap_deps cmap e) m rho1 rho2 ->
       (* Continuation hypothesis: if the result variables [r1 ~ r2] are
          related, local bindings are preserved, and variables not consumed
          by this conversion are transferred, then [e_k1 ~ e_k2] *)
@@ -628,7 +661,7 @@ Section AlphaEquiv.
       Disjoint _ (cmap_vars cmap) S1 ->
       Disjoint _ (cmap_vars cmap) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
-      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
+      preord_env_P cenv PG (cmap_deps_list cmap args) m rho1 rho2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
@@ -660,7 +693,7 @@ Section AlphaEquiv.
       Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
       Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
-      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
+      preord_env_P cenv PG (cmap_deps_mfix cmap mfix) m rho1 rho2 ->
       Forall2 (preord_var_env cenv PG m
                  (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
               fnames1 fnames2.
@@ -668,7 +701,8 @@ Section AlphaEquiv.
   (** Two ANF conversions of the same case branches produce
       [preord_exp]-related [Ecase] expressions. *)
   Definition anf_cvt_branches_alpha_equiv_for
-             (ind : inductive) (brs : list (list name * EAst.term)) (n : N) k :=
+             (ind : inductive) (brs : list (list name * EAst.term))
+             (n : N) k :=
     forall pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
       (m <= k)%nat ->
       anf_cvt_rel_branches' S1 ind brs n vars1 y1 S2 pats1 ->
@@ -679,7 +713,7 @@ Section AlphaEquiv.
       Disjoint _ (cmap_vars cmap) S3 ->
       Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       preord_var_env cenv PG m rho1 rho2 y1 y2 ->
-      preord_env_P cenv PG (cmap_vars cmap) m rho1 rho2 ->
+      preord_env_P cenv PG (cmap_deps_brs cmap brs) m rho1 rho2 ->
       preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
 
   (* Value-level alpha-equiv *)
@@ -726,9 +760,12 @@ Section AlphaEquiv.
       inv Hrel1. inv Hrel2.
       inversion Hall as [| ? ? IH_hd IH_tl]; subst.
       rewrite <- !app_ctx_f_fuse.
-      (* IH for head t *)
+      (* IH for head t: need cmap_deps cmap t ⊆ cmap_deps_list cmap (t::args') *)
       eapply IH_hd; [lia | eassumption | eassumption | assumption | assumption
-                     | assumption | assumption | assumption | assumption |].
+                     | assumption | assumption | assumption
+                     | eapply preord_env_P_antimon; [exact Hglob |];
+                       eapply cmap_vars_of_monotone; intros kn Hkn; apply Exists_cons_hd; exact Hkn
+                     |].
       (* Continuation: after head, convert tail *)
       intros j rho1' rho2' Hj Hvar_hd Henv' Htransfer.
       eapply IHargs; [exact IH_tl | lia | eassumption | eassumption
@@ -737,10 +774,14 @@ Section AlphaEquiv.
                       | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
                       | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
                       | exact Henv'
+                      (* cmap_deps_list cmap args' ⊆ cmap_deps_list cmap (t::args') *)
                       | intros v0 Hv0; eapply Htransfer;
-                        [eapply Hglob; exact Hv0
-                        | intros Hc; eapply Hdis_cm1; constructor; eassumption
-                        | intros Hc; eapply Hdis_cm2; constructor; eassumption]
+                        [eapply Hglob; eapply cmap_vars_of_monotone;
+                         [| exact Hv0]; intros kn Hkn; apply Exists_cons_tl; exact Hkn
+                        | intros Hc; eapply Hdis_cm1; constructor;
+                          [eapply cmap_vars_of_subset; exact Hv0 | exact Hc]
+                        | intros Hc; eapply Hdis_cm2; constructor;
+                          [eapply cmap_vars_of_subset; exact Hv0 | exact Hc]]
                       |].
       (* Continuation: combine head and tail results *)
       intros j' rho1'' rho2'' Hj' Hxs_tl Henv'' Htransfer'.
@@ -804,7 +845,8 @@ Section AlphaEquiv.
             end. }
           rewrite <- Hlen_eq in *.
           eapply ctx_bind_proj_Forall2_compat
-            with (acc1 := vars1) (acc2 := vars2) (S_extra := cmap_vars cmap).
+            with (acc1 := vars1) (acc2 := vars2)
+                 (S_extra := cmap_deps_brs cmap ((lnames, e_br) :: brs')).
           -- eapply preord_var_env_monotonic with (k := m). exact Hvar_y.
              apply Nat.lt_le_incl. exact Hlt.
           -- eapply Forall2_preord_var_env_monotonic with (k := m); [| exact Henv].
@@ -824,14 +866,16 @@ Section AlphaEquiv.
                   eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
              ++ eapply Disjoint_Included_r; [| eapply Disjoint_sym; exact Hdis2].
                 rewrite Union_commut. eapply Included_refl.
-          -- (* preord_env_P cmap_vars at step m' *)
+          -- (* preord_env_P (cmap_deps_brs cmap ((lnames,e_br)::brs')) at step m' *)
              intros v0 Hv0.
              eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
-          -- (* Disjoint cmap_vars (FromList vars) *)
+          -- (* Disjoint (cmap_deps_brs ...) (FromList vars): via cmap_vars_of_subset *)
+             eapply Disjoint_Included_l; [eapply cmap_vars_of_subset |].
              eapply Disjoint_Included_r; [| exact Hdis_cm1].
              match goal with H : FromList ?vs \subset _ |- _ =>
                eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
-          -- (* Disjoint cmap_vars (FromList vars0) *)
+          -- (* Disjoint (cmap_deps_brs ...) (FromList vars0): via cmap_vars_of_subset *)
+             eapply Disjoint_Included_l; [eapply cmap_vars_of_subset |].
              eapply Disjoint_Included_r; [| exact Hdis_cm2].
              match goal with H : FromList ?vs \subset _ |- _ =>
                eapply Included_trans; [exact H | eapply anf_cvt_branches_subset; eassumption] end.
@@ -866,14 +910,18 @@ Section AlphaEquiv.
                    eapply anf_cvt_branches_subset. eassumption.
                 ** exact Hdis_cm2.
              ++ eapply Forall2_app; eassumption.
-             ++ exact Henv_extra_proj.
+             (* IH_hd needs cmap_deps cmap e_br ⊆ cmap_deps_brs cmap ((lnames,e_br)::brs') *)
+             ++ eapply preord_env_P_antimon; [exact Henv_extra_proj |].
+                eapply cmap_vars_of_monotone. intros kn Hkn. apply Exists_cons_hd. exact Hkn.
              ++ (* body continuation: Ehalt *)
                 intros j rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
                 eapply preord_exp_halt_compat;
                   [eapply Hprops | eapply Hprops | exact Hvar_r].
         * lia.
-      + (* tail: same fresh sets, same environments *)
+      + (* tail: cmap_deps_brs cmap brs' ⊆ cmap_deps_brs cmap ((lnames,e_br)::brs') *)
         eapply (IHbrs (n + 1)%N IH_tl); try eassumption.
+        eapply preord_env_P_antimon; [exact Hglob |].
+        eapply cmap_vars_of_monotone. intros kn Hkn. apply Exists_cons_tl. exact Hkn.
   Qed.
 
   (* Derives mfix alpha-equiv assuming exp alpha-equiv for each body
@@ -1019,20 +1067,28 @@ Section AlphaEquiv.
                 ** eapply Hdis2. constructor.
                    --- right. exact H.
                    --- exact (Hsi2_sub _ Hxi2_in).
-        * (* preord_env_P cmap_vars *)
+        * (* preord_env_P (cmap_deps cmap e_body): antimon from cmap_deps_mfix *)
           eapply preord_env_P_def_funs_set.
-          -- intros v0 Hv0.
-             eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
-          -- eapply Disjoint_Included_r.
-             ++ exact (proj1 (Same_set_all_fun_name _)).
-             ++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
-                       exact Hdis_cm_fn1.
-          -- eapply Disjoint_Included_r.
-             ++ exact (proj1 (Same_set_all_fun_name _)).
-             ++ erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
-                       exact Hdis_cm_fn2.
-          -- intros Hc. eapply Hdis_cm1. constructor; [exact Hc | exact (Hsi1_sub _ Hxi1_in)].
-          -- intros Hc. eapply Hdis_cm2. constructor; [exact Hc | exact (Hsi2_sub _ Hxi2_in)].
+          -- eapply preord_env_P_antimon.
+             ++ intros v0 Hv0.
+                eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
+             ++ (* cmap_deps cmap e_body ⊆ cmap_deps_mfix cmap mfix *)
+                eapply cmap_vars_of_monotone. intros kn Hkn.
+                apply Exists_exists. exists d1. split.
+                ** eapply nth_error_In. exact Hnth_d1.
+                ** rewrite Hbody1. simpl. exact Hkn.
+          -- (* Disjoint (cmap_deps cmap e_body) (name_in_fundefs B1) *)
+             eapply Disjoint_Included_l; [eapply cmap_vars_of_subset |].
+             eapply Disjoint_Included_r; [exact (proj1 (Same_set_all_fun_name _)) |].
+             erewrite anf_cvt_rel_mfix_all_fun_name by eassumption. exact Hdis_cm_fn1.
+          -- (* Disjoint (cmap_deps cmap e_body) (name_in_fundefs B2) *)
+             eapply Disjoint_Included_l; [eapply cmap_vars_of_subset |].
+             eapply Disjoint_Included_r; [exact (proj1 (Same_set_all_fun_name _)) |].
+             erewrite anf_cvt_rel_mfix_all_fun_name by eassumption. exact Hdis_cm_fn2.
+          -- intros Hc. eapply Hdis_cm1. constructor;
+               [eapply cmap_vars_of_subset; exact Hc | exact (Hsi1_sub _ Hxi1_in)].
+          -- intros Hc. eapply Hdis_cm2. constructor;
+               [eapply cmap_vars_of_subset; exact Hc | exact (Hsi2_sub _ Hxi2_in)].
         * (* Continuation: Ehalt *)
           intros j' rho1'' rho2'' Hle' Hvar_r Henv_body Hpres.
           eapply preord_exp_halt_compat;
@@ -1147,12 +1203,16 @@ Section AlphaEquiv.
                   v0 ∈ cmap_vars. v0 ≠ x1, x2 (disjoint from S ∋ x1,x2).
                   v0 ≠ f1, f2 (disjoint from S \\ {x} ∋ f). So M.gso twice. *)
                eapply preord_var_env_extend_neq;
-                 [| intros Heq; subst; eapply Hdis_cm1; constructor; [exact Hv0 | eassumption]
-                  | intros Heq; subst; eapply Hdis_cm2; constructor; [exact Hv0 | eassumption]].
+                 [| intros Heq; subst; eapply Hdis_cm1; constructor;
+                    [eapply cmap_vars_of_subset; exact Hv0 | eassumption]
+                  | intros Heq; subst; eapply Hdis_cm2; constructor;
+                    [eapply cmap_vars_of_subset; exact Hv0 | eassumption]].
                eapply preord_var_env_extend_neq;
-                 [| intros Heq; subst; eapply Hdis_cm1; constructor; [exact Hv0 |];
+                 [| intros Heq; subst; eapply Hdis_cm1; constructor;
+                    [eapply cmap_vars_of_subset; exact Hv0 |];
                     eapply Setminus_Included; eassumption
-                  | intros Heq; subst; eapply Hdis_cm2; constructor; [exact Hv0 |];
+                  | intros Heq; subst; eapply Hdis_cm2; constructor;
+                    [eapply cmap_vars_of_subset; exact Hv0 |];
                     eapply Setminus_Included; eassumption].
                eapply preord_var_env_monotonic with (k := m).
                eapply Hglob. exact Hv0. lia.
@@ -1174,9 +1234,13 @@ Section AlphaEquiv.
     { (* tLetIn na b t: comp_ctx_f C_b C_t *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse.
-      (* IH1 for binding b *)
+      (* IH1 for binding b: cmap_deps cmap b ⊆ cmap_deps cmap (tLetIn na b t) *)
       eapply IHe1; [lia | eassumption | eassumption | assumption | assumption
-                    | assumption | assumption | assumption | assumption |].
+                    | assumption | assumption | assumption
+                    | eapply preord_env_P_antimon; [exact Hglob |];
+                      eapply cmap_vars_of_monotone; intros kn Hkn;
+                      apply KernameSet.union_spec; left; exact Hkn
+                    |].
       (* Continuation: after b converted, convert t in extended env *)
       intros j rho1' rho2' Hj Hvar_x Henv' Htransfer.
       eapply IHe2; [lia | eassumption | eassumption | | | | | | |].
@@ -1194,12 +1258,16 @@ Section AlphaEquiv.
       - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption].
       - (* Forall2 (x1::vars1) (x2::vars2) *)
         constructor; [exact Hvar_x | exact Henv'].
-      - (* preord_env_P cmap_vars: transfer from Hglob via Htransfer *)
+      - (* preord_env_P cmap_deps t: cmap_deps t ⊆ cmap_deps (tLetIn ..), via Htransfer *)
         intros v Hv_in.
         eapply Htransfer.
-        + eapply Hglob. exact Hv_in.
-        + intros Hc. eapply Hdis_cm1. constructor; eassumption.
-        + intros Hc. eapply Hdis_cm2. constructor; eassumption.
+        + eapply Hglob.
+          eapply cmap_vars_of_monotone; [| exact Hv_in].
+          intros kn Hkn. apply KernameSet.union_spec. right. exact Hkn.
+        + intros Hc. eapply Hdis_cm1. constructor;
+            [eapply cmap_vars_of_subset; exact Hv_in | exact Hc].
+        + intros Hc. eapply Hdis_cm2. constructor;
+            [eapply cmap_vars_of_subset; exact Hv_in | exact Hc].
       - (* Continuation for t: chain to Hcont *)
         intros j' rho1'' rho2'' Hj' Hvar_r Henv'' Htransfer'.
         eapply Hcont.
@@ -1216,11 +1284,15 @@ Section AlphaEquiv.
     { (* tApp u v: comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)) *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse. simpl.
-      (* IH1 for function u *)
+      (* IH1 for function u: cmap_deps cmap u ⊆ cmap_deps cmap (tApp u v) *)
       eapply IHe1; [lia | eassumption | eassumption | assumption | assumption
-                    | assumption | assumption | assumption | assumption |].
+                    | assumption | assumption | assumption
+                    | eapply preord_env_P_antimon; [exact Hglob |];
+                      eapply cmap_vars_of_monotone; intros kn Hkn;
+                      apply KernameSet.union_spec; left; exact Hkn
+                    |].
       intros j rho1' rho2' Hj Hvar_x1 Henv' Htransfer1.
-      (* IH2 for argument v *)
+      (* IH2 for argument v: cmap_deps cmap v ⊆ cmap_deps cmap (tApp u v) *)
       eapply IHe2; [lia | eassumption | eassumption
                     | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
                     | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
@@ -1228,9 +1300,12 @@ Section AlphaEquiv.
                     | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | assumption]
                     | exact Henv'
                     | intros v0 Hv0; eapply Htransfer1;
-                      [eapply Hglob; exact Hv0
-                      | intros Hc; eapply Hdis_cm1; constructor; eassumption
-                      | intros Hc; eapply Hdis_cm2; constructor; eassumption]
+                      [eapply Hglob; eapply cmap_vars_of_monotone;
+                       [| exact Hv0]; intros kn Hkn; apply KernameSet.union_spec; right; exact Hkn
+                      | intros Hc; eapply Hdis_cm1; constructor;
+                        [eapply cmap_vars_of_subset; exact Hv0 | exact Hc]
+                      | intros Hc; eapply Hdis_cm2; constructor;
+                        [eapply cmap_vars_of_subset; exact Hv0 | exact Hc]]
                     |].
       intros j' rho1'' rho2'' Hj' Hvar_x2 Henv'' Htransfer2.
       (* letapp compatibility *)
@@ -1285,14 +1360,16 @@ Section AlphaEquiv.
       end.
       eapply Hcont.
       - lia.
-      - eapply Hglob. exists s. eassumption.
+      - eapply Hglob. exists s. split.
+        + apply KernameSet.singleton_spec. reflexivity.
+        + eassumption.
       - assumption.
       - intros; assumption. }
 
     { (* tConstruct ind c args: comp_ctx_f C_args (Econstr_c x ctag xs Hole_c) *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse.
-      (* Use args helper with X *)
+      (* Use args helper with X: cmap_deps_list cmap args ⊆ cmap_deps cmap (tConstruct ...) *)
       eapply anf_cvt_args_alpha_from_all;
         [exact X | lia | eassumption | eassumption
         | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis1]
@@ -1300,7 +1377,10 @@ Section AlphaEquiv.
         | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm1]
         | eapply Disjoint_Included_r; [apply Setminus_Included | exact Hdis_cm2]
         | exact Henv
-        | intros v0 Hv0; eapply Hglob; exact Hv0
+        | eapply preord_env_P_antimon; [exact Hglob |];
+          eapply cmap_vars_of_monotone; intros kname Hkname;
+          destruct ind as [ind_mind ind_idx]; simpl;
+          apply Exists_fold_left_union; exact Hkname
         |].
       (* Continuation: after args converted, build constructor *)
       intros j rho1' rho2' Hj Hxs Henvvars Htransfer.
@@ -1354,11 +1434,19 @@ Section AlphaEquiv.
           * eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
           * intro Hc. eapply Hdis1. constructor; [exact Hc | eassumption].
           * intro Hc. eapply Hdis2. constructor; [exact Hc | eassumption].
-        + (* preord_env_P cmap in M.set f rho *)
+        + (* preord_env_P (cmap_deps cmap mch) in M.set f rho:
+             cmap_deps cmap mch ⊆ cmap_deps cmap (tCase ...) via fold_left *)
           intros v0 Hv0. eapply preord_var_env_extend_neq.
-          * eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia].
-          * intros Heq. subst. eapply Hdis_cm1. constructor; [exact Hv0 | eassumption].
-          * intros Heq. subst. eapply Hdis_cm2. constructor; [exact Hv0 | eassumption].
+          * eapply preord_var_env_monotonic.
+            -- eapply Hglob.
+               eapply cmap_vars_of_monotone; [| exact Hv0]. intros kn Hkn.
+               apply KernameSet.union_spec. right.
+               apply fold_left_union_In. exact Hkn.
+            -- lia.
+          * intros Heq. subst. eapply Hdis_cm1.
+            constructor; [eapply cmap_vars_of_subset; exact Hv0 | eassumption].
+          * intros Heq. subst. eapply Hdis_cm2.
+            constructor; [eapply cmap_vars_of_subset; exact Hv0 | eassumption].
         + (* Continuation: Eletapp r f func_tag [x_mch] e_k *)
           intros j rho1' rho2' Hle Hvar_xscr Henvvars Hpres.
           eapply preord_exp_letapp_compat.
@@ -1423,23 +1511,27 @@ Section AlphaEquiv.
                            eapply Setminus_Included; exact H end.
                   ** (* preord_var_env y1 y2 *)
                      eapply preord_var_env_extend_eq. eassumption.
-                  ** (* preord_env_P cmap in M.set y (M.set f rho):
-                        v0 ≠ y, v0 ≠ f since both ∈ S1 and cmap ⊥ S1 *)
+                  ** (* preord_env_P (cmap_deps_brs cmap brs) in M.set y (M.set f rho):
+                        cmap_deps_brs brs ⊆ cmap_deps (tCase ..) via fold_left *)
                      intros v0 Hv0.
                      eapply preord_var_env_extend_neq.
                      --- eapply preord_var_env_extend_neq.
-                         +++ eapply preord_var_env_monotonic;
-                               [eapply Hglob; exact Hv0 | lia].
+                         +++ eapply preord_var_env_monotonic.
+                             *** eapply Hglob.
+                                 eapply cmap_vars_of_monotone; [| exact Hv0].
+                                 intros kn Hkn. apply KernameSet.union_spec. right.
+                                 apply Exists_fold_left_union. exact Hkn.
+                             *** lia.
                          +++ intros Heq. subst. eapply Hdis_cm1.
-                             constructor; [exact Hv0 | eassumption].
+                             constructor; [eapply cmap_vars_of_subset; exact Hv0 | eassumption].
                          +++ intros Heq. subst. eapply Hdis_cm2.
-                             constructor; [exact Hv0 | eassumption].
+                             constructor; [eapply cmap_vars_of_subset; exact Hv0 | eassumption].
                      --- intros Heq. subst. eapply Hdis_cm1.
-                         constructor; [exact Hv0 |].
+                         constructor; [eapply cmap_vars_of_subset; exact Hv0 |].
                          match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
                            eapply Setminus_Included; exact H end.
                      --- intros Heq. subst. eapply Hdis_cm2.
-                         constructor; [exact Hv0 |].
+                         constructor; [eapply cmap_vars_of_subset; exact Hv0 |].
                          match goal with H : Ensembles.In _ (Setminus _ _ _) _ |- _ =>
                            eapply Setminus_Included; exact H end.
             -- (* f ∉ S1 \\ {f} \\ {y} — absurd since f ∈ S1 but f ∉ S1\\{f} *)
@@ -1488,8 +1580,12 @@ Section AlphaEquiv.
     { (* tProj p c: comp_ctx_f C_c (Eproj_c y ctag n x Hole_c) *)
       inv Hrel1. inv Hrel2.
       rewrite <- !app_ctx_f_fuse. simpl.
-      (* Use IHe for sub-expression c *)
-      eapply IHe; [lia | eassumption | eassumption | assumption | assumption | assumption | assumption | assumption | assumption |].
+      (* Use IHe for sub-expression c: cmap_deps cmap c ⊆ cmap_deps cmap (tProj p c) *)
+      eapply IHe; [lia | eassumption | eassumption | assumption | assumption | assumption | assumption | assumption
+                  | eapply preord_env_P_antimon; [exact Hglob |];
+                    eapply cmap_vars_of_monotone; intros kn Hkn;
+                    apply KernameSet.union_spec; right; exact Hkn
+                  |].
       (* Continuation: after c is converted, project the field *)
       intros j rho1' rho2' Hj Hvar_c Henv' Htransfer.
       eapply preord_exp_proj_compat.
@@ -1564,7 +1660,12 @@ Section AlphaEquiv.
         - match goal with H : FromList ?fn \subset _ |- _ =>
             eapply Disjoint_Included_l; [exact H | eapply Disjoint_sym; exact Hdis2] end.
         - eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
-        - intros v0 Hv0. eapply preord_var_env_monotonic; [eapply Hglob; exact Hv0 | lia]. }
+        (* cmap_deps_mfix cmap mfix ⊆ cmap_deps cmap (tFix mfix idx) *)
+        - intros v0 Hv0. eapply preord_var_env_monotonic.
+          + eapply Hglob.
+            eapply cmap_vars_of_monotone; [| exact Hv0]. intros kn Hkn.
+            simpl. apply Exists_fold_left_union. exact Hkn.
+          + lia. }
       eapply preord_exp_fun_compat.
       - eapply Hprops.
       - eapply Hprops.

@@ -4,7 +4,7 @@
 From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Ensembles.
 
 (** MetaRocq *)
-From MetaRocq.Erasure Require Import EAst EPrimitive.
+From MetaRocq.Erasure Require Import EAst EAstUtils EPrimitive.
 From MetaRocq.Common Require Import Primitive Kernames.
 From MetaRocq.Utils Require Import bytestring.
 
@@ -14,7 +14,7 @@ From compcert Require Import lib.Maps.
 (** CertiRocq *)
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq Require Import Pipeline_utils.
-From CertiRocq.LambdaANF Require Import cps ctx.
+From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util.
 
 Import ListNotations.
 Open Scope bs_scope.
@@ -78,6 +78,64 @@ Fixpoint lookup_const (cm : const_map) (k : kername) : option var :=
 (** The set of variables in the range of a [const_map]. *)
 Definition cmap_vars (cm : const_map) : Ensemble var :=
   fun v => exists s, lookup_const cm s = Some v.
+
+(** The subset of [cmap_vars] restricted to kernames satisfying [D]. *)
+Definition cmap_vars_of (cm : const_map) (D : kername -> Prop) : Ensemble var :=
+  fun v => exists k, D k /\ lookup_const cm k = Some v.
+
+Lemma cmap_vars_of_subset cm D :
+  cmap_vars_of cm D \subset cmap_vars cm.
+Proof. intros v [k [_ Hlk]]. exists k. exact Hlk. Qed.
+
+Lemma cmap_vars_of_monotone cm (D1 D2 : kername -> Prop) :
+  (forall k, D1 k -> D2 k) ->
+  cmap_vars_of cm D1 \subset cmap_vars_of cm D2.
+Proof. intros Hsub v [k [Hd Hlk]]. exists k. split; [exact (Hsub k Hd) | exact Hlk]. Qed.
+
+(** ** Helpers for KernameSet fold_left inclusions *)
+
+(** If k is in [init], it survives any fold_left union. *)
+Lemma fold_left_union_In {A} (f : A -> KernameSet.t) (l : list A) init k :
+  KernameSet.In k init ->
+  KernameSet.In k (fold_left (fun acc x => KernameSet.union (f x) acc) l init).
+Proof.
+  revert init.
+  induction l as [| x l' IH]; intros init Hk.
+  - exact Hk.
+  - simpl. apply IH. apply KernameSet.union_spec. right. exact Hk.
+Qed.
+
+(** If k is in [f x] for some [x ∈ l], it appears in the fold_left union. *)
+Lemma Exists_fold_left_union {A} (f : A -> KernameSet.t) (l : list A) init k :
+  Exists (fun x => KernameSet.In k (f x)) l ->
+  KernameSet.In k (fold_left (fun acc x => KernameSet.union (f x) acc) l init).
+Proof.
+  revert init.
+  induction l as [| x l' IH]; intros init HE.
+  - inv HE.
+  - inv HE.
+    + simpl. apply fold_left_union_In.
+      apply KernameSet.union_spec. left. assumption.
+    + simpl. apply IH. assumption.
+Qed.
+
+(** ** Dependency-restricted cmap variable sets *)
+
+(** Cmap variables needed by a single term. *)
+Definition cmap_deps (cm : const_map) (e : EAst.term) : Ensemble var :=
+  cmap_vars_of cm (fun k => KernameSet.In k (term_global_deps e)).
+
+(** Cmap variables needed by a list of terms (e.g. constructor args). *)
+Definition cmap_deps_list (cm : const_map) (es : list EAst.term) : Ensemble var :=
+  cmap_vars_of cm (fun k => Exists (fun e => KernameSet.In k (term_global_deps e)) es).
+
+(** Cmap variables needed by case branch bodies. *)
+Definition cmap_deps_brs (cm : const_map) (brs : list (list name * EAst.term)) : Ensemble var :=
+  cmap_vars_of cm (fun k => Exists (fun br => KernameSet.In k (term_global_deps (snd br))) brs).
+
+(** Cmap variables needed by mutual fixpoint bodies. *)
+Definition cmap_deps_mfix (cm : const_map) (mfix : list (EAst.def EAst.term)) : Ensemble var :=
+  cmap_vars_of cm (fun k => Exists (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix).
 
 (** Primitive lookup *)
 Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
