@@ -180,60 +180,6 @@ Section ANF_Val.
         * exact Hcvt.
   Qed.
 
-  (* Like [anf_fix_rel_find_def] but derives the [nth_error mfix] and
-     [dbody] facts from the [anf_fix_rel] induction. Also gives
-     disjointness and freshness for the lambda parameter. *)
-  Lemma anf_fix_rel_exists :
-    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f,
-      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
-      nth_error fnames_list idx = Some f ->
-      NoDup fnames_list ->
-      exists (d : EAst.def EAst.term) (na : name) (e_body : EAst.term) (x_pc : var)
-             (C_body : exp_ctx) (r_body : var)
-             (S_body1 S_body2 : Ensemble var),
-        nth_error mfix idx = Some d /\
-        d.(EAst.dbody) = EAst.tLambda na e_body /\
-        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
-        anf_cvt_rel' S_body1 e_body
-                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body /\
-        Disjoint var (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
-        ~ x_pc \in (FromList fnames0 :|: FromList names0).
-  Proof.
-    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f Hrel Hnth Hnd.
-    revert idx f Hnth Hnd.
-    induction Hrel; intros idx0 f0 Hnth Hnd.
-    - destruct idx0; discriminate.
-    - destruct idx0 as [| idx'].
-      + simpl in Hnth. injection Hnth as Heq. subst.
-        exists d, na, e1, x, C1, r1, S1', S2.
-        split; [reflexivity | split; [eassumption | split; [| split; [| split]]]].
-        * simpl. destruct (M.elt_eq f0 f0); [reflexivity | congruence].
-        * eassumption.
-        * (* Disjoint (x |: (FromList fnames0 :|: FromList names0)) S1' *)
-          (* S1' ⊆ S1 \\ {x}, so x ∉ S1' and (fnames :|: names) ⊥ S1' *)
-          eapply Union_Disjoint_l.
-          -- (* {x} ⊥ S1': x ∉ S1' because S1' ⊆ S1 \\ {x} *)
-             eapply Disjoint_Singleton_l.
-             intro Hx. apply H2 in Hx. destruct Hx as [_ Hc].
-             apply Hc. constructor.
-          -- (* (fnames :|: names) ⊥ S1': from (fnames :|: names) ⊥ S1 and S1' ⊆ S1 *)
-             eapply Disjoint_sym.
-             eapply Disjoint_Included_l; [|eassumption].
-             eapply Included_trans; [eassumption |]. eapply Setminus_Included.
-        * intro Hc. eapply H0. constructor; [exact H1 | exact Hc].
-      + simpl in Hnth.
-        match goal with H : NoDup (_ :: _) |- _ =>
-          inversion H as [| ? ? Hnotin Hnd_tl]; subst end.
-        edestruct IHHrel as (d' & na' & e' & xp & Cp & rp & Sp1 & Sp2 &
-                             Hnth_d & Hbod & Hfind & Hcvt & Hdis_p & Hfresh_p);
-          [exact Hnth | exact Hnd_tl |].
-        exists d', na', e', xp, Cp, rp, Sp1, Sp2.
-        split; [simpl; exact Hnth_d | split; [exact Hbod |
-        split; [| split; [| split]]]]; try assumption.
-        simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
-        * exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth.
-        * exact Hfind.
-  Qed.
 
   (* Build Forall2 from pointwise proof + length equality *)
   Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
@@ -431,6 +377,65 @@ Section ANF_Val.
         * eapply Included_trans; [exact Hsi_sub |].
           eapply Included_trans; [eapply anf_cvt_exp_subset; eassumption |].
           eapply Setminus_Included.
+  Qed.
+
+  (* Like [anf_fix_rel_find_def] but derives the [nth_error mfix] and
+     [dbody] facts from the [anf_fix_rel] induction. Also gives
+     disjointness, freshness, and membership for the lambda parameter. *)
+  Lemma anf_fix_rel_exists :
+    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f,
+      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      NoDup fnames_list ->
+      exists (d : EAst.def EAst.term) (na : name) (e_body : EAst.term) (x_pc : var)
+             (C_body : exp_ctx) (r_body : var)
+             (S_body1 S_body2 : Ensemble var),
+        nth_error mfix idx = Some d /\
+        d.(EAst.dbody) = EAst.tLambda na e_body /\
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel' S_body1 e_body
+                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body /\
+        Disjoint var (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
+        ~ x_pc \in (FromList fnames0 :|: FromList names0) /\
+        x_pc \in S1.
+  Proof.
+    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f Hrel Hnth Hnd.
+    revert idx f Hnth Hnd.
+    induction Hrel; intros idx0 f0 Hnth Hnd.
+    - destruct idx0; discriminate.
+    - destruct idx0 as [| idx'].
+      + simpl in Hnth. injection Hnth as Heq. subst.
+        exists d, na, e1, x, C1, r1, S1', S2.
+        split; [reflexivity | split; [eassumption | split; [| split; [| split; [| ]]]]].
+        * simpl. destruct (M.elt_eq f0 f0); [reflexivity | congruence].
+        * eassumption.
+        * eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             intro Hx. apply H2 in Hx. destruct Hx as [_ Hc].
+             apply Hc. constructor.
+          -- eapply Disjoint_sym.
+             eapply Disjoint_Included_l; [|eassumption].
+             eapply Included_trans; [eassumption |]. eapply Setminus_Included.
+        * split.
+          -- intro Hc. eapply H0. constructor; [exact H1 | exact Hc].
+          -- exact H1.
+      + simpl in Hnth.
+        match goal with H : NoDup (_ :: _) |- _ =>
+          inversion H as [| ? ? Hnotin Hnd_tl]; subst end.
+        edestruct IHHrel as (d' & na' & e' & xp & Cp & rp & Sp1 & Sp2 &
+                             Hnth_d & Hbod & Hfind & Hcvt & Hdis_p & Hfresh_p & Hxp_in);
+          [exact Hnth | exact Hnd_tl |].
+        exists d', na', e', xp, Cp, rp, Sp1, Sp2.
+        split; [simpl; exact Hnth_d | split; [exact Hbod |
+        split; [| split; [| split; [| split]]]]].
+        * simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
+          -- exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth.
+          -- exact Hfind.
+        * exact Hcvt.
+        * exact Hdis_p.
+        * exact Hfresh_p.
+        * eapply Setminus_Included. eapply H2.
+          eapply anf_cvt_exp_subset. eassumption. eapply H3. exact Hxp_in.
   Qed.
 
 (* ================================================================= *)
@@ -1946,11 +1951,12 @@ Section AlphaEquiv.
       intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
       inv Hrel1. inv Hrel2.
 
-      (* Save global_env_rel' before any rename *)
-      match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
-        rename H into Hglob_fix1 end.
-      match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
-        rename H into Hglob_fix2 end.
+      (* Revert global_env_rel' into goal to protect from clearing *)
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+        revert H end.
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+        revert H end.
+      intros Hglob2_saved Hglob1_saved.
 
       (* Extract find_def for the idx-th function from both fix relations *)
       match goal with
@@ -1968,17 +1974,18 @@ Section AlphaEquiv.
 
       edestruct anf_fix_rel_exists
         as (d1 & na1 & e1 & x1 & C_1 & r_1 & S_b1 & S_b1' &
-            Hnth_d1 & Hbod1 & Hfind1 & Hcvt1 & Hdis_b1 & Hfresh_b1);
+            Hnth_d1 & Hbod1 & Hfind1 & Hcvt1 & Hdis_b1 & Hfresh_b1 & Hx1_in);
         [exact Hfix1 | exact Hnth1 | eassumption |].
       edestruct anf_fix_rel_exists
         as (d2 & na2 & e2 & x2 & C_2 & r_2 & S_b2 & S_b2' &
-            Hnth_d2 & Hbod2 & Hfind2 & Hcvt2 & Hdis_b2 & Hfresh_b2);
+            Hnth_d2 & Hbod2 & Hfind2 & Hcvt2 & Hdis_b2 & Hfresh_b2 & Hx2_in);
         [exact Hfix2 | exact Hnth2 | eassumption |].
 
       eapply preord_val_fun.
       + exact Hfind1.
       + exact Hfind2.
       + intros rho1' j vs1 vs2 Hlen Hset1.
+        (* Hglob1_saved/Hglob2_saved already saved at top *)
         destruct vs1 as [| v_arg1 [| ? ?]]; simpl in *; try congruence.
         destruct vs2 as [| v_arg2 [| ? ?]]; simpl in *; try congruence.
         inv Hset1. eexists. split. { reflexivity. }
@@ -2073,9 +2080,44 @@ Section AlphaEquiv.
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
           (* preord_env_P cmap_deps_mfix: same as Clos_v *)
-          (* Goal is preord_var_env for a single v0.
-             v0, k0, Hk0, Hlk0, Hv0_cmap already in context. *)
-          admit.
+          (* Convert Hk0 : KernameSet.In k0 (term_global_deps e1)
+             to Exists ... fnl for global_env_rel' *)
+          assert (Hk0_exists : Exists
+            (fun d => KernameSet.In k0 (term_global_deps (dbody d))) fnl).
+          { eapply Exists_exists. exists d1. split.
+            - eapply nth_error_In. exact Hnth_d1.
+            - rewrite Hbod1. simpl. exact Hk0. }
+          (* Extract from both global_env_rel' *)
+          pose proof (Hglob2_saved k0 v0 Hk0_exists Hlk0) as Hg1_ex.
+          pose proof (Hglob1_saved k0 v0 Hk0_exists Hlk0) as Hg2_ex.
+          destruct Hg1_ex as (decl1' & body1' & anf_v1' & Hdecl1' & Hbody1' & Hget1' & Hvrel1').
+          destruct Hg2_ex as (decl2' & body2' & anf_v2' & Hdecl2' & Hbody2' & Hget2' & Hvrel2').
+          assert (decl1' = decl2') by (unfold declared_constant in *; congruence). subst decl2'.
+          assert (body1' = body2') by congruence. subst body2'.
+          destruct (globals_terminate _ _ _ Hdecl1' Hbody1') as (src_v' & f_ev' & t_ev' & Heval').
+          specialize (Hvrel1' _ _ _ Heval'). specialize (Hvrel2' _ _ _ Heval').
+          (* v0 ∉ name_in_fundefs Bs/Bs0 *)
+          assert (Hafn1' := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix1).
+          assert (Hni_v0_1 : ~ name_in_fundefs Bs v0).
+          { intro Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
+            rewrite Hafn1' in Hc. eapply H7. constructor; eassumption. }
+          assert (Hafn2' := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix2).
+          assert (Hni_v0_2 : ~ name_in_fundefs Bs0 v0).
+          { intro Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
+            rewrite Hafn2' in Hc. eapply H17. constructor; eassumption. }
+          eapply preord_var_env_extend_neq.
+          -- (* preord_var_env in def_funs envs *)
+             intros w Hw.
+             rewrite def_funs_neq in Hw; [| exact Hni_v0_1].
+             rewrite Hget1' in Hw. injection Hw as <-.
+             eexists. split.
+             { rewrite def_funs_neq; [exact Hget2' | exact Hni_v0_2]. }
+             eapply IHk; [lia | exact Hvrel1' | exact Hvrel2'].
+          -- (* v0 ≠ x1: x1 ∈ S1, cmap ⊥ S1 *)
+             intro Heq. subst.
+             eapply H6. constructor; [exact Hv0_cmap | exact Hx1_in].
+          -- intro Heq. subst.
+             eapply H16. constructor; [exact Hv0_cmap | exact Hx2_in].
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat;
