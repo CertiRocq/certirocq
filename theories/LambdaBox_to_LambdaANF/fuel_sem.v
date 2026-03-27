@@ -106,6 +106,7 @@ Section FUEL_SEM.
           {Ht : @LambdaBox_resource trace}.
 
   Context (Σ : EAst.global_context).
+  Context (box_dc : dcon).
 
 
   (** * Big-step resource semantics for EAst.term *)
@@ -232,7 +233,7 @@ Section FUEL_SEM.
         eval_env_fuel rho (EAst.tFix mfix idx)
                       (Val (ClosFix_v rho mfix idx)) <0> (one_i (EAst.tFix mfix idx))
   | eval_Box_fuel :
-      forall (rho : env) (box_dc : dcon),
+      forall (rho : env),
         eval_env_fuel rho EAst.tBox
                       (Val (Con_v box_dc []))
                       <0> (one_i EAst.tBox)

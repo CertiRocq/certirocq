@@ -14,7 +14,7 @@ From CertiRocq.LambdaANF Require Import
   List_util algebra alpha_conv functions Ensembles_util
   tactics identifiers bounds cps_util rename set_util.
 From MetaRocq.Utils Require Import All_Forall.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem anf_corresp.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
 
 Import ListNotations.
 
@@ -29,7 +29,8 @@ Section ANF_Val.
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
 
-  Context (Σ : EAst.global_context).
+  Context (Σ : EAst.global_context)
+          (box_dc : dcon).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
 
@@ -56,7 +57,7 @@ Section ANF_Val.
         decl.(EAst.cst_body) = Some body /\
         M.get v rho = Some anf_v /\
         (forall src_v f t,
-           @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t ->
+           @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t ->
            val_rel src_v anf_v).
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
@@ -492,14 +493,15 @@ Section AlphaEquiv.
   Context {src_trace : Type}
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
-  Context (Σ : EAst.global_context).
+  Context (Σ : EAst.global_context)
+          (box_dc : dcon).
 
   Context (globals_terminate :
     forall k decl body,
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t,
-        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t).
+        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t).
 
   Context (func_tag default_tag : positive).
 
@@ -507,7 +509,7 @@ Section AlphaEquiv.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
-  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
 
 
 (* ----------------------------------------------------------------- *)
@@ -1914,9 +1916,9 @@ Section AlphaEquiv.
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
           (* Extract from both global_env_rel' hypotheses *)
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
           destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
           destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
@@ -1963,9 +1965,9 @@ Section AlphaEquiv.
       inv Hrel1. inv Hrel2.
 
       (* Revert global_env_rel' into goal to protect from clearing *)
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
       intros Hglob2_saved Hglob1_saved.
 
