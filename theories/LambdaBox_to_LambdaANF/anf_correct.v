@@ -176,6 +176,19 @@ Section Correct.
       + exact (IH k' Hk).
   Qed.
 
+  Lemma Forall2_nth_error_r {A B} (R : A -> B -> Prop) l1 l2 k b :
+    Forall2 R l1 l2 ->
+    nth_error l2 k = Some b ->
+    exists a, nth_error l1 k = Some a /\ R a b.
+  Proof.
+    intros HF2 Hk. revert k Hk.
+    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k']; simpl in Hk.
+      + inv Hk. exists a'. split; [ reflexivity | exact Hab ].
+      + exact (IH k' Hk).
+  Qed.
+
 
   Lemma anf_cvt_rel_mfix_to_fix_rel fnames_all names0 :
     forall mfix S fnames S' fdefs,
@@ -230,7 +243,29 @@ Section Correct.
     all: try (intros; right; left; match goal with
       | [ Hsub : FromList _ \subset _, Hnth : nth_error _ _ = Some _ |- _ ] =>
         eapply Hsub; eapply nth_error_In; eassumption end).
-    all: admit.
+    all: try (intros; match goal with
+    | [ IH : _ \/ _ \/ _ |- _ ] =>
+      destruct IH as [?Hvn | [?Hs | ?Hcm]];
+      [ unfold FromList, Ensembles.In in *; simpl in *;
+        match goal with
+        | [ H : _ = _ \/ _ |- _ ] =>
+          destruct H as [<- | ?]; [left; assumption | left; assumption]
+        | _ => left; assumption
+        end
+      | right; left; eapply anf_cvt_exp_subset; eassumption
+      | right; right; assumption ]
+    end).
+    (* Construct: x ∈ S1 is a premise *)
+    - intros. right; left. assumption.
+    (* LetIn: x2 from body conversion *)
+    - intros ? ? ? ? ? ? ? ? ? ? ? ? IH1 ? IH2.
+      destruct IH2 as [Hin_vn | [Hin_S2 | Hin_cm]].
+      + unfold FromList, Ensembles.In in Hin_vn. simpl in Hin_vn.
+        destruct Hin_vn as [<- | ?]; [exact IH1 | left; assumption].
+      + right; left. eapply anf_cvt_exp_subset; eassumption.
+      + right; right. exact Hin_cm.
+    all: try solve [intros; right; left; admit].
+    all: try solve [intros; right; right; admit].
   Admitted.
 
   Lemma wellformed_tLetIn n na b t' :
@@ -647,7 +682,13 @@ Section Correct.
                     (* v1' satisfies global contract: x1 is a cmap variable
                        from b0 = tConst kn', so v1 evaluates from the same
                        constant body, and value determinism gives src_v = v1 *)
-                    admit. (* needs: inversion of eval for tConst + value det *)
+                    intros src_v f' t' Heval_src.
+                    (* x1 = vn0 ∈ cmap_vars. By anf_cvt_result_in_consumed,
+                       x1 ∈ FromList vn ∨ x1 ∈ S ∨ x1 ∈ cmap_vars.
+                       Since Disjoint cmap_vars S, x1 ∉ S.
+                       We need x1 ∈ cmap_vars, so b0 = tConst.
+                       Then eval inversion + value det gives src_v = v1. *)
+                    admit. (* needs eval_Const inversion + value det *)
                   + (* vn0 ≠ x1: M.gso *)
                     exists d1, b1, av. repeat (split; [assumption |]).
                     split; [rewrite M.gso; [exact Hgv | exact Hneq_vn] | exact Hd3].
@@ -675,9 +716,40 @@ Section Correct.
                     Both related to v1 via anf_val_rel', so preord_val by alpha-equiv. *)
                  (* M.get x1 rho must have a binding related to v1 *)
                  assert (Hget_x1 : exists w, M.get x1 rho = Some w /\ anf_val_rel' v1 w).
-                 { admit. (* needs: x1 ∈ FromList vnames → env + env_consistent,
-                             or x1 ∈ cmap_vars → global_env_rel' + eval inversion,
-                             or x1 ∈ S → contradiction with Hdis_ek *) }
+                 { destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_b)
+                     as [Hin_vn | [Hin_S | Hin_cm]].
+                   - (* x1 ∈ FromList vnames: use env relation + env_consistent *)
+                     unfold FromList, Ensembles.In in Hin_vn.
+                     destruct (In_nth_error _ _ Hin_vn) as [k Hk].
+                     change positive with var in Hk.
+                     eapply (Forall2_nth_error_r _ _ _ k) in Henv; [| exact Hk].
+                     destruct Henv as [v_k [Hnth_k [w' [Hget_w' Hrel_w']]]].
+                     exists w'. split; [exact Hget_w' |].
+                     (* rho0[k] = v1 by env_consistent *)
+                     assert (Hcons_ext := env_consistent_extend
+                               x1 vnames v1 rho0 b0 S S2 C1 f1 t1
+                               Hcons Hdis Hdis_cmap Hcvt_b Heval1).
+                     assert (Hek : Some v1 = nth_error rho0 k).
+                     { change var with positive in Hk.
+                       exact (Hcons_ext 0 (Datatypes.S k) x1 eq_refl Hk). }
+                     rewrite <- Hek in Hnth_k. injection Hnth_k as <-.
+                     exact Hrel_w'.
+                   - (* x1 ∈ S: contradiction — x1 ∈ occurs_free e_k ∩ (S\\S'\\{x}) *)
+                     exfalso. eapply Hdis_ek. constructor; [exact Hy |].
+                     constructor.
+                     * constructor.
+                       -- exact Hin_S.
+                       -- intro Hin_S'.
+                          eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_b Hdis Hdis_cmap).
+                          eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_t). exact Hin_S'.
+                     * intro Habs. inv Habs. exact (Hneq2 eq_refl).
+                   - (* x1 ∈ cmap_vars: use global_env_rel' *)
+                     destruct Hin_cm as [kn_x Hlk_x].
+                     unfold global_env_rel' in Hglob.
+                     destruct (Hglob kn_x x1 I Hlk_x) as [dx [bx [avx [Hdx [Hbx [Hgx Hrx]]]]]].
+                     exists avx. split; [exact Hgx |].
+                     admit. (* needs: eval inversion for tConst + value det *)
+                 }
                  destruct Hget_x1 as [w [Hget_w Hrel_w]].
                  rewrite Hget_w in Hget. injection Hget as <-.
                  eexists. split.
