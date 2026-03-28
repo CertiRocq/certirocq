@@ -284,7 +284,13 @@ Section Correct.
       assert (Hsub_brs : _ \subset _) by (eapply anf_cvt_branches_subset; eassumption).
       apply Hsub_brs in H5. apply Hsub_exp in H5.
       destruct H5. destruct H5. assumption.
-  Admitted.
+    (* Fix: f ∈ fnames ⊆ S1 *)
+    - intros. right; left. apply H. eapply nth_error_In. exact H4.
+    - intros. right; left. assumption.
+    - intros. right; right. eexists. eassumption.
+    - intros. right; left. eapply anf_cvt_exp_subset; eassumption.
+    - intros. right; left. assumption.
+  Qed.
 
   Lemma wellformed_tLetIn n na b t' :
     wellformed Σ n (EAst.tLetIn na b t') = true ->
