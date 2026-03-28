@@ -528,7 +528,22 @@ Section Correct.
       apply env_consistent_extend_fresh; [assumption |].
       intro Hc. eapply H4. constructor; [exact Hc |].
       eapply anf_cvt_exp_subset; eassumption.
-    - (* Const — depends on eval_val_det *) intros. admit.
+    - (* Const *)
+      intros. destruct r0; [| exact I].
+      remember (EAst.tConst k) as e_const.
+      destruct H3; try discriminate. clear Heqe_const.
+      (* H3 is gone. s and H7 : lookup_const cmap s = Some x1. *)
+      (* x1 = lookup_const cmap s ∈ cmap_vars. *)
+      (* If x1 ∉ FromList vn: env_consistent_extend_fresh *)
+      (* If x1 ∈ FromList vn: needs v = rho[j'] — depends on eval_val_det *)
+      (* x1 = v0 = lookup_const cmap s ∈ cmap_vars.
+         For i=0,j=S j' with vn[j']=v0: need v = rho[j'].
+         This requires knowing rho[j'] was produced by eval [] body —
+         i.e., provenance of rho[j']. The env_consistent invariant doesn't
+         carry this information. Needs a stronger invariant or value det
+         applied to a second eval that we don't have.
+         BLOCKED: genuinely unprovable from current hypotheses. *)
+      admit.
     - (* Rel *)
       intros n rho_r v Hnth_rho vn_r S0_r S2_r C1_r x_r Hcvt Hcons_r Hdv_r Hdc_r.
       remember (EAst.tRel n) as e_r.
