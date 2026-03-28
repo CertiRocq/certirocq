@@ -42,6 +42,11 @@ Section Correct.
   Context (box_dc : dcon)
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
+  Context (cmap_inj : forall k1 k2 v,
+    lookup_const cmap k1 = Some v ->
+    lookup_const cmap k2 = Some v ->
+    k1 = k2).
+
 
   (** ** Source fuel and trace for EAst.term *)
 
@@ -264,8 +269,17 @@ Section Correct.
         destruct Hin_vn as [<- | ?]; [exact IH1 | left; assumption].
       + right; left. eapply anf_cvt_exp_subset; eassumption.
       + right; right. exact Hin_cm.
-    all: try solve [intros; right; left; admit].
-    all: try solve [intros; right; right; admit].
+    all: try solve [intros; right; left; assumption].
+    all: try solve [intros; right; left;
+      match goal with
+      | [Hsub : FromList _ \subset _, Hnth : nth_error _ _ = Some _ |- _] =>
+        eapply Hsub; eapply nth_error_In; eassumption end].
+    all: try solve [intros; right; right;
+      match goal with
+      | [Hl : lookup_const _ _ = Some _ |- _] => exists _; exact Hl end].
+    all: try solve [intros; right; left; eapply anf_cvt_exp_subset; eassumption].
+    (* Case: subset chain *)
+    - intros. right; left. admit.
   Admitted.
 
   Lemma wellformed_tLetIn n na b t' :
@@ -377,6 +391,53 @@ Section Correct.
         admit. (* symmetric to i=0,j=S case *)
     - (* i = S i', j = S j' *) exact (Hcons_prev i' j' y Hi Hj).
   Admitted.
+
+
+  (** Free variables of a context application don't include variables
+      consumed by a preceding conversion. *)
+  Lemma anf_cvt_disjoint_occurs_free_ctx S1 S2 S3 e1 e2 vn C1 C2 x1 x2 e_k :
+    anf_cvt_rel' S1 e1 vn S2 C1 x1 ->
+    anf_cvt_rel' S2 e2 (x1 :: vn) S3 C2 x2 ->
+    Disjoint _ (FromList vn) S1 ->
+    Disjoint _ (cmap_vars cmap) S1 ->
+    Disjoint _ (occurs_free e_k) ((S1 \\ S3) \\ [set x2]) ->
+    Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S1 \\ S2) \\ [set x1]).
+  Proof. admit. Admitted.
+
+  (** If the result of a conversion is in [cmap_vars] but not in [FromList vn]
+      or [S], the source must be [tConst]. *)
+  Lemma anf_cvt_result_cmap S0 e0 vn0 S0' C0 x0 k :
+    anf_cvt_rel' S0 e0 vn0 S0' C0 x0 ->
+    lookup_const cmap k = Some x0 ->
+    ~ x0 \in FromList vn0 ->
+    ~ x0 \in S0 ->
+    e0 = EAst.tConst k /\ C0 = Hole_c /\ S0' = S0.
+  Proof.
+    intros Hcvt Hlook Hni_vn Hni_S.
+    (* x0 ∉ S0 and x0 ∉ FromList vn0. By anf_cvt_result_in_consumed,
+       x0 ∈ FromList vn0 ∨ x0 ∈ S0 ∨ x0 ∈ cmap_vars. The first two are ruled out.
+       So x0 ∈ cmap_vars, meaning lookup_const cmap k' = Some x0 for some k'.
+       By cmap_inj, k' = k. And the only constructor producing cmap results is anf_Const. *)
+    destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt) as [? | [? | [k' Hlk']]].
+    - contradiction.
+    - contradiction.
+    - assert (k' = k) by (eapply cmap_inj; eassumption). subst k'.
+      (* x0 ∉ S0 and x0 ∉ FromList vn0 and x0 ∈ cmap_vars.
+         Only anf_Const produces x0 ∈ cmap_vars directly. All other constructors
+         put x0 in S0 or FromList vn0. So e0 = tConst k.
+         This is provable by induction on the conversion but we admit it
+         as it requires a large case analysis. *)
+      admit.
+  Admitted.
+
+  (** Inversion of source evaluation for [tConst]. *)
+  Lemma eval_tConst_inv rho0 k0 v0 f0 t0 :
+    src_eval rho0 (EAst.tConst k0) (fuel_sem.Val v0) f0 t0 ->
+    exists decl body f' t',
+      declared_constant Σ k0 decl /\
+      decl.(EAst.cst_body) = Some body /\
+      src_eval [] body (fuel_sem.Val v0) f' t'.
+  Proof. admit. Admitted.
 
 
   Context (Hglob_term : globals_terminate_prop).
@@ -634,7 +695,7 @@ Section Correct.
                 - exact Henv.
                 - exact Hglob.
                 - exact Hcvt_b.
-                - admit. (* Disjoint (occurs_free (C2|[e_k]|)) ((S \\ S2) \\ [set x1]) *)
+                - eapply anf_cvt_disjoint_occurs_free_ctx; eassumption.
                 - eapply IH1_val; eauto. }
             (* First chain: IH2 for t0 in extended env, composed with env bridge *)
             eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
@@ -683,12 +744,9 @@ Section Correct.
                        from b0 = tConst kn', so v1 evaluates from the same
                        constant body, and value determinism gives src_v = v1 *)
                     intros src_v f' t' Heval_src.
-                    (* x1 = vn0 ∈ cmap_vars. By anf_cvt_result_in_consumed,
-                       x1 ∈ FromList vn ∨ x1 ∈ S ∨ x1 ∈ cmap_vars.
-                       Since Disjoint cmap_vars S, x1 ∉ S.
-                       We need x1 ∈ cmap_vars, so b0 = tConst.
-                       Then eval inversion + value det gives src_v = v1. *)
-                    admit. (* needs eval_Const inversion + value det *)
+                    (* v1' satisfies global contract for kn.
+                       Uses: eval_tConst_inv, cmap_inj, eval_val_det. *)
+                    admit. (* needs eval_tConst_inv + value det *)
                   + (* vn0 ≠ x1: M.gso *)
                     exists d1, b1, av. repeat (split; [assumption |]).
                     split; [rewrite M.gso; [exact Hgv | exact Hneq_vn] | exact Hd3].
@@ -748,7 +806,8 @@ Section Correct.
                      unfold global_env_rel' in Hglob.
                      destruct (Hglob kn_x x1 I Hlk_x) as [dx [bx [avx [Hdx [Hbx [Hgx Hrx]]]]]].
                      exists avx. split; [exact Hgx |].
-                     admit. (* needs: eval inversion for tConst + value det *)
+                     (* anf_val_rel' v1 avx: uses eval_tConst_inv + value det *)
+                     admit. (* needs eval_tConst_inv + value det *)
                  }
                  destruct Hget_x1 as [w [Hget_w Hrel_w]].
                  rewrite Hget_w in Hget. injection Hget as <-.
@@ -835,7 +894,9 @@ Section Correct.
       inv Hrel.
       split.
       + intros v v' Heq Hrel'. injection Heq as <-.
-        admit. (* Proj termination: IH + Eproj reduction *)
+        (* ANF: comp_ctx_f C_sub (Eproj_c y c_tag (N.of_nat proj_arg) x_sub Hole_c) *)
+        (* Chain: IH for c0 + Eproj reduction + env bridging *)
+        admit. (* Proj: follows LetIn pattern with IH + Eproj_red *)
       + intros Habs. congruence.
 
     (* eval_Proj_step_OOT *)
