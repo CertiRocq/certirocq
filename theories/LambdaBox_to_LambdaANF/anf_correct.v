@@ -356,6 +356,19 @@ Section Correct.
     well_formed_val Σ v0.
   Proof. admit. Admitted.
 
+  (** If the conversion result is in [FromList vn], then the eval result
+      equals the source env value at any matching position.
+      Uses env_consistent to handle duplicate variable names. *)
+  Lemma anf_cvt_eval_rel_value S0 e0 vn S0' C0 x0 rho0 v0 f0 t0 :
+    anf_cvt_rel' S0 e0 vn S0' C0 x0 ->
+    src_eval rho0 e0 (fuel_sem.Val v0) f0 t0 ->
+    env_consistent vn rho0 ->
+    Disjoint _ (FromList vn) S0 ->
+    Disjoint _ (cmap_vars cmap) S0 ->
+    x0 \in FromList vn ->
+    forall k, nth_error vn k = Some x0 -> nth_error rho0 k = Some v0.
+  Proof. admit. Admitted.
+
   (** [env_consistent] extends when adding a new binding.
       Uses [anf_cvt_result_in_consumed] + value determinism. *)
   Lemma env_consistent_extend x1 vnames0 v1 rho0 b0 S0 S2 C1 f1 t1 :
@@ -379,26 +392,26 @@ Section Correct.
         destruct (In_nth_error _ _ Hin_vn) as [n Hn].
         assert (Hprev := Hcons_prev n j' x1 Hn Hj).
         rewrite <- Hprev.
-        admit. (* v1 = rho0[n] — needs eval of tRel gives nth_error *)
+        symmetry. eapply anf_cvt_eval_rel_value; eassumption.
       + (* x1 ∈ S0 — contradiction *)
         exfalso. eapply Hdis_vn. constructor.
         * eapply nth_error_In. exact Hj.
         * exact Hin_S.
-      + (* x1 ∈ cmap_vars — use value determinism *)
-        admit. (* needs: vnames0[j'] = x1 ∈ cmap_vars → same constant → value det *)
+      + (* x1 ∈ cmap_vars — needs provenance tracking + value det *)
+        admit.
     - (* i = S i', j = 0 *) injection Hj as <-.
       f_equal. symmetry.
       destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt) as [Hin_vn | [Hin_S | Hin_cm]].
       + unfold FromList, Ensembles.In in Hin_vn.
         destruct (In_nth_error _ _ Hin_vn) as [n Hn].
         assert (Hprev := Hcons_prev i' n x1 Hi Hn).
-        rewrite Hprev.
-        admit. (* v1 = rho0[n] *)
+        rewrite Hprev. symmetry.
+        eapply anf_cvt_eval_rel_value; eassumption.
       + exfalso. eapply Hdis_vn. constructor.
         * eapply nth_error_In. exact Hi.
         * exact Hin_S.
-      + (* x1 ∈ cmap_vars *)
-        admit. (* symmetric to i=0,j=S case *)
+      + (* x1 ∈ cmap_vars — symmetric *)
+        admit.
     - (* i = S i', j = S j' *) exact (Hcons_prev i' j' y Hi Hj).
   Admitted.
 
