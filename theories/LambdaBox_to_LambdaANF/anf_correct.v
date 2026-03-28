@@ -356,21 +356,40 @@ Section Correct.
     well_formed_val Σ v0.
   Proof. admit. Admitted.
 
-  (** If the conversion result is in [FromList vn], then the eval result
-      equals the source env value at any matching position.
-      Uses env_consistent to handle duplicate variable names. *)
-  Lemma anf_cvt_eval_rel_value S0 e0 vn S0' C0 x0 rho0 v0 f0 t0 :
-    anf_cvt_rel' S0 e0 vn S0' C0 x0 ->
-    src_eval rho0 e0 (fuel_sem.Val v0) f0 t0 ->
-    env_consistent vn rho0 ->
-    Disjoint _ (FromList vn) S0 ->
-    Disjoint _ (cmap_vars cmap) S0 ->
-    x0 \in FromList vn ->
-    forall k, nth_error vn k = Some x0 -> nth_error rho0 k = Some v0.
-  Proof. admit. Admitted.
+  (** Weakening: env_consistent over an extended list implies
+      env_consistent over the original list with the first and last entries. *)
+  Lemma env_consistent_weaken x x1 vn v v_b rho :
+    env_consistent (x :: x1 :: vn) (v :: v_b :: rho) ->
+    env_consistent vn rho ->
+    env_consistent (x :: vn) (v :: rho).
+  Proof.
+    intros Hext Horig i j y Hi Hj.
+    destruct i as [|i'], j as [|j']; simpl in *.
+    - reflexivity.
+    - (* i=0, j=S j': x = vn[j'], need v = rho[j'].
+         Use Hext with i=0 and j=j'+2. *)
+      apply (Hext 0 (S (S j')) y Hi Hj).
+    - apply (Hext (S (S i')) 0 y Hi Hj).
+    - exact (Horig i' j' y Hi Hj).
+  Qed.
 
-  (** [env_consistent] extends when adding a new binding.
-      Uses [anf_cvt_result_in_consumed] + value determinism. *)
+  (** Combined: eval preserves env_consistent when extending.
+      Proved by eval induction. The LetIn case uses IH(b) to extend,
+      then IH(body), then weakening to project out the intermediate binding. *)
+  (* Helper: when x ∉ FromList vn, env_consistent extension is trivial *)
+  Lemma env_consistent_extend_fresh x vn v rho :
+    env_consistent vn rho ->
+    ~ x \in FromList vn ->
+    env_consistent (x :: vn) (v :: rho).
+  Proof.
+    intros Hcons Hni i j y Hi Hj.
+    destruct i as [|i'], j as [|j']; simpl in *.
+    - reflexivity.
+    - injection Hi as <-. exfalso. apply Hni. eapply nth_error_In. exact Hj.
+    - injection Hj as <-. exfalso. apply Hni. eapply nth_error_In. exact Hi.
+    - exact (Hcons i' j' y Hi Hj).
+  Qed.
+
   Lemma env_consistent_extend x1 vnames0 v1 rho0 b0 S0 S2 C1 f1 t1 :
     env_consistent vnames0 rho0 ->
     Disjoint _ (FromList vnames0) S0 ->
@@ -379,40 +398,117 @@ Section Correct.
     src_eval rho0 b0 (fuel_sem.Val v1) f1 t1 ->
     env_consistent (x1 :: vnames0) (v1 :: rho0).
   Proof.
-    intros Hcons_prev Hdis_vn Hdis_cm Hcvt Heval.
-    intros i j y Hi Hj.
-    destruct i as [| i'], j as [| j']; simpl in *.
-    - (* i = 0, j = 0 *) reflexivity.
-    - (* i = 0, j = S j' *) injection Hi as <-.
-      f_equal.
-      (* x1 = vnames0[j']. Need: v1 = rho0[j'] *)
-      destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt) as [Hin_vn | [Hin_S | Hin_cm]].
-      + (* x1 ∈ FromList vnames0 — Rel case *)
-        unfold FromList, Ensembles.In in Hin_vn.
-        destruct (In_nth_error _ _ Hin_vn) as [n Hn].
-        assert (Hprev := Hcons_prev n j' x1 Hn Hj).
-        rewrite <- Hprev.
-        symmetry. eapply anf_cvt_eval_rel_value; eassumption.
-      + (* x1 ∈ S0 — contradiction *)
-        exfalso. eapply Hdis_vn. constructor.
-        * eapply nth_error_In. exact Hj.
-        * exact Hin_S.
-      + (* x1 ∈ cmap_vars — needs provenance tracking + value det *)
-        admit.
-    - (* i = S i', j = 0 *) injection Hj as <-.
-      f_equal. symmetry.
-      destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt) as [Hin_vn | [Hin_S | Hin_cm]].
-      + unfold FromList, Ensembles.In in Hin_vn.
-        destruct (In_nth_error _ _ Hin_vn) as [n Hn].
-        assert (Hprev := Hcons_prev i' n x1 Hi Hn).
-        rewrite Hprev. symmetry.
-        eapply anf_cvt_eval_rel_value; eassumption.
-      + exfalso. eapply Hdis_vn. constructor.
-        * eapply nth_error_In. exact Hi.
-        * exact Hin_S.
-      + (* x1 ∈ cmap_vars — symmetric *)
-        admit.
-    - (* i = S i', j = S j' *) exact (Hcons_prev i' j' y Hi Hj).
+    intros Hcons Hdis_vn Hdis_cm Hcvt.
+    revert vnames0 S0 S2 C1 x1 Hcons Hdis_vn Hdis_cm Hcvt.
+    revert rho0 b0 f1 t1.
+    (* We prove a stronger statement by eval induction:
+       for any eval producing Val, env_consistent extends. *)
+    cut (forall rho0 b0 r f1 t1,
+           src_eval rho0 b0 r f1 t1 ->
+           forall vn S0 S2 C1 x1,
+             anf_cvt_rel' S0 b0 vn S2 C1 x1 ->
+             env_consistent vn rho0 ->
+             Disjoint _ (FromList vn) S0 ->
+             Disjoint _ (cmap_vars cmap) S0 ->
+             match r with
+             | fuel_sem.Val v => env_consistent (x1 :: vn) (v :: rho0)
+             | fuel_sem.OOT => True
+             end).
+    { intros H rho0 b0 f1 t1 vn S0 S2 C1 x1 Hcons Hdis_vn Hdis_cm Hcvt Heval.
+      exact (H rho0 b0 _ f1 t1 Heval vn S0 S2 C1 x1 Hcvt Hcons Hdis_vn Hdis_cm). }
+    intros rho0 b0 r f1 t1 Heval.
+    eapply (@eval_env_fuel_ind'
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc
+              (* P_step *)
+              (fun rho e r f t =>
+                 forall vn S0 S2 C1 x1,
+                   anf_cvt_rel' S0 e vn S2 C1 x1 ->
+                   env_consistent vn rho ->
+                   Disjoint _ (FromList vn) S0 ->
+                   Disjoint _ (cmap_vars cmap) S0 ->
+                   match r with
+                   | fuel_sem.Val v => env_consistent (x1 :: vn) (v :: rho)
+                   | fuel_sem.OOT => True
+                   end)
+              (* P_many *)
+              (fun _ _ _ _ _ => True)
+              (* P_fuel = same as P_step *)
+              (fun rho e r f t =>
+                 forall vn S0 S2 C1 x1,
+                   anf_cvt_rel' S0 e vn S2 C1 x1 ->
+                   env_consistent vn rho ->
+                   Disjoint _ (FromList vn) S0 ->
+                   Disjoint _ (cmap_vars cmap) S0 ->
+                   match r with
+                   | fuel_sem.Val v => env_consistent (x1 :: vn) (v :: rho)
+                   | fuel_sem.OOT => True
+                   end));
+      try (intros; exact I).
+
+    (* ================================================================ *)
+    (* P_step cases                                                      *)
+    (* ================================================================ *)
+
+    (* For most cases, the result variable x1 is fresh (∈ S), so
+       env_consistent_extend_fresh handles it. The key non-trivial cases are
+       eval_Rel_fuel (x1 ∈ FromList vn) and eval_LetIn_step (recursive).
+       We handle them individually; all others are dispatched by automation. *)
+
+    (* All 21 cases handled with explicit bullets *)
+    (* The `try (intros; exact I)` above consumed: OOT step cases (6),
+       P_many (2), eval_OOT (1). Remaining 12 goals in order:
+       P_step terminating: App, FixApp, LetIn, Construct, Case, Proj, Const (7)
+       P_fuel Val: Rel, Lam, Fix, Box (4)
+       P_fuel: eval_step (1) *)
+    - admit. (* App *)
+    - admit. (* FixApp *)
+    - (* LetIn *)
+      intros na_l b_l t_l v_b r_l rho_l fb ft tb tt
+             Heval_b IH_b Heval_t IH_t
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      (* Invert conversion for tLetIn using remember+destruct *)
+      remember (EAst.tLetIn na_l b_l t_l) as e_l.
+      destruct Hcvt; try discriminate.
+      (* After destruct, only anf_LetIn case remains.
+         Use eassumption to find sub-conversions. *)
+      injection Heqe_l as <- <- <-.
+      specialize (IH_b _ _ _ _ _ ltac:(eassumption) Hcons0 Hdv Hdc).
+      assert (Hdv2 : Disjoint _ (FromList (x1 :: vn)) S2).
+      { constructor. intros z Hz. destruct Hz.
+        unfold FromList, Ensembles.In in H. simpl in H.
+        destruct H as [<- | Hin_vn].
+        - eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt1 Hdv Hdc). assumption.
+        - eapply Hdv. constructor; [exact Hin_vn |].
+          eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt1). assumption. }
+      assert (Hdc2 : Disjoint _ (cmap_vars cmap) S2).
+      { eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdc]. }
+      specialize (IH_t _ _ _ _ _ ltac:(eassumption) IH_b Hdv2 Hdc2).
+      destruct r_l as [v_res |]; [| exact I].
+      eapply env_consistent_weaken; [exact IH_t | exact Hcons0].
+    - admit. (* Construct *)
+    - admit. (* Case *)
+    - admit. (* Proj *)
+    - admit. (* Const *)
+    - (* Rel *)
+      intros n rho_r v Hnth_rho vn_r S0_r S2_r C1_r x_r Hcvt Hcons_r Hdv_r Hdc_r.
+      remember (EAst.tRel n) as e_r.
+      destruct Hcvt; try discriminate.
+      (* H : nth_error vn_r ? = Some x_r. Save before injection clears n. *)
+      rename H into Hnth_vn.
+      injection Heqe_r as <-.
+      intros i j y Hi Hj.
+      destruct i as [|i'], j as [|j']; simpl in *.
+      + reflexivity.
+      + injection Hi as <-. f_equal.
+        rewrite <- Hnth_rho. exact (Hcons_r _ j' _ Hnth_vn Hj).
+      + injection Hj as <-. f_equal.
+        rewrite (Hcons_r i' _ _ Hi Hnth_vn). exact Hnth_rho.
+      + exact (Hcons_r i' j' y Hi Hj).
+    - admit. (* Lam *)
+    - admit. (* Fix *)
+    - admit. (* Box *)
+    - intros ? ? ? ? ? ? IH. exact IH. (* eval_step *)
+    - exact Heval.
   Admitted.
 
 
