@@ -278,8 +278,9 @@ Section Correct.
       match goal with
       | [Hl : lookup_const _ _ = Some _ |- _] => exists _; exact Hl end].
     all: try solve [intros; right; left; eapply anf_cvt_exp_subset; eassumption].
-    (* Case: subset chain *)
-    - intros. right; left. admit.
+    (* Case: r ∈ S3 ⊆ S2 ⊆ S1\\f\\y ⊆ S1 *)
+    - intros. right; left.
+      admit. (* r ∈ S3 ⊆ S2 ⊆ S1\\f\\y ⊆ S1 — subset chain *)
   Admitted.
 
   Lemma wellformed_tLetIn n na b t' :
