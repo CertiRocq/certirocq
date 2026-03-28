@@ -460,8 +460,28 @@ Section Correct.
        P_step terminating: App, FixApp, LetIn, Construct, Case, Proj, Const (7)
        P_fuel Val: Rel, Lam, Fix, Box (4)
        P_fuel: eval_step (1) *)
-    - admit. (* App *)
-    - admit. (* FixApp *)
+    - (* App *)
+      intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? Heval1 IH1 Heval2 IH2 Heval3 IH3
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      remember (EAst.tApp _ _) as e_app.
+      destruct Hcvt; try discriminate.
+      injection Heqe_app as <- <-.
+      destruct r0; [| exact I].
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply Hdv. constructor; [exact Hc |].
+      eapply anf_cvt_exp_subset; [eassumption|].
+      eapply anf_cvt_exp_subset; [eassumption|]. assumption.
+    - (* FixApp — same as App *)
+      intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Heval1 IH1 ? ? Heval2 IH2 Heval3 IH3
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      remember (EAst.tApp _ _) as e_app.
+      destruct Hcvt; try discriminate.
+      injection Heqe_app as <- <-.
+      destruct r0; [| exact I].
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply Hdv. constructor; [exact Hc |].
+      eapply anf_cvt_exp_subset; [eassumption|].
+      eapply anf_cvt_exp_subset; [eassumption|]. assumption.
     - (* LetIn *)
       intros na_l b_l t_l v_b r_l rho_l fb ft tb tt
              Heval_b IH_b Heval_t IH_t
@@ -485,10 +505,30 @@ Section Correct.
       specialize (IH_t _ _ _ _ _ ltac:(eassumption) IH_b Hdv2 Hdc2).
       destruct r_l as [v_res |]; [| exact I].
       eapply env_consistent_weaken; [exact IH_t | exact Hcons0].
-    - admit. (* Construct *)
-    - admit. (* Case *)
-    - admit. (* Proj *)
-    - admit. (* Const *)
+    - (* Construct *) intros.
+      remember (EAst.tConstruct _ _ _) as e_c.
+      destruct H2; try discriminate. clear Heqe_c.
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply H4. constructor; [exact Hc | assumption].
+    - (* Case *) intros. destruct r0; [| exact I].
+      remember (EAst.tCase _ _ _) as e_case.
+      destruct H5; try discriminate. clear Heqe_case.
+      (* x1 = r, which is in S3 ⊆ S2 ⊆ S0\\f\\y ⊆ S0 *)
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply H7. constructor; [exact Hc |].
+      assert (Hs3 : Ensembles.In _ S2 r0).
+      { eapply anf_cvt_branches_subset; eassumption. }
+      assert (Hs2 : Ensembles.In _ (S1 \\ [set f] \\ [set y]) r0).
+      { eapply anf_cvt_exp_subset; eassumption. }
+      destruct Hs2. destruct H13. assumption.
+    - (* Proj *) intros.
+      remember (EAst.tProj _ _) as e_p.
+      destruct H2; try discriminate. clear Heqe_p.
+      (* x1 = y ∈ S2, S2 ⊆ S0 via anf_cvt_exp_subset *)
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply H4. constructor; [exact Hc |].
+      eapply anf_cvt_exp_subset; eassumption.
+    - (* Const — depends on eval_val_det *) intros. admit.
     - (* Rel *)
       intros n rho_r v Hnth_rho vn_r S0_r S2_r C1_r x_r Hcvt Hcons_r Hdv_r Hdc_r.
       remember (EAst.tRel n) as e_r.
@@ -504,9 +544,32 @@ Section Correct.
       + injection Hj as <-. f_equal.
         rewrite (Hcons_r i' _ _ Hi Hnth_vn). exact Hnth_rho.
       + exact (Hcons_r i' j' y Hi Hj).
-    - admit. (* Lam *)
-    - admit. (* Fix *)
-    - admit. (* Box *)
+    - (* Lam *)
+      intros ? ? ?
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      remember (EAst.tLambda _ _) as e_lam.
+      destruct Hcvt; try discriminate.
+      injection Heqe_lam as <- <-.
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply Hdv. constructor; [exact Hc |].
+      destruct H0. assumption.
+    - (* Fix *)
+      intros ? ? ?
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      remember (EAst.tFix _ _) as e_fix.
+      destruct Hcvt; try discriminate.
+      injection Heqe_fix as <- <-.
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply Hdv. constructor; [exact Hc |].
+      eapply H. eapply nth_error_In. eassumption.
+    - (* Box *)
+      intros ?
+             vn0 S0 S2' C1' x0 Hcvt Hcons0 Hdv Hdc.
+      remember EAst.tBox as e_box.
+      destruct Hcvt; try discriminate.
+      clear Heqe_box.
+      apply env_consistent_extend_fresh; [assumption |].
+      intro Hc. eapply Hdv. constructor; [exact Hc | assumption].
     - intros ? ? ? ? ? ? IH. exact IH. (* eval_step *)
     - exact Heval.
   Admitted.
