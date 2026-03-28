@@ -280,7 +280,10 @@ Section Correct.
     all: try solve [intros; right; left; eapply anf_cvt_exp_subset; eassumption].
     (* Case: r ∈ S3 ⊆ S2 ⊆ S1\\f\\y ⊆ S1 *)
     - intros. right; left.
-      admit. (* r ∈ S3 ⊆ S2 ⊆ S1\\f\\y ⊆ S1 — subset chain *)
+      assert (Hsub_exp : _ \subset _) by (eapply anf_cvt_exp_subset; eassumption).
+      assert (Hsub_brs : _ \subset _) by (eapply anf_cvt_branches_subset; eassumption).
+      apply Hsub_brs in H5. apply Hsub_exp in H5.
+      destruct H5. destruct H5. assumption.
   Admitted.
 
   Lemma wellformed_tLetIn n na b t' :
