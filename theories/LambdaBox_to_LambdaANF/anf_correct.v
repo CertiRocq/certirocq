@@ -1213,31 +1213,47 @@ Section Correct.
                Since v' ≈ v_bc_val, and rho ≈ rho_app on relevant vars,
                the source bstep_ek in M.set x v' rho translates to a
                target bstep in M.set x v_bc_val rho_app. *)
-            (* Provide witnesses: the target steps via BStept_letapp + BStepf_run *)
-            exists (eval.Res v_ek_val), (cin_bc <+> cin_ek <+> <1> (Eletapp x x1 func_tag [x2] e_k)),
-                   (cout_bc <+> cout_ek <+> <1> (Eletapp x x1 func_tag [x2] e_k)).
+            (* Use preord_exp_refl to bridge source env → target env for continuation.
+               Source: M.set x v' rho. Target: M.set x v_bc_val rho_app.
+               e_k's free vars avoid x1, x2 (from Hdis_ek), so extra bindings don't matter.
+               At x: v' ≈ v_bc_val (from Hres_bc). *)
+            assert (Hbridge : preord_exp cenv eq_fuel eq_fuel (i - to_nat (<0> <+> <1> (Ehalt r1)))
+                     (e_k, M.set x v' rho) (e_k, M.set x v_bc_val rho_app)).
+            { eapply preord_exp_refl. exact eq_fuel_compat.
+              intros y Hy.
+              destruct (Pos.eq_dec y x) as [-> | Hneq_x].
+              - (* y = x: v' ≈ v_bc_val *)
+                intros w Hget. rewrite M.gss in Hget. inv Hget.
+                eexists. split. unfold rho_app. rewrite M.gss. reflexivity.
+                admit. (* preord_val v' v_bc_val at reduced step index *)
+              - (* y ≠ x: same in both envs *)
+                intros w Hget. rewrite M.gso in Hget; [| exact Hneq_x].
+                eexists. split.
+                + unfold rho_app. rewrite M.gso; [| exact Hneq_x].
+                  (* y ≠ x2 and y ≠ x1: from Hdis_ek *)
+                  admit. (* M.gso for x2, x1 — y ∉ {x1,x2} from Hdis_ek *)
+                + eapply preord_val_refl. tci. }
+            (* Extract continuation bstep from bridge *)
+            assert (Hle_bridge : to_nat cin_ek <= i - to_nat (<0> <+> <1> (Ehalt r1))) by admit.
+            destruct (Hbridge (eval.Res v_ek_val) cin_ek cout_ek
+                        Hle_bridge Hbstep_ek)
+              as [v_cont [cin_cont [cout_cont [Hbstep_cont [Hpost_cont Hres_cont]]]]].
+            (* Construct BStept_letapp with body + continuation *)
+            exists v_cont, (cin_bc <+> cin_cont <+> <1> (Eletapp x x1 func_tag [x2] e_k)),
+                   (cout_bc <+> cout_cont <+> <1> (Eletapp x x1 func_tag [x2] e_k)).
             split.
-            { (* bstep_fuel rho_app (Eletapp x x1 func_tag [x2] e_k) ... *)
-              econstructor 2. (* BStepf_run *)
-              eapply BStept_letapp.
-              - (* M.get x1 rho_app = Some (Vfun rho1 defs_cc f0) *)
-                unfold rho_app.
-                rewrite M.gso; [rewrite M.gss; reflexivity |].
+            { econstructor 2. eapply BStept_letapp.
+              - unfold rho_app. rewrite M.gso; [rewrite M.gss; reflexivity |].
                 admit. (* x2 ≠ x1 *)
-              - (* get_list [x2] rho_app = Some [v2'] *)
-                simpl. unfold rho_app. rewrite M.gss. reflexivity.
-              - (* find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|) *)
-                unfold defs_cc. simpl.
+              - simpl. unfold rho_app. rewrite M.gss. reflexivity.
+              - unfold defs_cc. simpl.
                 destruct (M.elt_eq f0 f0); [reflexivity | contradiction].
-              - (* set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc *)
-                simpl. reflexivity.
-              - (* bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc *)
-                exact Hbstep_bc.
-              - (* bstep_fuel (M.set x v_bc_val rho_app) e_k cin_ek ... *)
-                admit. (* continuation: need env bridge M.set x v' rho ≈ M.set x v_bc_val rho_app *)
-            }
+              - simpl. reflexivity.
+              - exact Hbstep_bc.
+              - exact Hbstep_cont. }
             split.
-            { (* Post condition *) admit. }
+            { (* Post: fuel bounds *)
+              admit. (* fuel arithmetic *) }
             { (* preord_res *) admit. }
         }
         (* inclusion: fuel composition — depends on ?P1 from Eletapp stage *)
