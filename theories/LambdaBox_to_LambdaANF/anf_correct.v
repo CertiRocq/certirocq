@@ -1104,9 +1104,73 @@ Section Correct.
                1. Look up x1 → v1' (closure), x2 → v2' (argument)
                2. Apply the closure: find_def, set_lists, step body
                3. Bind result to x, continue with e_k *)
-            (* Step 1: Extract closure structure from anf_val_rel *)
+            (* Step 1: Extract closure structure from anf_val_rel.
+               After inv Hrel_clos (anf_rel_Clos):
+               v1' = Vfun rho1 (Fcons f0 func_tag [x0] (C0|[Ehalt r1]|) Fnil) f0
+               rho1 = target closure env
+               names = captured var names
+               x0 = parameter var, f0 = function name var
+               C0 = body context, r1 = body result var
+               H2 : anf_env_rel names rho' rho1
+               H3 : env_consistent names rho'
+               H12 : anf_cvt_rel' S1 body0 (x0::names) S0 C0 r1
+               + disjointness/cmap hypotheses *)
             inv Hrel_clos.
-            Show. admit.
+            (* Define target defs and body env *)
+            set (defs_cc := Fcons f0 func_tag [x0] (C0 |[ Ehalt r1 ]|) Fnil).
+            set (rho_bc := M.set x0 v2' (def_funs defs_cc defs_cc rho1 rho1)).
+            (* Apply IH3 to the closure body *)
+            assert (IH3_full :
+              (forall v0 v'0, fuel_sem.Val v = fuel_sem.Val v0 ->
+               anf_val_rel' v0 v'0 ->
+               preord_exp cenv (anf_bound f3 t3) eq_fuel i
+                 (Ehalt r1, M.set r1 v'0 rho_bc)
+                 (C0 |[ Ehalt r1 ]|, rho_bc)) /\
+              (fuel_sem.Val v = fuel_sem.OOT ->
+               exists c, bstep_fuel cenv rho_bc (C0 |[ Ehalt r1 ]|) c eval.OOT tt)).
+            { eapply (IH3 rho_bc (x0 :: names) C0 r1 S1 S0 i).
+              - (* well_formed_env (v2 :: rho') *)
+                constructor; [exact Hwf_v2 |].
+                admit. (* well_formed_env rho' from Hwf_clos *)
+              - admit. (* wellformed body0 from Hwf_clos *)
+              - (* env_consistent (x0::names) (v2::rho') *)
+                apply env_consistent_extend_fresh; [exact H3 |].
+                intro Hc. apply H9. right. exact Hc.
+              - (* cmap_consistent (x0::names) (v2::rho') *)
+                admit. (* cmap_consistent for closure body *)
+              - admit. (* Disjoint (FromList (x0::names)) S1 *)
+              - exact H5. (* Disjoint (cmap_vars cmap) S1 *)
+              - (* anf_env_rel (x0::names) (v2::rho') rho_bc *)
+                admit. (* build from H2, Hrel_v2, def_funs *)
+              - (* global_env_rel' rho_bc *)
+                admit. (* from H13 + def_funs *)
+              - exact H12. (* anf_cvt_rel' S1 body0 (x0::names) S0 C0 r1 *)
+              - admit. (* Disjoint for Ehalt r1 continuation *)
+            }
+            destruct IH3_full as [IH3_val _].
+            specialize (IH3_val v v' eq_refl Hrel').
+            (* Step 2: Extract body bstep from IH3 via Ehalt witness *)
+            (* Ehalt r1 in (M.set r1 v' rho_bc) steps in 1 fuel to (Res v') *)
+            assert (Hehalt : bstep_fuel cenv (M.set r1 v' rho_bc)
+                               (Ehalt r1) (<0> <+> <1> (Ehalt r1)) (eval.Res v') (<0> <+> <1> (Ehalt r1))).
+            { apply BStepf_run. apply BStept_halt. rewrite M.gss. reflexivity. }
+            (* Step 3: Prove preord_exp for Eletapp.
+               Goal: preord_exp ?P1 eq_fuel i
+                 (e_k, M.set x v' rho)
+                 (Eletapp x x1 func_tag [x2] e_k, M.set x2 v2' (M.set x1 v1' rho))
+               Strategy: introduce source reduction, construct target via BStept_letapp
+               using IH3 for body + env bridge for continuation *)
+            admit. (* Eletapp preord_exp: ~100 lines remaining.
+                      1. Specialize IH3_val with Ehalt witness to extract body bstep
+                      2. Construct BStept_letapp:
+                         - M.get x1 rho' = Some (Vfun rho1 defs_cc f0)
+                         - get_list [x2] rho' = Some [v2']
+                         - find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|)
+                         - set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc
+                         - bstep_fuel rho_bc (C0|[Ehalt r1]|) ... (Res v_bc) ...
+                         - bstep_fuel (M.set x v_bc rho') e_k ... v' ...
+                      3. Bridge continuation env: preord_exp_refl + case split on variables
+                      4. Compose fuel bounds *)
         }
         (* inclusion: fuel composition — depends on ?P1 from Eletapp stage *)
         admit. (* Will be provable by lia once Eletapp stage fills in ?P1 *)
