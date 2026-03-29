@@ -120,15 +120,29 @@ Proof.
     + simpl. apply IH. assumption.
 Qed.
 
+(** ** Dependency predicates at kername level *)
+
+(** Kernames referenced by a single term. *)
+Definition kn_deps (e : EAst.term) : kername -> Prop :=
+  fun k => KernameSet.In k (term_global_deps e).
+
+(** Kernames referenced by any term in a list. *)
+Definition kn_deps_list (es : list EAst.term) : kername -> Prop :=
+  fun k => Exists (fun e => KernameSet.In k (term_global_deps e)) es.
+
+(** Kernames referenced by any body in a mutual fixpoint. *)
+Definition kn_deps_mfix (mfix : list (EAst.def EAst.term)) : kername -> Prop :=
+  fun k => Exists (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix.
+
 (** ** Dependency-restricted cmap variable sets *)
 
 (** Cmap variables needed by a single term. *)
 Definition cmap_deps (cm : const_map) (e : EAst.term) : Ensemble var :=
-  cmap_vars_of cm (fun k => KernameSet.In k (term_global_deps e)).
+  cmap_vars_of cm (kn_deps e).
 
 (** Cmap variables needed by a list of terms (e.g. constructor args). *)
 Definition cmap_deps_list (cm : const_map) (es : list EAst.term) : Ensemble var :=
-  cmap_vars_of cm (fun k => Exists (fun e => KernameSet.In k (term_global_deps e)) es).
+  cmap_vars_of cm (kn_deps_list es).
 
 (** Cmap variables needed by case branch bodies. *)
 Definition cmap_deps_brs (cm : const_map) (brs : list (list name * EAst.term)) : Ensemble var :=
@@ -136,7 +150,7 @@ Definition cmap_deps_brs (cm : const_map) (brs : list (list name * EAst.term)) :
 
 (** Cmap variables needed by mutual fixpoint bodies. *)
 Definition cmap_deps_mfix (cm : const_map) (mfix : list (EAst.def EAst.term)) : Ensemble var :=
-  cmap_vars_of cm (fun k => Exists (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix).
+  cmap_vars_of cm (kn_deps_mfix mfix).
 
 (** Primitive lookup *)
 Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=

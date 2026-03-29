@@ -102,8 +102,7 @@ Section ANF_Val.
         ~ x \in f |: FromList names ->
         ~ f \in FromList names ->
         anf_cvt_rel' S1 e (x :: names) S2 C1 r1 ->
-        global_env_rel' anf_val_rel
-          (fun k => KernameSet.In k (term_global_deps e)) rho ->
+        global_env_rel' anf_val_rel (kn_deps e) rho ->
         anf_val_rel (Clos_v vs na e)
                     (Vfun rho (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) Fnil) f)
   | anf_rel_ClosFix :
@@ -117,9 +116,7 @@ Section ANF_Val.
         Disjoint _ (FromList names) (FromList fnames) ->
         nth_error fnames n = Some f ->
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
-        global_env_rel' anf_val_rel
-          (fun k => Exists
-            (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix) rho ->
+        global_env_rel' anf_val_rel (kn_deps_mfix mfix) rho ->
         anf_val_rel (ClosFix_v vs mfix n) (Vfun rho Bs f).
 
   Definition anf_env_rel : list var -> list fuel_sem.value -> M.t val -> Prop :=
@@ -2112,8 +2109,7 @@ Section AlphaEquiv.
           (* preord_env_P cmap_deps_mfix: same as Clos_v *)
           (* Convert Hk0 : KernameSet.In k0 (term_global_deps e1)
              to Exists ... fnl for global_env_rel' *)
-          assert (Hk0_exists : Exists
-            (fun d => KernameSet.In k0 (term_global_deps (dbody d))) fnl).
+          assert (Hk0_exists : kn_deps_mfix fnl k0).
           { eapply Exists_exists. exists d1. split.
             - eapply nth_error_In. exact Hnth_d1.
             - rewrite Hbod1. simpl. exact Hk0. }
