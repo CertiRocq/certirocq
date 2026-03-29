@@ -1160,17 +1160,28 @@ Section Correct.
                  (Eletapp x x1 func_tag [x2] e_k, M.set x2 v2' (M.set x1 v1' rho))
                Strategy: introduce source reduction, construct target via BStept_letapp
                using IH3 for body + env bridge for continuation *)
-            admit. (* Eletapp preord_exp: ~100 lines remaining.
-                      1. Specialize IH3_val with Ehalt witness to extract body bstep
-                      2. Construct BStept_letapp:
-                         - M.get x1 rho' = Some (Vfun rho1 defs_cc f0)
-                         - get_list [x2] rho' = Some [v2']
-                         - find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|)
-                         - set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc
-                         - bstep_fuel rho_bc (C0|[Ehalt r1]|) ... (Res v_bc) ...
-                         - bstep_fuel (M.set x v_bc rho') e_k ... v' ...
-                      3. Bridge continuation env: preord_exp_refl + case split on variables
-                      4. Compose fuel bounds *)
+            (* Introduce source reduction *)
+            intros v_ek cin_ek cout_ek Hle_ek Hbstep_ek.
+            (* Case split: if source is OOT, target OOTs trivially *)
+            destruct v_ek as [| v_ek_val].
+            { (* Source OOT: any target OOT suffices *)
+              exists eval.OOT, <0>, <0>.
+              split; [eapply bstep_fuel_zero_OOT |]. split; [admit | constructor]. }
+            (* Source Res: cin_ek >= 1, so i >= 1 *)
+            (* Use IH3_val with Ehalt to get body bstep *)
+            assert (H1_le_i : to_nat (<0> <+> <1> (Ehalt r1)) <= i).
+            { admit. (* from bstep_fuel ... (Res v_ek_val), cin_ek >= 1 *) }
+            destruct (IH3_val (eval.Res v') (<0> <+> <1> (Ehalt r1)) (<0> <+> <1> (Ehalt r1))
+                        H1_le_i Hehalt)
+              as [v_bc [cin_bc [cout_bc [Hbstep_bc [Hpost_bc Hres_bc]]]]].
+            (* v_bc must be Res (from preord_res with Res v') *)
+            destruct v_bc as [| v_bc_val].
+            { exfalso. exact Hres_bc. }
+            (* Now have:
+               Hbstep_bc : bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc
+               Hres_bc : preord_val cenv (i - to_nat ...) v' v_bc_val *)
+            (* Construct BStept_letapp + env bridge for continuation *)
+            admit. (* ~60 lines: BStept_letapp construction + env bridge *)
         }
         (* inclusion: fuel composition — depends on ?P1 from Eletapp stage *)
         admit. (* Will be provable by lia once Eletapp stage fills in ?P1 *)
