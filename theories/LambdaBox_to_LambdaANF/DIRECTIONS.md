@@ -12,181 +12,133 @@ The old correctness proof is in
 reference. The new proof adapts it to the MetaRocq pipeline, which introduces
 `tConst` (global constants) — a construct not present in the old source language.
 
-## The Central Design Issue: Environment Invariants with Global Constants
+## Invariant Chain (DONE)
 
-### Background: the old proof structure
+The `cmap_consistent` invariant and its interaction with `env_consistent` is
+fully resolved. The following are all proved (Qed):
 
-The old proof used two key lemmas for maintaining `env_consistent`:
+- **`cmap_consistent`** — definition tracking global constant provenance
+- **`env_consistent_extend`** — trivial 4-line lemma
+- **`cmap_consistent_extend`** — trivial analog
+- **`anf_cvt_rel_var_lookup_and_cmap_eval`** — combined lemma proving BOTH
+  var_lookup (Part 1) and cmap_eval (Part 2) simultaneously by eval induction.
+  All 12 cases proved. Part 2 replaces the false `anf_cvt_result_cmap` and
+  removes the need for `eval_tConst_inv`.
+- **`anf_cvt_rel_var_lookup`** — corollary of Part 1
+- **`anf_cvt_cmap_eval`** — corollary of Part 2
+- **`env_consistent_extend_from_cvt`** — combines var_lookup + extend
+- **`cmap_consistent_extend_from_cvt`** — uses cmap_eval + extend
 
-1. **`anf_cvt_rel_var_lookup`** (eval induction): If `eval rho e (Val v)` and
-   conversion gives result `x` with `vn[i] = x`, then `rho[i] = Some v`.
-2. **`env_consistent_extend`** (trivial 4-line proof): Given `env_consistent vn rho`
-   and the condition from (1), extend to `env_consistent (x::vn) (v::rho)`.
+Only admitted dependency: `eval_val_det` (value determinism).
 
-In the old proof, `anf_cvt_rel_var_lookup` worked because:
-- **Rel**: `v = rho[n]` (lookup from local env), `x = vn[n]`. `env_consistent`
-  connects `rho[i]` to `rho[n]`. Direct.
-- **All others**: `x ∈ S` (fresh), contradicts `Disjoint (FromList vn) S`. Vacuous.
-- **LetIn**: IH_b gives the condition for `env_consistent_extend`. IH_body with
-  extended `env_consistent` gives the result.
+### Key discovery: `anf_cvt_result_cmap` is FALSE
 
-### The problem with `tConst`
+Counterexample: `tLetIn na (tConst k) (tRel 0)` — the result is a cmap
+variable but the expression is not `tConst k`. Replaced by `anf_cvt_cmap_eval`
+which directly gives `eval [] body_k (Val v)` without requiring `e = tConst k`.
 
-With `tConst k`, the ANF conversion result is `x = lookup_const cmap k ∈ cmap_vars`.
-This is neither in `FromList vn` nor in `S`. The eval gives `v` from
-`eval [] body_k (Val v)` — computed from the global body in the EMPTY env,
-NOT looked up from the local env `rho`.
+### Key design: inner conjunction in combined lemma
 
-In `anf_cvt_rel_var_lookup`, the Const case needs `rho[i] = Some v` when
-`vn[i] = x`. But `v` comes from outside `rho`, so `env_consistent` (which
-relates values WITHIN `rho`) can't connect `v` to `rho[i]`. We need
-`eval [] body_k (Val rho[i])` to apply `eval_val_det`, but nothing provides it.
-
-**Analogy:** `tRel n` is a lookup from the LOCAL env → `env_consistent` handles it.
-`tConst k` is a lookup from the GLOBAL env → needs a parallel invariant.
-
-### The solution: `cmap_consistent`
-
-Add an invariant tracking provenance for global constant values in `rho`:
-
+The conjunction in `anf_cvt_rel_var_lookup_and_cmap_eval` is placed AFTER the
+shared hypotheses (env_consistent, cmap_consistent, Disjoint, etc.) so that
+`intros` works uniformly for both parts:
 ```coq
-Definition cmap_consistent vn rho :=
-  forall i k decl body v_i,
-    nth_error vn i = Some (lookup_const cmap k) ->
-    nth_error rho i = Some v_i ->
-    declared_constant Σ k decl ->
-    decl.(cst_body) = Some body ->
-    exists f t, src_eval [] body (Val v_i) f t.
+forall v, r = Val v -> forall S vn S' C x,
+  anf_cvt_rel' S e vn S' C x -> Disjoint ... -> ... ->
+  (forall i, nth_error vn i = Some x -> nth_error rho i = Some v) /\
+  (forall k decl body, lookup_const cmap k = Some x -> ... -> exists f' t', ...)
 ```
 
-"If position `i` in `vn` holds a cmap variable for constant `k`, then `rho[i]`
-is the result of evaluating `k`'s body."
+## What's Done in `anf_cvt_correct`
 
-**How `anf_cvt_rel_var_lookup` uses it (Const case):**
-`cmap_consistent` provides `eval [] body_k (Val rho[i])`. Combined with
-`eval [] body_k (Val v)` (from current eval) and `eval_val_det`: `rho[i] = v`. Done.
-
-**Why `cmap_consistent` is maintainable** (needs careful verification):
-- **Top level**: `vn` has no cmap vars → vacuous.
-- **LetIn + tConst k**: position 0 gets `eval [] body_k (Val v)` directly.
-- **LetIn + tRel n**: value is `rho[n]`. If `vn[n] ∈ cmap_vars`,
-  `cmap_consistent` at position `n` gives the eval. Inherited.
-- **LetIn + fresh (x ∈ S)**: `x ∉ cmap_vars` (by `Disjoint cmap_vars S`). Vacuous.
-- **LetIn body**: existing positions shift by 1, same values.
-
-### Proof structure
-
-Follow the old proof's decomposition. The current `env_consistent_extend` (proved
-by `eval_env_fuel_ind'`) should be REPLACED with this cleaner structure:
-
-1. **`anf_cvt_rel_var_lookup`** (eval induction) — the key lemma. Uses BOTH
-   `env_consistent` AND `cmap_consistent`. Rel case uses `env_consistent`.
-   Const case uses `cmap_consistent` + `eval_val_det`. LetIn case uses IH.
-   See old proof at line ~2069 for reference.
-
-2. **`env_consistent_extend`** — trivial 4-line lemma (same as old proof, line ~822).
-   Takes the `forall k, vn[k] = x -> rho[k] = Some v` condition from (1).
-
-3. **`cmap_consistent_extend`** — analogous to (2) for the cmap invariant.
-   Needs eval inversion for tConst to extract `eval [] body (Val v)`.
-
-`anf_cvt_rel_var_lookup` is also used in the old proof for:
-- **`anf_cvt_rel_exps_var_lookup`** (line ~2247): variant for expression lists
-  (constructor arguments in eval_many).
-- **`anf_cvt_result_in_vnames_eval`** (line ~2436): connecting eval result to
-  ANF env value when x ∈ FromList vn. Used in the env bridging (`y = x1` case).
-
-**CRITICAL: Before implementing, verify end-to-end that:**
-- `cmap_consistent` is provable at the initial call site of `anf_cvt_correct`
-- `cmap_consistent` is preserved through ALL induction cases
-- The LetIn case of `anf_cvt_correct` can provide both invariants to IH calls
-- No new circularity is introduced
-
-## What's Done
-
-### Proved induction cases of `anf_cvt_correct` (12 of 21)
+### Proved cases (12 of 21)
 - `eval_Rel_fuel`, `eval_Lam_fuel`, `eval_Fix_fuel`, `eval_Box_fuel`
 - `eval_OOT`, `eval_step`
-- All 6 OOT step cases
+- All 6 OOT step cases (+ 2 App OOT cases)
 - `eval_many_nil`
 
-### `eval_LetIn_step` case
-Structurally complete with full IH chaining (`preord_exp_trans` + `preord_exp_refl`
-+ `env_consistent_weaken`). Zero inline admits. Depends on admitted helper lemmas.
-This case serves as the TEMPLATE for all other terminating step cases.
+### `eval_LetIn_step` case (template)
+Structurally complete with IH chaining. Two inline admits for `global_env_rel'`
+contract when shadowing a cmap variable (lines ~1348, ~1408). These need
+`anf_cvt_cmap_eval` + `eval_val_det` + `anf_cvt_val_alpha_equiv`.
 
-### Proved helper lemmas (Qed)
-- `anf_cvt_result_in_consumed` — 3-way disjunction for conversion result origin
-- `wellformed_tLetIn` — wellformed inversion for tLetIn
-- `anf_env_rel_set` — env relation through M.set
-- `anf_env_rel_length` — Forall2 length preservation
-- `Forall2_nth_error_l`, `Forall2_nth_error_r` — list indexing through Forall2
-- `env_consistent_extend_fresh` — extension when x ∉ FromList vn
-- `env_consistent_weaken` — projecting out intermediate binding
-- `anf_cvt_rel_mfix_to_fix_rel` — mfix to fix relation conversion
-- Reduction lemmas: `preord_exp_Efun_red`, `preord_exp_Econstr_red`, `preord_exp_Eproj_red`
+### `eval_App_step` case (in progress)
+**What's done:**
+- IH1/IH2 chaining via `preord_exp_trans` (both complete)
+- IH2 continuation disjointness fully proved (Free_Eletapp1/2 case analysis)
+- Closure structure extracted via `inv Hrel_clos` (anf_rel_Clos)
+- IH3 invocation skeleton with `env_consistent_extend_fresh` for body
+- Body bstep extraction via Ehalt witness (`BStepf_run` + `BStept_halt`)
+- OOT case handled trivially
+- Res case: body result `v_bc_val` extracted with `preord_val` from `Hres_bc`
+- Env bridge for continuation via `preord_exp_refl`
+- `BStept_letapp` fully constructed for the `x1 ≠ x2` branch
+- `Disjoint (FromList (x0::names)) S1` proved
+- Ehalt r1 continuation disjointness proved
 
-### `cmap_consistent` + `anf_cvt_rel_var_lookup` decomposition (DONE)
-The `cmap_consistent` invariant has been introduced and the proof restructured
-following the old proof's decomposition:
-- **`cmap_consistent`** — definition tracking global constant provenance in `rho`
-- **`env_consistent_extend`** — trivial 4-line lemma (Qed)
-- **`cmap_consistent_extend`** — trivial analog (Qed)
-- **`anf_cvt_rel_var_lookup`** — key lemma by eval induction, all 12 cases proved (Qed).
-  Uses `env_consistent` for Rel, `cmap_consistent` + `eval_val_det` for Const.
-- **`env_consistent_extend_from_cvt`** — combines var_lookup + extend (Qed)
-- **`cmap_consistent_extend_from_cvt`** — uses var_lookup + result_cmap + tConst_inv (Qed)
-- Correctness predicates updated to carry `cmap_consistent` hypothesis
-- LetIn case of `anf_cvt_correct` updated to pass both invariants to IH calls
+**Remaining admits (17 in App case):**
+1. **x1 = x2 case** (~160 lines in old proof, lines 3249-3410). When x1 = x2,
+   the argument shadows the closure. Need `preord_val_trans` to show v2' is
+   also a valid Vfun. This is the HARDEST remaining piece.
+2. **IH1 continuation disjointness** — App-specific context free-variable
+   reasoning for `C2 |[ Eletapp ... e_k ]|`. Similar to the admitted
+   `anf_cvt_disjoint_occurs_free_ctx` but for App structure.
+3. **global_env_rel' for M.set x1 v1' rho** — same pattern as LetIn's admit.
+4. **IH3 env construction** (6 admits) — well_formed_env, wellformed body0,
+   cmap_consistent for closure, anf_env_rel with def_funs, global_env_rel'.
+   All mechanical but need careful env/def_funs reasoning.
+5. **Fuel/step-index bounds** (5 admits) — `1 <= i` from Res, `cin_ek <= i-1`,
+   `preord_val` at reduced index, Post condition, preord_res, fuel composition.
+6. **y ∉ {x1,x2} in env bridge** — from `Hdis_ek`.
 
-## Admitted Helper Lemmas (Verify them very carefully)
+### Not yet written
+FixApp, Construct, Case, Proj, Const, eval_many_cons.
 
-1. **`eval_val_det`** — Value determinism. Standard, provable by mutual induction.
+## Admitted Helper Lemmas
+
+1. **`eval_val_det`** — Value determinism. Only admitted dependency of the
+   invariant chain. Provable by mutual induction on eval.
 2. **`eval_preserves_wf`** — Eval preserves well-formedness. Standard.
-3. **`anf_cvt_disjoint_occurs_free_ctx`** — Free variables of context application
-   avoid consumed variables. Structural, independent of env invariant issue.
-4. **`anf_cvt_result_cmap`** — Conversion inversion for cmap results.
-5. **`eval_tConst_inv`** — Eval inversion for tConst.
-6. **`anf_val_rel_exists`** (in `anf_corresp.v`) — Target value existence.
+3. **`anf_cvt_disjoint_occurs_free_ctx`** — Free variables of context
+   application avoid consumed vars. Structural. Also needed for App (IH1).
 
-## Remaining Step Cases
+## Technical Notes
 
-Not yet written: App, FixApp, Construct, Case, Proj, Const, eval_many_cons.
-All follow the LetIn template (IH chaining with `preord_exp_trans`).
+### Hypothesis naming after `destruct`/`injection`
+`destruct Hcvt` on `anf_cvt_rel` renames variables to the constructor's
+parameter names (e.g., `vn0 → vn`, `S0 → S1`, `x0 → x2`). NEVER reference
+variable names after `destruct`/`injection`. Instead:
+- Assert facts BEFORE `destruct` (e.g., `assert (Hin : x0 \in FromList vn0)`)
+- Use `match goal with` for robust hypothesis selection
+- Use hypothesis names (stable across destruct) not variable names
 
-## Technical Notes (Coq-specific)
+### `inv` on `occurs_free` with evars
+`inv` on `occurs_free ?e_k` when `?e_k` is an evar matches ALL constructors.
+Fix: prove disjointness assertions BEFORE `edestruct` so `?e_k` is unified.
 
 ### Conversion inversion hangs
-`inv`/`inversion` on `anf_cvt_rel` (large mutual inductive) causes Coq to hang
-(54+ minutes). Use:
-```coq
-remember (EAst.tXxx arg1 arg2) as e_x.
-destruct Hcvt; try discriminate.
-injection Heqe_x as <- <-.
-```
-Works for most constructors. For tConstruct/tCase, `destruct` may fail —
-use `intros` first. IMPORTANT: `injection ... as <- <-` may clear hypotheses.
-Save critical hypotheses with `rename` or `pose proof` before injection.
+`inv`/`inversion` on `anf_cvt_rel` (large mutual inductive) causes Coq to hang.
+Use `remember` + `destruct` + `injection` instead (see CLAUDE.md).
 
 ### `eval_env_fuel_ind'` goal ordering
-After `try (intros; exact I)` consumes OOT/True cases, remaining goals are:
+After `try (intros; exact I); try (intros; congruence)` consumes OOT/True:
 P_step terminating (7): App, FixApp, LetIn, Construct, Case, Proj, Const.
 P_fuel Val (4): Rel, Lam, Fix, Box.
-P_fuel other (2): OOT, eval_step.
-Use explicit `-` bullets. Do NOT use goal selectors — numbering shifts.
-
-### Resource instance ambiguity
-Both `LambdaBox_resource_fuel` and `LambdaBox_resource_trace` are
-`@LambdaBox_resource nat`. All shorthands use explicit `@` with both instances.
+P_fuel other (1): eval_step.
 
 ### Key tactic patterns
 - `preord_exp_trans`: `eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ]`
-- `preord_exp_post_monotonic`: `eapply (preord_exp_post_monotonic cenv _ eq_fuel)`
-- `anf_cvt_val_alpha_equiv`: needs 15+ explicit parameters (see code)
-- `Setminus` is Inductive: use bare `destruct`, not `as [? ?]`
-- `FromList` is `fun x => List.In x l`: use `unfold FromList, Ensembles.In`
-- `Disjoint` is Inductive: after `constructor; intros z Hz; destruct Hz`
-- Nested `[A|[B|C]]` fails in `try solve`: use chained `destruct`
+- `preord_exp_refl` for env bridging: case split on `Pos.eq_dec y x`
+- `BStept_letapp` needs 6 args: M.get f, get_list ys, find_def, set_lists, body bstep, cont bstep
+- `Setminus` is Inductive: use bare `destruct`
+- `Disjoint` proof: `constructor. intros z Hz. inv Hz. ...`
+
+### App case: x1 = x2 issue
+When e1 and e2 both return the same variable (e.g., both `tRel n`), `x1 = x2`.
+Then `rho_app = M.set x1 v2' (M.set x1 v1' rho)` has `v2'` at x1, NOT `v1'`.
+The `BStept_letapp` gets `v2'` as the function, not the closure `v1'`.
+Old proof (lines 3249-3410) handles this via `preord_val_trans`:
+show v2' is also a valid Vfun using `anf_cvt_val_alpha_equiv`.
 
 ## Section Parameters
 ```coq
@@ -208,12 +160,11 @@ Hglob_term : globals_terminate_prop
 ```
 common.v → ANF.v → fuel_sem.v → wf.v → anf_corresp.v → anf_util.v → anf_correct.v
 ```
-`anf_util.v` does NOT depend on `anf_corresp.v` (dependency removed;
-`term_ind_fix_body` moved to `common.v`).
 
 ## Old Proof Reference
-`LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v` — key lemmas to study:
+`LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v` — key lemmas:
 - `anf_cvt_rel_var_lookup` (line ~2069): the key invariant lemma
 - `env_consistent_extend` (line ~822): the trivial extension
 - `env_consistent_extend_from_cvt` (line ~2231): combines the two
 - The LetIn step case (line ~3515): template for IH chaining
+- The App step case (line ~3075): x1=x2 case split at line ~3248

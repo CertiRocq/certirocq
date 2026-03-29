@@ -346,8 +346,60 @@ Section Correct.
     unfold anf_env_rel'. intro H. eapply Forall2_length in H. exact H.
   Qed.
 
+  (* Weakening: if x ∉ FromList vnames, adding x to rho preserves anf_env_rel *)
+  Lemma anf_env_rel_weaken vnames vs0 x v rho :
+    anf_env_rel' vnames vs0 rho ->
+    ~ x \in FromList vnames ->
+    anf_env_rel' vnames vs0 (M.set x v rho).
+  Proof.
+    intros Henv Hni.
+    eapply anf_env_rel_set; [exact Henv |].
+    intros k Hk. exfalso. apply Hni. eapply nth_error_In. exact Hk.
+  Qed.
 
+  (* global_env_rel' weakening: if x is not a cmap variable, M.set preserves it *)
+  Lemma global_env_rel_set_fresh D rho x w :
+    global_env_rel' D rho ->
+    ~ x \in cmap_vars cmap ->
+    global_env_rel' D (M.set x w rho).
+  Proof.
+    intros Hglob Hni k v Hd Hlk.
+    assert (Hneq : v <> x).
+    { intro Heq. subst. apply Hni. exists k. exact Hlk. }
+    destruct (Hglob k v Hd Hlk) as (decl & body & anf_v & Hdecl & Hbody & Hget & Hrel).
+    exists decl, body, anf_v. repeat split; try assumption.
+    rewrite M.gso; [exact Hget | exact Hneq].
+  Qed.
 
+  (* global_env_rel' under M.set: general case where x may be a cmap variable *)
+  Lemma global_env_rel_set D rho x w :
+    global_env_rel' D rho ->
+    (forall k, D k -> lookup_const cmap k = Some x ->
+      forall decl body, declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      forall src_v f_s t_s, src_eval [] body (fuel_sem.Val src_v) f_s t_s ->
+      anf_val_rel' src_v w) ->
+    global_env_rel' D (M.set x w rho).
+  Proof.
+    intros Hglob Hx k v Hd Hlk.
+    destruct (Pos.eq_dec v x) as [-> | Hneq].
+    - destruct (Hglob k x Hd Hlk) as (decl & body & anf_v & Hdecl & Hbody & Hget & Hrel).
+      exists decl, body, w. repeat split; try assumption.
+      + rewrite M.gss. reflexivity.
+      + intros src_v f_s t_s Heval_s. eapply Hx; eassumption.
+    - destruct (Hglob k v Hd Hlk) as (decl & body & anf_v & Hdecl & Hbody & Hget & Hrel).
+      exists decl, body, anf_v. repeat split; try assumption.
+      rewrite M.gso; [exact Hget | exact Hneq].
+  Qed.
+
+  (* global_env_rel' monotonicity: weaken the domain *)
+  Lemma global_env_rel_mono D1 D2 rho :
+    global_env_rel' D1 rho ->
+    D2 \subset D1 ->
+    global_env_rel' D2 rho.
+  Proof.
+    intros Hglob Hsub k v Hd Hlk. exact (Hglob k v (Hsub k Hd) Hlk).
+  Qed.
 
 
   (** Value determinism: if source evaluation terminates,
@@ -445,15 +497,6 @@ Section Correct.
       exists v1, f, t. split; [reflexivity | exact Hev].
     - exact (Hcm i' x k decl body Hnth_vn Hlk Hdecl Hbody).
   Qed.
-
-  (** NOTE: [anf_cvt_result_cmap] (previously here) was FALSE:
-      a [tLetIn na (tConst k) (tRel 0)] conversion can produce a cmap
-      result without being [tConst k] itself. Replaced by
-      [anf_cvt_cmap_eval] which directly gives the eval of the constant
-      body, proved simultaneously with [anf_cvt_rel_var_lookup].
-
-      [eval_tConst_inv] is no longer needed for the core invariant chain
-      but may be useful for remaining cases of [anf_cvt_correct]. *)
 
   (** Combined lemma proving both var_lookup and cmap_eval simultaneously.
       Part 1 (var lookup): if vn[i] = x then rho[i] = v.
@@ -1050,7 +1093,8 @@ Section Correct.
                 - exact Hcvt_e1.
                 - admit. (* Disjoint continuation for IH1: needs App-specific context disjointness *)
                 - eapply IH1_val; eauto. }
-            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            eapply preord_exp_trans with (P1 := anf_bound (f3 + 2) (t3 + 2)).
+            tci. exact eq_fuel_idemp.
             (* IH2: evaluate e2 via C2 *)
             2:{ intros m.
                 (* Prove Eletapp continuation disjointness before edestruct *)
@@ -1092,7 +1136,20 @@ Section Correct.
                       [exact Heval1 | exact Hcvt_e1
                       | exact Hdis | exact Hdis_cmap | exact Hcons | exact Hcmap | exact Hk]. }
                   exists (Clos_v rho' na0 body0). split; [exact Hek | exact Hrel_clos].
-                - admit. (* global_env_rel' for M.set x1 v1' rho *)
+                - (* global_env_rel' for M.set x1 v1' rho *)
+                  eapply global_env_rel_set; [exact Hglob |].
+                  intros k_g _ Hlk_g decl_g body_g Hdecl_g Hbody_g src_vg f_g t_g Heval_g.
+                  (* From cmap_eval: eval [] body_g gives Clos_v rho' na0 body0 *)
+                  assert (Heval_g' : exists fg tg,
+                    src_eval [] body_g (fuel_sem.Val (Clos_v rho' na0 body0)) fg tg).
+                  { eapply anf_cvt_cmap_eval;
+                      [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                      | exact Hcons | exact Hcmap | exact Hlk_g | exact Hdecl_g | exact Hbody_g]. }
+                  destruct Heval_g' as [fg [tg Heval_g']].
+                  assert (src_vg = Clos_v rho' na0 body0)
+                    by (eapply eval_val_det; [exact Heval_g | exact Heval_g']).
+                  subst src_vg.
+                  exact Hrel_clos.
                 - exact Hcvt_e2.
                 - exact Hdis_eletapp.
                 - eapply IH2_val; eauto. }
@@ -1115,33 +1172,39 @@ Section Correct.
                H3 : env_consistent names rho'
                H12 : anf_cvt_rel' S1 body0 (x0::names) S0 C0 r1
                + disjointness/cmap hypotheses *)
+            (* Save Hrel_clos before inv clears it — needed in env bridge *)
+            pose proof Hrel_clos as Hrel_clos_saved.
             inv Hrel_clos.
             (* Define target defs and body env *)
             set (defs_cc := Fcons f0 func_tag [x0] (C0 |[ Ehalt r1 ]|) Fnil).
             set (rho_bc := M.set x0 v2' (def_funs defs_cc defs_cc rho1 rho1)).
-            (* Apply IH3 to the closure body *)
+            (* Apply IH3 to the closure body.
+               Use step index (S i) so that after consuming 1 for Ehalt,
+               the residual preord_val is at step i, matching the overall index. *)
             assert (IH3_full :
               (forall v0 v'0, fuel_sem.Val v = fuel_sem.Val v0 ->
                anf_val_rel' v0 v'0 ->
-               preord_exp cenv (anf_bound f3 t3) eq_fuel i
+               preord_exp cenv (anf_bound f3 t3) eq_fuel (i + 1)
                  (Ehalt r1, M.set r1 v'0 rho_bc)
                  (C0 |[ Ehalt r1 ]|, rho_bc)) /\
               (fuel_sem.Val v = fuel_sem.OOT ->
                exists c, bstep_fuel cenv rho_bc (C0 |[ Ehalt r1 ]|) c eval.OOT tt)).
-            { eapply (IH3 rho_bc (x0 :: names) C0 r1 S1 S0 i).
+            { eapply (IH3 rho_bc (x0 :: names) C0 r1 S1 S0 (i + 1)).
               - (* well_formed_env (v2 :: rho') *)
                 constructor; [exact Hwf_v2 |].
                 inv Hwf_clos. assumption.
-              - (* wellformed body0: from Hwf_clos *)
+              - (* wellformed body0: Wf_Clos gives wellformed (S (length rho')) body0,
+                   and length rho' = length names from anf_env_rel *)
                 inv Hwf_clos.
-                admit. (* need wellformed (length (x0::names)) body0 — from closure wf *)
+                simpl. rewrite <- (anf_env_rel_length _ _ _ H2). assumption.
               - (* env_consistent (x0::names) (v2::rho') *)
                 apply env_consistent_extend_fresh; [exact H3 |].
                 intro Hc. apply H9. right. exact Hc.
               - (* cmap_consistent (x0::names) (v2::rho') *)
                 apply cmap_consistent_extend; [admit (* cmap_consistent names rho' *) |].
+                (* x0 is NOT a cmap variable (H6), so the condition is vacuous *)
                 intros k_c decl_c body_c Hlk_c Hdecl_c Hbody_c.
-                admit. (* need eval [] body_c (Val v2) — from Hglob_term or cmap_consistent *)
+                exfalso. apply H6. exists k_c. exact Hlk_c.
               - (* Disjoint (FromList (x0::names)) S1 *)
                 rewrite FromList_cons. eapply Union_Disjoint_l.
                 + eapply Disjoint_Singleton_l.
@@ -1150,7 +1213,12 @@ Section Correct.
                   intros z Hz. right. right. exact Hz.
               - exact H5. (* Disjoint (cmap_vars cmap) S1 *)
               - (* anf_env_rel (x0::names) (v2::rho') rho_bc *)
-                admit. (* build: constructor for x0→v2', weaken H2 through def_funs *)
+                unfold rho_bc. constructor.
+                + (* x0 → v2' *)
+                  exists v2'. split; [rewrite M.gss; reflexivity | exact Hrel_v2].
+                + (* names → rho' via rho1, weakened through def_funs and M.set x0 *)
+                  eapply anf_env_rel_weaken; [| intro Hc; apply H9; right; exact Hc].
+                  eapply anf_env_rel_weaken; [exact H2 | exact H10].
               - (* global_env_rel' rho_bc *)
                 admit. (* from H13 + def_funs weakening *)
               - exact H12. (* anf_cvt_rel' S1 body0 (x0::names) S0 C0 r1 *)
@@ -1165,99 +1233,214 @@ Section Correct.
             assert (Hehalt : bstep_fuel cenv (M.set r1 v' rho_bc)
                                (Ehalt r1) (<0> <+> <1> (Ehalt r1)) (eval.Res v') (<0> <+> <1> (Ehalt r1))).
             { apply BStepf_run. apply BStept_halt. rewrite M.gss. reflexivity. }
-            (* Step 3: Prove preord_exp for Eletapp.
-               Goal: preord_exp ?P1 eq_fuel i
-                 (e_k, M.set x v' rho)
-                 (Eletapp x x1 func_tag [x2] e_k, M.set x2 v2' (M.set x1 v1' rho))
-               Strategy: introduce source reduction, construct target via BStept_letapp
-               using IH3 for body + env bridge for continuation *)
-            (* Introduce source reduction *)
+            (* Introduce source reduction.
+               Do NOT destruct v_ek into OOT/Res — handle uniformly.
+               The body bstep from IH3 and env bridge both work for any v_ek. *)
             intros v_ek cin_ek cout_ek Hle_ek Hbstep_ek.
-            (* Case split: if source is OOT, target OOTs trivially *)
-            destruct v_ek as [| v_ek_val].
-            { (* Source OOT: any target OOT suffices *)
-              exists eval.OOT, <0>, <0>.
-              split; [eapply bstep_fuel_zero_OOT |]. split; [admit | constructor]. }
-            (* Source Res: cin_ek >= 1, so i >= 1 *)
-            (* Use IH3_val with Ehalt to get body bstep *)
-            assert (H1_le_i : to_nat (<0> <+> <1> (Ehalt r1)) <= i).
-            { admit. (* Res result implies cin_ek >= 1, so i >= 1 *) }
+            (* Extract body bstep from IH3 *)
+            assert (H1_le_Si : to_nat (<0> <+> <1> (Ehalt r1)) <= i + 1).
+            { unfold_all. simpl. lia. }
             destruct (IH3_val (eval.Res v') (<0> <+> <1> (Ehalt r1)) (<0> <+> <1> (Ehalt r1))
-                        H1_le_i Hehalt)
+                        H1_le_Si Hehalt)
               as [v_bc [cin_bc [cout_bc [Hbstep_bc [Hpost_bc Hres_bc]]]]].
-            (* v_bc must be Res (from preord_res with Res v') *)
             destruct v_bc as [| v_bc_val].
             { exfalso. exact Hres_bc. }
-            (* Now have:
-               Hbstep_bc : bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc
-               Hres_bc : preord_val cenv (i - to_nat ...) v' v_bc_val *)
-            (* Step 4: Construct target reduction via BStept_letapp.
-               We have body bstep: Hbstep_bc.
-               We need continuation bstep from Hbstep_ek + env bridge.
-               Env bridge: M.set x v' rho ≈ M.set x v_bc_val rho_app
-               where rho_app = M.set x2 v2' (M.set x1 (Vfun rho1 defs_cc f0) rho) *)
-            (* Use source bstep_ek in the bridged env *)
+            (* Hbstep_bc : bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc
+               Hres_bc : preord_val cenv eq_fuel i v' v_bc_val *)
             set (rho_app := M.set x2 v2' (M.set x1 (Vfun rho1 defs_cc f0) rho)).
-            (* The target continuation runs in M.set x v_bc_val rho_app.
-               Source runs in M.set x v' rho.
-               Need preord_val between v' and v_bc_val (from Hres_bc),
-               and preord_env between rho and rho_app for other variables. *)
-            (* Construct BStept_letapp:
-               1. M.get x1 rho_app = Vfun rho1 defs_cc f0
-               2. get_list [x2] rho_app = Some [v2']
-               3. find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|)
-               4. set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc
-               5. bstep_fuel rho_bc body cin_bc (Res v_bc_val) cout_bc
-               6. bstep_fuel (M.set x v_bc_val rho_app) e_k cin_cont v_cont cout_cont *)
-            (* For step 6, we need a continuation bstep.
-               Since v' ≈ v_bc_val, and rho ≈ rho_app on relevant vars,
-               the source bstep_ek in M.set x v' rho translates to a
-               target bstep in M.set x v_bc_val rho_app. *)
-            (* Use preord_exp_refl to bridge source env → target env for continuation.
-               Source: M.set x v' rho. Target: M.set x v_bc_val rho_app.
-               e_k's free vars avoid x1, x2 (from Hdis_ek), so extra bindings don't matter.
-               At x: v' ≈ v_bc_val (from Hres_bc). *)
-            assert (Hbridge : preord_exp cenv eq_fuel eq_fuel (i - to_nat (<0> <+> <1> (Ehalt r1)))
-                     (e_k, M.set x v' rho) (e_k, M.set x v_bc_val rho_app)).
+            (* Case split on x1 =? x2 BEFORE env bridge *)
+            destruct (Pos.eq_dec x1 x2) as [Heq_x1x2 | Hneq_x1x2].
+            { (* x1 = x2: argument shadows closure.
+                 Old proof uses preord_val_trans (~160 lines). *)
+              admit. (* x1 = x2 case *) }
+            (* x1 ≠ x2: standard case *)
+            (* Env bridge: M.set x v' rho ≈ M.set x v_bc_val rho_app
+               on occurs_free e_k. For y=x use preord_val from Hres_bc.
+               For y=x1/x2, case split on FromList vnames vs S vs cmap_vars. *)
+            assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
+              (e_k, M.set x v' rho)
+              (e_k, M.set x v_bc_val rho_app)).
             { eapply preord_exp_refl. exact eq_fuel_compat.
               intros y Hy.
               destruct (Pos.eq_dec y x) as [-> | Hneq_x].
-              - (* y = x: v' ≈ v_bc_val *)
+              - (* y = x *)
                 intros w Hget. rewrite M.gss in Hget. inv Hget.
-                eexists. split. unfold rho_app. rewrite M.gss. reflexivity.
-                admit. (* preord_val v' v_bc_val at reduced step index *)
-              - (* y ≠ x: same in both envs *)
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hres_bc. unfold_all. simpl. lia.
+              - (* y ≠ x *)
                 intros w Hget. rewrite M.gso in Hget; [| exact Hneq_x].
-                eexists. split.
-                + unfold rho_app. rewrite M.gso; [| exact Hneq_x].
-                  (* y ≠ x2 and y ≠ x1: from Hdis_ek *)
-                  admit. (* M.gso for x2, x1 — y ∉ {x1,x2} from Hdis_ek *)
-                + eapply preord_val_refl. tci. }
+                destruct (Pos.eq_dec y x2) as [-> | Hneq_x2].
+                + (* y = x2 *)
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e2)
+                    as [Hin_vn | [Hin_S2 | Hin_cm]].
+                  * (* x2 ∈ FromList vnames: use alpha-equiv *)
+                    eexists. split.
+                    { unfold rho_app. rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x]. }
+                    assert (Hin_list : List.In x2 vnames) by exact Hin_vn.
+                    apply In_nth_error in Hin_list. destruct Hin_list as [k0 Hk0].
+                    assert (Heval2_k : nth_error rho0 k0 = Some v2).
+                    { eapply anf_cvt_rel_var_lookup; [exact Heval2 | exact Hcvt_e2 | | | | | exact Hk0].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap].
+                      - exact Hcons.
+                      - exact Hcmap. }
+                    destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk0)
+                      as [v_src [Hk0_src Hrel_k0]].
+                    destruct Hrel_k0 as [w_k0 [Hget_k0 Hrel_k0]].
+                    assert (v_src = v2) by (rewrite Heval2_k in Hk0_src; congruence).
+                    subst v_src.
+                    assert (w_k0 = w) by congruence. subst w_k0.
+                    eapply (@anf_cvt_val_alpha_equiv
+                              _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                              eq_fuel_compat (fun _ _ H => H)
+                              nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                              Σ box_dc Hglob_term func_tag default_tag);
+                      [exact Hrel_k0 | exact Hrel_v2].
+                  * (* x2 ∈ S2: contradiction via Hdis_ek *)
+                    exfalso.
+                    assert (Hx2_not_S3 : ~ x2 \in S3).
+                    { eapply anf_cvt_result_not_in_output; [exact Hcvt_e2 | |].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap]. }
+                    match goal with Hr : x \in S3 |- _ =>
+                      assert (Hx2_ne_x : x2 <> x) by (intro; subst; exact (Hx2_not_S3 Hr)) end.
+                    destruct Hdis_ek as [Hdis_ek'].
+                    apply (Hdis_ek' x2). constructor; [exact Hy |].
+                    constructor.
+                    -- constructor.
+                       ++ eapply anf_cvt_exp_subset. exact Hcvt_e1. exact Hin_S2.
+                       ++ intro Habs. destruct Habs. exact (Hx2_not_S3 H).
+                    -- intro Habs. inv Habs. exact (Hx2_ne_x eq_refl).
+                  * (* x2 ∈ cmap_vars: use alpha-equiv via global_env_rel' *)
+                    eexists. split.
+                    { unfold rho_app. rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x]. }
+                    destruct Hin_cm as [k_c Hlk_c].
+                    destruct (Hglob k_c x2 I Hlk_c)
+                      as (decl_c & body_c & anf_vc & Hdecl_c & Hbody_c & Hget_c & Hrel_c).
+                    assert (anf_vc = w) by congruence. subst anf_vc.
+                    assert (Heval2_body : exists f_c t_c,
+                      src_eval [] body_c (fuel_sem.Val v2) f_c t_c).
+                    { eapply anf_cvt_cmap_eval;
+                        [exact Heval2 | exact Hcvt_e2 | | | | | exact Hlk_c | exact Hdecl_c | exact Hbody_c].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                      - eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap].
+                      - exact Hcons.
+                      - exact Hcmap. }
+                    destruct Heval2_body as [f_c [t_c Heval2_c]].
+                    eapply (@anf_cvt_val_alpha_equiv
+                              _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                              eq_fuel_compat (fun _ _ H => H)
+                              nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                              Σ box_dc Hglob_term func_tag default_tag);
+                      [exact (Hrel_c v2 f_c t_c Heval2_c) | exact Hrel_v2].
+                + destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
+                  * (* y = x1 *)
+                    destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1)
+                      as [Hin_vn1 | [Hin_S1 | Hin_cm1]].
+                    -- (* x1 ∈ FromList vnames: use alpha-equiv *)
+                       eexists. split.
+                       { unfold rho_app. rewrite M.gso; [| exact Hneq_x].
+                         rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x1x2]. }
+                       assert (Hin_list1 : List.In x1 vnames) by exact Hin_vn1.
+                       apply In_nth_error in Hin_list1. destruct Hin_list1 as [k1 Hk1].
+                       assert (Heval1_k : nth_error rho0 k1 = Some (Clos_v rho' na0 body0)).
+                       { eapply anf_cvt_rel_var_lookup;
+                           [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                           | exact Hcons | exact Hcmap | exact Hk1]. }
+                       destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk1)
+                         as [v_src1 [Hk1_src Hrel_k1]].
+                       destruct Hrel_k1 as [w_k1 [Hget_k1 Hrel_k1]].
+                       assert (v_src1 = Clos_v rho' na0 body0) by congruence. subst v_src1.
+                       assert (w_k1 = w) by congruence. subst w_k1.
+                       eapply (@anf_cvt_val_alpha_equiv
+                                 _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                 eq_fuel_compat (fun _ _ H => H)
+                                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                 Σ box_dc Hglob_term func_tag default_tag);
+                         [exact Hrel_k1 | exact Hrel_clos_saved].
+                    -- (* x1 ∈ S: contradiction via Hdis_ek *)
+                       exfalso.
+                       assert (Hx1_not_S2 : ~ x1 \in S2).
+                       { eapply anf_cvt_result_not_in_output; eassumption. }
+                       assert (Hx1_not_S3 : ~ x1 \in S3).
+                       { intro Hin. apply Hx1_not_S2.
+                         eapply anf_cvt_exp_subset. exact Hcvt_e2. exact Hin. }
+                       match goal with Hr : x \in S3 |- _ =>
+                         assert (Hx1_ne_x : x1 <> x)
+                           by (intro; subst; exact (Hx1_not_S3 Hr)) end.
+                       destruct Hdis_ek as [Hdis_ek'].
+                       apply (Hdis_ek' x1). constructor; [exact Hy |].
+                       constructor.
+                       ++ constructor; [exact Hin_S1 |].
+                          intro Habs. destruct Habs. exact (Hx1_not_S3 H).
+                       ++ intro Habs. inv Habs. exact (Hx1_ne_x eq_refl).
+                    -- (* x1 ∈ cmap_vars: use alpha-equiv via global_env_rel' *)
+                       eexists. split.
+                       { unfold rho_app. rewrite M.gso; [| exact Hneq_x].
+                         rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x1x2]. }
+                       destruct Hin_cm1 as [k_c1 Hlk_c1].
+                       destruct (Hglob k_c1 x1 I Hlk_c1)
+                         as (decl_c1 & body_c1 & anf_vc1 & Hdecl_c1 & Hbody_c1 & Hget_c1 & Hrel_c1).
+                       assert (anf_vc1 = w) by congruence. subst anf_vc1.
+                       assert (Heval1_body : exists f_c1 t_c1,
+                         src_eval [] body_c1 (fuel_sem.Val (Clos_v rho' na0 body0)) f_c1 t_c1).
+                       { eapply anf_cvt_cmap_eval;
+                           [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                           | exact Hcons | exact Hcmap | exact Hlk_c1 | exact Hdecl_c1 | exact Hbody_c1]. }
+                       destruct Heval1_body as [f_c1 [t_c1 Heval1_c1]].
+                       eapply (@anf_cvt_val_alpha_equiv
+                                 _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                 eq_fuel_compat (fun _ _ H => H)
+                                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                 Σ box_dc Hglob_term func_tag default_tag);
+                         [exact (Hrel_c1 (Clos_v rho' na0 body0) f_c1 t_c1 Heval1_c1) | exact Hrel_clos_saved].
+                  * (* y ≠ x, ≠ x1, ≠ x2 *)
+                    eexists. split.
+                    { unfold rho_app. rewrite M.gso; [| exact Hneq_x].
+                      rewrite M.gso; [| exact Hneq_x2].
+                      rewrite M.gso; [exact Hget | exact Hneq_x1]. }
+                    eapply preord_val_refl. tci. }
             (* Extract continuation bstep from bridge *)
-            assert (Hle_bridge : to_nat cin_ek <= i - to_nat (<0> <+> <1> (Ehalt r1))) by admit.
-            destruct (Hbridge (eval.Res v_ek_val) cin_ek cout_ek
-                        Hle_bridge Hbstep_ek)
-              as [v_cont [cin_cont [cout_cont [Hbstep_cont [Hpost_cont Hres_cont]]]]].
-            (* Construct BStept_letapp with body + continuation *)
-            exists v_cont, (cin_bc <+> cin_cont <+> <1> (Eletapp x x1 func_tag [x2] e_k)),
-                   (cout_bc <+> cout_cont <+> <1> (Eletapp x x1 func_tag [x2] e_k)).
-            split.
+            edestruct Hrefl as (v_cont & cin_cont & cout_cont &
+              Hbstep_cont & Hpost_cont & Hres_cont).
+            { exact Hle_ek. }
+            { exact Hbstep_ek. }
+            (* Construct BStept_letapp *)
+            do 3 eexists. split.
             { econstructor 2. eapply BStept_letapp.
-              - unfold rho_app. rewrite M.gso; [rewrite M.gss; reflexivity |].
-                admit. (* x2 ≠ x1 *)
-              - simpl. unfold rho_app. rewrite M.gss. reflexivity.
-              - unfold defs_cc. simpl.
+              - (* M.get x1 rho_app *)
+                unfold rho_app. rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x1x2].
+              - (* get_list [x2] rho_app *)
+                simpl. unfold rho_app. rewrite M.gss. reflexivity.
+              - (* find_def f0 defs_cc *)
+                unfold defs_cc. simpl.
                 destruct (M.elt_eq f0 f0); [reflexivity | contradiction].
-              - simpl. reflexivity.
-              - exact Hbstep_bc.
-              - exact Hbstep_cont. }
+              - (* set_lists *)
+                simpl. reflexivity.
+              - (* body bstep *)
+                exact Hbstep_bc.
+              - (* continuation bstep *)
+                exact Hbstep_cont. }
             split.
             { (* Post: fuel bounds *)
-              admit. (* fuel arithmetic *) }
-            { (* preord_res *) admit. }
+              unfold anf_bound in Hpost_bc |- *.
+              unfold eq_fuel in Hpost_cont. simpl in Hpost_cont, Hpost_bc.
+              destruct Hpost_bc as [Hlb_bc Hub_bc].
+              unfold_all. simpl in *. split; lia. }
+            { exact Hres_cont. }
         }
-        (* inclusion: fuel composition — depends on ?P1 from Eletapp stage *)
-        admit. (* Will be provable by lia once Eletapp stage fills in ?P1 *)
+        (* inclusion: comp (comp (anf_bound (f3+2) (t3+2)) (anf_bound f2 t2)) (anf_bound f1 t1)
+           ⊆ anf_bound (f1+f2+f3+1) (t1+t2+t3+2) *)
+        { unfold inclusion, comp, eq_fuel, anf_bound.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?].
+          intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] [? ?]]].
+          unfold_all. simpl in *. split; lia. }
       + (* Divergence *)
         intros _. exists 0. eapply bstep_fuel_zero_OOT.
 
