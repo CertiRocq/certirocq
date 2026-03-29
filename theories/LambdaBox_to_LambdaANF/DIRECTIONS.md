@@ -126,21 +126,28 @@ This case serves as the TEMPLATE for all other terminating step cases.
 - `anf_cvt_rel_mfix_to_fix_rel` — mfix to fix relation conversion
 - Reduction lemmas: `preord_exp_Efun_red`, `preord_exp_Econstr_red`, `preord_exp_Eproj_red`
 
-### `env_consistent_extend` (current state — NEEDS RESTRUCTURING)
-Currently proved by `eval_env_fuel_ind'` with all cases except Const proved.
-Should be restructured to the simpler old-proof decomposition:
-`anf_cvt_rel_var_lookup` (hard) + trivial 4-line `env_consistent_extend`.
+### `cmap_consistent` + `anf_cvt_rel_var_lookup` decomposition (DONE)
+The `cmap_consistent` invariant has been introduced and the proof restructured
+following the old proof's decomposition:
+- **`cmap_consistent`** — definition tracking global constant provenance in `rho`
+- **`env_consistent_extend`** — trivial 4-line lemma (Qed)
+- **`cmap_consistent_extend`** — trivial analog (Qed)
+- **`anf_cvt_rel_var_lookup`** — key lemma by eval induction, all 12 cases proved (Qed).
+  Uses `env_consistent` for Rel, `cmap_consistent` + `eval_val_det` for Const.
+- **`env_consistent_extend_from_cvt`** — combines var_lookup + extend (Qed)
+- **`cmap_consistent_extend_from_cvt`** — uses var_lookup + result_cmap + tConst_inv (Qed)
+- Correctness predicates updated to carry `cmap_consistent` hypothesis
+- LetIn case of `anf_cvt_correct` updated to pass both invariants to IH calls
 
 ## Admitted Helper Lemmas (Verify them very carefully)
 
 1. **`eval_val_det`** — Value determinism. Standard, provable by mutual induction.
 2. **`eval_preserves_wf`** — Eval preserves well-formedness. Standard.
-3. **`env_consistent_extend`** — Needs restructuring (see above).
-4. **`anf_cvt_disjoint_occurs_free_ctx`** — Free variables of context application
+3. **`anf_cvt_disjoint_occurs_free_ctx`** — Free variables of context application
    avoid consumed variables. Structural, independent of env invariant issue.
-5. **`anf_cvt_result_cmap`** — Conversion inversion for cmap results.
-6. **`eval_tConst_inv`** — Eval inversion for tConst.
-7. **`anf_val_rel_exists`** (in `anf_corresp.v`) — Target value existence.
+4. **`anf_cvt_result_cmap`** — Conversion inversion for cmap results.
+5. **`eval_tConst_inv`** — Eval inversion for tConst.
+6. **`anf_val_rel_exists`** (in `anf_corresp.v`) — Target value existence.
 
 ## Remaining Step Cases
 
