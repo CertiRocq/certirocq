@@ -1131,21 +1131,32 @@ Section Correct.
             { eapply (IH3 rho_bc (x0 :: names) C0 r1 S1 S0 i).
               - (* well_formed_env (v2 :: rho') *)
                 constructor; [exact Hwf_v2 |].
-                admit. (* well_formed_env rho' from Hwf_clos *)
-              - admit. (* wellformed body0 from Hwf_clos *)
+                inv Hwf_clos. assumption.
+              - (* wellformed body0: from Hwf_clos *)
+                inv Hwf_clos.
+                admit. (* need wellformed (length (x0::names)) body0 — from closure wf *)
               - (* env_consistent (x0::names) (v2::rho') *)
                 apply env_consistent_extend_fresh; [exact H3 |].
                 intro Hc. apply H9. right. exact Hc.
               - (* cmap_consistent (x0::names) (v2::rho') *)
-                admit. (* cmap_consistent for closure body *)
-              - admit. (* Disjoint (FromList (x0::names)) S1 *)
+                apply cmap_consistent_extend; [admit (* cmap_consistent names rho' *) |].
+                intros k_c decl_c body_c Hlk_c Hdecl_c Hbody_c.
+                admit. (* need eval [] body_c (Val v2) — from Hglob_term or cmap_consistent *)
+              - (* Disjoint (FromList (x0::names)) S1 *)
+                rewrite FromList_cons. eapply Union_Disjoint_l.
+                + eapply Disjoint_Singleton_l.
+                  eapply Disjoint_In_l. exact H4. left. constructor.
+                + eapply Disjoint_Included_l; [| exact H4].
+                  intros z Hz. right. right. exact Hz.
               - exact H5. (* Disjoint (cmap_vars cmap) S1 *)
               - (* anf_env_rel (x0::names) (v2::rho') rho_bc *)
-                admit. (* build from H2, Hrel_v2, def_funs *)
+                admit. (* build: constructor for x0→v2', weaken H2 through def_funs *)
               - (* global_env_rel' rho_bc *)
-                admit. (* from H13 + def_funs *)
+                admit. (* from H13 + def_funs weakening *)
               - exact H12. (* anf_cvt_rel' S1 body0 (x0::names) S0 C0 r1 *)
-              - admit. (* Disjoint for Ehalt r1 continuation *)
+              - (* Disjoint for Ehalt r1 *)
+                constructor. intros z Hz. inv Hz.
+                inv H. destruct H0. apply H0. constructor.
             }
             destruct IH3_full as [IH3_val _].
             specialize (IH3_val v v' eq_refl Hrel').
@@ -1170,7 +1181,7 @@ Section Correct.
             (* Source Res: cin_ek >= 1, so i >= 1 *)
             (* Use IH3_val with Ehalt to get body bstep *)
             assert (H1_le_i : to_nat (<0> <+> <1> (Ehalt r1)) <= i).
-            { admit. (* from bstep_fuel ... (Res v_ek_val), cin_ek >= 1 *) }
+            { admit. (* Res result implies cin_ek >= 1, so i >= 1 *) }
             destruct (IH3_val (eval.Res v') (<0> <+> <1> (Ehalt r1)) (<0> <+> <1> (Ehalt r1))
                         H1_le_i Hehalt)
               as [v_bc [cin_bc [cout_bc [Hbstep_bc [Hpost_bc Hres_bc]]]]].
@@ -1180,8 +1191,54 @@ Section Correct.
             (* Now have:
                Hbstep_bc : bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc
                Hres_bc : preord_val cenv (i - to_nat ...) v' v_bc_val *)
-            (* Construct BStept_letapp + env bridge for continuation *)
-            admit. (* ~60 lines: BStept_letapp construction + env bridge *)
+            (* Step 4: Construct target reduction via BStept_letapp.
+               We have body bstep: Hbstep_bc.
+               We need continuation bstep from Hbstep_ek + env bridge.
+               Env bridge: M.set x v' rho ≈ M.set x v_bc_val rho_app
+               where rho_app = M.set x2 v2' (M.set x1 (Vfun rho1 defs_cc f0) rho) *)
+            (* Use source bstep_ek in the bridged env *)
+            set (rho_app := M.set x2 v2' (M.set x1 (Vfun rho1 defs_cc f0) rho)).
+            (* The target continuation runs in M.set x v_bc_val rho_app.
+               Source runs in M.set x v' rho.
+               Need preord_val between v' and v_bc_val (from Hres_bc),
+               and preord_env between rho and rho_app for other variables. *)
+            (* Construct BStept_letapp:
+               1. M.get x1 rho_app = Vfun rho1 defs_cc f0
+               2. get_list [x2] rho_app = Some [v2']
+               3. find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|)
+               4. set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc
+               5. bstep_fuel rho_bc body cin_bc (Res v_bc_val) cout_bc
+               6. bstep_fuel (M.set x v_bc_val rho_app) e_k cin_cont v_cont cout_cont *)
+            (* For step 6, we need a continuation bstep.
+               Since v' ≈ v_bc_val, and rho ≈ rho_app on relevant vars,
+               the source bstep_ek in M.set x v' rho translates to a
+               target bstep in M.set x v_bc_val rho_app. *)
+            (* Provide witnesses: the target steps via BStept_letapp + BStepf_run *)
+            exists (eval.Res v_ek_val), (cin_bc <+> cin_ek <+> <1> (Eletapp x x1 func_tag [x2] e_k)),
+                   (cout_bc <+> cout_ek <+> <1> (Eletapp x x1 func_tag [x2] e_k)).
+            split.
+            { (* bstep_fuel rho_app (Eletapp x x1 func_tag [x2] e_k) ... *)
+              econstructor 2. (* BStepf_run *)
+              eapply BStept_letapp.
+              - (* M.get x1 rho_app = Some (Vfun rho1 defs_cc f0) *)
+                unfold rho_app.
+                rewrite M.gso; [rewrite M.gss; reflexivity |].
+                admit. (* x2 ≠ x1 *)
+              - (* get_list [x2] rho_app = Some [v2'] *)
+                simpl. unfold rho_app. rewrite M.gss. reflexivity.
+              - (* find_def f0 defs_cc = Some (func_tag, [x0], C0|[Ehalt r1]|) *)
+                unfold defs_cc. simpl.
+                destruct (M.elt_eq f0 f0); [reflexivity | contradiction].
+              - (* set_lists [x0] [v2'] (def_funs defs_cc defs_cc rho1 rho1) = Some rho_bc *)
+                simpl. reflexivity.
+              - (* bstep_fuel rho_bc (C0|[Ehalt r1]|) cin_bc (Res v_bc_val) cout_bc *)
+                exact Hbstep_bc.
+              - (* bstep_fuel (M.set x v_bc_val rho_app) e_k cin_ek ... *)
+                admit. (* continuation: need env bridge M.set x v' rho ≈ M.set x v_bc_val rho_app *)
+            }
+            split.
+            { (* Post condition *) admit. }
+            { (* preord_res *) admit. }
         }
         (* inclusion: fuel composition — depends on ?P1 from Eletapp stage *)
         admit. (* Will be provable by lia once Eletapp stage fills in ?P1 *)
