@@ -1665,6 +1665,80 @@ Section Correct.
     - apply in_rev. rewrite rev_involutive. exact Hx.
   Qed.
 
+  (* env_consistent for fix body: rev fnames ++ names, make_rec_env mfix rho.
+     Proof: NoDup(rev fnames) handles the fnames part, env_consistent handles names,
+     Disjoint(fnames)(names) handles cross cases. *)
+  Lemma env_consistent_make_rec_env fnames0 names0 mfix rho_s :
+    NoDup fnames0 ->
+    env_consistent names0 rho_s ->
+    Disjoint _ (FromList names0) (FromList fnames0) ->
+    Datatypes.length fnames0 = Datatypes.length mfix ->
+    env_consistent (rev fnames0 ++ names0) (make_rec_env mfix rho_s).
+  Proof.
+    intros Hnd Hcons Hdis_nf Hflen.
+    intros i0 j0 y Hi0 Hj0.
+    set (n := Datatypes.length (rev fnames0)).
+    assert (Hn : n = Datatypes.length mfix) by (unfold n; rewrite length_rev; lia).
+    destruct (Nat.lt_ge_cases i0 n) as [Hli | Hli],
+             (Nat.lt_ge_cases j0 n) as [Hlj | Hlj].
+    - rewrite nth_error_app1 in Hi0 by exact Hli.
+      rewrite nth_error_app1 in Hj0 by exact Hlj.
+      assert (i0 = j0).
+      { apply (proj1 (NoDup_nth_error _) (NoDup_rev Hnd) i0 j0 Hli).
+        congruence. }
+      subst j0. reflexivity.
+    - rewrite nth_error_app1 in Hi0 by exact Hli.
+      rewrite nth_error_app2 in Hj0 by exact Hlj.
+      exfalso. destruct Hdis_nf as [Hd]. apply (Hd y). constructor.
+      + eapply nth_error_In. exact Hj0.
+      + apply in_rev. eapply nth_error_In. exact Hi0.
+    - rewrite nth_error_app2 in Hi0 by exact Hli.
+      rewrite nth_error_app1 in Hj0 by exact Hlj.
+      exfalso. destruct Hdis_nf as [Hd]. apply (Hd y). constructor.
+      + eapply nth_error_In. exact Hi0.
+      + apply in_rev. eapply nth_error_In. exact Hj0.
+    - rewrite nth_error_app2 in Hi0 by exact Hli.
+      rewrite nth_error_app2 in Hj0 by exact Hlj.
+      assert (Hcons_ij := Hcons _ _ y Hi0 Hj0).
+      unfold n in *.
+      pose proof (make_rec_env_nth_orig mfix rho_s (i0 - Datatypes.length (rev fnames0))) as Hr1.
+      pose proof (make_rec_env_nth_orig mfix rho_s (j0 - Datatypes.length (rev fnames0))) as Hr2.
+      rewrite length_rev, Hflen in Hr1, Hr2.
+      replace (Datatypes.length mfix + (i0 - Datatypes.length mfix))%nat
+        with i0 in Hr1 by lia.
+      replace (Datatypes.length mfix + (j0 - Datatypes.length mfix))%nat
+        with j0 in Hr2 by lia.
+      rewrite Hr1, Hr2.
+      rewrite length_rev, Hflen in Hcons_ij. exact Hcons_ij.
+  Qed.
+
+  (* cmap_consistent for fix body: fnames disjoint from cmap_vars *)
+  Lemma cmap_consistent_make_rec_env fnames0 names0 mfix rho_s :
+    cmap_consistent names0 rho_s ->
+    Disjoint _ (cmap_vars cmap) (FromList fnames0) ->
+    Datatypes.length fnames0 = Datatypes.length mfix ->
+    cmap_consistent (rev fnames0 ++ names0) (make_rec_env mfix rho_s).
+  Proof.
+    intros Hcm Hdis_cm Hflen i0 x k decl body Hi0 Hlk Hdecl Hbody.
+    set (n := Datatypes.length (rev fnames0)).
+    assert (Hn : n = Datatypes.length mfix) by (unfold n; rewrite length_rev; lia).
+    destruct (Nat.lt_ge_cases i0 n) as [Hli | Hli].
+    - rewrite nth_error_app1 in Hi0 by exact Hli.
+      exfalso. destruct Hdis_cm as [Hd]. apply (Hd x). constructor.
+      + exists k. exact Hlk.
+      + apply in_rev. eapply nth_error_In. exact Hi0.
+    - rewrite nth_error_app2 in Hi0 by exact Hli.
+      destruct (Hcm _ _ _ _ _ Hi0 Hlk Hdecl Hbody) as (vi & fi & ti & Hnth & Heval).
+      exists vi, fi, ti. split; [| exact Heval].
+      unfold n in *.
+      pose proof (make_rec_env_nth_orig mfix rho_s (i0 - Datatypes.length (rev fnames0))) as Hr.
+      rewrite length_rev, Hflen in Hr.
+      replace (Datatypes.length mfix + (i0 - Datatypes.length mfix))%nat
+        with i0 in Hr by lia.
+      rewrite Hr.
+      rewrite length_rev, Hflen in Hnth. exact Hnth.
+  Qed.
+
   (* env_consistent for concatenated lists:
      NoDup on left half + env_consistent on right half
      + disjointness + length match *)
@@ -2884,9 +2958,23 @@ Section Correct.
                 cbn [wellformed] in Hwf_bod.
                 (* If cbn doesn't work, the bool conjunction structure gives it *)
                 rewrite Bool.andb_true_iff in Hwf_bod. exact (proj2 Hwf_bod).
-              - (* env_consistent *) admit.
-              - (* cmap_consistent *) admit.
-              - (* Disjoint FromList *) admit.
+              - (* env_consistent *)
+                apply env_consistent_extend_fresh.
+                + eapply env_consistent_make_rec_env; [exact H2 | exact H0 | exact H6 |].
+                  eapply anf_fix_rel_fnames_length. exact H9.
+                + intro Hc. apply Hfresh_xpc.
+                  rewrite FromList_app, FromList_rev in Hc. exact Hc.
+              - (* cmap_consistent *)
+                apply cmap_consistent_extend.
+                + eapply cmap_consistent_make_rec_env; [exact H1 | exact H5 |].
+                  eapply anf_fix_rel_fnames_length. exact H9.
+                + intros k_c decl_c body_c Hlk_c Hdecl_c Hbody_c. exfalso.
+                  destruct H4 as [Hdc]. apply (Hdc x_pc).
+                  constructor; [exists k_c; exact Hlk_c | exact Hxpc_in_S1].
+              - (* Disjoint (FromList (x_pc :: rev fnames ++ names)) S_body1 *)
+                rewrite FromList_cons, FromList_app, FromList_rev.
+                eapply Disjoint_Included_l; [| exact Hdis_xpc].
+                admit.
               - (* Disjoint (cmap_vars cmap) S_body1 *)
                 eapply Disjoint_Included_r; [exact Hsbody_sub | exact H4].
               - (* anf_env_rel' *)
