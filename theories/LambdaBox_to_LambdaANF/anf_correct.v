@@ -2859,11 +2859,28 @@ Section Correct.
                 eapply well_formed_env_make_rec_env;
                   [inv Hwf_fix; assumption | inv Hwf_fix; assumption].
               - (* wellformed body0 *)
-                admit.
+                simpl Datatypes.length. rewrite length_app, length_rev.
+                assert (Hfl : Datatypes.length fnames = Datatypes.length mfix0)
+                  by (eapply anf_fix_rel_fnames_length; exact H9).
+                assert (Hle : Datatypes.length names = Datatypes.length rho').
+                { symmetry. exact (anf_env_rel_length _ _ _ H). }
+                rewrite Hfl, Hle.
+                inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies].
+                subst.
+                eapply Forall_forall in Hwf_mfix_bodies;
+                  [| eapply nth_error_In; exact Hnth_d].
+                destruct Hwf_mfix_bodies as [_ Hwf_bod].
+                rewrite Hbody_eq in Hwf_bod.
+                (* wellformed n (tLambda na body) = wellformed (S n) body
+                   for MetaRocq's wellformed — reduce with cbn *)
+                cbn [wellformed] in Hwf_bod.
+                (* If cbn doesn't work, the bool conjunction structure gives it *)
+                rewrite Bool.andb_true_iff in Hwf_bod. exact (proj2 Hwf_bod).
               - (* env_consistent *) admit.
               - (* cmap_consistent *) admit.
-              - (* Disjoint FromList *) admit.
-              - (* Disjoint cmap *) admit.
+              - (* Disjoint (FromList (x_pc :: rev fnames ++ names)) S_body1 *) admit.
+              - (* Disjoint (cmap_vars cmap) S_body1 *)
+                eapply Disjoint_Included_r; [exact Hsbody_sub | exact H4].
               - (* anf_env_rel' *)
                 unfold rho_bc. constructor.
                 + exists v2'. split; [rewrite M.gss; reflexivity | exact Hrel_v2].
