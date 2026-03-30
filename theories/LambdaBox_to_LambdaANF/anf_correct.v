@@ -2866,8 +2866,22 @@ Section Correct.
                 assert (Hdis_eletapp :
                   Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
                              ((S2 \\ S3) \\ [set x2])).
-                { (* Same proof as App case — depends only on S/S2/S3 *)
-                  admit. }
+                { constructor. intros z Hz. inv Hz.
+                  destruct H12 as [[HinS2 HninS3] Hninx2].
+                  remember (Eletapp x x1 func_tag [x2] e_k) as e_let.
+                  destruct H11; try discriminate;
+                    injection Heqe_let; intros; subst.
+                  - simpl in *. destruct H11 as [-> | [-> | []]].
+                    + eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _
+                                Hcvt_e1 Hdis Hdis_cmap). exact HinS2.
+                    + apply Hninx2. constructor.
+                  - eapply Hdis_ek. constructor; [eassumption |].
+                    constructor.
+                    + constructor.
+                      * eapply anf_cvt_exp_subset; [exact Hcvt_e1 | exact HinS2].
+                      * intro Habs. destruct Habs. apply HninS3. assumption.
+                    + intro Habs. inv Habs. match goal with Hneq : _ <> _ |- _ =>
+                        exact (Hneq eq_refl) end. }
                 edestruct (IH2 (M.set x1 (Vfun rho1 Bs f0) rho) vnames C2 x2 S2 S3 m) as [IH2_val _].
                 - exact Hwf.
                 - exact (proj2 (wellformed_tApp _ _ _ Hwfe)).
