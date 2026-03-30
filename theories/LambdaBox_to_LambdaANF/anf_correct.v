@@ -2866,7 +2866,8 @@ Section Correct.
                 assert (Hdis_eletapp :
                   Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
                              ((S2 \\ S3) \\ [set x2])).
-                { admit. }
+                { (* Same proof as App case — depends only on S/S2/S3 *)
+                  admit. }
                 edestruct (IH2 (M.set x1 (Vfun rho1 Bs f0) rho) vnames C2 x2 S2 S3 m) as [IH2_val _].
                 - exact Hwf.
                 - exact (proj2 (wellformed_tApp _ _ _ Hwfe)).
@@ -3075,7 +3076,52 @@ Section Correct.
                          ++ intro Habs. destruct Habs. exact (Hx2_not_S3 H11).
                       -- intro Habs. inv Habs. exact (Hx2_ne_x eq_refl).
                     * (* x2 ∈ cmap_vars *)
-                      admit. (* cmap case identical to App *)
+                      destruct (In_dec Pos.eq_dec x2 vnames) as [Hin2_vn | Hni2_vn].
+                      -- eexists. split.
+                         { rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x]. }
+                         apply In_nth_error in Hin2_vn. destruct Hin2_vn as [k0' Hk0'].
+                         assert (Heval2_k' : nth_error rho0 k0' = Some v2).
+                         { eapply anf_cvt_rel_var_lookup; [exact Heval2 | exact Hcvt_e2 | | | | | exact Hk0'].
+                           - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                           - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap].
+                           - exact Hcons. - exact Hcmap. }
+                         destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk0')
+                           as [v_src' [Hk0_src' [w_k0' [Hget_k0' Hrel_k0']]]].
+                         assert (v_src' = v2) by congruence. subst v_src'.
+                         assert (w_k0' = w) by congruence. subst w_k0'.
+                         eapply (@anf_cvt_val_alpha_equiv
+                                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                   eq_fuel_compat (fun _ _ HH => HH)
+                                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                   Σ box_dc Hglob_term func_tag default_tag);
+                           [exact Hrel_k0' | exact Hrel_v2].
+                      -- eexists. split.
+                         { rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x]. }
+                         destruct Hin_cm as [k_c Hlk_c].
+                         assert (Hkc_deps : kn_deps (EAst.tApp e1 e2) k_c).
+                         { unfold kn_deps. simpl. apply KernameSet.union_spec. right.
+                           eapply anf_cvt_cmap_result_in_deps;
+                             [exact Hcvt_e2 | exact Hlk_c
+                             | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis]
+                             | eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap]
+                             | exact Hni2_vn]. }
+                         destruct (Hglob k_c x2 Hkc_deps Hlk_c)
+                           as (decl_c & body_c & anf_vc & Hdecl_c & Hbody_c & Hget_c & Hrel_c).
+                         assert (anf_vc = w) by congruence. subst anf_vc.
+                         assert (Heval2_body : exists f_c t_c,
+                           src_eval [] body_c (fuel_sem.Val v2) f_c t_c).
+                         { eapply anf_cvt_cmap_eval;
+                             [exact Heval2 | exact Hcvt_e2 | | | | | exact Hlk_c | exact Hdecl_c | exact Hbody_c].
+                           - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                           - eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap].
+                           - exact Hcons. - exact Hcmap. }
+                         destruct Heval2_body as [f_c' [t_c' Heval2_c]].
+                         eapply (@anf_cvt_val_alpha_equiv
+                                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                   eq_fuel_compat (fun _ _ HH => HH)
+                                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                   Σ box_dc Hglob_term func_tag default_tag);
+                           [exact (Hrel_c v2 f_c' t_c' Heval2_c) | exact Hrel_v2].
                   + destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
                     * (* y = x1: same as App but with ClosFix_v *)
                       destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1)
@@ -3113,7 +3159,48 @@ Section Correct.
                             intro Habs. destruct Habs. exact (Hx1_not_S3 H11).
                          ++ intro Habs. inv Habs. exact (Hx1_ne_x eq_refl).
                       -- (* x1 ∈ cmap_vars *)
-                         admit. (* cmap case identical to App *)
+                         destruct (In_dec Pos.eq_dec x1 vnames) as [Hin1_vn' | Hni1_vn'].
+                         ++ eexists. split.
+                            { rewrite M.gso; [| exact Hneq_x].
+                              rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x1x2]. }
+                            apply In_nth_error in Hin1_vn'. destruct Hin1_vn' as [k1' Hk1'].
+                            assert (Heval1_k' : nth_error rho0 k1' = Some (ClosFix_v rho' mfix0 idx0)).
+                            { eapply anf_cvt_rel_var_lookup;
+                                [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                                | exact Hcons | exact Hcmap | exact Hk1']. }
+                            destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk1')
+                              as [v_src1' [Hk1_src' [w_k1' [Hget_k1' Hrel_k1']]]].
+                            assert (v_src1' = ClosFix_v rho' mfix0 idx0) by congruence. subst v_src1'.
+                            assert (w_k1' = w) by congruence. subst w_k1'.
+                            eapply (@anf_cvt_val_alpha_equiv
+                                      _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                      eq_fuel_compat (fun _ _ HH => HH)
+                                      nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                      Σ box_dc Hglob_term func_tag default_tag);
+                              [exact Hrel_k1' | exact Hrel_fix_saved].
+                         ++ eexists. split.
+                            { rewrite M.gso; [| exact Hneq_x].
+                              rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x1x2]. }
+                            destruct Hin_cm1 as [k_c1 Hlk_c1].
+                            assert (Hkc1_deps : kn_deps (EAst.tApp e1 e2) k_c1).
+                            { unfold kn_deps. simpl. apply KernameSet.union_spec. left.
+                              eapply anf_cvt_cmap_result_in_deps;
+                                [exact Hcvt_e1 | exact Hlk_c1 | exact Hdis | exact Hdis_cmap | exact Hni1_vn']. }
+                            destruct (Hglob k_c1 x1 Hkc1_deps Hlk_c1)
+                              as (decl_c1 & body_c1 & anf_vc1 & Hdecl_c1 & Hbody_c1 & Hget_c1 & Hrel_c1).
+                            assert (anf_vc1 = w) by congruence. subst anf_vc1.
+                            assert (Heval1_body : exists f_c1 t_c1,
+                              src_eval [] body_c1 (fuel_sem.Val (ClosFix_v rho' mfix0 idx0)) f_c1 t_c1).
+                            { eapply anf_cvt_cmap_eval;
+                                [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                                | exact Hcons | exact Hcmap | exact Hlk_c1 | exact Hdecl_c1 | exact Hbody_c1]. }
+                            destruct Heval1_body as [f_c1' [t_c1' Heval1_c1]].
+                            eapply (@anf_cvt_val_alpha_equiv
+                                      _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                                      eq_fuel_compat (fun _ _ HH => HH)
+                                      nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                                      Σ box_dc Hglob_term func_tag default_tag);
+                              [exact (Hrel_c1 _ _ _ Heval1_c1) | exact Hrel_fix_saved].
                     * (* y ≠ x, ≠ x1, ≠ x2 *)
                       eexists. split.
                       { rewrite M.gso; [| exact Hneq_x].
