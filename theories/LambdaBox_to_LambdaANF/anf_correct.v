@@ -2973,8 +2973,7 @@ Section Correct.
                   constructor; [exists k_c; exact Hlk_c | exact Hxpc_in_S1].
               - (* Disjoint (FromList (x_pc :: rev fnames ++ names)) S_body1 *)
                 rewrite FromList_cons, FromList_app, FromList_rev.
-                eapply Disjoint_Included_l; [| exact Hdis_xpc].
-                admit.
+                eapply Disjoint_Included_l; [| exact Hdis_xpc]. apply Included_refl.
               - (* Disjoint (cmap_vars cmap) S_body1 *)
                 eapply Disjoint_Included_r; [exact Hsbody_sub | exact H4].
               - (* anf_env_rel' *)
@@ -2982,8 +2981,8 @@ Section Correct.
                 + exists v2'. split; [rewrite M.gss; reflexivity | exact Hrel_v2].
                 + eapply anf_env_rel_weaken.
                   * eapply anf_env_rel_extend_fundefs; eassumption.
-                  * (* x_pc ∉ FromList (rev fnames ++ names) *)
-                    admit.
+                  * intro Hc. apply Hfresh_xpc.
+                    rewrite FromList_app, FromList_rev in Hc. exact Hc.
               - (* global_env_rel' *)
                 unfold rho_bc.
                 eapply global_env_rel_set_fresh.
@@ -2998,8 +2997,11 @@ Section Correct.
                 + intro Hcm. destruct H4 as [Hdc]. apply (Hdc x_pc).
                   constructor; [exact Hcm | exact Hxpc_in_S1].
               - exact Hcvt_bc.
-              - (* Disjoint Ehalt *)
-                admit. }
+              - (* Disjoint Ehalt: occurs_free (Ehalt r_bc) ∩ (S_body1\\S_body2\\{r_bc}) = ∅ *)
+                eapply Disjoint_Included_l; [| eapply Disjoint_Singleton_l].
+                + intros z Hz. remember (Ehalt r_bc) as eh. destruct Hz; try discriminate.
+                  injection Heqeh as ->. constructor.
+                + intro Habs. destruct Habs as [_ Hc]. apply Hc. constructor. }
             destruct IH3_full as [IH3_val _].
             specialize (IH3_val v v' eq_refl Hrel').
             (* Ehalt bstep witness *)
