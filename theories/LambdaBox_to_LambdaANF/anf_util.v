@@ -14,7 +14,7 @@ From CertiRocq.LambdaANF Require Import
   List_util algebra alpha_conv functions Ensembles_util
   tactics identifiers bounds cps_util rename set_util.
 From MetaRocq.Utils Require Import All_Forall.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem anf_corresp.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
 
 Import ListNotations.
 
@@ -29,7 +29,8 @@ Section ANF_Val.
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
 
-  Context (Σ : EAst.global_context).
+  Context (Σ : EAst.global_context)
+          (box_dc : dcon).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
 
@@ -56,7 +57,7 @@ Section ANF_Val.
         decl.(EAst.cst_body) = Some body /\
         M.get v rho = Some anf_v /\
         (forall src_v f t,
-           @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t ->
+           @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t ->
            val_rel src_v anf_v).
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
@@ -84,6 +85,19 @@ Section ANF_Val.
       nth_error vn j = Some x ->
       nth_error rho i = nth_error rho j.
 
+  (** Provenance invariant for global constants.
+      If position [i] in [vn] holds a cmap variable for constant [k],
+      then [rho[i]] exists and is the result of evaluating [k]'s body. *)
+  Definition cmap_consistent (vn : list var) (rho : list fuel_sem.value) : Prop :=
+    forall i x k decl body,
+      nth_error vn i = Some x ->
+      lookup_const cmap k = Some x ->
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      exists v_i f t,
+        nth_error rho i = Some v_i /\
+        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val v_i) f t.
+
   Inductive anf_val_rel : fuel_sem.value -> val -> Prop :=
   | anf_rel_Con :
       forall vs vs' dc c_tag,
@@ -94,6 +108,7 @@ Section ANF_Val.
       forall vs rho names na x f e C1 r1 S1 S2,
         anf_env_rel' anf_val_rel names vs rho ->
         env_consistent names vs ->
+        cmap_consistent names vs ->
         Disjoint var (x |: (f |: FromList names)) S1 ->
         Disjoint _ (cmap_vars cmap) S1 ->
         ~ x \in cmap_vars cmap ->
@@ -108,6 +123,7 @@ Section ANF_Val.
       forall S1 S2 names fnames vs rho mfix Bs n f,
         anf_env_rel' anf_val_rel names vs rho ->
         env_consistent names vs ->
+        cmap_consistent names vs ->
         NoDup fnames ->
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
         Disjoint _ (cmap_vars cmap) S1 ->
@@ -489,14 +505,15 @@ Section AlphaEquiv.
   Context {src_trace : Type}
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
-  Context (Σ : EAst.global_context).
+  Context (Σ : EAst.global_context)
+          (box_dc : dcon).
 
   Context (globals_terminate :
     forall k decl body,
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t,
-        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t).
+        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t).
 
   Context (func_tag default_tag : positive).
 
@@ -504,7 +521,7 @@ Section AlphaEquiv.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
-  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
 
 
 (* ----------------------------------------------------------------- *)
@@ -1911,9 +1928,9 @@ Section AlphaEquiv.
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
           (* Extract from both global_env_rel' hypotheses *)
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
-          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
           destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
           destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
@@ -1959,12 +1976,28 @@ Section AlphaEquiv.
       intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
       inv Hrel1. inv Hrel2.
 
-      (* Revert global_env_rel' into goal to protect from clearing *)
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+      (* Save hypotheses before they get confused/cleared by inv.
+         Both closures share the same source, so some hyps are identical. *)
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
-      intros Hglob2_saved Hglob1_saved.
+      (* Save Disjoint (cmap_vars cmap) S1 — both identical *)
+      match goal with H : Disjoint _ (cmap_vars cmap) _ |- _ =>
+        revert H end.
+      (* Save Disjoint hypotheses — one per closure, may get confused *)
+      match goal with H : Disjoint _ (FromList _) (FromList _) |- _ =>
+        revert H end.
+      match goal with H : Disjoint _ (FromList _) (FromList _) |- _ =>
+        revert H end.
+      match goal with H : Disjoint _ (cmap_vars cmap) (FromList _) |- _ =>
+        revert H end.
+      (* Save Disjoint (names :|: fnames) S1 — one per closure *)
+      match goal with H : Disjoint _ (FromList _ :|: FromList _) _ |- _ =>
+        revert H end.
+      match goal with H : Disjoint _ (FromList _ :|: FromList _) _ |- _ =>
+        revert H end.
+      intros Hdis_nfS1 Hdis_nfS2 Hdis_cm_fn Hdis_nf1 Hdis_nf2 Hdis_cmap_S1 Hglob2_saved Hglob1_saved.
 
       (* Extract find_def for the idx-th function from both fix relations *)
       match goal with
@@ -2029,8 +2062,10 @@ Section AlphaEquiv.
              match goal with H : In z _ |- _ => apply in_rev in H; exact H end
             |right; right; assumption].
         * (* Disjoint cmap S_b1 *)
-          eapply Disjoint_Included_r; [exact Hb1_sub | exact H6].
-        * eapply Disjoint_Included_r; [exact Hb2_sub | exact H16].
+          eapply Disjoint_Included_r; [exact Hb1_sub |].
+          match goal with H : Disjoint _ (cmap_vars cmap) _ |- _ => exact H end.
+        * eapply Disjoint_Included_r; [exact Hb2_sub |].
+          match goal with H : Disjoint _ (cmap_vars cmap) _ |- _ => exact H end.
         * (* Forall2 for x :: rev fnames ++ names *)
           constructor.
           -- (* x1/x2: argument values *)
@@ -2069,13 +2104,19 @@ Section AlphaEquiv.
                        (* preord_val j via IHk: reconstruct anf_rel_ClosFix *)
                        eapply (IHk j Hlt (ClosFix_v vs_clos fnl i)).
                        +++ eapply anf_rel_ClosFix;
-                             [exact H2 | exact H3 | exact H4 | exact H5
-                             | exact H6 | exact H7 | exact H8
-                             | exact Hni | exact Hfix1 | exact Hglob2_saved].
+                             [ exact H2 | exact H3 | exact H4
+                             | exact H5 | exact Hdis_nfS1
+                             | exact H7 | exact Hdis_cm_fn
+                             | exact Hdis_nf1
+                             | exact Hni | exact Hfix1
+                             | exact Hglob2_saved ].
                        +++ eapply anf_rel_ClosFix;
-                             [exact H10 | exact H13 | exact H14 | exact H15
-                             | exact H16 | exact H17 | exact H18
-                             | exact Hni' | exact Hfix2 | exact Hglob1_saved].
+                             [ exact H11 | exact H14 | exact H15
+                             | exact H16 | exact Hdis_nfS2
+                             | exact H18 | exact Hdis_cmap_S1
+                             | exact Hdis_nf2
+                             | exact Hni' | exact Hfix2
+                             | exact Hglob1_saved ].
                 ** (* names: captured env related via IHk j *)
                    eapply Forall2_preord_var_env_def_funs.
                    --- eapply anf_cvt_env_alpha_equiv_Forall2.
@@ -2124,11 +2165,13 @@ Section AlphaEquiv.
           assert (Hafn1' := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix1).
           assert (Hni_v0_1 : ~ name_in_fundefs Bs v0).
           { intro Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
-            rewrite Hafn1' in Hc. eapply H7. constructor; eassumption. }
+            rewrite Hafn1' in Hc.
+            eapply Hdis_cm_fn. constructor; [exact Hv0_cmap | exact Hc]. }
           assert (Hafn2' := anf_fix_rel_names _ _ _ _ _ _ _ _ _ _ _ Hfix2).
           assert (Hni_v0_2 : ~ name_in_fundefs Bs0 v0).
           { intro Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
-            rewrite Hafn2' in Hc. eapply H17. constructor; eassumption. }
+            rewrite Hafn2' in Hc.
+            eapply Hdis_cmap_S1. constructor; [exact Hv0_cmap | exact Hc]. }
           eapply preord_var_env_extend_neq.
           -- (* preord_var_env in def_funs envs *)
              intros w Hw.
@@ -2139,9 +2182,9 @@ Section AlphaEquiv.
              eapply IHk; [lia | exact Hvrel1' | exact Hvrel2'].
           -- (* v0 ≠ x1: x1 ∈ S1, cmap ⊥ S1 *)
              intro Heq. subst.
-             eapply H6. constructor; [exact Hv0_cmap | exact Hx1_mem].
+             eapply H7. constructor; [exact Hv0_cmap | exact Hx1_mem].
           -- intro Heq. subst.
-             eapply H16. constructor; [exact Hv0_cmap | exact Hx2_mem].
+             eapply H18. constructor; [exact Hv0_cmap | exact Hx2_mem].
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat;
