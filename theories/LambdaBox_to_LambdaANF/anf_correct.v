@@ -2564,7 +2564,14 @@ Section Correct.
                     intros src_v f' t' Heval_src.
                     (* v1' satisfies global contract for kn.
                        Uses: eval_tConst_inv, cmap_inj, eval_val_det. *)
-                    admit. (* needs eval_tConst_inv + value det *)
+                    (* v1 also evaluates body b1 in [], by anf_cvt_cmap_eval *)
+                    destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval1
+                                _ _ _ _ _ kn d1 b1
+                                Hcvt_b Hdis Hdis_cmap Hcons Hcmap Hl Hd1 Hd2)
+                      as [f1' [t1' Heval_body_v1]].
+                    (* eval_val_det: src_v = v1 *)
+                    assert (Heq_sv : src_v = v1) by (eapply eval_val_det; eassumption).
+                    subst src_v. exact Hrel1.
                   + (* vn0 ≠ x1: M.gso *)
                     exists d1, b1, av. repeat (split; [assumption |]).
                     split; [rewrite M.gso; [exact Hgv | exact Hneq_vn] | exact Hd3].
