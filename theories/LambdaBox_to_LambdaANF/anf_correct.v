@@ -1657,6 +1657,14 @@ Section Correct.
       + apply IH. lia.
   Qed.
 
+  Lemma FromList_rev {A : Type} (l : list A) :
+    FromList (rev l) <--> FromList l.
+  Proof.
+    split; intros x Hx; unfold FromList, Ensembles.In in *.
+    - apply in_rev in Hx. exact Hx.
+    - apply in_rev. rewrite rev_involutive. exact Hx.
+  Qed.
+
   (* env_consistent for concatenated lists:
      NoDup on left half + env_consistent on right half
      + disjointness + length match *)
@@ -2878,7 +2886,7 @@ Section Correct.
                 rewrite Bool.andb_true_iff in Hwf_bod. exact (proj2 Hwf_bod).
               - (* env_consistent *) admit.
               - (* cmap_consistent *) admit.
-              - (* Disjoint (FromList (x_pc :: rev fnames ++ names)) S_body1 *) admit.
+              - (* Disjoint FromList *) admit.
               - (* Disjoint (cmap_vars cmap) S_body1 *)
                 eapply Disjoint_Included_r; [exact Hsbody_sub | exact H4].
               - (* anf_env_rel' *)
