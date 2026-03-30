@@ -168,6 +168,187 @@ Section Correct.
     | _, _ => rho
     end.
 
+  Lemma set_many_get_notin y xs vs (rho : M.t val) :
+    ~ List.In y xs ->
+    M.get y (set_many xs vs rho) = M.get y rho.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hnin.
+    - reflexivity.
+    - destruct vs as [ | v vs']. { reflexivity. }
+      simpl. rewrite M.gso by (intro; apply Hnin; left; auto).
+      apply IH. intro; apply Hnin; right; auto.
+  Qed.
+
+  Lemma set_many_get_in x xs vs rho :
+    List.In x xs ->
+    Datatypes.length xs = Datatypes.length vs ->
+    exists v, M.get x (set_many xs vs rho) = Some v.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hin Hlen.
+    - destruct Hin.
+    - destruct vs as [ | v vs']. { simpl in Hlen; lia. }
+      simpl. destruct Hin as [-> | Hin'].
+      + exists v. apply M.gss.
+      + destruct (Pos.eq_dec x a) as [-> | Hneq].
+        * exists v. apply M.gss.
+        * rewrite M.gso by auto. apply IH. assumption. simpl in Hlen; lia.
+  Qed.
+
+  Lemma set_many_set_neq_base z x v xs vs rho :
+    z <> x ->
+    M.get z (set_many xs vs (M.set x v rho)) = M.get z (set_many xs vs rho).
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hneq.
+    - simpl. rewrite M.gso; auto.
+    - destruct vs as [ | va vs'].
+      + simpl. rewrite M.gso; auto.
+      + simpl. destruct (Pos.eq_dec z a) as [-> | Hza].
+        * rewrite !M.gss. reflexivity.
+        * rewrite !M.gso by auto. apply IH. exact Hneq.
+  Qed.
+
+  Lemma first_occurrence_exists (xs : list var) (k : nat) (x : var) :
+    nth_error xs k = Some x ->
+    exists k0, (k0 <= k)%nat /\ nth_error xs k0 = Some x /\
+               forall j, (j < k0)%nat -> nth_error xs j <> Some x.
+  Proof.
+    revert k. induction xs as [ | a xs' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k'].
+      + exists 0%nat. simpl in *. split; [ lia | split; [ exact Hk | ] ].
+        intros j Hj. lia.
+      + simpl in Hk.
+        destruct (Pos.eq_dec a x) as [Heq | Hneq].
+        * subst. exists 0%nat. simpl. split; [ lia | split; [ reflexivity | ] ].
+          intros j Hj. lia.
+        * destruct (IH k' Hk) as [k0 [Hle [Hk0 Hfirst]]].
+          exists (S k0). simpl. split; [ lia | split; [ exact Hk0 | ] ].
+          intros j Hj. destruct j as [ | j']; simpl.
+          -- intros Heq'. inv Heq'. contradiction.
+          -- apply Hfirst. lia.
+  Qed.
+
+  Lemma set_many_get_first xs vs rho x k :
+    Datatypes.length xs = Datatypes.length vs ->
+    nth_error xs k = Some x ->
+    (forall (j : nat), (j < k)%nat -> nth_error xs j <> Some x) ->
+    exists v, nth_error vs k = Some v /\
+      M.get x (set_many xs vs rho) = Some v.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hlen Hnth Hfirst.
+    - destruct k; simpl in Hnth; discriminate.
+    - destruct vs as [ | v0 vs']. { simpl in Hlen; lia. }
+      simpl in Hlen.
+      destruct k as [ | k'].
+      + simpl in Hnth. inv Hnth. simpl.
+        rewrite M.gss. eexists; eauto.
+      + simpl in Hnth. simpl.
+        assert (Ha_neq : a <> x).
+        { intros ->. eapply (Hfirst 0%nat). lia. simpl. reflexivity. }
+        rewrite M.gso by (now apply not_eq_sym).
+        apply IH.
+        * lia.
+        * exact Hnth.
+        * intros j Hj. apply (Hfirst (S j)). lia.
+  Qed.
+
+  Lemma get_list_exists xs (rho : M.t val) :
+    (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
+    exists vs, get_list xs rho = Some vs.
+  Proof.
+    induction xs as [ | a xs' IH]; intros Hbound.
+    - exists []. reflexivity.
+    - assert (Ha : exists v, M.get a rho = Some v)
+        by (apply Hbound; left; reflexivity).
+      destruct Ha as [v Hv].
+      assert (IH_pre : forall x, List.In x xs' -> exists v0, M.get x rho = Some v0)
+        by (intros x Hx; apply Hbound; right; exact Hx).
+      destruct (IH IH_pre) as [vs_rest Hvs].
+      exists (v :: vs_rest). simpl. rewrite Hv, Hvs. reflexivity.
+  Qed.
+
+  Lemma get_list_set_many_exists xs vs rho :
+    Datatypes.length xs = Datatypes.length vs ->
+    exists vs', get_list xs (set_many xs vs rho) = Some vs'.
+  Proof.
+    intros Hlen. eapply get_list_exists.
+    intros y Hy. eapply set_many_get_in; eauto.
+  Qed.
+
+  Lemma get_list_nth_error (xs : list var) (vs : list val) (rho : M.t val)
+        (k : nat) (x : var) :
+    get_list xs rho = Some vs ->
+    nth_error xs k = Some x ->
+    nth_error vs k = M.get x rho.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hgl Hnth.
+    - destruct k; simpl in Hnth; discriminate.
+    - simpl in Hgl.
+      destruct (M.get a rho) eqn:Ha; [ | discriminate ].
+      destruct (get_list xs' rho) eqn:Hrest; [ | discriminate ].
+      inv Hgl.
+      destruct k as [ | k'].
+      + simpl in Hnth. inv Hnth. simpl. symmetry. exact Ha.
+      + simpl in Hnth. simpl. exact (IH l k' eq_refl Hnth).
+  Qed.
+
+  (* list_consistent: if a key appears multiple times in a list,
+     all corresponding values are related by R. *)
+  Definition list_consistent {A : Type} (R : A -> A -> Prop)
+             (keys : list var) (vals : list A) : Prop :=
+    forall i j x vi vj,
+      nth_error keys i = Some x ->
+      nth_error keys j = Some x ->
+      nth_error vals i = Some vi ->
+      nth_error vals j = Some vj ->
+      R vi vj.
+
+  Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
+        (l1 : list A) (l2 : list B) :
+    Datatypes.length l1 = Datatypes.length l2 ->
+    (forall k a b, nth_error l1 k = Some a -> nth_error l2 k = Some b -> R a b) ->
+    Forall2 R l1 l2.
+  Proof.
+    revert l2. induction l1 as [ | a l1' IH]; intros l2 Hlen Hpw.
+    - destruct l2; [ constructor | simpl in Hlen; lia ].
+    - destruct l2 as [ | b l2']; [ simpl in Hlen; lia | ].
+      constructor.
+      + exact (Hpw 0%nat a b eq_refl eq_refl).
+      + apply IH.
+        * simpl in Hlen; lia.
+        * intros k a' b' Ha' Hb'. exact (Hpw (S k) a' b' Ha' Hb').
+  Qed.
+
+  Lemma get_list_set_many_consistent (R : val -> val -> Prop) xs vs (rho : M.t val) :
+    (forall x, R x x) ->
+    Datatypes.length xs = Datatypes.length vs ->
+    list_consistent R xs vs ->
+    exists vs', get_list xs (set_many xs vs rho) = Some vs' /\
+                Forall2 R vs vs'.
+  Proof.
+    intros Hrefl Hlen Hcons.
+    destruct (get_list_set_many_exists xs vs rho Hlen) as [vs' Hvs'].
+    exists vs'. split; [ exact Hvs' | ].
+    assert (Hlen' : Datatypes.length vs = Datatypes.length vs').
+    { assert (H : Datatypes.length xs = Datatypes.length vs')
+        by (eapply get_list_length_eq; exact Hvs').
+      rewrite Hlen in H. exact H. }
+    eapply Forall2_from_nth_error; [ exact Hlen' | ].
+    intros k vk v'k Hvk Hv'k.
+    destruct (nth_error xs k) as [x | ] eqn:Hx.
+    2: { exfalso.
+         apply nth_error_None in Hx.
+         assert (Hlt : (k < Datatypes.length vs')%nat).
+         { apply nth_error_Some. intro Habs. rewrite Habs in Hv'k. discriminate. }
+         lia. }
+    destruct (first_occurrence_exists xs k x Hx) as [k0 [Hle [Hk0 Hfirst]]].
+    destruct (set_many_get_first xs vs rho x k0 Hlen Hk0 Hfirst) as [v0 [Hvk0 Hget]].
+    assert (Hv'eq : nth_error vs' k = Some v0).
+    { erewrite get_list_nth_error; [ | exact Hvs' | exact Hx ]. exact Hget. }
+    assert (Heq : v'k = v0) by congruence. subst v'k.
+    exact (Hcons k k0 x vk v0 Hx Hk0 Hvk Hvk0).
+  Qed.
+
   Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
     Forall2 R l1 l2 ->
     nth_error l1 k = Some a ->
@@ -218,6 +399,28 @@ Section Correct.
       eapply Included_trans.
       * eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). eassumption.
       * eapply Setminus_Included.
+  Qed.
+
+  (* Each element's deps are contained in the fold_left union. *)
+  Lemma fold_left_KernameSet_In (l : list EAst.term) (init : KernameSet.t) (k : kername) :
+    KernameSet.In k init \/ Exists (fun e => KernameSet.In k (term_global_deps e)) l ->
+    KernameSet.In k (fold_left (fun acc x => KernameSet.union (term_global_deps x) acc) l init).
+  Proof.
+    revert init. induction l as [| e es IH]; intros init [Hinit | Hex].
+    - exact Hinit.
+    - inversion Hex.
+    - apply IH. left. apply KernameSet.union_spec. right. exact Hinit.
+    - inversion Hex; subst.
+      + apply IH. left. apply KernameSet.union_spec. left. assumption.
+      + apply IH. right. assumption.
+  Qed.
+
+  Lemma kn_deps_list_subset_construct ind c args k :
+    kn_deps_list args k ->
+    KernameSet.In k (term_global_deps (EAst.tConstruct ind c args)).
+  Proof.
+    intros Hk. destruct ind as [kn_ind idx_ind]. simpl.
+    apply fold_left_KernameSet_In. right. exact Hk.
   Qed.
 
 
@@ -292,6 +495,171 @@ Section Correct.
     - intros. right; left. assumption.
   Qed.
 
+  (** ** Helpers for [anf_cvt_rel_args] and [eval_fuel_many] *)
+
+  (* Extract individual evaluation from eval_fuel_many at position k. *)
+  Lemma eval_fuel_many_nth rho es vs f t k e v :
+    @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc rho es vs f t ->
+    nth_error es k = Some e ->
+    nth_error vs k = Some v ->
+    exists f_k t_k, src_eval rho e (fuel_sem.Val v) f_k t_k.
+  Proof.
+    intros Hmany. revert k.
+    induction Hmany as [ | rho0 e0 es0 v0 vs0 f0 fs0 t0 ts0 Heval Hmany IH];
+      intros k Hes Hvs.
+    - destruct k; simpl in Hes; discriminate.
+    - destruct k as [|k']; simpl in Hes, Hvs.
+      + injection Hes as <-. injection Hvs as <-.
+        exists f0, t0. exact Heval.
+      + exact (IH k' Hes Hvs).
+  Qed.
+
+  Lemma eval_fuel_many_length vs es vs1 f1 t1 :
+    @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc vs es vs1 f1 t1 ->
+    Datatypes.length vs1 = Datatypes.length es.
+  Proof.
+    intros Hrel. induction Hrel.
+    - reflexivity.
+    - simpl. f_equal. exact IHHrel.
+  Qed.
+
+  Lemma anf_cvt_rel_args_length S es vn S' C xs :
+    anf_cvt_rel_args' S es vn S' C xs ->
+    Datatypes.length xs = Datatypes.length es.
+  Proof.
+    intros H. induction H as [ | ? ? ? ? ? ? ? ? ? ? Hcvt_e Hcvt_rest IH].
+    - reflexivity.
+    - simpl. f_equal. exact IH.
+  Qed.
+
+  (* Extract individual anf_cvt_rel from anf_cvt_rel_args at position k. *)
+  Lemma anf_cvt_rel_args_nth_cvt :
+    forall S es vn S' C xs,
+      anf_cvt_rel_args' S es vn S' C xs ->
+      forall k e_k x_k,
+        nth_error es k = Some e_k ->
+        nth_error xs k = Some x_k ->
+        exists S_k S_k' C_k,
+          anf_cvt_rel' S_k e_k vn S_k' C_k x_k /\
+          S_k \subset S.
+  Proof.
+    intros S es vn S' C xs Hcvt.
+    induction Hcvt as [ | S1 S2 S3 vn0 t ts C1 x1 C2 xs0
+                         Hcvt_hd Hcvt_tl IH];
+      intros k e_k x_k Hes Hxs.
+    - destruct k; simpl in Hes; discriminate.
+    - destruct k as [|k']; simpl in Hes, Hxs.
+      + injection Hes as <-. injection Hxs as <-.
+        exists S1, S2, C1. split; [exact Hcvt_hd | apply Included_refl].
+      + destruct (IH k' e_k x_k Hes Hxs) as [S_k [S_k' [C_k [Hcvt_k Hsub_k]]]].
+        exists S_k, S_k', C_k. split; [exact Hcvt_k |].
+        eapply Included_trans; [exact Hsub_k |].
+        eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). exact Hcvt_hd.
+  Qed.
+
+  (* Every result variable of anf_cvt_rel_args is in FromList vn, S, or cmap_vars. *)
+  Lemma anf_cvt_rel_args_In_range :
+    forall xs S es vn S' C,
+      anf_cvt_rel_args' S es vn S' C xs ->
+      forall x, List.In x xs -> x \in FromList vn \/ x \in S \/ x \in cmap_vars cmap.
+  Proof.
+    induction xs as [ | x1 xs' IH]; intros S es vn S' C Hcvt x Hin.
+    - destruct Hin.
+    - remember (x1 :: xs') as xxs.
+      destruct Hcvt; try discriminate.
+      injection Heqxxs as Heq1 Heq2. subst.
+      destruct Hin as [Heq | Hin].
+      + subst. eapply anf_cvt_result_in_consumed. eassumption.
+      + match goal with
+        | [ Hcvt_rest : anf_cvt_rel_args _ _ _ _ _ _ _ _ _ _ |- _ ] =>
+          destruct (IH _ _ _ _ _ Hcvt_rest x Hin) as [Hvn | [HS2 | Hcm]];
+          [ left; exact Hvn
+          | right; left;
+            eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap); eassumption
+          | right; right; exact Hcm ]
+        end.
+  Qed.
+
+  (* Result variables of anf_cvt_rel_args are not in the output set S'. *)
+  Lemma anf_cvt_rel_args_results_not_in_output :
+    forall xs S es vn S' C,
+      anf_cvt_rel_args' S es vn S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      Disjoint _ (cmap_vars cmap) S ->
+      forall x, List.In x xs -> ~ x \in S'.
+  Proof.
+    induction xs as [ | x1 xs' IH]; intros S es vn S' C Hcvt Hdis Hdis_cm x Hin.
+    - destruct Hin.
+    - remember (x1 :: xs') as xxs.
+      destruct Hcvt; try discriminate.
+      injection Heqxxs as <- <-.
+      destruct Hin as [<- | Hin'].
+      + (* x = x1: result of head conversion, not in S2.
+           S' ⊆ S2 by anf_cvt_args_subset, so x ∉ S'. *)
+        intro HxS'.
+        eapply anf_cvt_result_not_in_output; try eassumption.
+        eapply (anf_cvt_args_subset func_tag default_tag tgm cmap); eassumption.
+      + (* x ∈ xs': by IH, x ∉ S3 = S' *)
+        eapply IH; try eassumption.
+        * eapply Disjoint_Included_r;
+            [eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap); eassumption
+            | exact Hdis].
+        * eapply Disjoint_Included_r;
+            [eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap); eassumption
+            | exact Hdis_cm].
+  Qed.
+
+  (* Fresh variables (not in vn, not in cmap_vars) appear at most once in xs. *)
+  Lemma anf_cvt_rel_args_unique_fresh :
+    forall xs S es vn S' C,
+      anf_cvt_rel_args' S es vn S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      Disjoint _ (cmap_vars cmap) S ->
+      forall i j x,
+        nth_error xs i = Some x -> nth_error xs j = Some x ->
+        ~ x \in FromList vn ->
+        ~ x \in cmap_vars cmap ->
+        i = j.
+  Proof.
+    induction xs as [ | x1 xs' IH];
+      intros S es vn S' C Hcvt Hdis Hdis_cm i j x Hxi Hxj Hx_not_vn Hx_not_cm.
+    - destruct i; simpl in Hxi; discriminate.
+    - remember (x1 :: xs') as xxs.
+      destruct Hcvt; try discriminate.
+      injection Heqxxs as Heq1 Heq2. subst.
+      destruct i as [ | i'], j as [ | j']; simpl in Hxi, Hxj.
+      + reflexivity.
+      + exfalso.
+        assert (Heq_x1 : x1 = x) by (simpl in Hxi; congruence). subst x1.
+        assert (Hx_not_S2 : ~ x \in S2).
+        { eapply anf_cvt_result_not_in_output; eassumption. }
+        destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ Hcvt x (nth_error_In _ _ Hxj))
+          as [Hvn | [HS2 | Hcm]].
+        * exact (Hx_not_vn Hvn).
+        * exact (Hx_not_S2 HS2).
+        * exact (Hx_not_cm Hcm).
+      + exfalso.
+        assert (Heq_x1 : x1 = x) by (simpl in Hxj; congruence). subst x1.
+        assert (Hx_not_S2 : ~ x \in S2).
+        { eapply anf_cvt_result_not_in_output; eassumption. }
+        destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ Hcvt x (nth_error_In _ _ Hxi))
+          as [Hvn | [HS2 | Hcm]].
+        * exact (Hx_not_vn Hvn).
+        * exact (Hx_not_S2 HS2).
+        * exact (Hx_not_cm Hcm).
+      + f_equal.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel _ _ _ _ _ ?S2 _ _ _ _ |- _ ] =>
+          eapply (IH _ _ _ _ _ Hcvt); try eassumption;
+          [ eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis]
+          | eapply Disjoint_Included_r;
+            [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm] ]
+        end.
+  Qed.
+
   Lemma wellformed_tApp n e1 e2 :
     wellformed Σ n (EAst.tApp e1 e2) = true ->
     wellformed Σ n e1 = true /\ wellformed Σ n e2 = true.
@@ -310,6 +678,20 @@ Section Correct.
     intro H. apply andb_true_iff in H. destruct H as [H1 H2].
     apply andb_true_iff in H1. destruct H1 as [H1a H1b].
     split; assumption.
+  Qed.
+
+  Lemma wellformed_tConstruct n ind c args :
+    wellformed Σ n (EAst.tConstruct ind c args) = true ->
+    Forall (fun e => wellformed Σ n e = true) args.
+  Proof.
+    unfold wellformed. simpl. fold (@wellformed efl).
+    intro H. apply List.Forall_forall. intros e He.
+    destruct cstr_as_blocks.
+    - apply Bool.andb_true_iff in H. destruct H as [_ Hwf_args].
+      apply Bool.andb_true_iff in Hwf_args. destruct Hwf_args as [_ Hwf_args].
+      rewrite forallb_forall in Hwf_args. exact (Hwf_args e He).
+    - apply Bool.andb_true_iff in H. destruct H as [_ Hnil].
+      destruct args; [inv He | simpl in Hnil; discriminate].
   Qed.
 
 
@@ -841,6 +1223,72 @@ Section Correct.
   Qed.
 
 
+  (* Position tracking for args: if xs[j] = vn[i] = x, then vs[j] = rho[i]. *)
+  Lemma anf_cvt_rel_args_var_lookup rho es vs f t :
+    @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc rho es vs f t ->
+    forall S vn S' C xs,
+      anf_cvt_rel_args' S es vn S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      Disjoint _ (cmap_vars cmap) S ->
+      env_consistent vn rho ->
+      cmap_consistent vn rho ->
+      forall j i x,
+        nth_error xs j = Some x ->
+        nth_error vn i = Some x ->
+        exists v, nth_error vs j = Some v /\ nth_error rho i = Some v.
+  Proof.
+    intros Hmany. induction Hmany as [ | rho0 e0 es0 v0 vs0 f0 fs0 t0 ts0 Heval Hmany IH].
+    - intros S vn S' C xs Hcvt Hdis Hdis_cm Hcons Hcmap j i x Hj Hi.
+      remember (@nil EAst.term) as ees.
+      destruct Hcvt; try discriminate. destruct j; simpl in Hj; discriminate.
+    - intros S vn S' C xs Hcvt Hdis Hdis_cm Hcons Hcmap j i x Hj Hi.
+      remember (e0 :: es0) as ees.
+      destruct Hcvt; try discriminate.
+      injection Heqees as <- <-.
+      destruct j as [ | j']; simpl in Hj.
+      + inv Hj. exists v0. split; [ reflexivity | ].
+        eapply anf_cvt_rel_var_lookup;
+          [ exact Heval | eassumption | exact Hdis | exact Hdis_cm
+          | exact Hcons | exact Hcmap | exact Hi ].
+      + match goal with
+        | [ Hcvt1 : anf_cvt_rel _ _ _ _ _ _ _ ?S2 _ _,
+            Hcvt_rest : anf_cvt_rel_args _ _ _ _ ?S2 _ _ _ _ _ |- _ ] =>
+          eapply IH; [ eassumption
+                      | eapply Disjoint_Included_r;
+                        [eapply anf_cvt_exp_subset; eassumption | exact Hdis]
+                      | eapply Disjoint_Included_r;
+                        [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm]
+                      | exact Hcons | exact Hcmap | exact Hj | exact Hi ]
+        end.
+  Qed.
+
+  (* If x ∈ FromList vn and the conversion result is x, then
+     the ANF-env value at x is related to the evaluation result. *)
+  Lemma anf_cvt_result_in_vnames_eval S e vn S' C x vs rho v f t v' :
+    anf_env_rel' vn vs rho ->
+    env_consistent vn vs ->
+    cmap_consistent vn vs ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (cmap_vars cmap) S ->
+    anf_cvt_rel' S e vn S' C x ->
+    x \in FromList vn ->
+    src_eval vs e (fuel_sem.Val v) f t ->
+    M.get x rho = Some v' ->
+    anf_val_rel' v v'.
+  Proof.
+    intros Hrel Hcons Hcmap Hdis Hdis_cm Hcvt Hin Heval Hget.
+    destruct (In_nth_error _ _ Hin) as [k Hk].
+    assert (Hvk := anf_cvt_rel_var_lookup _ _ _ _ _ Heval _ _ _ _ _ k
+                      Hcvt Hdis Hdis_cm Hcons Hcmap Hk).
+    unfold anf_env_rel' in Hrel.
+    destruct (Forall2_nth_error_r _ _ _ k _ Hrel Hk)
+      as [v_src [Hvsrc [v'' [Hget' Hvrel]]]].
+    rewrite Hvk in Hvsrc. inv Hvsrc.
+    rewrite Hget in Hget'. inv Hget'. exact Hvrel.
+  Qed.
+
+
   (** Free variables of a context application don't include variables
       consumed by a preceding conversion. *)
   Lemma anf_cvt_disjoint_occurs_free_ctx S1 S2 S3 e1 e2 vn C1 C2 x1 x2 e_k :
@@ -874,7 +1322,113 @@ Section Correct.
     Disjoint _ (cmap_vars cmap) S ->
     ~ x \in FromList vn ->
     KernameSet.In k (term_global_deps e).
-  Proof. admit. Admitted.
+  Proof.
+    intros Hcvt Hlk Hdis Hdis_cm Hni.
+    revert k Hlk Hdis Hdis_cm Hni.
+    revert S e vn S' C x Hcvt.
+    apply (anf_cvt_rel_ind' func_tag default_tag tgm cmap
+      (fun S e vn S' C x =>
+        forall k, lookup_const cmap k = Some x ->
+        Disjoint _ (FromList vn) S ->
+        Disjoint _ (cmap_vars cmap) S ->
+        ~ x \in FromList vn ->
+        KernameSet.In k (term_global_deps e))
+      (fun _ _ _ _ _ _ => True)
+      (fun _ _ _ _ _ _ => True)
+      (fun _ _ _ _ _ _ _ _ => True));
+    try (intros; exact I).
+    (* Rel: x ∈ FromList vn → contradiction *)
+    - intros S0 v vn0 n Hnth k0 Hlk Hdis Hdis_cm Hni.
+      exfalso. apply Hni. eapply nth_error_In. exact Hnth.
+    (* Lam: x = f ∈ S → cmap ∩ S contradiction *)
+    - intros S0 S0' na e1 C1 r1 x1 f vn0 Hx1 Hf Hcvt1 IH1
+             k0 Hlk Hdis Hdis_cm Hni.
+      exfalso. eapply Hdis_cm. constructor.
+      + exists k0. exact Hlk.
+      + eapply Setminus_Included. exact Hf.
+    (* App: x = r ∈ S3 ⊆ S → contradiction *)
+    - intros S1 S2 S3 u C1 x1 v C2 x2 r vn0
+             Hcvt1 IH1 Hcvt2 IH2 Hr
+             k0 Hlk Hdis Hdis_cm Hni.
+      exfalso. eapply Hdis_cm. constructor.
+      + exists k0. exact Hlk.
+      + eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). exact Hcvt1.
+        eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). exact Hcvt2.
+        exact Hr.
+    (* Construct: x ∈ S → contradiction *)
+    - intros. exfalso.
+      match goal with
+      | [ Hdcm : Disjoint _ (cmap_vars _) _,
+          Hlk : lookup_const _ ?k_ = Some _,
+          Hx : Ensembles.In _ _ _ |- _ ] =>
+        eapply Hdcm; constructor; [exists k_; exact Hlk | exact Hx] end.
+    (* LetIn: x2 from body. Use IH on binding or body. *)
+    - intros S1 S2 S3 na b t0 C1 x1 C2 x2 vn0
+             Hcvt1 IH1 Hcvt2 IH2
+             k0 Hlk Hdis Hdis_cm Hni.
+      simpl. apply KernameSet.union_spec.
+      destruct (@Dec _ _ (Decidable_FromList (x1 :: vn0)) x2) as [Hin_ext | Hnin_ext].
+      + unfold FromList, Ensembles.In in Hin_ext. simpl in Hin_ext.
+        destruct Hin_ext as [<- | Hin_vn].
+        * (* x2 = x1: use IH1 on the binding *)
+          left. apply IH1; assumption.
+        * (* x2 ∈ FromList vn0: contradicts Hni *)
+          exfalso. exact (Hni Hin_vn).
+      + (* x2 ∉ FromList (x1::vn0): use IH2 on the body *)
+        right. apply IH2; try assumption.
+        * rewrite FromList_cons. apply Union_Disjoint_l.
+          -- apply Disjoint_Singleton_l.
+             eapply anf_cvt_result_not_in_output; eassumption.
+          -- eapply Disjoint_Included_r.
+             eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). exact Hcvt1.
+             exact Hdis.
+        * eapply Disjoint_Included_r.
+          eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). exact Hcvt1.
+          exact Hdis_cm.
+    (* Case: r ∈ S → contradiction *)
+    - intros. exfalso.
+      match goal with
+      | [ Hdcm : Disjoint _ (cmap_vars _) _,
+          Hlk : lookup_const _ ?k_ = Some _ |- _ ] =>
+        eapply Hdcm; constructor; [exists k_; exact Hlk |] end.
+      eapply Setminus_Included. eapply Setminus_Included.
+      eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap); [eassumption |].
+      eapply (anf_cvt_branches_subset func_tag default_tag tgm cmap); eassumption.
+    (* Fix: x ∈ FromList fnames ⊆ S → contradiction *)
+    - intros. exfalso.
+      match goal with
+      | [ Hdcm : Disjoint _ (cmap_vars _) _,
+          Hlk : lookup_const _ ?k_ = Some _,
+          Hsub : FromList _ \subset _,
+          Hnth : nth_error _ _ = Some _ |- _ ] =>
+        eapply Hdcm; constructor; [exists k_; exact Hlk |];
+        eapply Hsub; eapply nth_error_In; exact Hnth end.
+    (* Box: x ∈ S → contradiction *)
+    - intros S0 vn0 x0 Hx0 k0 Hlk Hdis Hdis_cm Hni.
+      exfalso. eapply Hdis_cm. constructor.
+      + exists k0. exact Hlk.
+      + exact Hx0.
+    (* Const: k = s by cmap_inj. k ∈ {s}. *)
+    - intros S0 vn0 s v Hlk_s k0 Hlk_k Hdis Hdis_cm Hni.
+      assert (k0 = s) by (eapply cmap_inj; eassumption). subst.
+      simpl. apply KernameSet.singleton_spec. reflexivity.
+    (* Proj: y ∈ S2 ⊆ S → contradiction *)
+    - intros. exfalso.
+      match goal with
+      | [ Hdcm : Disjoint _ (cmap_vars _) _,
+          Hlk : lookup_const _ ?k_ = Some _,
+          Hcvt_c : anf_cvt_rel _ _ _ _ _ _ _ _ _ _,
+          Hy : Ensembles.In _ _ _ |- _ ] =>
+        eapply Hdcm; constructor; [exists k_; exact Hlk |];
+        eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap); [exact Hcvt_c | exact Hy] end.
+    (* Prim: x ∈ S → contradiction *)
+    - intros. exfalso.
+      match goal with
+      | [ Hdcm : Disjoint _ (cmap_vars _) _,
+          Hlk : lookup_const _ ?k_ = Some _,
+          Hx : Ensembles.In _ _ _ |- _ ] =>
+        eapply Hdcm; constructor; [exists k_; exact Hlk | exact Hx] end.
+  Qed.
 
   Context (Hglob_term : globals_terminate_prop).
 
@@ -907,6 +1461,117 @@ Section Correct.
     destruct x as [[[? ?] ?] ?].
     destruct y as [[[? ?] ?] ?]. destructAll.
     destruct x as [[[? ?] ?] ?]. congruence.
+  Qed.
+
+
+  (* list_consistent: ANF args conversion preserves consistency.
+     Duplicate xs positions map to the same source variable via var_lookup,
+     so their target values are related via alpha-equiv. *)
+  Lemma anf_cvt_args_consistent k rho_src es vs_src f t
+        S vn S' C xs vs_tgt (rho_tgt : M.t val) :
+    @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc rho_src es vs_src f t ->
+    anf_cvt_rel_args' S es vn S' C xs ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (cmap_vars cmap) S ->
+    env_consistent vn rho_src ->
+    cmap_consistent vn rho_src ->
+    Forall2 anf_val_rel' vs_src vs_tgt ->
+    global_env_rel' (kn_deps_list es) rho_tgt ->
+    list_consistent (preord_val cenv eq_fuel k) xs vs_tgt.
+  Proof.
+    intros Hmany Hcvt Hdis Hdis_cm Hcons Hcmap HF2 Hglob_args
+           i j x vi vj Hxi Hxj Hvi Hvj.
+    destruct (Nat.eq_dec i j) as [Heq | Hneq].
+    - (* i = j: reflexivity *)
+      subst j. replace vj with vi by congruence.
+      eapply preord_val_refl. tci.
+    - (* i ≠ j: case split on x *)
+      destruct (@Dec _ _ (Decidable_FromList vn) x) as [Hin_vn | Hnin_vn].
+      + (* x ∈ FromList vn: var_lookup gives same source value *)
+        destruct (In_nth_error _ _ Hin_vn) as [i_vn Hi_vn].
+        destruct (anf_cvt_rel_args_var_lookup _ _ _ _ _ Hmany _ _ _ _ _
+                    Hcvt Hdis Hdis_cm Hcons Hcmap _ _ _ Hxi Hi_vn)
+          as [v_src_i [Hvsi Hrhoi]].
+        destruct (anf_cvt_rel_args_var_lookup _ _ _ _ _ Hmany _ _ _ _ _
+                    Hcvt Hdis Hdis_cm Hcons Hcmap _ _ _ Hxj Hi_vn)
+          as [v_src_j [Hvsj Hrhoj]].
+        rewrite Hrhoi in Hrhoj. injection Hrhoj as <-.
+        destruct (Forall2_nth_error_l _ _ _ _ _ HF2 Hvsi) as [vt_i [Hvti Hrel_i]].
+        destruct (Forall2_nth_error_l _ _ _ _ _ HF2 Hvsj) as [vt_j [Hvtj Hrel_j]].
+        rewrite Hvi in Hvti. injection Hvti as <-.
+        rewrite Hvj in Hvtj. injection Hvtj as <-.
+        eapply (@anf_cvt_val_alpha_equiv
+                  _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                  eq_fuel_compat (fun _ _ H0 => H0)
+                  nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                  Σ box_dc Hglob_term func_tag default_tag); eassumption.
+      + (* x ∉ FromList vn: use In_range to split S vs cmap *)
+        destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ Hcvt x (nth_error_In _ _ Hxi))
+          as [Hvn | [HS | Hcm]].
+        * (* x ∈ FromList vn: contradicts Hnin_vn *)
+          exfalso. exact (Hnin_vn Hvn).
+        * (* x ∈ S: fresh, not in cmap_vars → unique in xs *)
+          exfalso. apply Hneq.
+          eapply anf_cvt_rel_args_unique_fresh; try eassumption.
+          intro Hcm. eapply Hdis_cm. constructor; [exact Hcm | exact HS].
+        * (* x ∈ cmap_vars: both produce the same cmap variable.
+             Route through anf_cvt_cmap_eval to show both source values
+             equal the evaluation of the same constant body in []. *)
+          (* Get source values *)
+          destruct (Forall2_nth_error_r _ _ _ i _ HF2 Hvi) as [v_src_i [Hvsi Hrel_i]].
+          destruct (Forall2_nth_error_r _ _ _ j _ HF2 Hvj) as [v_src_j [Hvsj Hrel_j]].
+          (* Get es positions from xs positions via length equality *)
+          assert (Hlen_xs_es := anf_cvt_rel_args_length _ _ _ _ _ _ Hcvt).
+          assert (Hi_range : (i < Datatypes.length es)%nat).
+          { rewrite <- Hlen_xs_es. apply nth_error_Some. intro Habs. rewrite Habs in Hxi. discriminate. }
+          assert (Hj_range : (j < Datatypes.length es)%nat).
+          { rewrite <- Hlen_xs_es. apply nth_error_Some. intro Habs. rewrite Habs in Hxj. discriminate. }
+          destruct (nth_error es i) as [e_i|] eqn:Hes_i; [| exfalso; apply nth_error_None in Hes_i; lia].
+          destruct (nth_error es j) as [e_j|] eqn:Hes_j; [| exfalso; apply nth_error_None in Hes_j; lia].
+          (* Get individual evals *)
+          destruct (eval_fuel_many_nth _ _ _ _ _ _ _ _ Hmany Hes_i Hvsi) as [fi [ti Heval_i]].
+          destruct (eval_fuel_many_nth _ _ _ _ _ _ _ _ Hmany Hes_j Hvsj) as [fj [tj Heval_j]].
+          (* x ∈ cmap_vars → ∃ kn, lookup_const cmap kn = Some x *)
+          destruct Hcm as [kn Hlk_kn].
+          (* Extract individual anf_cvt_rel for es[i] and es[j] *)
+          destruct (anf_cvt_rel_args_nth_cvt _ _ _ _ _ _ Hcvt _ _ _ Hes_i Hxi)
+            as [Si [Si' [Ci [Hcvt_i Hsub_i]]]].
+          destruct (anf_cvt_rel_args_nth_cvt _ _ _ _ _ _ Hcvt _ _ _ Hes_j Hxj)
+            as [Sj [Sj' [Cj [Hcvt_j Hsub_j]]]].
+          (* kn ∈ kn_deps_list es via anf_cvt_cmap_result_in_deps *)
+          assert (Hkn_deps : kn_deps_list es kn).
+          { unfold kn_deps_list. apply Exists_exists.
+            exists e_i. split.
+            - eapply nth_error_In. exact Hes_i.
+            - eapply anf_cvt_cmap_result_in_deps; [ exact Hcvt_i | exact Hlk_kn | | | exact Hnin_vn ].
+              + eapply Disjoint_Included_r; [exact Hsub_i | exact Hdis].
+              + eapply Disjoint_Included_r; [exact Hsub_i | exact Hdis_cm]. }
+          (* Get declared_constant from global_env_rel' *)
+          destruct (Hglob_args kn x Hkn_deps Hlk_kn)
+            as [decl [body [anf_v [Hdecl [Hbody [Hget Hrel_glob]]]]]].
+          (* anf_cvt_cmap_eval on each: src_eval [] body (Val v_src_i/j) *)
+          destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_i _ _ _ _ _ kn decl body
+                      Hcvt_i
+                      (Disjoint_Included_r _ _ _ Hsub_i Hdis)
+                      (Disjoint_Included_r _ _ _ Hsub_i Hdis_cm)
+                      Hcons Hcmap Hlk_kn Hdecl Hbody)
+            as [fi' [ti' Heval_body_i]].
+          destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_j _ _ _ _ _ kn decl body
+                      Hcvt_j
+                      (Disjoint_Included_r _ _ _ Hsub_j Hdis)
+                      (Disjoint_Included_r _ _ _ Hsub_j Hdis_cm)
+                      Hcons Hcmap Hlk_kn Hdecl Hbody)
+            as [fj' [tj' Heval_body_j]].
+          (* eval_val_det on body: v_src_i = v_src_j *)
+          assert (Heq_v : v_src_i = v_src_j) by (eapply eval_val_det; eassumption).
+          subst v_src_j.
+          (* alpha_equiv *)
+          eapply (@anf_cvt_val_alpha_equiv
+                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                    eq_fuel_compat (fun _ _ H0 => H0)
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc Hglob_term func_tag default_tag); eassumption.
   Qed.
 
 
@@ -2028,9 +2693,239 @@ Section Correct.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
              Henv Hglob Hrel e_k Hdis_ek.
       inv Hrel.
+      (* After inv: anf_Construct gives
+         H  : c_tag = dcon_to_tag ...
+         H0 : x \in S
+         H1 : anf_cvt_rel_args (S \\ [set x]) args vnames S' C0 xs *)
       split.
       + intros v v' Heq Hrel'. injection Heq as <-.
-        admit. (* Construct termination *)
+        (* Hrel' : anf_val_rel (Con_v (dcon_of_con ind c) vs0) v' — invert *)
+        pose proof Hrel' as Hrel'_saved.
+        rename vs0 into vs_src.
+        remember (fuel_sem.Con_v (dcon_of_con ind c) vs_src) as cv.
+        destruct Hrel'; try discriminate.
+        injection Heqcv as Heq_dc Heq_vs. subst.
+        match goal with
+        | [ HF : Forall2 _ vs_src ?vs_tgt |- _ ] => rename HF into HF2_vs;
+            rename vs_tgt into vs'0
+        end.
+        (* Length equalities *)
+        assert (Hlen_xs_args : Datatypes.length xs = Datatypes.length args)
+          by (eapply anf_cvt_rel_args_length; eassumption).
+        assert (Hlen_vs_src_args : Datatypes.length vs_src = Datatypes.length args)
+          by (eapply eval_fuel_many_length; exact Heval_args).
+        assert (Hlen_xs_vs'0 : Datatypes.length xs = Datatypes.length vs'0).
+        { pose proof (Forall2_length HF2_vs). lia. }
+        (* get_list for Econstr_red *)
+        destruct (get_list_set_many_exists xs vs'0 rho Hlen_xs_vs'0)
+          as [vs_new Hvs_new].
+        (* Rewrite context: comp_ctx_f C0 (Econstr_c ...) |[e_k]| = C0 |[Econstr x c_tag xs e_k]| *)
+        rewrite <- app_ctx_f_fuse.
+        (* Chain: IH_args → Econstr_red → env bridge *)
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            (* IH_args: args evaluation *)
+            2:{ intros m.
+                unfold anf_cvt_correct_exps in IH_args.
+                eapply IH_args.
+                - exact Hwf.
+                - eapply wellformed_tConstruct. exact Hwfe.
+                - exact Hcons.
+                - exact Hcmap.
+                - eapply Disjoint_Included_r.
+                  eapply Setminus_Included. exact Hdis.
+                - eapply Disjoint_Included_r.
+                  eapply Setminus_Included. exact Hdis_cmap.
+                - exact Henv.
+                - eapply global_env_rel_mono; [exact Hglob |].
+                  intros k0 Hk0. eapply kn_deps_list_subset_construct. exact Hk0.
+                - eassumption.
+                - exact HF2_vs.
+                - (* Disjoint (occurs_free (Econstr x c_tag xs e_k)) ... *)
+                  simpl. rewrite occurs_free_Econstr.
+                  eapply Union_Disjoint_l.
+                  + eapply Disjoint_Setminus_r. eapply Included_refl.
+                  + eapply Setminus_Disjoint_preserv_l.
+                    eapply Setminus_Disjoint_preserv_r.
+                    eapply Disjoint_Included_r.
+                    2: exact Hdis_ek.
+                    intros y [[Hy_S Hy_nx] Hy_nS'].
+                    split; [split; [exact Hy_S | exact Hy_nS'] | exact Hy_nx]. }
+            (* Econstr_red + env bridge *)
+            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            (* Right step: Econstr reduction *)
+            2:{ intros m0. eapply preord_exp_Econstr_red. exact Hvs_new. }
+            (* Left step: env bridge
+               M.set x (Vconstr c_tag vs'0) rho ≈
+               M.set x (Vconstr c_tag vs_new) (set_many xs vs'0 rho) *)
+            eapply preord_exp_refl. now eapply eq_fuel_compat.
+            intros y Hy v1 Hget.
+            destruct (Pos.eq_dec y x) as [Heq|Hneq].
+            * (* y = x: constructor value *)
+              subst. rewrite M.gss in Hget. inv Hget.
+              eexists. split. rewrite M.gss. reflexivity.
+              rewrite preord_val_eq. simpl. split; eauto.
+              { (* Forall2 (preord_val cenv eq_fuel i) vs'0 vs_new *)
+                assert (Hcons_xs : list_consistent (preord_val cenv eq_fuel i) xs vs'0).
+                { eapply anf_cvt_args_consistent; try eassumption.
+                  - eapply Disjoint_Included_r.
+                    eapply Setminus_Included. exact Hdis.
+                  - eapply Disjoint_Included_r.
+                    eapply Setminus_Included. exact Hdis_cmap.
+                  - eapply global_env_rel_mono; [exact Hglob |].
+                    intros k0 Hk0. eapply kn_deps_list_subset_construct. exact Hk0. }
+                destruct (get_list_set_many_consistent
+                            (preord_val cenv eq_fuel i) xs vs'0 rho)
+                  as [vs_new' [Hvs_new' HF2_new]].
+                - intros x0. eapply preord_val_refl. tci.
+                - exact Hlen_xs_vs'0.
+                - exact Hcons_xs.
+                - rewrite Hvs_new in Hvs_new'. inv Hvs_new'. exact HF2_new. }
+            * (* y ≠ x *)
+              rewrite M.gso in Hget; auto.
+              destruct (in_dec Pos.eq_dec y xs) as [Hyin | Hynin].
+              -- (* y ∈ xs: three sub-cases *)
+                rewrite M.gso; [ | assumption ].
+                edestruct set_many_get_in as [v_y Hget_y]; eauto.
+                rewrite Hget_y. eexists. split; [ reflexivity | ].
+                destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ H9 y Hyin)
+                  as [Hy_vn | [Hy_S | Hy_cm]].
+                ++ (* y ∈ FromList vnames: position tracking + alpha-equiv *)
+                   destruct (In_nth_error _ _ Hy_vn) as [n Hn].
+                   destruct (In_nth_error _ _ Hyin) as [k Hk].
+                   destruct (first_occurrence_exists xs k y Hk) as [k0 [Hle [Hk0 Hfirst]]].
+                   destruct (set_many_get_first xs vs'0 rho y k0 Hlen_xs_vs'0 Hk0 Hfirst)
+                     as [v0 [Hv0k Hget_v0]].
+                   assert (Hvy_eq : v_y = v0) by congruence. subst v0.
+                   (* Common source value via var_lookup *)
+                   destruct (anf_cvt_rel_args_var_lookup _ _ _ _ _ Heval_args
+                               _ _ _ _ _ H9 ltac:(eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis])
+                               ltac:(eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap])
+                               Hcons Hcmap _ _ _ Hk0 Hn)
+                     as [v_src [Hvsrc_k0 Hvsrc_n]].
+                   unfold anf_env_rel' in Henv.
+                   destruct (Forall2_nth_error_r _ _ _ n _ Henv Hn)
+                     as [v_env [Hv_env [v_tgt [Hget_tgt Hrel_tgt]]]].
+                   rewrite Hvsrc_n in Hv_env. inv Hv_env.
+                   rewrite Hget in Hget_tgt. inv Hget_tgt.
+                   destruct (Forall2_nth_error_l _ _ _ _ _ HF2_vs Hvsrc_k0)
+                     as [v_y' [Hvy' Hrel_vy]].
+                   rewrite Hv0k in Hvy'. inv Hvy'.
+                   eapply (@anf_cvt_val_alpha_equiv
+                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                     eq_fuel_compat (fun _ _ H0 => H0)
+                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                     Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                ++ (* y ∈ S \ {x} (fresh): contradiction with Hdis_ek *)
+                   exfalso.
+                   assert (Hy_not_S' : ~ y \in S').
+                   { eapply anf_cvt_rel_args_results_not_in_output; try eassumption.
+                     eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis].
+                     eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap]. }
+                   destruct Hdis_ek as [Hdis_ek'].
+                   apply (Hdis_ek' y). constructor; [ exact Hy | ].
+                   constructor.
+                   { inv Hy_S. constructor; assumption. }
+                   { intro Heq_yx. apply Hneq. symmetry. inv Heq_yx. reflexivity. }
+                ++ (* y ∈ cmap_vars: if also y ∈ FromList vnames, use sub-case A.
+                      Otherwise use anf_cvt_cmap_eval via Hglob. *)
+                   destruct (@Dec _ _ (Decidable_FromList vnames) y) as [Hy_vn2 | Hni_y].
+                   ** (* y ∈ FromList vnames: reuse sub-case A logic *)
+                      destruct (In_nth_error _ _ Hy_vn2) as [n Hn].
+                      destruct (In_nth_error _ _ Hyin) as [k Hk].
+                      destruct (first_occurrence_exists xs k y Hk) as [k0 [Hle [Hk0 Hfirst]]].
+                      destruct (set_many_get_first xs vs'0 rho y k0 Hlen_xs_vs'0 Hk0 Hfirst)
+                        as [v0 [Hv0k Hget_v0]].
+                      assert (Hvy_eq : v_y = v0) by congruence. subst v0.
+                      destruct (anf_cvt_rel_args_var_lookup _ _ _ _ _ Heval_args
+                                  _ _ _ _ _ H9 ltac:(eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis])
+                                  ltac:(eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap])
+                                  Hcons Hcmap _ _ _ Hk0 Hn)
+                        as [v_src [Hvsrc_k0 Hvsrc_n]].
+                      unfold anf_env_rel' in Henv.
+                      destruct (Forall2_nth_error_r _ _ _ n _ Henv Hn)
+                        as [v_env [Hv_env [v_tgt [Hget_tgt Hrel_tgt]]]].
+                      rewrite Hvsrc_n in Hv_env. inv Hv_env.
+                      rewrite Hget in Hget_tgt. inv Hget_tgt.
+                      destruct (Forall2_nth_error_l _ _ _ _ _ HF2_vs Hvsrc_k0)
+                        as [v_y' [Hvy' Hrel_vy]].
+                      rewrite Hv0k in Hvy'. inv Hvy'.
+                      eapply (@anf_cvt_val_alpha_equiv
+                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                        eq_fuel_compat (fun _ _ H0 => H0)
+                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                   ** (* y ∉ FromList vnames: cmap approach *)
+                      destruct Hy_cm as [kn Hlk_kn].
+                      destruct (In_nth_error _ _ Hyin) as [k Hk].
+                      destruct (first_occurrence_exists xs k y Hk) as [k0 [Hle [Hk0 Hfirst]]].
+                      destruct (set_many_get_first xs vs'0 rho y k0 Hlen_xs_vs'0 Hk0 Hfirst)
+                        as [v0 [Hv0k Hget_v0]].
+                      assert (Hvy_eq : v_y = v0) by congruence. subst v0.
+                      (* Extract individual conversion *)
+                      assert (Hk0_range : (k0 < Datatypes.length args)%nat).
+                      { rewrite <- Hlen_xs_args. apply nth_error_Some.
+                        intro Habs. rewrite Habs in Hk0. discriminate. }
+                      destruct (nth_error args k0) as [e_k0|] eqn:Hes_k0;
+                        [| exfalso; apply nth_error_None in Hes_k0; lia].
+                      destruct (anf_cvt_rel_args_nth_cvt _ _ _ _ _ _ H9 _ _ _ Hes_k0 Hk0)
+                        as [Sk0 [Sk0' [Ck0 [Hcvt_k0 Hsub_k0]]]].
+                      (* kn ∈ kn_deps_list args *)
+                      assert (Hkn_in : kn_deps_list args kn).
+                      { unfold kn_deps_list. apply Exists_exists. exists e_k0. split.
+                        - eapply nth_error_In. exact Hes_k0.
+                        - eapply anf_cvt_cmap_result_in_deps;
+                            [ exact Hcvt_k0 | exact Hlk_kn
+                            | eapply Disjoint_Included_r; [exact Hsub_k0 |];
+                              eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis]
+                            | eapply Disjoint_Included_r; [exact Hsub_k0 |];
+                              eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap]
+                            | exact Hni_y ]. }
+                      (* Hglob gives declared_constant for kn *)
+                      assert (Hkn_construct : KernameSet.In kn (term_global_deps (EAst.tConstruct ind c args))).
+                      { eapply kn_deps_list_subset_construct. exact Hkn_in. }
+                      destruct (Hglob kn y Hkn_construct Hlk_kn)
+                        as [decl [body [anf_v [Hdecl [Hbody [Hget_glob Hrel_glob]]]]]].
+                      (* v1 = anf_v from Hglob *)
+                      rewrite Hget in Hget_glob. inv Hget_glob.
+                      (* Get source value at k0 for v_y *)
+                      assert (Hlen_vs_es := eval_fuel_many_length _ _ _ _ _ Heval_args).
+                      destruct (nth_error vs_src k0) as [v_src_k0|] eqn:Hvs_k0;
+                        [| exfalso; apply nth_error_None in Hvs_k0; lia].
+                      destruct (eval_fuel_many_nth _ _ _ _ _ _ _ _ Heval_args Hes_k0 Hvs_k0)
+                        as [fk0 [tk0 Heval_k0]].
+                      (* anf_cvt_cmap_eval: v_src_k0 evaluates body in [] *)
+                      destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_k0 _ _ _ _ _ kn decl body
+                                  Hcvt_k0
+                                  ltac:(eapply Disjoint_Included_r; [exact Hsub_k0 |];
+                                        eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis])
+                                  ltac:(eapply Disjoint_Included_r; [exact Hsub_k0 |];
+                                        eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap])
+                                  Hcons Hcmap Hlk_kn Hdecl Hbody)
+                        as [fk0' [tk0' Heval_body_k0]].
+                      (* v_y = vs'0[k0] is anf_val_rel to v_src_k0 *)
+                      destruct (Forall2_nth_error_l _ _ _ _ _ HF2_vs Hvs_k0)
+                        as [v_y' [Hvy' Hrel_vy]].
+                      rewrite Hv0k in Hvy'. inv Hvy'.
+                      (* v1 = anf_v is related to body eval via Hrel_glob *)
+                      (* alpha-equiv: both related to v_src_k0 = body eval *)
+                      eapply (@anf_cvt_val_alpha_equiv
+                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                        eq_fuel_compat (fun _ _ H0 => H0)
+                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc Hglob_term func_tag default_tag).
+                      { eapply Hrel_glob. exact Heval_body_k0. }
+                      { exact Hrel_vy. }
+              -- (* y ∉ xs: set_many doesn't affect y *)
+                 eexists. split. rewrite M.gso; auto.
+                 rewrite set_many_get_notin; auto. eassumption.
+                 eapply preord_val_refl. tci. }
+        (* Post inclusion: comp (comp eq_fuel eq_fuel) (anf_bound fs ts) ⊆
+           anf_bound (fs + one_i ...) (ts + one_i ...) *)
+        unfold inclusion, comp, eq_fuel, anf_bound.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?].
+        intros [[[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]]].
+        unfold_all. destruct p. destructAll. simpl in *. lia.
       + intros Habs. congruence.
 
     (* eval_Construct_step_OOT *)
