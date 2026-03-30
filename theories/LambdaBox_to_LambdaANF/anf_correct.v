@@ -3019,12 +3019,217 @@ Section Correct.
             { exfalso. exact Hres_bc. }
             (* Case split x1 = x2, then env bridge + BStept_letapp *)
             destruct (Pos.eq_dec x1 x2) as [Heq_x1x2 | Hneq_x1x2].
-            { (* x1 = x2 *) admit. }
+            { (* x1 = x2: argument shadows closure *)
+              subst x2.
+              (* Step 1: get v_rho related to both source values *)
+              assert (Hrel_rho_ex : exists v_rho,
+                M.get x1 rho = Some v_rho /\
+                anf_val_rel' (ClosFix_v rho' mfix0 idx0) v_rho /\
+                anf_val_rel' v2 v_rho /\
+                ClosFix_v rho' mfix0 idx0 = v2).
+              { destruct (In_dec Pos.eq_dec x1 vnames) as [Hin_vn | Hni_vn].
+                - apply In_nth_error in Hin_vn. destruct Hin_vn as [k0 Hk0].
+                  assert (Heval1_k : nth_error rho0 k0 = Some (ClosFix_v rho' mfix0 idx0)).
+                  { eapply anf_cvt_rel_var_lookup;
+                      [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                      | exact Hcons | exact Hcmap | exact Hk0]. }
+                  assert (Heval2_k : nth_error rho0 k0 = Some v2).
+                  { eapply anf_cvt_rel_var_lookup;
+                      [exact Heval2 | exact Hcvt_e2
+                      | eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis]
+                      | eapply Disjoint_Included_r;
+                          [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap]
+                      | exact Hcons | exact Hcmap | exact Hk0]. }
+                  destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk0)
+                    as [v_src [Hsrc [v_rho [Hget Hrel]]]].
+                  assert (v_src = ClosFix_v rho' mfix0 idx0) by congruence. subst v_src.
+                  assert (Heq_v2' : ClosFix_v rho' mfix0 idx0 = v2) by congruence.
+                  exists v_rho. split; [exact Hget |]. split; [exact Hrel |].
+                  split; [subst v2; exact Hrel | exact Heq_v2'].
+                - destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1)
+                    as [Hin1 | [Hin1 | Hin1]].
+                  + contradiction.
+                  + exfalso. destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e2)
+                      as [Hin2 | [Hin2 | Hin2]].
+                    * contradiction.
+                    * eapply anf_cvt_result_not_in_output;
+                        [exact Hcvt_e1 | exact Hdis | exact Hdis_cmap | exact Hin2].
+                    * destruct Hdis_cmap as [Hdc]. apply (Hdc x1).
+                      constructor; [exact Hin2 | exact Hin1].
+                  + destruct Hin1 as [k_c1 Hlk1].
+                    assert (Hkc_deps : kn_deps (EAst.tApp e1 e2) k_c1).
+                    { unfold kn_deps. simpl. apply KernameSet.union_spec. left.
+                      eapply anf_cvt_cmap_result_in_deps;
+                        [exact Hcvt_e1 | exact Hlk1 | exact Hdis | exact Hdis_cmap | exact Hni_vn]. }
+                    destruct (Hglob k_c1 x1 Hkc_deps Hlk1)
+                      as (decl_g & body_g & v_rho & Hdecl_g & Hbody_g & Hget_g & Hrel_g).
+                    exists v_rho. split; [exact Hget_g |].
+                    assert (Heval1_cmap : exists f_c t_c,
+                      src_eval [] body_g (fuel_sem.Val (ClosFix_v rho' mfix0 idx0)) f_c t_c).
+                    { eapply anf_cvt_cmap_eval;
+                        [exact Heval1 | exact Hcvt_e1 | exact Hdis | exact Hdis_cmap
+                        | exact Hcons | exact Hcmap | exact Hlk1 | exact Hdecl_g | exact Hbody_g]. }
+                    destruct Heval1_cmap as [f_c1 [t_c1 Hev1]].
+                    assert (Heval2_cmap : exists f_c t_c,
+                      src_eval [] body_g (fuel_sem.Val v2) f_c t_c).
+                    { eapply anf_cvt_cmap_eval;
+                        [exact Heval2 | exact Hcvt_e2
+                        | eapply Disjoint_Included_r;
+                            [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis]
+                        | eapply Disjoint_Included_r;
+                            [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis_cmap]
+                        | exact Hcons | exact Hcmap | exact Hlk1 | exact Hdecl_g | exact Hbody_g]. }
+                    destruct Heval2_cmap as [f_c2 [t_c2 Hev2]].
+                    split; [exact (Hrel_g _ _ _ Hev1) |].
+                    split; [exact (Hrel_g _ _ _ Hev2) |].
+                    eapply eval_val_det; [exact Hev1 | exact Hev2]. }
+              destruct Hrel_rho_ex as [v_rho [Hget_rho [Hrel_rho [Hrel_rho_v2 Heq_v2]]]].
+              (* Step 2: preord_val (Vfun rho1 Bs f0) v2' *)
+              assert (Hpv_cv : forall j, preord_val cenv eq_fuel j
+                        (Vfun rho1 Bs f0) v2').
+              { intro j. eapply preord_val_trans; [tci | exact eq_fuel_idemp | | ].
+                - eapply (@anf_cvt_val_alpha_equiv
+                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                    eq_fuel_compat (fun _ _ HH => HH)
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc Hglob_term func_tag default_tag).
+                  exact Hrel_fix_saved. exact Hrel_rho.
+                - intros m0.
+                  eapply (@anf_cvt_val_alpha_equiv
+                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                    eq_fuel_compat (fun _ _ HH => HH)
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc Hglob_term func_tag default_tag).
+                  rewrite Heq_v2 in Hrel_rho. exact Hrel_rho. exact Hrel_v2. }
+              (* Step 3: extract Vfun from v2' *)
+              assert (Hpv_inst := Hpv_cv (cin_bc + i + 1)%nat).
+              rewrite preord_val_eq in Hpv_inst.
+              destruct v2' as [ | rho2_fc B2 f2_v | | ];
+                try (simpl in Hpv_inst; contradiction).
+              (* Step 4: get body correspondence *)
+              assert (Hset_fc : Some rho_bc = set_lists [x_pc]
+                [Vfun rho2_fc B2 f2_v] (def_funs Bs Bs rho1 rho1)).
+              { unfold rho_bc. reflexivity. }
+              edestruct Hpv_inst as (xs2_pc & e2_body & rho2_body &
+                Hfind_v2 & Hset_v2 & Hbody_preord).
+              { reflexivity. }
+              { exact Hfind_fc. }
+              { exact Hset_fc. }
+              (* Step 5: transfer body via preord_exp' *)
+              assert (Hbody_pe : preord_exp' cenv (preord_val cenv) eq_fuel eq_fuel
+                        (cin_bc + i)%nat
+                        (C_bc |[ Ehalt r_bc ]|, rho_bc) (e2_body, rho2_body)).
+              { apply Hbody_preord. lia.
+                constructor; [ | constructor ].
+                eapply preord_val_refl. tci. }
+              destruct (Hbody_pe (eval.Res v_bc_val) cin_bc cout_bc) as
+                (v2_body_res & cin2_bc & cout2_bc & Hbstep2_bc & Hpost2_bc & Hres2_bc).
+              { simpl. lia. }
+              { exact Hbstep_bc. }
+              destruct v2_body_res as [ | v2_bc ].
+              { simpl in Hres2_bc. contradiction. }
+              simpl in Hres2_bc.
+              (* Step 6: forall m', preord_val v_bc_val v2_bc via bstep determinism *)
+              assert (Hpv_all : forall m', preord_val cenv eq_fuel m' v_bc_val v2_bc).
+              { intro m'.
+                pose proof (Hpv_cv (cin_bc + m' + 1)%nat) as Hpv_m.
+                rewrite preord_val_eq in Hpv_m.
+                edestruct Hpv_m as (xs2_m & e2_m & rho2_m &
+                  Hfind_m & Hset_m & Hbp_m).
+                { reflexivity. }
+                { exact Hfind_fc. }
+                { exact Hset_fc. }
+                replace e2_m with e2_body in * by congruence.
+                replace xs2_m with xs2_pc in * by congruence.
+                replace rho2_m with rho2_body in * by congruence.
+                assert (Hba_m : preord_exp' cenv (preord_val cenv) eq_fuel eq_fuel
+                          (cin_bc + m')%nat
+                          (C_bc |[ Ehalt r_bc ]|, rho_bc) (e2_body, rho2_body)).
+                { apply Hbp_m. lia.
+                  constructor; [ | constructor ].
+                  eapply preord_val_refl. tci. }
+                destruct (Hba_m (eval.Res v_bc_val) cin_bc cout_bc) as
+                  (v2_m & cin2_m & cout2_m & Hbs2_m & _ & Hres2_m).
+                { simpl. lia. }
+                { exact Hbstep_bc. }
+                destruct v2_m as [ | v2_m_val ].
+                { simpl in Hres2_m. contradiction. }
+                simpl in Hres2_m.
+                eapply bstep_fuel_deterministic in Hbs2_m.
+                2:{ exact Hbstep2_bc. }
+                destruct Hbs2_m as [Hv_eq [_ _]]. subst v2_m_val.
+                replace (cin_bc + m' - cin_bc)%nat with m' in Hres2_m by lia.
+                exact Hres2_m. }
+              (* Step 7: preord_val v' v2_bc *)
+              assert (Hpv_direct : preord_val cenv eq_fuel i v' v2_bc).
+              { eapply preord_val_trans; [tci | exact eq_fuel_idemp | | ].
+                - eapply preord_val_monotonic. exact Hres_bc. unfold_all. simpl. lia.
+                - exact Hpv_all. }
+              (* Step 8: x ≠ x1 *)
+              assert (Hx_neq_x1 : x <> x1).
+              { intro Heq. subst x.
+                assert (Hx1_in_S : x1 \in S).
+                { eapply anf_cvt_exp_subset; [exact Hcvt_e1 |].
+                  eapply anf_cvt_exp_subset; [exact Hcvt_e2 |]. exact H8. }
+                destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1)
+                  as [Hin1 | [Hin1 | Hin1]].
+                - eapply Hdis. constructor; eassumption.
+                - assert (Hx1_not_S2 : ~ x1 \in S2)
+                    by (eapply anf_cvt_result_not_in_output; eassumption).
+                  apply Hx1_not_S2. eapply anf_cvt_exp_subset; [exact Hcvt_e2 | exact H8].
+                - eapply Hdis_cmap. constructor; eassumption. }
+              (* Step 9: env bridge *)
+              assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
+                        (e_k, M.set x v' rho)
+                        (e_k, M.set x v2_bc
+                          (M.set x1 (Vfun rho2_fc B2 f2_v)
+                            (M.set x1 (Vfun rho1 Bs f0) rho)))).
+              { eapply preord_exp_refl. now eapply eq_fuel_compat.
+                intros y Hy.
+                destruct (Pos.eq_dec y x) as [-> | Hneq_x].
+                - intros w Hget. rewrite M.gss in Hget. inv Hget.
+                  eexists. split. rewrite M.gss. reflexivity.
+                  exact Hpv_direct.
+                - intros w Hget. rewrite M.gso in Hget by auto.
+                  destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
+                  + eexists. split.
+                    { rewrite M.gso by auto. rewrite M.gss. reflexivity. }
+                    eapply (@anf_cvt_val_alpha_equiv
+                      _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                      eq_fuel_compat (fun _ _ HH => HH)
+                      nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                      Σ box_dc Hglob_term func_tag default_tag).
+                    * assert (w = v_rho) by congruence. subst w.
+                      exact Hrel_rho_v2.
+                    * exact Hrel_v2.
+                  + eexists. split.
+                    { rewrite M.gso by auto. rewrite M.gso by auto.
+                      rewrite M.gso by auto. exact Hget. }
+                    eapply preord_val_refl. tci. }
+              edestruct Hrefl as (v_cont & cin_cont & cout_cont &
+                Hbstep_cont & Heq_cont & Hres_cont).
+              { exact Hle_ek. }
+              { exact Hbstep_ek. }
+              do 3 eexists. split.
+              { econstructor 2. eapply BStept_letapp.
+                - rewrite M.gss. reflexivity.
+                - simpl. rewrite M.gss. reflexivity.
+                - exact Hfind_v2.
+                - symmetry. exact Hset_v2.
+                - exact Hbstep2_bc.
+                - exact Hbstep_cont. }
+              split.
+              { unfold anf_bound in Hpost_bc, Hpost2_bc |- *.
+                unfold eq_fuel in Heq_cont, Hpost2_bc. simpl in Heq_cont, Hpost_bc, Hpost2_bc.
+                destruct Hpost_bc as [Hlb_bc Hub_bc].
+                simpl. unfold one, one_i in *; simpl; unfold_all. lia. }
+              { exact Hres_cont. } }
             { (* x1 ≠ x2 *)
               assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
                         (e_k, M.set x v' rho)
                         (e_k, M.set x v_bc_val (M.set x2 v2' (M.set x1 (Vfun rho1 Bs f0) rho)))).
-              { eapply preord_exp_refl. exact eq_fuel_compat.
+              { eapply preord_exp_refl. now eapply eq_fuel_compat.
                 intros y Hy.
                 destruct (Pos.eq_dec y x) as [-> | Hneq_x].
                 - (* y = x *)
