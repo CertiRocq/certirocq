@@ -784,6 +784,39 @@ Section Correct.
   Qed.
 
 
+  (* set_lists of disjoint variables preserves anf_env_rel *)
+  Lemma anf_env_rel_weaken_setlists vnames vs0 ys ws rho rho' :
+    anf_env_rel' vnames vs0 rho ->
+    set_lists ys ws rho = Some rho' ->
+    Disjoint _ (FromList ys) (FromList vnames) ->
+    anf_env_rel' vnames vs0 rho'.
+  Proof.
+    revert ws rho rho'. induction ys; intros ws rho1 rho2 Hrel Hset Hdis.
+    - destruct ws; inv Hset. exact Hrel.
+    - destruct ws; [discriminate |].
+      simpl in Hset.
+      destruct (set_lists ys ws rho1) eqn:Hset'; [| discriminate]. inv Hset.
+      apply anf_env_rel_weaken.
+      + eapply IHys; [exact Hrel | exact Hset' |].
+        rewrite FromList_cons in Hdis.
+        eapply Disjoint_Included_l; [| exact Hdis].
+        intros z Hz. right. exact Hz.
+      + intros Hc. rewrite FromList_cons in Hdis. inv Hdis. eapply H.
+        constructor; [left; reflexivity | exact Hc].
+  Qed.
+
+  (* Extending anf_env_rel' with projected constructor fields.
+     Used in the Case proof to build the environment relation for the branch body.
+     Same statement as LambdaBoxLocal_to_LambdaANF_anf_correct.anf_env_rel_extend_weaken_setlists_rev *)
+  Lemma anf_env_rel_extend_setlists_rev vnames vs0 xs vs1 vs2 rho rho' :
+    anf_env_rel' vnames vs0 rho ->
+    set_lists (rev xs) vs2 rho = Some rho' ->
+    Forall2 anf_val_rel' vs1 vs2 ->
+    Disjoint _ (FromList xs) (FromList vnames) ->
+    NoDup xs ->
+    anf_env_rel' (xs ++ vnames) (rev vs1 ++ vs0) rho'.
+  Proof. admit. Admitted.
+
   (** Value determinism: if source evaluation terminates,
       the value is unique (fuel/trace may differ). *)
   Lemma eval_val_det rho0 e0 v1 v2 f1 t1 f2 t2 :
@@ -1957,6 +1990,113 @@ Section Correct.
     eapply preord_res_refl; tci.
   Qed.
 
+
+  Lemma Efun1_c_comp_simpl B C1 C2 e :
+    Efun1_c B (comp_ctx_f C1 C2) |[ e ]| = Efun B (C1 |[ C2 |[ e ]| ]|).
+  Proof.
+    simpl. f_equal. symmetry. apply app_ctx_f_fuse.
+  Qed.
+
+  Definition eq_fuel_n (n : nat) : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + n)%nat = f2.
+
+  Lemma preord_exp_Ecase_red k rho ctag vs P e n y :
+    M.get y rho = Some (Vconstr ctag vs) ->
+    caseConsistent cenv P ctag ->
+    find_tag_nth P ctag e n ->
+    preord_exp cenv one_step eq_fuel k (e, rho) (Ecase y P, rho).
+  Proof.
+    intros Hget Hcc Hnth r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor; eauto.
+    split. simpl. unfold_all. lia.
+    eapply preord_res_refl; tci.
+  Qed.
+
+  (* ctx_bind_proj projects constructor fields and preserves preord_exp.
+     Same statement as the old LambdaBoxLocal proof but with caseConsistent. *)
+  Lemma ctx_bind_proj_preord_exp :
+    forall vars C k r n e rho rho' vs vs' ctag,
+      n = (List.length vars) ->
+      ~ r \in FromList vars ->
+      ctx_bind_proj ctag r vars n = C ->
+      M.get r rho = Some (Vconstr ctag (vs ++ vs')) ->
+      set_lists (rev vars) vs rho = Some rho' ->
+      preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
+  Proof. admit. Admitted.
+
+  (* Connecting source find_branch to target find_tag_nth via anf_cvt_rel_branches *)
+  Lemma anf_cvt_rel_branches_find_branch S1 ind brs n vn r S2 pats c nargs body :
+    anf_cvt_rel_branches func_tag default_tag tgm cmap S1 ind brs n vn r S2 pats ->
+    find_branch ind c nargs brs = Some body ->
+    let tg := dcon_to_tag default_tag (dcon_of_con ind (c + N.to_nat n)) tgm in
+    exists vars S_mid S_out C_br r_br ctx_p m,
+      FromList vars \subset S_mid /\
+      Datatypes.length vars = nargs /\
+      NoDup vars /\
+      ctx_bind_proj tg r vars (Datatypes.length vars) = ctx_p /\
+      find_tag_nth pats tg (app_ctx_f ctx_p (C_br |[ Ehalt r_br ]|)) m /\
+      anf_cvt_rel func_tag default_tag tgm cmap (S_mid \\ FromList vars) body (vars ++ vn) S_out C_br r_br /\
+      S_mid \subset S1.
+  Proof.
+    intros Hcvt Hfind. simpl.
+    revert brs S1 S2 pats n Hcvt Hfind.
+    induction c as [| c' IH]; intros brs S1 S2 pats n Hcvt Hfind.
+    - (* c = 0: first branch matches *)
+      destruct brs as [| [lnames e_br] brs']; [simpl in Hfind; discriminate |].
+      simpl in Hfind. destruct (Datatypes.length lnames =? nargs) eqn:Hlen;
+        [apply Nat.eqb_eq in Hlen | discriminate].
+      inv Hfind.
+      inversion Hcvt; subst.
+      (* Hypotheses from anf_Branches_cons:
+         H3 : anf_cvt_rel_branches ... S1 ind brs' (n+1) vn r S3 pats'
+         H4 : FromList vars \subset S3
+         H5 : NoDup vars
+         H8 : Datatypes.length vars = Datatypes.length lnames
+         H15 : anf_cvt_rel ... (S3 \\ FromList vars) body (vars ++ vn) S2 C1 r1 *)
+      eexists vars, S3, S2, C1, r1,
+        (ctx_bind_proj (dcon_to_tag default_tag (dcon_of_con ind (N.to_nat n)) tgm)
+                       r vars (Datatypes.length vars)),
+        1.
+      split; [| split; [| split; [| split; [| split; [| split]]]]].
+      + exact H4.
+      + exact H8.
+      + exact H5.
+      + reflexivity.
+      + replace (0 + N.to_nat n)%nat with (N.to_nat n) by lia.
+        apply find_tag_hd.
+      + replace (0 + N.to_nat n)%nat with (N.to_nat n) by lia.
+        exact H15.
+      + eapply (anf_cvt_branches_subset func_tag default_tag tgm cmap).
+        exact H3.
+    - (* c = S c': recursive case *)
+      destruct brs as [| [lnames e_br] brs']; [simpl in Hfind; discriminate |].
+      simpl in Hfind.
+      inversion Hcvt; subst.
+      (* H3 : anf_cvt_rel_branches ... S1 ind brs' (n+1) vn r S3 pats' *)
+      replace (c' - 0)%nat with c' in Hfind by lia.
+      edestruct (IH brs' S1 S3 pats' (n + 1)%N) as
+        (vars' & S_mid & S_out & C_br & r_br & ctx_p_f & m_f &
+         Hvars_sub & Hvars_len & Hvars_nd & Hctx_p & Hfind_tag &
+         Hcvt_br & HS_sub).
+      { exact H3. }
+      { exact Hfind. }
+      do 7 eexists.
+      split; [| split; [| split; [| split; [| split; [| split]]]]].
+      + exact Hvars_sub.
+      + exact Hvars_len.
+      + exact Hvars_nd.
+      + replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
+        exact Hctx_p.
+      + apply find_tag_lt.
+        * replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
+          exact Hfind_tag.
+        * intros Hceq.
+          apply dcon_to_tag_inj in Hceq.
+          unfold dcon_of_con in Hceq. injection Hceq as Hceq. lia.
+      + replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
+        exact Hcvt_br.
+      + exact HS_sub.
+  Qed.
 
   (** ** Correctness predicates *)
 
@@ -3939,7 +4079,170 @@ Section Correct.
       inv Hrel.
       split.
       + intros v v' Heq Hrel'. subst r0.
-        admit. (* Case termination: IH chaining *)
+        (* Rename hypotheses from inv Hrel (anf_Case) *)
+        rename H3 into Hf0_in_S.
+        rename H5 into Hy_in_S.
+        rename H10 into Hcvt_mch.
+        rename H11 into Hcvt_brs.
+        rename H12 into Hx_in_S3.
+        (* Decompose wellformed: has_tCase && ((wf_brs && wf mch) && forallb brs) *)
+        assert (Hwfe_mch : wellformed Σ (Datatypes.length vnames) mch = true).
+        { simpl in Hwfe.
+          apply Bool.andb_true_iff in Hwfe as [_ Hwfe_rest].
+          apply Bool.andb_true_iff in Hwfe_rest as [Hwfe_lhs _].
+          apply Bool.andb_true_iff in Hwfe_lhs as [_ Hwfe_m].
+          exact Hwfe_m. }
+        assert (Hlen_env := anf_env_rel_length _ _ _ Henv).
+        (* Well-formedness of scrutinee result *)
+        assert (Hwf_con : well_formed_val Σ (Con_v (dcon_of_con ind c0) vs0)).
+        { eapply eval_preserves_wf; try eassumption.
+          rewrite Hlen_env. exact Hwfe_mch. }
+        (* Get ANF value for constructor *)
+        assert (Hcon_exists : exists v_con, anf_val_rel' (Con_v (dcon_of_con ind c0) vs0) v_con).
+        { eapply anf_val_rel_exists; eassumption. }
+        destruct Hcon_exists as [v_con Hcon_rel].
+        (* Save constructor relation before inversion *)
+        rename Hcon_rel into Hcon_rel_saved.
+        (* Invert constructor value relation *)
+        remember (Con_v (dcon_of_con ind c0) vs0) as cv.
+        destruct Hcon_rel_saved; try discriminate.
+        injection Heqcv as Heq_dc Heq_vs. subst.
+        match goal with
+        | [ HF : Forall2 _ _ ?vs_tgt |- _ ] =>
+          rename HF into HF2_vs;
+          set (vs_anf := vs_tgt) in *
+        end.
+        set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c0) tgm) in *.
+        assert (Hcon_rel : anf_val_rel' (Con_v (dcon_of_con ind c0) vs0) (Vconstr c_tag vs_anf)).
+        { constructor; [exact HF2_vs | reflexivity]. }
+        (* Get branch conversion data *)
+        edestruct (anf_cvt_rel_branches_find_branch
+                     _ _ _ _ _ _ _ _ c0 _ _ Hcvt_brs Hbranch)
+          as (br_vars & S_br & S_br_out & C_br & r_br & ctx_br &
+              m_br & Hbr_sub & Hbr_len & Hbr_nd & Hctx_br_eq &
+              Hfind_tag & Hcvt_body & HS_br_sub).
+        simpl in Hfind_tag, Hcvt_body, Hctx_br_eq.
+        (* set up defs and rho_efun *)
+        set (defs := Fcons f0 func_tag [y] (Ecase y pats) Fnil).
+        set (rho_efun := def_funs defs defs rho rho).
+        (* === Chain 1: Efun reduction === *)
+        eapply preord_exp_post_monotonic.
+        2:{ (* Simplify context: comp_ctx_f C1 (Eletapp_c ...) |[e_k]| → C1 |[Eletapp ... e_k]| *)
+            rewrite Efun1_c_comp_simpl. simpl (Eletapp_c _ _ _ _ _ |[ _ ]|).
+            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ (* === Step 2: Efun_red (intermediate → target) === *)
+                intros m. eapply preord_exp_Efun_red. }
+            (* === Step 1: source → intermediate === *)
+            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ (* === Step 1b: IH_mch through C1 === *)
+                intros m.
+                edestruct (IH_mch rho_efun vnames C1 x1
+                           (S \\ [set f0] \\ [set y]) S2 m) as [IH_mch_val _].
+                - exact Hwf.
+                - exact Hwfe_mch.
+                - exact Hcons.
+                - exact Hcmap.
+                - (* Disjoint (FromList vnames) (S \\ [set f0] \\ [set y]) *)
+                  eapply Disjoint_Included_r; [| exact Hdis].
+                  eapply Included_trans; apply Setminus_Included.
+                - (* Disjoint (cmap_vars cmap) (S \\ [set f0] \\ [set y]) *)
+                  eapply Disjoint_Included_r; [| exact Hdis_cmap].
+                  eapply Included_trans; apply Setminus_Included.
+                - (* anf_env_rel' vnames rho0 rho_efun *)
+                  unfold rho_efun, defs. simpl.
+                  apply anf_env_rel_weaken; [exact Henv |].
+                  intros Hc. inv Hdis. eapply H.
+                  constructor; [exact Hc | exact Hf0_in_S].
+                - (* global_env_rel' (kn_deps mch) rho_efun *)
+                  admit.
+                - exact Hcvt_mch.
+                - admit. (* Disjoint (occurs_free (Eletapp x f0 func_tag [x1] e_k)) ... *)
+                - eapply IH_mch_val.
+                  + reflexivity.
+                  + exact Hcon_rel. }
+            (* === Step 1a: Eletapp step (source → after scrutinee) === *)
+            (* === Eletapp step: (e_k, M.set x v' rho) ≤
+                 (Eletapp x f0 func_tag [x1] e_k, M.set x1 (Vconstr c_tag vs_anf) rho_efun) === *)
+            set (rho_eletapp := M.set x1 (Vconstr c_tag vs_anf) rho_efun).
+            (* Function lookup *)
+            assert (Hneq_f0_x1 : f0 <> x1).
+            { admit. (* f0 ∈ S, x1 from S \\ {f0} \\ {y}, so f0 ≠ x1 *) }
+            assert (Hget_f0 : M.get f0 rho_eletapp = Some (Vfun rho defs f0)).
+            { unfold rho_eletapp, rho_efun, defs. simpl.
+              rewrite M.gso; [| exact Hneq_f0_x1].
+              rewrite M.gss. reflexivity. }
+            assert (Hget_x1 : get_list [x1] rho_eletapp = Some [Vconstr c_tag vs_anf]).
+            { unfold rho_eletapp. simpl. rewrite M.gss. reflexivity. }
+            assert (Hfind_f0 : find_def f0 defs = Some (func_tag, [y], Ecase y pats)).
+            { unfold defs. simpl. destruct (M.elt_eq f0 f0); [reflexivity | contradiction]. }
+            (* Body environment: set y to constructor value *)
+            set (rho_match := M.set y (Vconstr c_tag vs_anf)
+                  (def_funs defs defs rho rho)).
+            assert (Hset_body : set_lists [y] [Vconstr c_tag vs_anf]
+                     (def_funs defs defs rho rho) = Some rho_match).
+            { simpl. reflexivity. }
+            (* Projection environment *)
+            assert (Hset_proj : exists rho_proj,
+              set_lists (rev br_vars) vs_anf rho_match = Some rho_proj).
+            { assert (Hlen_proj : Datatypes.length (rev br_vars) = Datatypes.length vs_anf).
+              { admit. (* length (rev br_vars) = length vs_anf, from Hbr_len + Forall2_length *) }
+              exact (set_lists_length3 rho_match (rev br_vars) vs_anf Hlen_proj). }
+            destruct Hset_proj as [rho_proj Hset_proj].
+            (* Build body preord_exp via IH_body *)
+            assert (IH_body_val : preord_exp cenv (anf_bound f2 t2) eq_fuel (i + 1)
+              (Ehalt r_br, M.set r_br v' rho_proj)
+              (C_br |[ Ehalt r_br ]|, rho_proj)).
+            { admit. (* IH_body with all preconditions *) }
+            (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
+            replace (c0 + 0)%nat with c0 in * by lia.
+            assert (Hpre_ecase : preord_exp cenv
+              (comp (comp (anf_bound f2 t2) (eq_fuel_n (Datatypes.length br_vars))) one_step)
+              eq_fuel (i + 1)
+              (Ehalt r_br, M.set r_br v' rho_proj)
+              (Ecase y pats, rho_match)).
+            { eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+              2:{ intros m. eapply preord_exp_Ecase_red.
+                  - unfold rho_match. rewrite M.gss. reflexivity.
+                  - admit. (* caseConsistent cenv pats c_tag *)
+                  - subst ctx_br. exact Hfind_tag. }
+              eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+              2:{ intros m. eapply ctx_bind_proj_preord_exp with (vs := vs_anf) (vs' := []).
+                  - reflexivity.
+                  - admit. (* ~ y ∈ FromList br_vars *)
+                  - subst ctx_br. reflexivity.
+                  - unfold rho_match. rewrite M.gss. rewrite app_nil_r. reflexivity.
+                  - exact Hset_proj. }
+              exact IH_body_val. }
+            (* Extract concrete bstep from Hpre_ecase *)
+            assert (Hehalt : bstep_fuel cenv (M.set r_br v' rho_proj) (Ehalt r_br)
+              (<0> <+> (<1> Ehalt r_br)) (Res v') (<0> <+> (<1> Ehalt r_br))).
+            { econstructor 2. econstructor. rewrite M.gss. reflexivity. }
+            assert (H1_le_Si : to_nat (<0> <+> (<1> Ehalt r_br)) <= i + 1) by
+              (simpl; unfold_all; lia).
+            (* Unfold preord_exp' and construct the step *)
+            intros v_ek cin_ek cout_ek Hle_ek Hbstep_ek.
+            (* Extract concrete bstep from composed preord_exp *)
+            specialize (Hpre_ecase (Res v') _ _ H1_le_Si Hehalt)
+              as (v_ecase & cin_ecase & cout_ecase & Hbstep_ecase & Hpost_ecase & Hres_ecase).
+            (* v_ecase must be Res (from preord_res with Res v' on the left) *)
+            destruct v_ecase as [| v_ecase_val]; [admit |].
+            (* Now: v_ecase = Res v_ecase_val, Hbstep_ecase has (Res v_ecase_val) *)
+            do 3 eexists. split.
+            { econstructor 2.
+              eapply BStept_letapp.
+              - exact Hget_f0.
+              - exact Hget_x1.
+              - exact Hfind_f0.
+              - exact Hset_body.
+              - exact Hbstep_ecase.
+              - admit. (* continuation: bstep_fuel (M.set x v_ecase_val rho_eletapp) e_k *)
+            }
+            split.
+            - admit. (* Post bound *)
+            - admit. (* preord_res *)
+        }
+        (* Post inclusion *)
+        { admit. }
       + intros _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_Case_step_OOT *)
