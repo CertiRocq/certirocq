@@ -4176,7 +4176,12 @@ Section Correct.
                   intros Hc. inv Hdis. eapply H.
                   constructor; [exact Hc | exact Hf0_in_S].
                 - (* global_env_rel' (kn_deps mch) rho_efun *)
-                  admit.
+                  unfold rho_efun, defs. simpl.
+                  eapply global_env_rel_set_fresh.
+                  + eapply global_env_rel_mono; [exact Hglob |].
+                    admit. (* kn_deps mch ⊆ kn_deps (tCase ...) *)
+                  + intros Hc. inv Hdis_cmap. eapply H.
+                    constructor; [exact Hc | exact Hf0_in_S].
                 - exact Hcvt_mch.
                 - admit. (* Disjoint (occurs_free (Eletapp x f0 func_tag [x1] e_k)) ... *)
                 - eapply IH_mch_val.
@@ -4213,7 +4218,9 @@ Section Correct.
             (* Projection environment *)
             assert (Hset_proj : exists rho_proj,
               set_lists (rev br_vars) vs_anf rho_match = Some rho_proj).
-            { apply (set_lists_length3 rho_match). admit. }
+            { apply (set_lists_length3 rho_match).
+              rewrite rev_length, Hbr_len.
+              exact (Forall2_length HF2_vs). }
             destruct Hset_proj as [rho_proj Hset_proj].
             (* Build body preord_exp via IH_body *)
             assert (IH_body_val : preord_exp cenv (anf_bound f2 t2) eq_fuel (i + 1)
@@ -4225,14 +4232,38 @@ Section Correct.
               - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
               - admit. (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
               - admit. (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
-              - admit. (* Disjoint (FromList (br_vars ++ vnames)) (S_br \\ FromList br_vars) *)
-              - admit. (* Disjoint (cmap_vars cmap) (S_br \\ FromList br_vars) *)
+              - (* Disjoint (FromList (br_vars ++ vnames)) (S_br \\ FromList br_vars) *)
+                rewrite FromList_app. eapply Union_Disjoint_l.
+                + eapply Disjoint_Setminus_r. eapply Included_refl.
+                + eapply Disjoint_Included_r; [| exact Hdis].
+                  eapply Included_trans; [apply Setminus_Included |].
+                  eapply Included_trans; [exact HS_br_sub |].
+                  eapply Included_trans;
+                    [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                  eapply Included_trans; apply Setminus_Included.
+              - (* Disjoint (cmap_vars cmap) (S_br \\ FromList br_vars) *)
+                eapply Disjoint_Included_r; [| exact Hdis_cmap].
+                eapply Included_trans; [apply Setminus_Included |].
+                eapply Included_trans; [exact HS_br_sub |].
+                eapply Included_trans;
+                  [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                eapply Included_trans; apply Setminus_Included.
               - (* anf_env_rel' (br_vars ++ vnames) (rev vs0 ++ rho0) rho_proj *)
                 eapply anf_env_rel_extend_setlists_rev.
-                + admit. (* anf_env_rel' vnames rho0 rho_match — weaken Henv through def_funs + M.set y *)
+                + (* anf_env_rel' vnames rho0 rho_match *)
+                  unfold rho_match, defs. simpl.
+                  apply anf_env_rel_weaken; [| intros Hc; inv Hdis; eapply H; constructor; [exact Hc|]; inv Hy_in_S; exact H0].
+                  apply anf_env_rel_weaken; [exact Henv |].
+                  intros Hc. inv Hdis. eapply H. constructor; [exact Hc | exact Hf0_in_S].
                 + exact Hset_proj.
                 + exact HF2_vs.
-                + admit. (* Disjoint (FromList br_vars) (FromList vnames) *)
+                + (* Disjoint (FromList br_vars) (FromList vnames) *)
+                  eapply Disjoint_Included_l; [| eapply Disjoint_sym; exact Hdis].
+                  eapply Included_trans; [exact Hbr_sub |].
+                  eapply Included_trans; [exact HS_br_sub |].
+                  eapply Included_trans;
+                    [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                  eapply Included_trans; apply Setminus_Included.
                 + exact Hbr_nd.
               - admit. (* global_env_rel' (kn_deps body0) rho_proj *)
               - exact Hcvt_body.
@@ -4253,7 +4284,16 @@ Section Correct.
               eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
               2:{ intros m. eapply ctx_bind_proj_preord_exp with (vs := vs_anf) (vs' := []).
                   - reflexivity.
-                  - admit. (* ~ y ∈ FromList br_vars: y ∈ S\\{f0}, br_vars ⊂ S_br ⊂ S2 ⊂ S\\{f0}\\{y} *)
+                  - (* ~ y ∈ FromList br_vars *)
+                    intros Hy_in_bv.
+                    assert (Hy_in_S2 : y \in S2).
+                    { eapply HS_br_sub. eapply Hbr_sub. exact Hy_in_bv. }
+                    assert (Hy_in_Sfy :=
+                      anf_cvt_exp_subset func_tag default_tag tgm cmap
+                        _ _ _ _ _ _ Hcvt_mch _ Hy_in_S2).
+                    destruct Hy_in_Sfy as [Hy_Sf Hy_ny].
+                    destruct Hy_Sf as [_ Hy_nf0].
+                    apply Hy_ny. constructor.
                   - subst ctx_br. reflexivity.
                   - unfold rho_match. rewrite M.gss. rewrite app_nil_r. reflexivity.
                   - exact Hset_proj. }
