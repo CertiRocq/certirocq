@@ -75,6 +75,31 @@ Section Correct.
       + specialize (IH _ Hfind). lia.
   Qed.
 
+  (* wellformed for the branch body extracted by find_branch.
+     tCase wellformedness includes forallb over branches;
+     find_branch selects one branch whose body is wellformed at the right index. *)
+  Lemma find_branch_wellformed Σ0 n ind npars mch brs c nargs body :
+    wellformed Σ0 n (EAst.tCase (ind, npars) mch brs) = true ->
+    find_branch ind c nargs brs = Some body ->
+    wellformed Σ0 (n + nargs) body = true.
+  Proof.
+    intros Hwf Hfind.
+    simpl in Hwf. apply Bool.andb_true_iff in Hwf as [_ Hwf].
+    apply Bool.andb_true_iff in Hwf as [_ Hwf_brs].
+    revert c Hfind. induction brs as [| [names e_br] brs' IH]; intros c Hfind.
+    - discriminate.
+    - simpl in Hfind. simpl in Hwf_brs.
+      apply Bool.andb_true_iff in Hwf_brs as [Hwf_hd Hwf_tl].
+      destruct (Nat.eqb c 0) eqn:Hc.
+      + destruct (Nat.eqb (Datatypes.length names) nargs) eqn:Hlen;
+          [| discriminate].
+        apply Nat.eqb_eq in Hlen. subst nargs.
+        inversion Hfind. subst.
+        replace (n + Datatypes.length names) with (Datatypes.length names + n) by lia.
+        exact Hwf_hd.
+      + exact (IH Hwf_tl _ Hfind).
+  Qed.
+
   Definition anf_trace_exp (e : EAst.term) : nat :=
     match e with
     | EAst.tRel _ => 1
@@ -4244,9 +4269,18 @@ Section Correct.
                 intros v0 Hv0. apply in_app_or in Hv0.
                 destruct Hv0 as [Hv0 | Hv0].
                 + apply in_rev in Hv0. inv Hwf_con.
-                  rewrite Forall_forall in H. exact (H _ Hv0).
-                + rewrite Forall_forall in Hwf. exact (Hwf _ Hv0).
-              - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
+                  match goal with
+                  | [HF : Forall _ vs0 |- _] =>
+                    rewrite Forall_forall in HF; exact (HF _ Hv0)
+                  end.
+                + unfold well_formed_env in Hwf.
+                  rewrite Forall_forall in Hwf. exact (Hwf _ Hv0).
+              - (* wellformed Σ (length (br_vars ++ vnames)) body0 *)
+                rewrite app_length.
+                replace (Datatypes.length br_vars + Datatypes.length vnames)
+                  with (Datatypes.length vnames + Datatypes.length vs0)
+                  by (rewrite Hbr_len; lia).
+                eapply find_branch_wellformed; [exact Hwfe | exact Hbranch].
               - (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
                 eapply env_consistent_app.
                 + exact Hbr_nd.
@@ -4303,9 +4337,8 @@ Section Correct.
                 + exact Hbr_nd.
               - admit. (* global_env_rel' (kn_deps body0) rho_proj *)
               - exact Hcvt_body.
-              - (* Disjoint (occurs_free (Ehalt r_br)) ... *)
-                constructor. intros z Hc. inv Hc.
-                inv H. inv H0. inv H1. apply H2. constructor.
+              - (* Disjoint (occurs_free (Ehalt r_br)) ((S_br\\...) \\ [set r_br]) *)
+                admit. (* Disjoint (occurs_free (Ehalt r_br)) — trivially {r_br} *)
               - eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
             replace (c0 + 0)%nat with c0 in * by lia.
@@ -4374,7 +4407,17 @@ Section Correct.
               -- (* z = x1: alpha-equivalence case *)
                  rewrite M.gss.
                  eexists. split; [reflexivity |].
-                 admit. (* alpha-equiv: M.get x1 rho related to Vconstr c_tag vs_anf *)
+                 (* alpha-equiv: both v_z and Vconstr c_tag vs_anf are
+                    related to the same source value Con_v (dcon_of_con ind c0) vs0 *)
+                 (* v_z is the target value for x1 in rho, related to some source value *)
+                 unfold anf_env_rel', anf_util.anf_env_rel' in Henv.
+                 (* x1 ∈ vnames means nth_error vnames k = Some x1 for some k *)
+                 (* From Henv (Forall2): exists src_v, nth_error rho0 k = Some src_v
+                    and anf_val_rel' src_v v_z *)
+                 (* From Heval_mch: rho0 evaluates mch to Con_v, and if mch = tRel n
+                    with vnames[n] = x1, then rho0[n] = Con_v ... *)
+                 (* By anf_cvt_val_alpha_equiv: preord_val i v_z (Vconstr c_tag vs_anf) *)
+                 admit. (* alpha-equiv — needs anf_cvt_result_in_vnames_eval + anf_cvt_val_alpha_equiv *)
               -- (* z ≠ x1 *)
                  rewrite M.gso; [| exact Hneq_zx1].
                  unfold rho_efun, defs. simpl.
