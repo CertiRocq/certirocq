@@ -42,6 +42,9 @@ Section Correct.
   Context (box_dc : dcon)
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
+  Context (cenv_case_consistent : forall P ctag,
+    caseConsistent cenv P ctag).
+
   Context (cmap_inj : forall k1 k2 v,
     lookup_const cmap k1 = Some v ->
     lookup_const cmap k2 = Some v ->
@@ -2077,11 +2080,11 @@ Section Correct.
     preord_exp cenv one_step eq_fuel k (e, rho) (Ecase y P, rho).
   Proof.
     intros Hget Hnth r cin cout Hleq Hbstep.
-    do 3 eexists. split. econstructor 2. econstructor; eauto.
-    admit. (* caseConsistent — same admit as old CPS/ANF proof *)
+    do 3 eexists. split. econstructor 2. econstructor.
+    exact Hget. exact (cenv_case_consistent _ _). exact Hnth. exact Hbstep.
     split. simpl. unfold_all. lia.
     eapply preord_res_refl; tci.
-  Admitted.
+  Qed.
 
   (* ctx_bind_proj projects constructor fields and preserves preord_exp.
      Same statement as the old LambdaBoxLocal proof but with caseConsistent. *)
