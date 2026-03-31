@@ -2041,6 +2041,13 @@ Section Correct.
     simpl. f_equal. symmetry. apply app_ctx_f_fuse.
   Qed.
 
+  Lemma occurs_free_Ehalt_inv x z :
+    occurs_free (Ehalt x) z -> z = x.
+  Proof.
+    intros H. remember (Ehalt x) as eH.
+    destruct H; try congruence. congruence.
+  Qed.
+
   Definition eq_fuel_n (n : nat) : @PostT nat unit :=
     fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + n)%nat = f2.
 
@@ -4335,10 +4342,56 @@ Section Correct.
                     [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
                   eapply Included_trans; apply Setminus_Included.
                 + exact Hbr_nd.
-              - admit. (* global_env_rel' (kn_deps body0) rho_proj *)
+              - (* global_env_rel' (kn_deps body0) rho_proj *)
+                (* rho_proj built from rho via: def_funs (M.set f0), M.set y, set_lists br_vars
+                   All of f0, y, br_vars ∈ S, disjoint from cmap_vars *)
+                eapply global_env_rel_weaken_setlists.
+                + eapply global_env_rel_set_fresh.
+                  * eapply global_env_rel_set_fresh.
+                    -- eapply global_env_rel_mono; [exact Hglob |].
+                       (* kn_deps body0 ⊆ kn_deps (tCase ...) *)
+                       intros k0 Hk0. unfold kn_deps in *. simpl.
+                       apply KernameSet.union_spec. right.
+                       (* body0 is in brs via find_branch, so its deps are in the fold *)
+                       assert (Hfold_in : forall (l : list (list name * term)) body0' base,
+                         In body0' (map snd l) ->
+                         KernameSet.In k0 (term_global_deps body0') ->
+                         KernameSet.In k0 (fold_left (fun acc x =>
+                           KernameSet.union (term_global_deps (snd x)) acc) l base)).
+                       { intros l. induction l as [| [? ?] l' IH']; intros b' base Hin Hdep.
+                         - destruct Hin.
+                         - simpl in Hin. destruct Hin as [<- | Hin].
+                           + simpl. assert (Hbase : forall (ll : list (list name * term)) acc,
+                               KernameSet.In k0 acc ->
+                               KernameSet.In k0 (fold_left (fun a x => KernameSet.union (term_global_deps (snd x)) a) ll acc)).
+                             { intros ll. induction ll as [| [? ?] ll' IHll]; intros acc Hacc;
+                                 simpl; [exact Hacc | apply IHll; apply KernameSet.union_spec; right; exact Hacc]. }
+                             apply Hbase. apply KernameSet.union_spec. left. exact Hdep.
+                           + simpl. apply IH'; assumption. }
+                       eapply Hfold_in; [| exact Hk0].
+                       clear -Hbranch. revert c0 Hbranch. induction brs as [| [n' b'] brs' IH']; intros c0 Hfind.
+                       * discriminate.
+                       * simpl in Hfind. destruct (Nat.eqb c0 0) eqn:Hc0.
+                         -- destruct (Nat.eqb _ _); [| discriminate].
+                            injection Hfind as <-. left. reflexivity.
+                         -- right. exact (IH' _ Hfind).
+                    -- intros Hc. inv Hdis_cmap. eapply H.
+                       constructor; [exact Hc | exact Hf0_in_S].
+                  * intros Hc. inv Hdis_cmap. eapply H.
+                    constructor; [exact Hc |]. inv Hy_in_S. exact H0.
+                + exact Hset_proj.
+                + eapply Disjoint_Included_l; [| eapply Disjoint_sym; exact Hdis_cmap].
+                  eapply Included_trans; [exact Hbr_sub |].
+                  eapply Included_trans; [exact HS_br_sub |].
+                  eapply Included_trans;
+                    [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                  eapply Included_trans; apply Setminus_Included.
               - exact Hcvt_body.
               - (* Disjoint (occurs_free (Ehalt r_br)) ((S_br\\...) \\ [set r_br]) *)
-                admit. (* Disjoint (occurs_free (Ehalt r_br)) — trivially {r_br} *)
+                eapply Disjoint_Included_l.
+                + intros z Hz. apply occurs_free_Ehalt_inv in Hz. subst. left. constructor.
+                + eapply Disjoint_Singleton_l.
+                  intros Habs. destruct Habs as [? Habs]. apply Habs. constructor.
               - eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
             replace (c0 + 0)%nat with c0 in * by lia.
