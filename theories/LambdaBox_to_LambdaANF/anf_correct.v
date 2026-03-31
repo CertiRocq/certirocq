@@ -62,6 +62,19 @@ Section Correct.
     | (names, _) :: brs' => max (List.length names) (max_branch_fields brs')
     end.
 
+  Lemma find_branch_max_fields ind c nargs brs body :
+    find_branch ind c nargs brs = Some body ->
+    nargs <= max_branch_fields brs.
+  Proof.
+    revert c. induction brs as [| [names e_br] brs' IH]; intros c Hfind.
+    - discriminate.
+    - simpl in Hfind. simpl.
+      destruct (Nat.eqb c 0) eqn:Hc.
+      + destruct (Nat.eqb (Datatypes.length names) nargs) eqn:Hlen;
+          [apply Nat.eqb_eq in Hlen; lia | discriminate].
+      + specialize (IH _ Hfind). lia.
+  Qed.
+
   Definition anf_trace_exp (e : EAst.term) : nat :=
     match e with
     | EAst.tRel _ => 1
@@ -4139,7 +4152,10 @@ Section Correct.
             2:{ (* === Step 2: Efun_red (intermediate → target) === *)
                 intros m. eapply preord_exp_Efun_red. }
             (* === Step 1: source → intermediate === *)
-            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            eapply preord_exp_trans
+              with (P1 := anf_bound (f2 + Datatypes.length br_vars + 3)
+                                    (t2 + Datatypes.length br_vars + 3));
+              [tci | exact eq_fuel_idemp | | ].
             2:{ (* === Step 1b: IH_mch through C1 === *)
                 intros m.
                 edestruct (IH_mch rho_efun vnames C1 x1
@@ -4262,11 +4278,10 @@ Section Correct.
               (e_k, M.set x v' rho) (e_k, M.set x v_ecase_val rho_eletapp)).
             { eapply preord_exp_refl. exact eq_fuel_compat.
               intros z Hz v_z Hget_z.
-              admit. (* env bridge: for z ∈ occurs_free e_k, relate values in both envs *)
+              admit. (* env bridge: case z = x vs z ≠ x *)
             }
             specialize (Hbridge v_ek cin_ek cout_ek Hle_ek Hbstep_ek)
               as (v_ek' & cin_ek' & cout_ek' & Hbstep_ek' & Hpost_ek' & Hres_ek').
-            (* Now construct the full BStept_letapp *)
             do 3 eexists. split.
             { econstructor 2.
               eapply BStept_letapp.
@@ -4278,11 +4293,24 @@ Section Correct.
               - exact Hbstep_ek'.
             }
             split.
-            - admit. (* Post bound: arithmetic on composed bounds *)
+            - (* Post bound *)
+              unfold eq_fuel in Hpost_ek'.
+              destruct Hpost_ecase
+                as [mid2 [[mid1 [Hab Hefn]] Hos]].
+              unfold anf_bound, eq_fuel_n, one_step, eq_fuel in *.
+              destruct mid1 as [[[? ?] ?] ?]. destruct mid2 as [[[? ?] ?] ?].
+              unfold_all. simpl in *. lia.
             - exact Hres_ek'.
         }
         (* Post inclusion *)
-        { admit. }
+        { assert (Hbr_max : Datatypes.length br_vars <= max_branch_fields brs).
+          { rewrite Hbr_len. eapply find_branch_max_fields. exact Hbranch. }
+          unfold inclusion, comp, anf_bound, one_step.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?].
+          intros [mid2' [[mid1' [H_P1 H_ih1]] H_efun]].
+          unfold anf_bound in H_P1, H_ih1. unfold one_step in H_efun.
+          destruct mid1' as [[[? ?] ?] ?]. destruct mid2' as [[[? ?] ?] ?].
+          simpl in *. unfold_all. split; lia. }
       + intros _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_Case_step_OOT *)
