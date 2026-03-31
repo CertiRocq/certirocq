@@ -4166,7 +4166,14 @@ Section Correct.
             set (rho_eletapp := M.set x1 (Vconstr c_tag vs_anf) rho_efun).
             (* Function lookup *)
             assert (Hneq_f0_x1 : f0 <> x1).
-            { admit. (* f0 ∈ S, x1 from S \\ {f0} \\ {y}, so f0 ≠ x1 *) }
+            { intro Heq. subst x1.
+              destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_mch) as [Hc | [Hc | Hc]].
+              - inv Hdis. eapply H. constructor; [exact Hc | exact Hf0_in_S].
+              - inv Hc. inv H.
+                match goal with
+                | [Hn : ~ Ensembles.In _ [set f0] f0 |- _] => apply Hn; constructor
+                end.
+              - inv Hdis_cmap. eapply H. constructor; [exact Hc | exact Hf0_in_S]. }
             assert (Hget_f0 : M.get f0 rho_eletapp = Some (Vfun rho defs f0)).
             { unfold rho_eletapp, rho_efun, defs. simpl.
               rewrite M.gso; [| exact Hneq_f0_x1].
@@ -4184,15 +4191,31 @@ Section Correct.
             (* Projection environment *)
             assert (Hset_proj : exists rho_proj,
               set_lists (rev br_vars) vs_anf rho_match = Some rho_proj).
-            { assert (Hlen_proj : Datatypes.length (rev br_vars) = Datatypes.length vs_anf).
-              { admit. (* length (rev br_vars) = length vs_anf, from Hbr_len + Forall2_length *) }
-              exact (set_lists_length3 rho_match (rev br_vars) vs_anf Hlen_proj). }
+            { apply (set_lists_length3 rho_match). admit. }
             destruct Hset_proj as [rho_proj Hset_proj].
             (* Build body preord_exp via IH_body *)
             assert (IH_body_val : preord_exp cenv (anf_bound f2 t2) eq_fuel (i + 1)
               (Ehalt r_br, M.set r_br v' rho_proj)
               (C_br |[ Ehalt r_br ]|, rho_proj)).
-            { admit. (* IH_body with all preconditions *) }
+            { edestruct (IH_body rho_proj (br_vars ++ vnames) C_br r_br
+                         (S_br \\ FromList br_vars) S_br_out (i + 1)) as [IH_body_val' _].
+              - admit. (* well_formed_env Σ (rev vs0 ++ rho0) *)
+              - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
+              - admit. (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
+              - admit. (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
+              - admit. (* Disjoint (FromList (br_vars ++ vnames)) (S_br \\ FromList br_vars) *)
+              - admit. (* Disjoint (cmap_vars cmap) (S_br \\ FromList br_vars) *)
+              - (* anf_env_rel' (br_vars ++ vnames) (rev vs0 ++ rho0) rho_proj *)
+                eapply anf_env_rel_extend_setlists_rev.
+                + admit. (* anf_env_rel' vnames rho0 rho_match — weaken Henv through def_funs + M.set y *)
+                + exact Hset_proj.
+                + exact HF2_vs.
+                + admit. (* Disjoint (FromList br_vars) (FromList vnames) *)
+                + exact Hbr_nd.
+              - admit. (* global_env_rel' (kn_deps body0) rho_proj *)
+              - exact Hcvt_body.
+              - admit. (* Disjoint (occurs_free (Ehalt r_br)) ... *)
+              - eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
             replace (c0 + 0)%nat with c0 in * by lia.
             assert (Hpre_ecase : preord_exp cenv
@@ -4208,7 +4231,7 @@ Section Correct.
               eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
               2:{ intros m. eapply ctx_bind_proj_preord_exp with (vs := vs_anf) (vs' := []).
                   - reflexivity.
-                  - admit. (* ~ y ∈ FromList br_vars *)
+                  - admit. (* ~ y ∈ FromList br_vars: y ∈ S\\{f0}, br_vars ⊂ S_br ⊂ S2 ⊂ S\\{f0}\\{y} *)
                   - subst ctx_br. reflexivity.
                   - unfold rho_match. rewrite M.gss. rewrite app_nil_r. reflexivity.
                   - exact Hset_proj. }
@@ -4225,7 +4248,9 @@ Section Correct.
             specialize (Hpre_ecase (Res v') _ _ H1_le_Si Hehalt)
               as (v_ecase & cin_ecase & cout_ecase & Hbstep_ecase & Hpost_ecase & Hres_ecase).
             (* v_ecase must be Res (from preord_res with Res v' on the left) *)
-            destruct v_ecase as [| v_ecase_val]; [admit |].
+            destruct v_ecase as [| v_ecase_val].
+            { (* OOT case: preord_res (Res v') OOT is False *)
+              simpl in Hres_ecase. destruct Hres_ecase. }
             (* Now: v_ecase = Res v_ecase_val, Hbstep_ecase has (Res v_ecase_val) *)
             do 3 eexists. split.
             { econstructor 2.
@@ -4235,7 +4260,12 @@ Section Correct.
               - exact Hfind_f0.
               - exact Hset_body.
               - exact Hbstep_ecase.
-              - admit. (* continuation: bstep_fuel (M.set x v_ecase_val rho_eletapp) e_k *)
+              - (* continuation: need bstep for e_k in the target env *)
+                (* The target env is M.set x v_ecase_val rho_eletapp.
+                   We have Hbstep_ek : bstep_fuel (M.set x v' rho) e_k cin_ek v_ek cout_ek.
+                   Need: bstep_fuel (M.set x v_ecase_val rho_eletapp) e_k ??? ??? ???
+                   The envs agree on occurs_free e_k via the env bridge. *)
+                admit.
             }
             split.
             - admit. (* Post bound *)
