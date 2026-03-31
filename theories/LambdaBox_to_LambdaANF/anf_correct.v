@@ -4278,7 +4278,55 @@ Section Correct.
               (e_k, M.set x v' rho) (e_k, M.set x v_ecase_val rho_eletapp)).
             { eapply preord_exp_refl. exact eq_fuel_compat.
               intros z Hz v_z Hget_z.
-              admit. (* env bridge: case z = x vs z ≠ x *)
+              (* Case z = x: both sides have related values *)
+              destruct (Pos.eq_dec z x) as [-> | Hneq_zx].
+              { rewrite M.gss in Hget_z. inv Hget_z.
+                eexists. split. rewrite M.gss. reflexivity.
+                (* preord_val i v' v_ecase_val: from Hres_ecase with monotonicity *)
+                simpl in Hres_ecase.
+                eapply preord_val_monotonic.
+                exact Hres_ecase. simpl. unfold_all. lia. }
+              (* Case z ≠ x: M.gso on both sides *)
+              rewrite M.gso in Hget_z; [| exact Hneq_zx].
+              rewrite M.gso; [| exact Hneq_zx].
+              (* Now: Hget_z : M.get z rho = Some v_z
+                 Goal: exists v2, M.get z rho_eletapp = Some v2 /\ preord_val i v_z v2 *)
+              unfold rho_eletapp.
+              destruct (Pos.eq_dec z x1) as [-> | Hneq_zx1].
+              -- (* z = x1: alpha-equivalence case *)
+                 rewrite M.gss.
+                 eexists. split; [reflexivity |].
+                 admit. (* alpha-equiv: M.get x1 rho related to Vconstr c_tag vs_anf *)
+              -- (* z ≠ x1 *)
+                 rewrite M.gso; [| exact Hneq_zx1].
+                 unfold rho_efun, defs. simpl.
+                 destruct (Pos.eq_dec z f0) as [-> | Hneq_zf0].
+                 ++ (* z = f0: contradiction — f0 ∉ occurs_free e_k *)
+                    exfalso.
+                    (* f0 ∈ S, f0 ∉ S3 (since S3 ⊆ S2 ⊆ S\\{f0}\\{y}) *)
+                    assert (Hf0_notin_S3 : ~ f0 \in S3).
+                    { intros Hc.
+                      assert (Htmp := anf_cvt_branches_subset func_tag default_tag tgm cmap _ _ _ _ _ _ _ _ Hcvt_brs).
+                      assert (Hf0_in_S2 := Htmp _ Hc).
+                      assert (Htmp2 := anf_cvt_exp_subset func_tag default_tag tgm cmap _ _ _ _ _ _ Hcvt_mch).
+                      assert (Hf0_in_Sfy := Htmp2 _ Hf0_in_S2).
+                      (* f0 ∈ S \\ {f0} \\ {y} is impossible *)
+                      destruct Hf0_in_Sfy as [Hf0_in_Sf Hf0_ny].
+                      destruct Hf0_in_Sf as [Hf0_in_S' Hf0_nf0].
+                      apply Hf0_nf0. constructor. }
+                    (* f0 ∈ S \\ (S3 \\ [set x]) \\ [set x] contradicts Hdis_ek *)
+                    inv Hdis_ek. eapply H. constructor; [exact Hz |].
+                    (* Goal: f0 ∈ S \\ (S3 \\ [set x]) \\ [set x] *)
+                    constructor.
+                    ** (* f0 ∈ S \\ (S3 \\ [set x]) *)
+                       constructor; [exact Hf0_in_S |].
+                       intros [Hc _]. exact (Hf0_notin_S3 Hc).
+                    ** (* f0 ∉ [set x] *)
+                       intros Habs. inv Habs. exact (Hneq_zx eq_refl).
+                 ++ (* z ≠ f0: both envs agree on z *)
+                    rewrite M.gso; [| exact Hneq_zf0].
+                    eexists. split; [exact Hget_z |].
+                    eapply preord_val_refl. tci.
             }
             specialize (Hbridge v_ek cin_ek cout_ek Hle_ek Hbstep_ek)
               as (v_ek' & cin_ek' & cout_ek' & Hbstep_ek' & Hpost_ek' & Hres_ek').
