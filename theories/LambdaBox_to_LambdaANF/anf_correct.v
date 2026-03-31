@@ -4179,7 +4179,18 @@ Section Correct.
                   unfold rho_efun, defs. simpl.
                   eapply global_env_rel_set_fresh.
                   + eapply global_env_rel_mono; [exact Hglob |].
-                    admit. (* kn_deps mch ⊆ kn_deps (tCase ...) *)
+                    (* kn_deps mch ⊆ kn_deps (tCase ...) *)
+                    intros k0 Hk0. unfold kn_deps in *. simpl.
+                    apply KernameSet.union_spec. right.
+                    (* k0 ∈ term_global_deps mch ⊆ fold_left ... brs (term_global_deps mch) *)
+                    assert (Hfold : forall base (l : list (list name * term)),
+                      KernameSet.In k0 base ->
+                      KernameSet.In k0 (fold_left (fun acc (x : list name * term) =>
+                        KernameSet.union (term_global_deps (snd x)) acc) l base)).
+                    { intros base l. revert base. induction l as [| [? ?] l' IH'];
+                        intros base Hin; simpl; [exact Hin |].
+                      apply IH'. apply KernameSet.union_spec. right. exact Hin. }
+                    exact (Hfold _ _ Hk0).
                   + intros Hc. inv Hdis_cmap. eapply H.
                     constructor; [exact Hc | exact Hf0_in_S].
                 - exact Hcvt_mch.
@@ -4228,7 +4239,10 @@ Section Correct.
               (C_br |[ Ehalt r_br ]|, rho_proj)).
             { edestruct (IH_body rho_proj (br_vars ++ vnames) C_br r_br
                          (S_br \\ FromList br_vars) S_br_out (i + 1)) as [IH_body_val' _].
-              - admit. (* well_formed_env Σ (rev vs0 ++ rho0) *)
+              - (* well_formed_env Σ (rev vs0 ++ rho0) *)
+                unfold well_formed_env.
+                apply (proj2 (Forall_app _ (rev vs0) rho0)).
+                split; [apply Forall_rev; inv Hwf_con; exact H | exact Hwf].
               - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
               - admit. (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
               - admit. (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
@@ -4267,7 +4281,9 @@ Section Correct.
                 + exact Hbr_nd.
               - admit. (* global_env_rel' (kn_deps body0) rho_proj *)
               - exact Hcvt_body.
-              - admit. (* Disjoint (occurs_free (Ehalt r_br)) ... *)
+              - (* Disjoint (occurs_free (Ehalt r_br)) ... *)
+                constructor. intros z Hc. inv Hc.
+                inv H. inv H0. inv H1. apply H2. constructor.
               - eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
             replace (c0 + 0)%nat with c0 in * by lia.
