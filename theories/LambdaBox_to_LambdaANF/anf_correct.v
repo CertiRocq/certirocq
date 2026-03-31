@@ -4240,9 +4240,12 @@ Section Correct.
             { edestruct (IH_body rho_proj (br_vars ++ vnames) C_br r_br
                          (S_br \\ FromList br_vars) S_br_out (i + 1)) as [IH_body_val' _].
               - (* well_formed_env Σ (rev vs0 ++ rho0) *)
-                unfold well_formed_env.
-                apply (proj2 (Forall_app _ (rev vs0) rho0)).
-                split; [apply Forall_rev; inv Hwf_con; exact H | exact Hwf].
+                unfold well_formed_env. apply Forall_forall.
+                intros v0 Hv0. apply in_app_or in Hv0.
+                destruct Hv0 as [Hv0 | Hv0].
+                + apply in_rev in Hv0. inv Hwf_con.
+                  rewrite Forall_forall in H. exact (H _ Hv0).
+                + rewrite Forall_forall in Hwf. exact (Hwf _ Hv0).
               - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
               - (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
                 eapply env_consistent_app.
