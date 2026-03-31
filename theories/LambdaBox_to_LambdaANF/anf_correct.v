@@ -4244,8 +4244,27 @@ Section Correct.
                 apply (proj2 (Forall_app _ (rev vs0) rho0)).
                 split; [apply Forall_rev; inv Hwf_con; exact H | exact Hwf].
               - admit. (* wellformed Σ (length (br_vars ++ vnames)) body0 = true *)
-              - admit. (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
-              - admit. (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
+              - (* env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
+                eapply env_consistent_app.
+                + exact Hbr_nd.
+                + exact Hcons.
+                + eapply Disjoint_Included_l; [| eapply Disjoint_sym; exact Hdis].
+                  eapply Included_trans; [exact Hbr_sub |].
+                  eapply Included_trans; [exact HS_br_sub |].
+                  eapply Included_trans;
+                    [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                  eapply Included_trans; apply Setminus_Included.
+                + rewrite Hbr_len. rewrite rev_length. reflexivity.
+              - (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
+                eapply cmap_consistent_app.
+                + exact Hcmap.
+                + eapply Disjoint_Included_r; [| exact Hdis_cmap].
+                  eapply Included_trans; [exact Hbr_sub |].
+                  eapply Included_trans; [exact HS_br_sub |].
+                  eapply Included_trans;
+                    [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
+                  eapply Included_trans; apply Setminus_Included.
+                + rewrite Hbr_len. rewrite rev_length. reflexivity.
               - (* Disjoint (FromList (br_vars ++ vnames)) (S_br \\ FromList br_vars) *)
                 rewrite FromList_app. eapply Union_Disjoint_l.
                 + eapply Disjoint_Setminus_r. eapply Included_refl.
