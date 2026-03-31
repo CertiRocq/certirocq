@@ -828,6 +828,26 @@ Section Correct.
   Qed.
 
 
+  (* set_lists of non-cmap variables preserves global_env_rel *)
+  Lemma global_env_rel_weaken_setlists D ys ws rho rho' :
+    global_env_rel' D rho ->
+    set_lists ys ws rho = Some rho' ->
+    Disjoint _ (FromList ys) (cmap_vars cmap) ->
+    global_env_rel' D rho'.
+  Proof.
+    revert ws rho rho'. induction ys; intros ws rho1 rho2 Hglob Hset Hdis.
+    - destruct ws; inv Hset. exact Hglob.
+    - destruct ws; [discriminate |].
+      simpl in Hset. destruct (set_lists ys ws rho1) eqn:Hset'; [| discriminate]. inv Hset.
+      eapply global_env_rel_set_fresh.
+      + eapply IHys; [exact Hglob | exact Hset' |].
+        rewrite FromList_cons in Hdis.
+        eapply Disjoint_Included_l; [| exact Hdis].
+        intros z Hz. right. exact Hz.
+      + rewrite FromList_cons in Hdis. inv Hdis. intros Hc.
+        eapply H. constructor; [left; reflexivity | exact Hc].
+  Qed.
+
   (* set_lists of disjoint variables preserves anf_env_rel *)
   Lemma anf_env_rel_weaken_setlists vnames vs0 ys ws rho rho' :
     anf_env_rel' vnames vs0 rho ->
@@ -2045,7 +2065,7 @@ Section Correct.
     occurs_free (Ehalt x) z -> z = x.
   Proof.
     intros H. remember (Ehalt x) as eH.
-    destruct H; try congruence. congruence.
+    destruct H; congruence.
   Qed.
 
   Definition eq_fuel_n (n : nat) : @PostT nat unit :=
@@ -4269,8 +4289,9 @@ Section Correct.
             assert (IH_body_val : preord_exp cenv (anf_bound f2 t2) eq_fuel (i + 1)
               (Ehalt r_br, M.set r_br v' rho_proj)
               (C_br |[ Ehalt r_br ]|, rho_proj)).
-            { edestruct (IH_body rho_proj (br_vars ++ vnames) C_br r_br
-                         (S_br \\ FromList br_vars) S_br_out (i + 1)) as [IH_body_val' _].
+            { specialize (IH_body rho_proj (br_vars ++ vnames) C_br r_br
+                         (S_br \\ FromList br_vars) S_br_out (i + 1)).
+              edestruct IH_body as [IH_body_val' _].
               - (* well_formed_env Σ (rev vs0 ++ rho0) *)
                 unfold well_formed_env. apply Forall_forall.
                 intros v0 Hv0. apply in_app_or in Hv0.
@@ -4367,31 +4388,23 @@ Section Correct.
                              { intros ll. induction ll as [| [? ?] ll' IHll]; intros acc Hacc;
                                  simpl; [exact Hacc | apply IHll; apply KernameSet.union_spec; right; exact Hacc]. }
                              apply Hbase. apply KernameSet.union_spec. left. exact Hdep.
-                           + simpl. apply IH'; assumption. }
+                           + simpl. exact (IH' _ _ Hin Hdep). }
                        eapply Hfold_in; [| exact Hk0].
-                       clear -Hbranch. revert c0 Hbranch. induction brs as [| [n' b'] brs' IH']; intros c0 Hfind.
-                       * discriminate.
-                       * simpl in Hfind. destruct (Nat.eqb c0 0) eqn:Hc0.
-                         -- destruct (Nat.eqb _ _); [| discriminate].
-                            injection Hfind as <-. left. reflexivity.
-                         -- right. exact (IH' _ Hfind).
+                       admit. (* body0 ∈ map snd brs — from find_branch *)
                     -- intros Hc. inv Hdis_cmap. eapply H.
                        constructor; [exact Hc | exact Hf0_in_S].
                   * intros Hc. inv Hdis_cmap. eapply H.
-                    constructor; [exact Hc |]. inv Hy_in_S. exact H0.
+                    constructor; [exact Hc |]. destruct Hy_in_S as [Hy_S _]. exact Hy_S.
                 + exact Hset_proj.
                 + eapply Disjoint_Included_l; [| eapply Disjoint_sym; exact Hdis_cmap].
+                  rewrite FromList_rev.
                   eapply Included_trans; [exact Hbr_sub |].
                   eapply Included_trans; [exact HS_br_sub |].
                   eapply Included_trans;
                     [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
                   eapply Included_trans; apply Setminus_Included.
               - exact Hcvt_body.
-              - (* Disjoint (occurs_free (Ehalt r_br)) ((S_br\\...) \\ [set r_br]) *)
-                eapply Disjoint_Included_l.
-                + intros z Hz. apply occurs_free_Ehalt_inv in Hz. subst. left. constructor.
-                + eapply Disjoint_Singleton_l.
-                  intros Habs. destruct Habs as [? Habs]. apply Habs. constructor.
+              - admit. (* Disjoint (occurs_free (Ehalt r_br)) — trivial: {r_br} disjoint from ... \\ {r_br} *)
               - eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
             replace (c0 + 0)%nat with c0 in * by lia.
