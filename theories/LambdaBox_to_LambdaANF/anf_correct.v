@@ -56,6 +56,12 @@ Section Correct.
     | _ => 1
     end.
 
+  Fixpoint max_branch_fields (brs : list (list name * EAst.term)) : nat :=
+    match brs with
+    | [] => 0
+    | (names, _) :: brs' => max (List.length names) (max_branch_fields brs')
+    end.
+
   Definition anf_trace_exp (e : EAst.term) : nat :=
     match e with
     | EAst.tRel _ => 1
@@ -64,7 +70,7 @@ Section Correct.
     | EAst.tLetIn _ _ _ => 0
     | EAst.tFix _ _ => 2
     | EAst.tConstruct _ _ _ => 2
-    | EAst.tCase _ _ _ => 4  (* simplified; may need branch overhead *)
+    | EAst.tCase _ _ brs => 4 + max_branch_fields brs
     | EAst.tBox => 2
     | EAst.tConst _ => 1
     | EAst.tProj _ _ => 2
@@ -4251,7 +4257,16 @@ Section Correct.
             destruct v_ecase as [| v_ecase_val].
             { (* OOT case: preord_res (Res v') OOT is False *)
               simpl in Hres_ecase. destruct Hres_ecase. }
-            (* Now: v_ecase = Res v_ecase_val, Hbstep_ecase has (Res v_ecase_val) *)
+            (* Env bridge: relate continuation environments *)
+            assert (Hbridge : preord_exp cenv eq_fuel eq_fuel i
+              (e_k, M.set x v' rho) (e_k, M.set x v_ecase_val rho_eletapp)).
+            { eapply preord_exp_refl. exact eq_fuel_compat.
+              intros z Hz v_z Hget_z.
+              admit. (* env bridge: for z ∈ occurs_free e_k, relate values in both envs *)
+            }
+            specialize (Hbridge v_ek cin_ek cout_ek Hle_ek Hbstep_ek)
+              as (v_ek' & cin_ek' & cout_ek' & Hbstep_ek' & Hpost_ek' & Hres_ek').
+            (* Now construct the full BStept_letapp *)
             do 3 eexists. split.
             { econstructor 2.
               eapply BStept_letapp.
@@ -4260,16 +4275,11 @@ Section Correct.
               - exact Hfind_f0.
               - exact Hset_body.
               - exact Hbstep_ecase.
-              - (* continuation: need bstep for e_k in the target env *)
-                (* The target env is M.set x v_ecase_val rho_eletapp.
-                   We have Hbstep_ek : bstep_fuel (M.set x v' rho) e_k cin_ek v_ek cout_ek.
-                   Need: bstep_fuel (M.set x v_ecase_val rho_eletapp) e_k ??? ??? ???
-                   The envs agree on occurs_free e_k via the env bridge. *)
-                admit.
+              - exact Hbstep_ek'.
             }
             split.
-            - admit. (* Post bound *)
-            - admit. (* preord_res *)
+            - admit. (* Post bound: arithmetic on composed bounds *)
+            - exact Hres_ek'.
         }
         (* Post inclusion *)
         { admit. }
