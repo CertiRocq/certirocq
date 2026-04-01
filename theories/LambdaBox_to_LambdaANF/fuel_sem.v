@@ -186,11 +186,14 @@ Section FUEL_SEM.
         eval_env_step rho (EAst.tCase (ind, npars) mch brs) OOT f1 t1
 
   (** ** Projection *)
+  (* Projections apply to records (single constructor, index 0).
+     In the erased language, parameters are stripped (has_cstr_params = false),
+     so we index by proj_arg alone (proj_npars = 0). *)
   | eval_Proj_step :
       forall (p : projection) (c : EAst.term) (rho : env)
-             (dc : dcon) (vs : list value) (v : value) f1 t1,
-        eval_env_fuel rho c (Val (Con_v dc vs)) f1 t1 ->
-        nth_error vs (p.(proj_npars) + p.(proj_arg)) = Some v ->
+             (vs : list value) (v : value) f1 t1,
+        eval_env_fuel rho c (Val (Con_v (dcon_of_con p.(proj_ind) 0) vs)) f1 t1 ->
+        nth_error vs p.(proj_arg) = Some v ->
         eval_env_step rho (EAst.tProj p c) (Val v) f1 t1
   | eval_Proj_step_OOT :
       forall (p : projection) (c : EAst.term) (rho : env) f1 t1,
