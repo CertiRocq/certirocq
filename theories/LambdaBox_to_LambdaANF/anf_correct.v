@@ -24,11 +24,6 @@ From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem wf anf_
 
 Import ListNotations.
 
-Print MetaRocq.Erasure.EWcbvEval.eval. 
-
-Print iota_red.
-
-
 (* nthN and nth_error coincide at N.of_nat *)
 Lemma nthN_nth_error {A} (l : list A) (k : nat) :
   nthN l (N.of_nat k) = nth_error l k.
@@ -77,6 +72,7 @@ Section Correct.
   Definition fuel_exp (e : EAst.term) : nat :=
     match e with
     | EAst.tLetIn _ _ _ => 0
+    | EAst.tConst _ => 0  (* globals are values: no fuel overhead *)
     | _ => 1
     end.
 
@@ -1205,11 +1201,11 @@ Section Correct.
         * exists k_f. exact Hlk_f.
         * eapply anf_cvt_exp_subset; eassumption.
 
-    - (* Const *)
-      intros k0 body0 decl0 rho0 r0 f0 t0
+    - (* Const — globals are values: r = Val v0, f = 0 *)
+      intros k0 body0 v_const0 decl0 rho0 t0
              Hdecl0 Hbody0 Heval_body IH_body
              v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      subst r0.
+      injection Hv as ->.
       remember (EAst.tConst k0) as e_const.
       destruct Hcvt; try discriminate.
       rename H into Hlk0.
@@ -1227,7 +1223,7 @@ Section Correct.
         unfold declared_constant in Hdecl0, Hdecl_k.
         rewrite Hdecl0 in Hdecl_k. injection Hdecl_k as <-.
         rewrite Hbody0 in Hbody_k. injection Hbody_k as <-.
-        exists f0, t0. exact Heval_body.
+        exists 0, t0. exact Heval_body.
 
     - (* Rel *)
       intros n rho_r v0 Hnth_rho
@@ -4763,12 +4759,195 @@ Section Correct.
     - intros p0 c0 rho0 vs0 v0 f1 t1
              Heval_c IH_c Hnth_proj.
       unfold anf_cvt_correct_exp_step.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
+      intros rho vnames C x_res S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
              Henv Hglob Hrel e_k Hdis_ek.
       inv Hrel.
+      (* After inv (anf_Proj): inv may merge x_res with the inner sub-conversion
+         variable. Use match goal to get stable names. *)
+      match goal with
+      | [ Hc : anf_cvt_rel _ _ _ _ _ c0 vnames _ _ _ |- _ ] =>
+        rename Hc into Hcvt_c
+      end.
+      rewrite <- app_ctx_f_fuse.
       split.
       + intros v v' Heq Hrel'. injection Heq as <-.
-        admit.
+        (* Well-formed constructor value *)
+        assert (Hwf_con : well_formed_val Σ (Con_v (dcon_of_con (proj_ind p0) 0) vs0)).
+        { eapply eval_preserves_wf; [exact Hwf | | exact Heval_c].
+          rewrite (anf_env_rel_length _ _ _ Henv).
+          exact (wellformed_tProj _ _ _ Hwfe). }
+        (* ANF witness for constructor *)
+        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    (Con_v (dcon_of_con (proj_ind p0) 0) vs0) Hwf_con)
+          as [v_con' Hrel_con].
+        pose proof Hrel_con as Hrel_con_saved.
+        (* Invert constructor relation: Vconstr c_tag vs_anf *)
+        inversion Hrel_con; subst; clear Hrel_con.
+        match goal with
+        | [ HF : Forall2 _ vs0 _ |- _ ] => rename HF into Hf2_vs
+        end.
+        (* x_res ≠ x *)
+        assert (Hx_neq : x_res <> x).
+        { intro Heq. subst.
+          eapply anf_cvt_result_not_in_output; try eassumption. }
+        (* Projected ANF value via Forall2 + nthN *)
+        assert (Hnth_anf : exists v_proj,
+          nthN vs' (N.of_nat (proj_arg p0)) = Some v_proj
+          /\ anf_val_rel' v0 v_proj).
+        { eapply Forall2_nthN; [exact Hf2_vs |].
+          rewrite nthN_nth_error. exact Hnth_proj. }
+        destruct Hnth_anf as [v_proj [Hnth_vs_anf Hrel_proj]].
+        (* Chain: post_monotonic + trans(IH_c, trans(Eproj_red, env bridge)) *)
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            (* IH_c: evaluate c0 via C0 *)
+            2:{ intros m.
+                edestruct (IH_c rho vnames C0 x S S2 m) as [IH_c_val _].
+                - exact Hwf.
+                - exact (wellformed_tProj _ _ _ Hwfe).
+                - exact Hcons.
+                - exact Hcmap.
+                - exact Hdis.
+                - exact Hdis_cmap.
+                - exact Henv.
+                - eapply global_env_rel_mono; [exact Hglob |].
+                  intros k0 Hk0. unfold kn_deps. simpl.
+                  apply KernameSet.union_spec. right. exact Hk0.
+                - exact Hcvt_c.
+                - (* Disjoint (occurs_free (Eproj x_res tag n x e_k)) ((S \\ S2) \\ [set x]) *)
+                  eapply Disjoint_Included_l;
+                    [eapply (proj1 (occurs_free_Eproj _ _ _ _ _)) |].
+                  eapply Union_Disjoint_l.
+                  + (* {x} disjoint from (S \\ S2) \\ {x} *)
+                    constructor. intros z Hz.
+                    inversion Hz as [? Hs Hset]; subst.
+                    inv Hs. destruct Hset as [_ Habs]. apply Habs. constructor.
+                  + (* (occurs_free e_k \\ {x_res}) disjoint from (S \\ S2) \\ {x} *)
+                    constructor. intros z Hz.
+                    inversion Hz as [? Hset1 Hset2]; subst.
+                    destruct Hset1 as [Hfree_ek Hneq_xr].
+                    destruct Hset2 as [[HS HnS2] Hneq_xi].
+                    eapply Hdis_ek. constructor; [exact Hfree_ek |].
+                    constructor;
+                    [ constructor; [exact HS |];
+                      intros HinS2x; destruct HinS2x as [HinS2 _];
+                      exact (HnS2 HinS2)
+                    | exact Hneq_xr ].
+                - eapply IH_c_val; eauto. }
+            (* Eproj reduction step *)
+            eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ intros m. eapply preord_exp_Eproj_red.
+                - rewrite M.gss. reflexivity.
+                - exact Hnth_vs_anf. }
+            (* Env bridge: M.set x_res v' rho ≤ M.set x_res v_proj (M.set x v_con' rho) *)
+            eapply preord_exp_refl. exact eq_fuel_compat.
+            intros z Hz.
+            destruct (Pos.eq_dec z x_res) as [-> | Hneq_zxr].
+            * (* z = x_res: both v' and v_proj related to v0 *)
+              unfold preord_var_env. intros w Hget.
+              rewrite M.gss in Hget. injection Hget as <-.
+              eexists. split. { rewrite M.gss. reflexivity. }
+              eapply (@anf_cvt_val_alpha_equiv
+                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                        eq_fuel_compat (fun _ _ H => H)
+                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc Hglob_term func_tag default_tag);
+                [exact Hrel' | exact Hrel_proj].
+            * destruct (Pos.eq_dec z x) as [-> | Hneq_zx].
+              -- (* z = x: M.get x rho ≈ v_con' *)
+                 unfold preord_var_env. intros w Hget.
+                 rewrite M.gso in Hget; [| exact Hneq_zxr].
+                 assert (Hget_xi : exists w0, M.get x rho = Some w0
+                           /\ anf_val_rel' (Con_v (dcon_of_con (proj_ind p0) 0) vs0) w0).
+                 { destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_c)
+                     as [Hin_vn | [Hin_S | Hin_cm]].
+                   - (* x ∈ FromList vnames *)
+                     unfold FromList, Ensembles.In in Hin_vn.
+                     destruct (In_nth_error _ _ Hin_vn) as [k Hk].
+                     change positive with var in Hk.
+                     pose proof Henv as Henv_saved.
+                     eapply (Forall2_nth_error_r _ _ _ k) in Henv; [| exact Hk].
+                     destruct Henv as [v_k [Hnth_k [w' [Hget_w' Hrel_w']]]].
+                     exists w'. split; [exact Hget_w' |].
+                     assert (Hek : nth_error rho0 k =
+                       Some (Con_v (dcon_of_con (proj_ind p0) 0) vs0)).
+                     { eapply anf_cvt_rel_var_lookup;
+                         [exact Heval_c | exact Hcvt_c
+                         | exact Hdis | exact Hdis_cmap | exact Hcons | exact Hcmap
+                         | exact Hk]. }
+                     rewrite Hek in Hnth_k. injection Hnth_k as <-.
+                     exact Hrel_w'.
+                   - (* x ∈ S: contradiction with Hdis_ek *)
+                     exfalso. eapply Hdis_ek. constructor; [exact Hz |].
+                     constructor.
+                     + constructor; [exact Hin_S |].
+                       intros HinS2x. destruct HinS2x as [HinS2 _].
+                       eapply anf_cvt_result_not_in_output; try eassumption.
+                     + intro Habs. inv Habs. exact (Hneq_zxr eq_refl).
+                   - (* x ∈ cmap_vars *)
+                     destruct (In_dec Pos.eq_dec x vnames) as [Hin0_vn | Hni0_vn].
+                     + apply In_nth_error in Hin0_vn.
+                       destruct Hin0_vn as [k0' Hk0'].
+                       assert (Heval_body_k : nth_error rho0 k0' =
+                         Some (Con_v (dcon_of_con (proj_ind p0) 0) vs0)).
+                       { eapply anf_cvt_rel_var_lookup;
+                           [exact Heval_c | exact Hcvt_c | exact Hdis | exact Hdis_cmap
+                           | exact Hcons | exact Hcmap | exact Hk0']. }
+                       destruct (Forall2_nth_error_r _ _ _ _ _ Henv Hk0')
+                         as [v_src0' [Hk0_src' [w0' [Hget_w0' Hrel_w0']]]].
+                       assert (v_src0' = Con_v (dcon_of_con (proj_ind p0) 0) vs0)
+                         by congruence. subst v_src0'.
+                       exists w0'. split; [exact Hget_w0' | exact Hrel_w0'].
+                     + destruct Hin_cm as [kn_x Hlk_x].
+                       assert (Hknx_deps : kn_deps (EAst.tProj p0 c0) kn_x).
+                       { unfold kn_deps. simpl. apply KernameSet.union_spec.
+                         right. eapply anf_cvt_cmap_result_in_deps;
+                           try eassumption. }
+                       unfold global_env_rel' in Hglob.
+                       destruct (Hglob kn_x x Hknx_deps Hlk_x)
+                         as [dx [bx [avx [Hdx [Hbx [Hgx Hrx]]]]]].
+                       exists avx. split; [exact Hgx |].
+                       assert (Heval_cmap : exists f_c t_c,
+                         src_eval [] bx
+                           (fuel_sem.Val (Con_v (dcon_of_con (proj_ind p0) 0) vs0)) f_c t_c).
+                       { eapply anf_cvt_cmap_eval;
+                           [exact Heval_c | exact Hcvt_c | exact Hdis | exact Hdis_cmap
+                           | exact Hcons | exact Hcmap | exact Hlk_x | exact Hdx
+                           | exact Hbx]. }
+                       destruct Heval_cmap as [f_c [t_c Heval_cmap']].
+                       exact (Hrx _ f_c t_c Heval_cmap'). }
+                 destruct Hget_xi as [w0 [Hget_w0 Hrel_w0]].
+                 rewrite Hget_w0 in Hget. injection Hget as <-.
+                 eexists. split.
+                 { rewrite M.gso; [| exact (not_eq_sym Hx_neq)].
+                   rewrite M.gss. reflexivity. }
+                 eapply (@anf_cvt_val_alpha_equiv
+                           _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                           eq_fuel_compat (fun _ _ H => H)
+                           nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                           Σ box_dc Hglob_term func_tag default_tag);
+                   [exact Hrel_w0 | exact Hrel_con_saved].
+              -- (* z ≠ x_res, z ≠ x *)
+                 unfold preord_var_env. intros w Hget.
+                 rewrite M.gso in Hget; [| exact Hneq_zxr].
+                 eexists. split.
+                 { rewrite M.gso; [| exact Hneq_zxr].
+                   rewrite M.gso; [| exact Hneq_zx].
+                   exact Hget. }
+                 eapply preord_val_refl. tci. }
+        (* Inclusion: comp (comp (anf_bound f1 t1) one_step) eq_fuel ⊆ anf_bound (f1+1) (t1+2) *)
+        { unfold inclusion, comp, anf_bound, one_step, eq_fuel.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?] Hcomp.
+          repeat match goal with
+          | [ H : exists _, _ |- _ ] => destruct H
+          | [ H : _ /\ _ |- _ ] => destruct H
+          | [ p : _ * _ * _ * _ |- _ ] => destruct p
+          end.
+          repeat match goal with
+          | [ p : _ * _ |- _ ] => destruct p
+          end.
+          unfold_all. cbn in *. lia. }
       + intros Habs. congruence.
 
     (* eval_Proj_step_OOT *)
@@ -4778,18 +4957,56 @@ Section Correct.
       split; [intros; congruence |
               intros _; exists 0; eapply bstep_fuel_zero_OOT].
 
-    (* eval_Const_step *)
-    - intros k0 body0 decl0 rho0 r0 f0 t0
+    (* eval_Const_step — globals are values, so f=0, r=Val v0 *)
+    - intros k0 body0 v0 decl0 rho0 t0
              Hdecl Hbody Heval_body IH_body.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
              Henv Hglob Hrel e_k Hdis_ek.
       inv Hrel.
-      (* anf_Const: C = Hole_c, x = v from lookup_const cmap k0 *)
+      (* After inv (anf_Const): C = Hole_c, S' = S *)
+      match goal with
+      | [ Hlk : lookup_const cmap k0 = Some ?xc |- _ ] =>
+        rename Hlk into Hlk_const
+      end.
       split.
-      + intros v v' Heq Hrel'. subst r0.
-        admit. (* Const: needs special treatment — bound is anf_bound (f0+1) (t0+1) but target is free *)
-      + intros _. exists 0. eapply bstep_fuel_zero_OOT.
+      + intros v1 v1' Heq Hrel1. injection Heq as <-.
+        change (Hole_c |[ e_k ]|) with e_k.
+        eapply (preord_exp_post_monotonic cenv _ eq_fuel).
+        { intros [[[? ?] ?] ?] [[[? ?] ?] ?] Heq.
+          unfold anf_bound, eq_fuel in *. cbn in *. lia. }
+        eapply preord_exp_refl. exact eq_fuel_compat.
+        intros z Hz.
+        destruct (Pos.eq_dec z x) as [-> | Hneq_zx].
+        * (* z = x: v1' vs M.get x rho, both related to v0 *)
+          unfold preord_var_env. intros w Hget.
+          rewrite M.gss in Hget. injection Hget as <-.
+          (* Get M.get x rho from global_env_rel' *)
+          assert (Hkn_deps : kn_deps (EAst.tConst k0) k0).
+          { unfold kn_deps. simpl. apply KernameSet.singleton_spec. reflexivity. }
+          unfold global_env_rel' in Hglob.
+          destruct (Hglob k0 x Hkn_deps Hlk_const)
+            as [d1 [b1 [av [Hd1 [Hb1 [Hget_av Hrel_av]]]]]].
+          eexists. split. { exact Hget_av. }
+          (* av is related to v0 (via Hrel_av applied to Heval_body) *)
+          assert (Hav_rel : anf_val_rel' v0 av).
+          { assert (Hd1_eq : d1 = decl0)
+              by (unfold declared_constant in *; congruence).
+            subst d1.
+            assert (Hb1_eq : b1 = body0) by congruence. subst b1.
+            exact (Hrel_av v0 _ _ Heval_body). }
+          eapply (@anf_cvt_val_alpha_equiv
+                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                    eq_fuel_compat (fun _ _ H => H)
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc Hglob_term func_tag default_tag);
+            [exact Hrel1 | exact Hav_rel].
+        * (* z ≠ x *)
+          unfold preord_var_env. intros w Hget.
+          rewrite M.gso in Hget; [| exact Hneq_zx].
+          eexists. split. { exact Hget. }
+          eapply preord_val_refl. tci.
+      + intros Heq. discriminate.
 
     (* ================================================================ *)
     (* P0 cases: eval_fuel_many (2 cases)                               *)
@@ -4817,7 +5034,15 @@ Section Correct.
       intros rho vnames C xs S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
              Henv Hglob Hrel e_k vs' Hvs' Hdis_ek.
       inv Hrel. inv Hvs'.
-      admit. (* Cons case: IH chaining *)
+      match goal with
+      | [ Hc : anf_cvt_rel _ _ _ _ _ e0 vnames _ _ _ |- _ ] => rename Hc into Hcvt_head
+      | _ => idtac
+      end.
+      match goal with
+      | [ Hc : anf_cvt_rel_args _ _ _ _ _ _ _ _ _ _ |- _ ] => rename Hc into Hcvt_tail
+      | _ => idtac
+      end.
+      Show. admit. (* Cons case: IH chaining *)
 
     (* ================================================================ *)
     (* P1 cases: eval_env_fuel (6 cases)                                *)
