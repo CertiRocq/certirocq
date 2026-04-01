@@ -200,14 +200,15 @@ Section FUEL_SEM.
         eval_env_fuel rho c OOT f1 t1 ->
         eval_env_step rho (EAst.tProj p c) OOT f1 t1
 
-  (** ** Constant (delta reduction) *)
+  (** ** Constant (delta reduction) — globals are assumed to be values,
+      so the body evaluates with zero fuel. *)
   | eval_Const_step :
-      forall (k : kername) (body : EAst.term) (decl : EAst.constant_body)
-             (rho : env) r f t,
+      forall (k : kername) (body : EAst.term) (v : value)
+             (decl : EAst.constant_body) (rho : env) t,
         declared_constant Σ k decl ->
         decl.(EAst.cst_body) = Some body ->
-        eval_env_fuel [] body r f t ->
-        eval_env_step rho (EAst.tConst k) r f t
+        eval_env_fuel [] body (Val v) <0> t ->
+        eval_env_step rho (EAst.tConst k) (Val v) <0> t
 
   (** ** Mutual evaluation of argument lists *)
   with eval_fuel_many : env -> list EAst.term -> list value -> nat -> trace -> Prop :=
