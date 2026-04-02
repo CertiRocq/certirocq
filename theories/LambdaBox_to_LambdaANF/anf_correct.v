@@ -948,9 +948,25 @@ Section Correct.
         constructor; [left; reflexivity | exact Hc].
   Qed.
 
-  (* Extending anf_env_rel' with projected constructor fields.
-     Used in the Case proof to build the environment relation for the branch body.
-     Same statement as LambdaBoxLocal_to_LambdaANF_anf_correct.anf_env_rel_extend_weaken_setlists_rev *)
+  (* Build Forall2 from pointwise nth_error + length equality.
+     Not in Stdlib; used by anf_env_rel_extend_setlists_rev. *)
+  Local Lemma nth_error_Forall2 (A B : Type) (P : A -> B -> Prop)
+        (l : list A) (l' : list B) :
+    (forall n t, nth_error l n = Some t ->
+                 exists t', nth_error l' n = Some t' /\ P t t') ->
+    Datatypes.length l = Datatypes.length l' ->
+    Forall2 P l l'.
+  Proof.
+    revert l'. induction l as [| a l IH]; intros l' Hnth Hlen.
+    - destruct l'; [constructor | simpl in Hlen; lia].
+    - destruct l' as [| b l']; [simpl in Hlen; lia |].
+      constructor.
+      + destruct (Hnth 0%nat a eq_refl) as [b' [Hb' Hp]].
+        simpl in Hb'. injection Hb' as <-. exact Hp.
+      + apply IH; [| simpl in Hlen; lia].
+        intros n t Ht. exact (Hnth (S n) t Ht).
+  Qed.
+
   Lemma anf_env_rel_extend_setlists_rev vnames vs0 xs vs1 vs2 rho rho' :
     anf_env_rel' vnames vs0 rho ->
     set_lists (rev xs) vs2 rho = Some rho' ->
@@ -958,7 +974,74 @@ Section Correct.
     Disjoint _ (FromList xs) (FromList vnames) ->
     NoDup xs ->
     anf_env_rel' (xs ++ vnames) (rev vs1 ++ vs0) rho'.
-  Proof. admit. Admitted.
+  Proof.
+    intros Hrel Hset Hval Hdis Hnd.
+    assert (Hlen_eq : Datatypes.length xs = Datatypes.length vs1).
+    { assert (Hlen1 := Forall2_length Hval).
+      (* set_lists succeeds iff lengths match *)
+      assert (Hlen2 : Datatypes.length (rev xs) = Datatypes.length vs2).
+      { clear -Hset. revert vs2 rho rho' Hset.
+        induction (rev xs); intros vs2 rho0 rho0' Hset.
+        - simpl in Hset. destruct vs2; [reflexivity | discriminate].
+        - simpl in Hset. destruct vs2; [discriminate |].
+          simpl. f_equal.
+          match goal with
+          | [ H : match ?e with Some _ => _ | None => _ end = _ |- _ ] =>
+            destruct e eqn:?; [| discriminate]
+          end. eapply IHl. eassumption. }
+      rewrite List.length_rev in Hlen2. lia. }
+    assert (Hgl : get_list (rev xs) rho' = Some vs2).
+    { eapply get_list_set_lists; [| exact Hset]. apply NoDup_rev. exact Hnd. }
+    assert (Hlen_rev : Datatypes.length (rev vs1) = Datatypes.length xs).
+    { rewrite List.length_rev. lia. }
+    eapply Forall2_app.
+    - eapply nth_error_Forall2; [| exact Hlen_rev].
+      intros n v1r Hnth_v1r.
+      assert (Hn_bound : (n < Datatypes.length xs)%nat).
+      { rewrite <- Hlen_rev. eapply nth_error_Some. intro Habs.
+        rewrite Habs in Hnth_v1r. discriminate. }
+      (* v1r = (rev vs1)[n] = vs1[|vs1| - 1 - n] *)
+      assert (Hnth_v1r' : nth_error vs1 (Datatypes.length vs1 - S n) = Some v1r).
+      { pose proof Hnth_v1r as Htmp. rewrite nth_error_rev in Htmp.
+        match goal with
+        | [ H : (if ?c then _ else _) = Some _ |- _ ] =>
+          destruct c eqn:Hltb; [| discriminate]
+        end.
+        match goal with
+        | [ H : nth_error vs1 ?idx = Some v1r |- nth_error vs1 ?idx2 = Some v1r ] =>
+          replace idx2 with idx by lia; exact H
+        end. }
+      (* xs[n] is some variable x *)
+      destruct (nth_error xs n) as [x |] eqn:Hx;
+        [| exfalso; apply nth_error_None in Hx; lia].
+      eexists. split. reflexivity.
+      (* M.get x rho' = vs2[|xs| - 1 - n] via get_list *)
+      assert (Hnth_rev_xs : nth_error (rev xs) (Datatypes.length xs - 1 - n) = Some x).
+      { rewrite nth_error_rev.
+        match goal with
+        | [ |- (if ?c then _ else _) = _ ] =>
+          destruct c eqn:Hltb'; [| apply Nat.ltb_ge in Hltb'; exfalso; lia]
+        end.
+        match goal with
+        | [ |- nth_error xs ?idx = _ ] =>
+          replace idx with n by lia; exact Hx
+        end. }
+      assert (Hget_x : nth_error vs2 (Datatypes.length xs - 1 - n) = M.get x rho').
+      { eapply get_list_nth_error; [exact Hgl | exact Hnth_rev_xs]. }
+      destruct (nth_error vs2 (Datatypes.length xs - 1 - n)) as [v2 |] eqn:Hv2;
+        [| exfalso; apply nth_error_None in Hv2;
+           assert (tmp := Forall2_length Hval); lia].
+      eexists. split.
+      + symmetry. exact Hget_x.
+      + (* anf_val_rel v1r v2: both at index |xs| - 1 - n *)
+        replace (Datatypes.length vs1 - S n)%nat
+          with (Datatypes.length xs - 1 - n)%nat in Hnth_v1r' by lia.
+        destruct (Forall2_nth_error_r _ _ _ _ _ Hval Hv2) as [v1' [Hv1' Hvrel]].
+        rewrite Hv1' in Hnth_v1r'. injection Hnth_v1r' as <-. exact Hvrel.
+    - eapply anf_env_rel_weaken_setlists; [exact Hrel | exact Hset |].
+      eapply Disjoint_Included_l; [| exact Hdis].
+      intros z Hz. unfold FromList, Ensembles.In in *. apply in_rev. exact Hz.
+  Qed.
 
   (** Value determinism: if source evaluation terminates,
       the value is unique (fuel/trace may differ). *)

@@ -3,7 +3,7 @@
 From Stdlib Require Import Lists.List SetoidList NArith.BinNat PArith.BinPos
         MSets.MSetRBT Lists.List Sets.Ensembles micromega.Lia Sorting.Permutation.
 Require Import compcert.lib.Coqlib.
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.set_util LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.identifiers.
+Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.set_util LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.identifiers LambdaANF.tactics.
 Import ListNotations.
 
 (** bound_stem_ctx is the set of the variables bound on the stem of a context (from the root to the hole) *)
