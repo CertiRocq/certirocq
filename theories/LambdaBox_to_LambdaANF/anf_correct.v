@@ -18,7 +18,7 @@ From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
   cps cps_show eval ctx logical_relations
   List_util algebra alpha_conv functions Ensembles_util
-  tactics identifiers bounds cps_util rename set_util.
+  tactics identifiers bounds cps_util rename set_util stemctx.
 From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem wf anf_corresp anf_util.
 
@@ -1464,6 +1464,71 @@ Section Correct.
     rewrite Hget in Hget'. inv Hget'. exact Hvrel.
   Qed.
 
+
+  (** Free variables of an ANF conversion context are drawn from [vn],
+      consumed fresh variables [S \\ S'], or cmap variables.
+      Provable by mutual induction on [anf_cvt_rel] (port from old proof). *)
+  Lemma anf_cvt_occurs_free_ctx_exp S e vn S' C x :
+    anf_cvt_rel' S e vn S' C x ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (cmap_vars cmap) S ->
+    occurs_free_ctx C \subset FromList vn :|: (S \\ S') :|: cmap_vars cmap.
+  Proof. admit. Admitted.
+
+  (** Args version: free variables of args conversion context. *)
+  Lemma anf_cvt_occurs_free_ctx_args S es vn S' C xs :
+    anf_cvt_rel_args' S es vn S' C xs ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (cmap_vars cmap) S ->
+    occurs_free_ctx C \subset FromList vn :|: (S \\ S') :|: cmap_vars cmap.
+  Proof.
+    intros Hcvt. revert S S' C xs Hcvt.
+    induction es as [| e0 es' IH]; intros S S' C xs Hcvt Hdis Hdis_cm.
+    - remember ([] : list EAst.term) as es_nil.
+      destruct Hcvt; try discriminate.
+      rewrite occurs_free_Hole_c. intros z Hz. inv Hz.
+    - remember (e0 :: es') as es_cons.
+      destruct Hcvt; try discriminate.
+      injection Heqes_cons as <- <-.
+      match goal with
+      | [ Hh : anf_cvt_rel _ _ _ _ _ _ _ ?S2m _ _,
+          Ht : anf_cvt_rel_args _ _ _ _ ?S2m _ _ _ _ _ |- _ ] =>
+        rename Hh into Hcvt_h; rename Ht into Hcvt_t
+      end.
+      eapply Included_trans; [eapply occurs_free_ctx_comp |].
+      eapply Union_Included.
+      + (* occurs_free_ctx C1 ⊆ target *)
+        eapply Included_trans; [eapply anf_cvt_occurs_free_ctx_exp; eassumption |].
+        match goal with
+        | [ Hh : anf_cvt_rel _ _ _ _ _ _ _ ?S2m _ _ |- _ ] =>
+          assert (HS2_sub : S2m \subset S)
+            by (eapply anf_cvt_exp_subset; eassumption)
+        end.
+        intros z Hz. destruct Hz as [Hz | [Hz | Hz]].
+        * left. left. exact Hz.
+        * left. right. destruct Hz as [Hz1 Hz2]. constructor.
+          exact Hz1. intros Hc. apply Hz2. eapply anf_cvt_args_subset; eassumption.
+        * right. exact Hz.
+      + (* occurs_free_ctx C2_tail \\ bound_stem_ctx C1 ⊆ target *)
+        eapply Included_trans; [eapply Setminus_Included |].
+        match goal with
+        | [ Ht : anf_cvt_rel_args _ _ _ _ ?S2m _ _ _ _ _ |- _ ] =>
+          eapply Included_trans;
+            [eapply IH; [exact Ht
+            | eapply Disjoint_Included_r;
+                [eapply anf_cvt_exp_subset; eassumption | exact Hdis]
+            | eapply Disjoint_Included_r;
+                [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cm]] |]
+        end.
+        intros z Hz. destruct Hz as [Hz | [Hz | Hz]].
+        * left. left. exact Hz.
+        * left. right. destruct Hz as [Hz1 Hz2]. constructor.
+          match goal with
+          | [ Hh : anf_cvt_rel _ _ _ _ _ _ _ ?S2m _ _ |- _ ] =>
+            eapply anf_cvt_exp_subset; [exact Hh | exact Hz1]
+          end. exact Hz2.
+        * right. exact Hz.
+  Qed.
 
   (** Free variables of a context application don't include variables
       consumed by a preceding conversion. *)
@@ -5079,7 +5144,43 @@ Section Correct.
                 intros k0 Hk0. unfold kn_deps_list. constructor. exact Hk0.
               - exact Hcvt_head.
               - (* Disjoint (occurs_free (C2|[e_k]|)) ((S \\ S2) \\ [set x1]) *)
-                admit.
+                constructor. intros z Hz.
+                destruct Hz as [Hfree Hset].
+                destruct Hset as [[HS HnS2] Hneq_x1].
+                (* z ∈ occurs_free (C2|[e_k]|), z ∈ S, z ∉ S2, z ≠ x1 *)
+                apply (occurs_free_ctx_app C2 e_k) in Hfree.
+                destruct Hfree as [Hctx | Hek_minus].
+                + (* z ∈ occurs_free_ctx C2: in FromList vnames ∪ (S2\\S') ∪ cmap_vars *)
+                  assert (Hinc := anf_cvt_occurs_free_ctx_args _ _ _ _ _ _
+                    Hcvt_tail
+                    (Disjoint_Included_r _ _ _ (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_head) Hdis)
+                    (Disjoint_Included_r _ _ _ (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_head) Hdis_cmap)).
+                  destruct (Hinc _ Hctx) as [Hz' | Hz'].
+                  * destruct Hz' as [Hz' | Hz'].
+                    -- eapply Hdis. constructor; [exact Hz' | exact HS].
+                    -- destruct Hz'. exact (HnS2 H).
+                  * eapply Hdis_cmap. constructor; [exact Hz' | exact HS].
+                + (* z ∈ occurs_free e_k \\ bound_stem_ctx C2 *)
+                  destruct Hek_minus as [Hfree_ek _].
+                  (* z ∈ S, z ∉ S2, z ≠ x1, z ∈ occurs_free e_k *)
+                  assert (HnS' : ~ z \in S')
+                    by (intros Hc; apply HnS2;
+                        eapply anf_cvt_args_subset; eassumption).
+                  assert (Hnxs : ~ z \in FromList xs0).
+                  { intros Hin_xs.
+                    unfold FromList, Ensembles.In in Hin_xs.
+                    destruct (In_nth_error _ _ Hin_xs) as [j Hj].
+                    change positive with var in Hj.
+                    destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ Hcvt_tail z
+                                (nth_error_In _ _ Hj))
+                      as [Hvn | [HS2 | Hcm]].
+                    - eapply Hdis. constructor; [exact Hvn | exact HS].
+                    - exact (HnS2 HS2).
+                    - eapply Hdis_cmap. constructor; [exact Hcm | exact HS]. }
+                  eapply Hdis_ek. constructor; [exact Hfree_ek |].
+                  constructor.
+                  * constructor; [exact HS | exact HnS'].
+                  * simpl. intros [Heq | Hin]; [subst; apply Hneq_x1; constructor | exact (Hnxs Hin)].
               - eapply IH_e_val; eauto. }
           (* IH_es: evaluate es0 via C2 in M.set x1 y rho *)
           eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
