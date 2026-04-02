@@ -639,3 +639,92 @@ Import ListNotations.
       split;
         eauto 25 with Ensembles_DB.
   Qed.
+
+  (** Free variables of a context application are from the context
+      or from the expression (minus variables bound by the context). *)
+  Lemma occurs_free_ctx_app (C : exp_ctx) (e : exp) :
+    occurs_free (C |[ e ]|) \subset
+    occurs_free_ctx C :|: (occurs_free e \\ bound_stem_ctx C).
+  Proof.
+    revert e.
+    eapply ctx_exp_mut with (P := fun C =>
+                                    forall e,
+                                      occurs_free (C |[ e ]|) \subset
+                                      occurs_free_ctx C :|: (occurs_free e \\ bound_stem_ctx C))
+                            (P0 := fun F =>
+                                     forall e,
+                                       occurs_free_fundefs (F <[ e ]>) \subset
+                                        occurs_free_fundefs_ctx F :|: (occurs_free e \\ (names_in_fundefs_ctx F :|: bound_stem_fundefs_ctx F))); intros.
+    - simpl. normalize_occurs_free_ctx. normalize_bound_stem_ctx. sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Union_Included. now sets.
+      eapply Union_Included.
+      + eapply Included_trans. eapply H.
+        eapply Union_Included; now sets.
+      + now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included.
+      + eapply Included_trans. eapply H. now sets.
+      + rewrite <- name_in_fundefs_ctx_ctx at 1. now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx.
+      eapply Union_Included; [ | now sets ].
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply H.
+      eapply Union_Included.
+      + rewrite <- !Union_assoc.
+        rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (FromList l :|: name_in_fundefs f))).
+        now sets. now tci. now sets.
+      + rewrite (Union_commut (bound_stem_ctx e) (FromList l)).
+        rewrite !Union_assoc.
+        rewrite (Union_commut _ (bound_stem_ctx e)).
+        rewrite <- Setminus_Union with (s2 := bound_stem_ctx e).
+        rewrite <- ! Union_assoc.
+        rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (name_in_fundefs f :|: FromList l))).
+        now sets. now tci. now sets.
+    - simpl. repeat normalize_occurs_free_ctx. repeat normalize_bound_stem_ctx.
+      repeat normalize_occurs_free.
+      eapply Union_Included.
+      + rewrite <- name_in_fundefs_ctx_ctx. now sets.
+      + eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+        rewrite !Setminus_Union_distr.
+        eapply Union_Included. now sets. now xsets.
+  Qed.
