@@ -2213,7 +2213,63 @@ Section Correct.
     Disjoint _ (cmap_vars cmap) S1 ->
     Disjoint _ (occurs_free e_k) ((S1 \\ S3) \\ [set x2]) ->
     Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S1 \\ S2) \\ [set x1]).
-  Proof. admit. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt2 Hdis_vn Hdis_cm Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt1) as HS2_S1.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt2) as HS3_S2.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt1 Hdis_vn Hdis_cm)
+      as Hx1_not_S2.
+    pose proof (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt2) as Hx2_consumed.
+    assert (Hdis_x1vn_S2 : Disjoint _ (FromList (x1 :: vn)) S2).
+    { rewrite FromList_cons. eapply Union_Disjoint_l.
+      - eapply Disjoint_Singleton_l. exact Hx1_not_S2.
+      - eapply Disjoint_Included_r; [exact HS2_S1 | exact Hdis_vn]. }
+    assert (Hdis_cm_S2 : Disjoint _ (cmap_vars cmap) S2)
+      by (eapply Disjoint_Included_r; [exact HS2_S1 | exact Hdis_cm]).
+    pose proof (anf_cvt_occurs_free_ctx_exp _ _ _ _ _ _ Hcvt2 Hdis_x1vn_S2 Hdis_cm_S2)
+      as Hctx.
+    constructor. intros z Hz.
+    inversion Hz as [? Hz_of Hz_sm]; subst; clear Hz.
+    pose proof (proj1 (proj1 Hz_sm)) as Hz_S1.
+    pose proof (proj2 (proj1 Hz_sm)) as Hz_not_S2.
+    pose proof (proj2 Hz_sm) as Hz_not_x1.
+    apply (occurs_free_ctx_app C2 e_k) in Hz_of.
+    inv Hz_of.
+    - (* z ∈ occurs_free_ctx C2 *)
+      match goal with [H : Ensembles.In _ (occurs_free_ctx _) _ |- _] =>
+        apply Hctx in H; inv H end.
+      + (* z ∈ FromList (x1::vn) :|: (S2 \\ S3) *)
+        match goal with [H : Ensembles.In _ (_ :|: _) _ |- _] => inv H end.
+        * match goal with [H : Ensembles.In _ (FromList _) _ |- _] =>
+            unfold FromList, Ensembles.In in H; simpl in H;
+            destruct H as [<- | Hin];
+            [exact (Hz_not_x1 (In_singleton _ _))
+            | eapply Hdis_vn; constructor; [exact Hin | exact Hz_S1]]
+          end.
+        * match goal with [H : Ensembles.In _ (_ \\ _) _ |- _] =>
+            exact (Hz_not_S2 (proj1 H)) end.
+      + (* z ∈ cmap_vars *)
+        match goal with [H : Ensembles.In _ (cmap_vars _) _ |- _] =>
+          eapply Hdis_cm; constructor; [exact H | exact Hz_S1] end.
+    - (* z ∈ occurs_free e_k \ bound_stem_ctx C2 *)
+      match goal with [Hfree : Ensembles.In _ (Setminus _ _ _) _ |- _] =>
+        pose proof (proj1 Hfree) as Hz_ek end.
+      assert (Hz_not_x2 : z <> x2).
+      { intro Heq. subst.
+        destruct Hx2_consumed as [Hx2_vn | [Hx2_S2 | Hx2_cm]].
+        - unfold FromList, Ensembles.In in Hx2_vn. simpl in Hx2_vn.
+          destruct Hx2_vn as [Heq | Hin].
+          + subst. exact (Hz_not_x1 (In_singleton _ _)).
+          + eapply Hdis_vn; constructor; [exact Hin | exact Hz_S1].
+        - exact (Hz_not_S2 Hx2_S2).
+        - eapply Hdis_cm; constructor; [exact Hx2_cm | exact Hz_S1]. }
+      eapply Hdis_ek. constructor.
+      + exact Hz_ek.
+      + constructor.
+        * constructor; [exact Hz_S1 |].
+          intro Hc. apply Hz_not_S2. eapply HS3_S2. exact Hc.
+        * intro Hz_x2. apply Hz_not_x2. inv Hz_x2. reflexivity.
+  Qed.
 
   (** App-specific: free variables of C2|[Eletapp ...]| avoid (S\\S2)\\{x1}. *)
   Lemma anf_cvt_disjoint_occurs_free_ctx_app S e1 vn S2 C1 x1
