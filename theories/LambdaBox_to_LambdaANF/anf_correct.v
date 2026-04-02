@@ -1548,15 +1548,612 @@ Section Correct.
   Qed.
 
 
+  Lemma FromList_rev {A : Type} (l : list A) :
+    FromList (rev l) <--> FromList l.
+  Proof.
+    split; intros x Hx; unfold FromList, Ensembles.In in *.
+    - apply in_rev in Hx. exact Hx.
+    - apply in_rev. rewrite rev_involutive. exact Hx.
+  Qed.
+
+  (* Helper: free variables of ctx_bind_proj are just {r} *)
+  Lemma ctx_bind_proj_occurs_free_ctx tg0 r0 vars0 n0 :
+    occurs_free_ctx (ctx_bind_proj tg0 r0 vars0 n0) \subset [set r0].
+  Proof.
+    revert n0; induction vars0 as [| v0 vars' IH]; intros n0; simpl.
+    - rewrite occurs_free_Hole_c. now sets.
+    - rewrite occurs_free_Eproj_c.
+      eapply Union_Included.
+      + now sets.
+      + eapply Included_trans; [eapply Setminus_Included | apply IH].
+  Qed.
+
+  (* Helper: Ecase free vars from scrutinee and all branches *)
+  Lemma occurs_free_Ecase_all_branches y0 pats0 (target : Ensemble var) :
+    y0 \in target ->
+    (forall c0 e0, List.In (c0, e0) pats0 -> occurs_free e0 \subset target) ->
+    occurs_free (Ecase y0 pats0) \subset target.
+  Proof.
+    revert y0; induction pats0 as [| [c_hd e_hd] pats_tl IH]; intros y0 Hy Hall.
+    - rewrite occurs_free_Ecase_nil. now sets.
+    - rewrite occurs_free_Ecase_cons.
+      eapply Union_Included.
+      + intros z Hz. inv Hz. exact Hy.
+      + eapply Union_Included.
+        * eapply Hall. left. reflexivity.
+        * eapply IH; [exact Hy |].
+          intros c1 e1 Hin. eapply Hall. right. exact Hin.
+  Qed.
+
   (** Free variables of an ANF conversion context are drawn from [vn],
       consumed fresh variables [S \\ S'], or cmap variables.
-      Provable by mutual induction on [anf_cvt_rel] (port from old proof). *)
+      By mutual induction on [anf_cvt_rel]. *)
   Lemma anf_cvt_occurs_free_ctx_exp S e vn S' C x :
     anf_cvt_rel' S e vn S' C x ->
     Disjoint _ (FromList vn) S ->
     Disjoint _ (cmap_vars cmap) S ->
     occurs_free_ctx C \subset FromList vn :|: (S \\ S') :|: cmap_vars cmap.
-  Proof. admit. Admitted.
+  Proof.
+    (* Helper: if x ∈ S and S' ⊆ S \ {x}, then x ∈ S \ S' *)
+    assert (Hfresh_consumed : forall (x0 : var) (S0 S0' : Ensemble var),
+      x0 \in S0 -> S0' \subset S0 \\ [set x0] -> x0 \in S0 \\ S0').
+    { intros x0 S0 S0' Hin Hsub. constructor; [exact Hin|].
+      intros Hc. apply Hsub in Hc. inv Hc. eauto. }
+    (* Helper: extend disjointness to x::vn when x is consumed *)
+    assert (Hdis_ext : forall (x0 : var) (vn0 : list var) (S0 S0' : Ensemble var),
+      Disjoint _ (FromList vn0) S0 -> S0' \subset S0 -> ~ x0 \in S0' ->
+      Disjoint _ (FromList (x0 :: vn0)) S0').
+    { intros x0 vn0' S0 S0' Hdis0 Hsub0 Hni.
+      rewrite FromList_cons. eapply Union_Disjoint_l.
+      - eapply Disjoint_Singleton_l. exact Hni.
+      - eapply Disjoint_Included_r; [exact Hsub0 | exact Hdis0]. }
+    (* Helper: IH target monotonicity *)
+    assert (Hmono_sub : forall (vn0 : list var) (S1 S2 S1' S2' : Ensemble var),
+      S1 \subset S2 -> S2' \subset S1' ->
+      FromList vn0 :|: (S1 \\ S1') :|: cmap_vars cmap \subset
+      FromList vn0 :|: (S2 \\ S2') :|: cmap_vars cmap).
+    { intros vn0' S10 S20 S10' S20' Hsub1 Hsub2.
+      eapply Included_Union_compat;
+        [eapply Included_Union_compat;
+          [eapply Included_refl | eapply Included_Setminus_compat; eassumption]
+        | eapply Included_refl]. }
+    apply (anf_cvt_rel_ind' func_tag default_tag tgm cmap
+      (* P — expressions *)
+      (fun S0 _ vn0 S0' C0 _ =>
+        Disjoint _ (FromList vn0) S0 -> Disjoint _ (cmap_vars cmap) S0 ->
+        occurs_free_ctx C0 \subset FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap)
+      (* P0 — argument lists *)
+      (fun S0 _ vn0 S0' C0 xs0 =>
+        Disjoint _ (FromList vn0) S0 -> Disjoint _ (cmap_vars cmap) S0 ->
+        occurs_free_ctx C0 \subset FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap /\
+        FromList xs0 \subset FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap)
+      (* P1 — mfix *)
+      (fun S0 _ vn0 _ S0' fdefs0 =>
+        Disjoint _ (FromList vn0) S0 -> Disjoint _ (cmap_vars cmap) S0 ->
+        occurs_free_fundefs fdefs0 \subset FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap)
+      (* P2 — branches *)
+      (fun S0 _ _ _ vn0 r0 S0' pats0 =>
+        Disjoint _ (FromList vn0) S0 -> Disjoint _ (cmap_vars cmap) S0 ->
+        forall c0 e0, List.In (c0, e0) pats0 ->
+          occurs_free e0 \subset [set r0] :|: FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap)).
+
+    (* ===== anf_Rel ===== *)
+    - intros ? ? ? ? ? Hdis Hdis_cm.
+      rewrite occurs_free_Hole_c. now sets.
+
+    (* ===== anf_Lam ===== *)
+    - intros S0 S0' na0 e0 C0 r0 x0 f0 vn0 Hx0 Hf0 Hcvt_body IH Hdis Hdis_cm.
+      assert (Hsub_body : S0' \subset S0 \\ [set x0] \\ [set f0])
+        by (eapply anf_cvt_exp_subset; exact Hcvt_body).
+      assert (Hdis' : Disjoint _ (FromList (x0 :: vn0)) (S0 \\ [set x0] \\ [set f0])).
+      { eapply Hdis_ext; [exact Hdis |
+          eapply Included_trans; eapply Setminus_Included |].
+        intros Hc.
+        assert (Habs : x0 \in S0 \\ [set x0])
+          by (eapply Setminus_Included; exact Hc).
+        inv Habs.
+        match goal with [H : ~ _ |- _] => apply H; constructor end. }
+      assert (Hdis_cm' : Disjoint _ (cmap_vars cmap) (S0 \\ [set x0] \\ [set f0]))
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; eapply Setminus_Included | exact Hdis_cm]).
+      specialize (IH Hdis' Hdis_cm').
+      rewrite occurs_free_Efun1_c, occurs_free_Hole_c.
+      eapply Union_Included; [| now sets].
+      rewrite occurs_free_fundefs_Fcons, occurs_free_fundefs_Fnil.
+      eapply Union_Included; [| now sets].
+      eapply Included_trans; [eapply Setminus_Included|].
+      eapply Included_trans; [eapply occurs_free_ctx_app|].
+      assert (Htarget : FromList (x0 :: vn0) :|: ((S0 \\ [set x0] \\ [set f0]) \\ S0')
+                           :|: cmap_vars cmap
+                         \subset FromList vn0 :|: (S0 \\ S0') :|: cmap_vars cmap).
+      { eapply Union_Included; [| now sets].
+        eapply Union_Included.
+        - rewrite FromList_cons. eapply Union_Included; [| now sets].
+          intros z Hz. inv Hz. left. right. eapply Hfresh_consumed.
+          + exact Hx0.
+          + eapply Included_trans; [exact Hsub_body | now sets].
+        - intros z Hz. left. right.
+          pose proof (proj2 Hz) as Hneg.
+          repeat (apply Setminus_Included in Hz).
+          exact (conj Hz Hneg). }
+      eapply Union_Included.
+      + eapply Included_trans; [exact IH | exact Htarget].
+      + eapply Included_trans; [eapply Setminus_Included|].
+        rewrite occurs_free_Ehalt. intros z Hz. inv Hz.
+        destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_body) as [Hv | [Hs | Hcm]].
+        * eapply Htarget. left. left. exact Hv.
+        * eapply Htarget. left. right. constructor; [exact Hs|].
+          eapply anf_cvt_result_not_in_output; eassumption.
+        * eapply Htarget. right. exact Hcm.
+
+    (* ===== anf_App ===== *)
+    - intros S1_0 S2_0 S3_0 u0 C1_0 x1_0 v0 C2_0 x2_0 r0 vn0
+             Hcvt_e1 IH1 Hcvt_e2 IH2 Hr0 Hdis Hdis_cm.
+      assert (Hsub1 : S2_0 \subset S1_0) by (eapply anf_cvt_exp_subset; exact Hcvt_e1).
+      assert (Hsub2 : S3_0 \subset S2_0) by (eapply anf_cvt_exp_subset; exact Hcvt_e2).
+      assert (Hdis2 : Disjoint _ (FromList vn0) S2_0)
+        by (eapply Disjoint_Included_r; [exact Hsub1 | exact Hdis]).
+      assert (Hdis_cm2 : Disjoint _ (cmap_vars cmap) S2_0)
+        by (eapply Disjoint_Included_r; [exact Hsub1 | exact Hdis_cm]).
+      specialize (IH1 Hdis Hdis_cm).
+      specialize (IH2 Hdis2 Hdis_cm2).
+      eapply Included_trans; [eapply occurs_free_ctx_comp|].
+      eapply Union_Included.
+      + eapply Included_trans; [exact IH1|].
+        eapply Hmono_sub; [now sets|].
+        intros z Hz. inv Hz.
+        match goal with [H : Ensembles.In _ S3_0 _ |- _] => eapply Hsub2; exact H end.
+      + eapply Included_trans; [eapply Setminus_Included|].
+        eapply Included_trans; [eapply occurs_free_ctx_comp|].
+        eapply Union_Included.
+        * eapply Included_trans; [exact IH2|].
+          eapply Hmono_sub; [exact Hsub1|].
+          intros z Hz. inv Hz.
+          match goal with [H : Ensembles.In _ S3_0 _ |- _] => exact H end.
+        * eapply Included_trans; [eapply Setminus_Included|].
+          rewrite occurs_free_Eletapp_c, occurs_free_Hole_c.
+          eapply Union_Included; [| now sets].
+          eapply Union_Included.
+          -- (* {x1_0}: result of e1 *)
+             intros z Hz. inv Hz.
+             destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1) as [Hv | [Hs | Hcm]].
+             ++ now left; left.
+             ++ left. right. constructor; [exact Hs|].
+                intros Hc. inv Hc.
+                eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_e1 Hdis Hdis_cm).
+                eapply Hsub2.
+                match goal with [H : Ensembles.In _ S3_0 _ |- _] => exact H end.
+             ++ now right.
+          -- (* FromList [x2_0]: result of e2 *)
+             intros z Hz. unfold FromList, Ensembles.In in Hz. simpl in Hz.
+             destruct Hz as [<- | []].
+             destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e2) as [Hv | [Hs | Hcm]].
+             ++ now left; left.
+             ++ left. right. constructor; [eapply Hsub1; exact Hs|].
+                intros Hc. inv Hc.
+                eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_e2 Hdis2 Hdis_cm2).
+                match goal with [H : Ensembles.In _ S3_0 _ |- _] => exact H end.
+             ++ now right.
+
+    (* ===== anf_Construct ===== *)
+    - intros S1_0 S2_0 c_tag0 ind0 c0 args0 C0 xs0 x0 vn0
+             Htag Hx0 Hargs IH_args Hdis Hdis_cm.
+      assert (Hdis' : Disjoint _ (FromList vn0) (S1_0 \\ [set x0]))
+        by (eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis]).
+      assert (Hdis_cm' : Disjoint _ (cmap_vars cmap) (S1_0 \\ [set x0]))
+        by (eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm]).
+      destruct (IH_args Hdis' Hdis_cm') as [Hih_ctx Hih_xs].
+      eapply Included_trans; [eapply occurs_free_ctx_comp|].
+      eapply Union_Included.
+      + eapply Included_trans; [exact Hih_ctx|].
+        eapply Hmono_sub; [eapply Setminus_Included | now sets].
+      + eapply Included_trans; [eapply Setminus_Included|].
+        rewrite occurs_free_Econstr_c, occurs_free_Hole_c.
+        eapply Union_Included; [| now sets].
+        eapply Included_trans; [exact Hih_xs|].
+        eapply Hmono_sub; [eapply Setminus_Included | now sets].
+
+    (* ===== anf_LetIn ===== *)
+    - intros S1_0 S2_0 S3_0 na0 b0 t0 C1_0 x1_0 C2_0 x2_0 vn0
+             Hcvt_e1 IH1 Hcvt_e2 IH2 Hdis Hdis_cm.
+      assert (Hsub1 : S2_0 \subset S1_0) by (eapply anf_cvt_exp_subset; exact Hcvt_e1).
+      assert (Hnih : ~ x1_0 \in S2_0)
+        by (eapply anf_cvt_result_not_in_output; eassumption).
+      assert (Hdis2 : Disjoint _ (FromList (x1_0 :: vn0)) S2_0).
+      { eapply Hdis_ext; [exact Hdis | exact Hsub1 | exact Hnih]. }
+      assert (Hdis_cm2 : Disjoint _ (cmap_vars cmap) S2_0)
+        by (eapply Disjoint_Included_r; [exact Hsub1 | exact Hdis_cm]).
+      specialize (IH1 Hdis Hdis_cm).
+      specialize (IH2 Hdis2 Hdis_cm2).
+      eapply Included_trans; [eapply occurs_free_ctx_comp|].
+      eapply Union_Included.
+      + eapply Included_trans; [exact IH1|].
+        eapply Hmono_sub; [now sets | eapply anf_cvt_exp_subset; eassumption].
+      + eapply Included_trans; [eapply Setminus_Included|].
+        eapply Included_trans; [exact IH2|].
+        rewrite FromList_cons.
+        (* peel off cmap_vars *)
+        eapply Union_Included; [| now sets].
+        eapply Union_Included.
+        * (* [set x1_0] :|: FromList vn0 ⊆ target *)
+          eapply Union_Included.
+          -- (* {x1_0} ⊆ target *)
+             intros z Hz. inv Hz.
+             destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_e1) as [Hv | [Hs | Hcm]].
+             ++ now left; left.
+             ++ left. right. constructor; [exact Hs|].
+                intros Hc. eapply Hnih.
+                eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_e2). exact Hc.
+             ++ now right.
+          -- (* FromList vn0 ⊆ target *)
+             now left; left.
+        * (* S2_0 \\ S3_0 ⊆ target *)
+          intros z Hz. inv Hz.
+          left. right. constructor.
+          -- match goal with [H : Ensembles.In _ S2_0 _ |- _] => eapply Hsub1; exact H end.
+          -- match goal with [H : ~ _ |- _] => exact H end.
+
+    (* ===== anf_Case ===== *)
+    - intros S1_0 S2_0 S3_0 ind0 npars0 mch0 C1_0 x1_0 brs0 pats0 f0 y0 r0 vn0
+             Hf0 Hy0 Hcvt_mch IH_mch Hcvt_brs IH_brs Hr0 Hdis Hdis_cm.
+      assert (Hsub_mch : S2_0 \subset S1_0 \\ [set f0] \\ [set y0])
+        by (eapply anf_cvt_exp_subset; exact Hcvt_mch).
+      assert (Hsub_brs : S3_0 \subset S2_0)
+        by (eapply anf_cvt_branches_subset; exact Hcvt_brs).
+      (* chain: S3_0 ⊆ S2_0 ⊆ S1_0\\{f0}\\{y0} ⊆ S1_0\\{f0} ⊆ S1_0 *)
+      assert (Hsub_S3_S1fy : S3_0 \subset S1_0 \\ [set f0] \\ [set y0])
+        by (eapply Included_trans; [exact Hsub_brs | exact Hsub_mch]).
+      assert (Hdis_mch : Disjoint _ (FromList vn0) (S1_0 \\ [set f0] \\ [set y0]))
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; eapply Setminus_Included | exact Hdis]).
+      assert (Hdis_cm_mch : Disjoint _ (cmap_vars cmap) (S1_0 \\ [set f0] \\ [set y0]))
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; eapply Setminus_Included | exact Hdis_cm]).
+      assert (Hdis_brs : Disjoint _ (FromList vn0) S2_0)
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; [exact Hsub_mch |
+              eapply Included_trans; eapply Setminus_Included] | exact Hdis]).
+      assert (Hdis_cm_brs : Disjoint _ (cmap_vars cmap) S2_0)
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; [exact Hsub_mch |
+              eapply Included_trans; eapply Setminus_Included] | exact Hdis_cm]).
+      specialize (IH_mch Hdis_mch Hdis_cm_mch).
+      assert (Hy0_raw : y0 \in S1_0) by (inv Hy0; assumption).
+      (* Useful: f0,y0 ∉ S3_0\\{r0} via the subset chain *)
+      assert (Hfy_contra : forall z, z \in S3_0 -> z = y0 \/ z = f0 -> False).
+      { intros z0 Hz0 [Heq | Heq]; subst; apply Hsub_S3_S1fy in Hz0.
+        - exact (proj2 Hz0 (In_singleton _ _)).
+        - exact (proj2 (proj1 Hz0) (In_singleton _ _)). }
+      (* y0 ∈ target *)
+      assert (Hy_in_target : y0 \in FromList vn0 :|: (S1_0 \\ (S3_0 \\ [set r0]))
+                                        :|: cmap_vars cmap).
+      { left. right. constructor.
+        - exact Hy0_raw.
+        - intros Hc. apply Setminus_Included in Hc. eapply Hfy_contra; eauto. }
+      (* S' = S3_0 \\ [set r0] *)
+      rewrite occurs_free_Efun1_c.
+      eapply Union_Included.
+      + (* fundefs part: Fcons f0 func_tag [y0] (Ecase y0 pats0) Fnil *)
+        rewrite occurs_free_fundefs_Fcons, occurs_free_fundefs_Fnil.
+        eapply Union_Included; [| now sets].
+        eapply Included_trans; [eapply Setminus_Included|].
+        eapply occurs_free_Ecase_all_branches.
+        * exact Hy_in_target.
+        * intros c1 e1 Hin.
+          eapply Included_trans;
+            [eapply (IH_brs Hdis_brs Hdis_cm_brs c1 e1 Hin)|].
+          (* {y0} :|: FromList vn0 :|: (S2_0 \\ S3_0) :|: cmap ⊆ target *)
+          eapply Union_Included; [| now sets].
+          eapply Union_Included.
+          -- eapply Union_Included.
+             ++ intros z Hz. inv Hz. exact Hy_in_target.
+             ++ now left; left.
+          -- intros z Hz. left. right.
+             pose proof (proj1 Hz) as Hz_pos. pose proof (proj2 Hz) as Hz_neg.
+             constructor.
+             ++ apply Hsub_mch in Hz_pos.
+                repeat (apply Setminus_Included in Hz_pos). exact Hz_pos.
+             ++ intros Hc. apply Hz_neg. apply Setminus_Included in Hc. exact Hc.
+      + (* comp_ctx_f C1_0 (Eletapp_c r0 f0 func_tag [x1_0] Hole_c), minus {f0} *)
+        eapply Included_trans; [eapply Setminus_Included|].
+        eapply Included_trans; [eapply occurs_free_ctx_comp|].
+        eapply Union_Included.
+        * eapply Included_trans; [exact IH_mch|].
+          eapply Hmono_sub.
+          -- eapply Included_trans; eapply Setminus_Included.
+          -- intros z Hz. apply Setminus_Included in Hz.
+             eapply Hsub_brs. exact Hz.
+        * eapply Included_trans; [eapply Setminus_Included|].
+          rewrite occurs_free_Eletapp_c, occurs_free_Hole_c.
+          eapply Union_Included; [| now sets].
+          eapply Union_Included.
+          -- (* {f0}: the function name *)
+             intros z Hz. inv Hz. left. right. constructor.
+             ++ exact Hf0.
+             ++ intros Hc. apply Setminus_Included in Hc. eapply Hfy_contra; eauto.
+          -- (* FromList [x1_0]: result of mch conversion *)
+             intros z Hz. unfold FromList, Ensembles.In in Hz. simpl in Hz.
+             destruct Hz as [<- | []].
+             destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_mch) as [Hv | [Hs | Hcm]].
+             ++ now left; left.
+             ++ left. right. constructor.
+                ** repeat (apply Setminus_Included in Hs). exact Hs.
+                ** intros Hc. apply Setminus_Included in Hc.
+                   eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_mch Hdis_mch Hdis_cm_mch).
+                   eapply Hsub_brs. exact Hc.
+             ++ now right.
+
+    (* ===== anf_Fix ===== *)
+    - intros S1_0 S2_0 mfix0 idx0 f0 fnames0 vn0 fdefs0
+             Hfnames_sub Hnodup Hlen Hcvt_mfix IH_mfix Hnth Hdis Hdis_cm.
+      rewrite occurs_free_Efun1_c, occurs_free_Hole_c.
+      eapply Union_Included; [| now sets].
+      assert (Hsub_mfix : S2_0 \subset S1_0 \\ FromList fnames0)
+        by (eapply anf_cvt_mfix_subset; exact Hcvt_mfix).
+      assert (Hdis_mfix : Disjoint _ (FromList (List.rev fnames0 ++ vn0))
+                                      (S1_0 \\ FromList fnames0)).
+      { assert (Htmp : FromList (List.rev fnames0 ++ vn0) \subset
+                        FromList fnames0 :|: FromList vn0).
+        { intros z Hz. unfold FromList, Ensembles.In in Hz |- *.
+          apply in_app_or in Hz. destruct Hz as [Hz | Hz].
+          - left. apply in_rev in Hz. exact Hz.
+          - right. exact Hz. }
+        eapply Disjoint_Included_l; [exact Htmp |].
+        eapply Union_Disjoint_l.
+        - constructor. intros z Hz. inv Hz.
+          match goal with
+          | [H1 : _ z, H2 : _ z |- _] => exact (proj2 H2 H1)
+          end.
+        - eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis]. }
+      assert (Hdis_cm_mfix : Disjoint _ (cmap_vars cmap) (S1_0 \\ FromList fnames0))
+        by (eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm]).
+      specialize (IH_mfix Hdis_mfix Hdis_cm_mfix).
+      eapply Included_trans; [exact IH_mfix|].
+      rewrite FromList_app.
+      eapply Union_Included; [| now sets].
+      eapply Union_Included.
+      + (* FromList (rev fnames0) :|: FromList vn0 ⊆ target *)
+        eapply Union_Included.
+        * (* FromList (rev fnames0) ⊆ target *)
+          intros z Hz. rewrite FromList_rev in Hz.
+          left. right. constructor.
+          -- eapply Hfnames_sub. exact Hz.
+          -- intros Hc. apply Hsub_mfix in Hc. exact (proj2 Hc Hz).
+        * (* FromList vn0 ⊆ target *)
+          now left; left.
+      + (* (S1_0 \\ FromList fnames0) \\ S2_0 ⊆ target *)
+        intros z Hz. left. right.
+        pose proof (proj2 Hz) as Hneg.
+        repeat (apply Setminus_Included in Hz).
+        exact (conj Hz Hneg).
+
+    (* ===== anf_Box ===== *)
+    - intros S0 vn0 x0 Hx0 Hdis Hdis_cm.
+      rewrite occurs_free_Econstr_c, occurs_free_Hole_c, FromList_nil. now sets.
+
+    (* ===== anf_Const ===== *)
+    - intros ? ? ? ? ? Hdis Hdis_cm.
+      rewrite occurs_free_Hole_c. now sets.
+
+    (* ===== anf_Proj ===== *)
+    - intros S1_0 S2_0 p0 c0 C0 x0 y0 vn0 ctag0 Htag
+             Hcvt_c IH_c Hy0 Hdis Hdis_cm.
+      specialize (IH_c Hdis Hdis_cm).
+      eapply Included_trans; [eapply occurs_free_ctx_comp|].
+      eapply Union_Included.
+      + eapply Included_trans; [exact IH_c|].
+        eapply Hmono_sub; [now sets|].
+        eapply Setminus_Included.
+      + eapply Included_trans; [eapply Setminus_Included|].
+        rewrite occurs_free_Eproj_c, occurs_free_Hole_c.
+        eapply Union_Included; [| now sets].
+        intros z Hz. inv Hz.
+        destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_c) as [Hv | [Hs | Hcm]].
+        * now left; left.
+        * left. right. constructor; [exact Hs|].
+          intros Hc.
+          eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_c Hdis Hdis_cm).
+          eapply Setminus_Included. exact Hc.
+        * now right.
+
+    (* ===== anf_Prim ===== *)
+    - intros S0 vn0 p0 pv0 x0 Hpv Hx0 Hdis Hdis_cm.
+      rewrite occurs_free_Eprim_val_c, occurs_free_Hole_c. now sets.
+
+    (* ===== anf_Args_nil ===== *)
+    - intros S0 vn0 Hdis Hdis_cm.
+      split; [rewrite occurs_free_Hole_c | rewrite FromList_nil]; now sets.
+
+    (* ===== anf_Args_cons ===== *)
+    - intros S1_0 S2_0 S3_0 vn0 t0 ts0 C1_0 x1_0 C2_0 xs0
+             Hcvt_h IH_h Hcvt_t IH_t Hdis Hdis_cm.
+      assert (Hsub1 : S2_0 \subset S1_0) by (eapply anf_cvt_exp_subset; exact Hcvt_h).
+      assert (Hdis2 : Disjoint _ (FromList vn0) S2_0)
+        by (eapply Disjoint_Included_r; [exact Hsub1 | exact Hdis]).
+      assert (Hdis_cm2 : Disjoint _ (cmap_vars cmap) S2_0)
+        by (eapply Disjoint_Included_r; [exact Hsub1 | exact Hdis_cm]).
+      specialize (IH_h Hdis Hdis_cm).
+      destruct (IH_t Hdis2 Hdis_cm2) as [Hih2_ctx Hih2_xs].
+      split.
+      + (* occurs_free_ctx (comp_ctx_f C1_0 C2_0) ⊆ target *)
+        eapply Included_trans; [eapply occurs_free_ctx_comp|].
+        eapply Union_Included.
+        * eapply Included_trans; [exact IH_h|].
+          eapply Hmono_sub; [now sets | eapply anf_cvt_args_subset; eassumption].
+        * eapply Included_trans; [eapply Setminus_Included|].
+          eapply Included_trans; [exact Hih2_ctx|].
+          eapply Hmono_sub; [exact Hsub1 | now sets].
+      + (* FromList (x1_0 :: xs0) ⊆ target *)
+        rewrite FromList_cons. eapply Union_Included.
+        * intros z Hz. inv Hz.
+          destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_h) as [Hv | [Hs | Hcm]].
+          -- now left; left.
+          -- left. right. constructor; [exact Hs|].
+             intros Hc.
+             eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_h Hdis Hdis_cm).
+             eapply anf_cvt_args_subset; eassumption.
+          -- now right.
+        * eapply Included_trans; [exact Hih2_xs|].
+          eapply Hmono_sub; [exact Hsub1 | now sets].
+
+    (* ===== anf_Mfix_nil ===== *)
+    - intros S0 vn0 Hdis Hdis_cm.
+      rewrite occurs_free_fundefs_Fnil. now sets.
+
+    (* ===== anf_Mfix_cons ===== *)
+    - intros S1_0 S2_0 S3_0 vn0 fnames0 d0 mfix0' C1_0 r1_0 fdefs0
+             na0 e1_0 x1_0 f_name0 Hdbody Hx1 Hcvt_body IH_body Hcvt_rest IH_rest
+             Hdis Hdis_cm.
+      assert (Hsub_body : S2_0 \subset S1_0 \\ [set x1_0])
+        by (eapply anf_cvt_exp_subset; exact Hcvt_body).
+      assert (Hsub_rest : S3_0 \subset S2_0)
+        by (eapply anf_cvt_mfix_subset; exact Hcvt_rest).
+      assert (Hdis_body : Disjoint _ (FromList (x1_0 :: vn0)) (S1_0 \\ [set x1_0])).
+      { eapply Hdis_ext; [exact Hdis | eapply Setminus_Included |].
+        intros Hc. exact (proj2 Hc (In_singleton _ _)). }
+      assert (Hdis_cm_body : Disjoint _ (cmap_vars cmap) (S1_0 \\ [set x1_0]))
+        by (eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cm]).
+      assert (Hdis_rest : Disjoint _ (FromList vn0) S2_0)
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; [exact Hsub_body | eapply Setminus_Included] | exact Hdis]).
+      assert (Hdis_cm_rest : Disjoint _ (cmap_vars cmap) S2_0)
+        by (eapply Disjoint_Included_r;
+            [eapply Included_trans; [exact Hsub_body | eapply Setminus_Included] | exact Hdis_cm]).
+      specialize (IH_body Hdis_body Hdis_cm_body).
+      specialize (IH_rest Hdis_rest Hdis_cm_rest).
+      rewrite occurs_free_fundefs_Fcons.
+      eapply Union_Included.
+      + (* body part: occurs_free (C1_0|[Ehalt r1_0]|) \ ({f_name0} ∪ {x1_0} ∪ ...) *)
+        eapply Included_trans; [eapply Setminus_Included|].
+        eapply Included_trans; [eapply occurs_free_ctx_app|].
+        eapply Union_Included.
+        * eapply Included_trans; [exact IH_body|].
+          rewrite FromList_cons.
+          eapply Union_Included; [| now sets].
+          eapply Union_Included.
+          -- eapply Union_Included.
+             ++ (* {x1_0} ⊆ target *)
+                intros z Hz. inv Hz. left. right. constructor.
+                ** exact Hx1.
+                ** intros Hc. eapply Hsub_rest in Hc. eapply Hsub_body in Hc.
+                   exact (proj2 Hc (In_singleton _ _)).
+             ++ (* FromList vn0 ⊆ target *)
+                now left; left.
+          -- (* (S1_0 \\ [set x1_0]) \\ S2_0 ⊆ target *)
+             intros z Hz. left. right.
+             pose proof (proj2 Hz) as Hneg.
+             apply Setminus_Included in Hz. constructor.
+             ++ apply Setminus_Included in Hz. exact Hz.
+             ++ intros Hc. apply Hneg. eapply Hsub_rest. exact Hc.
+        * eapply Included_trans; [eapply Setminus_Included|].
+          rewrite occurs_free_Ehalt. intros z Hz. inv Hz.
+          destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_body) as [Hv | [Hs | Hcm]].
+          -- rewrite FromList_cons in Hv. inv Hv.
+             ++ match goal with [H : Ensembles.In _ [set _] _ |- _] =>
+                  inv H; left; right; constructor;
+                  [exact Hx1 |
+                   intros Hc; eapply Hsub_rest in Hc; eapply Hsub_body in Hc;
+                   exact (proj2 Hc (In_singleton _ _))]
+                end.
+             ++ now left; left.
+          -- left. right. constructor.
+             ++ apply Setminus_Included in Hs. exact Hs.
+             ++ intros Hc. eapply Hsub_rest in Hc.
+                eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_body Hdis_body Hdis_cm_body).
+                exact Hc.
+          -- now right.
+      + (* rest: occurs_free_fundefs fdefs0 \ {f_name0} *)
+        eapply Included_trans; [eapply Setminus_Included|].
+        eapply Included_trans; [exact IH_rest|].
+        eapply Hmono_sub.
+        * eapply Included_trans; [exact Hsub_body | eapply Setminus_Included].
+        * now sets.
+
+    (* ===== anf_Branches_nil ===== *)
+    - intros S0 ind0 vn0 r0 n0 Hdis Hdis_cm c0 e0 Hin. inv Hin.
+
+    (* ===== anf_Branches_cons ===== *)
+    - intros S1_0 S2_0 S3_0 ind0 vn0 r0 lnames0 e0 brs0' pats0' C1_0 r1_0
+             vars0 ctx_p0 tg0 n0
+             Htg Hcvt_rest IH_rest Hvars_sub Hnodup Hlen Hctx_p Hcvt_body IH_body
+             Hdis Hdis_cm c1 e1 Hin.
+      destruct Hin as [Heq | Hin_tail].
+      + (* current branch: (tg0, app_ctx_f ctx_p0 (C1_0|[Ehalt r1_0]|)) *)
+        injection Heq as <- <-.
+        assert (Hsub_rest : S2_0 \subset S1_0)
+          by (eapply anf_cvt_branches_subset; exact Hcvt_rest).
+        assert (Hsub_body_raw : S3_0 \subset S2_0 \\ FromList vars0)
+          by (eapply anf_cvt_exp_subset; exact Hcvt_body).
+        assert (Hdis_body : Disjoint _ (FromList (vars0 ++ vn0)) (S2_0 \\ FromList vars0)).
+        { rewrite FromList_app. eapply Union_Disjoint_l.
+          - now sets.
+          - eapply Disjoint_Included_r;
+              [eapply Included_trans; [eapply Setminus_Included | exact Hsub_rest] | exact Hdis]. }
+        assert (Hdis_cm_body : Disjoint _ (cmap_vars cmap) (S2_0 \\ FromList vars0))
+          by (eapply Disjoint_Included_r;
+              [eapply Included_trans; [eapply Setminus_Included | exact Hsub_rest] | exact Hdis_cm]).
+        specialize (IH_body Hdis_body Hdis_cm_body).
+        subst ctx_p0.
+        eapply Included_trans; [eapply occurs_free_ctx_app|].
+        eapply Union_Included.
+        * eapply Included_trans; [eapply ctx_bind_proj_occurs_free_ctx|].
+          intros z Hz. inv Hz.
+          left. left. now left.
+        * eapply Included_trans; [eapply Setminus_Included|].
+          eapply Included_trans; [eapply occurs_free_ctx_app|].
+          eapply Union_Included.
+          -- eapply Included_trans; [exact IH_body|].
+             rewrite FromList_app.
+             eapply Union_Included; [| now sets].
+             eapply Union_Included.
+             ++ eapply Union_Included.
+                ** (* FromList vars0 ⊆ target *)
+                   intros z Hz. left. right. constructor.
+                   --- eapply Hsub_rest. eapply Hvars_sub. exact Hz.
+                   --- intros Hc.
+                       assert (Htmp := anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_body).
+                       apply Htmp in Hc. exact (proj2 Hc Hz).
+                ** (* FromList vn0 ⊆ target *)
+                   now left; left.
+             ++ (* (S2_0 \\ FromList vars0) \\ S3_0 ⊆ target *)
+                intros z Hz. left. right.
+                pose proof (proj2 Hz) as Hneg.
+                apply Setminus_Included in Hz. constructor.
+                ** eapply Hsub_rest. apply Setminus_Included in Hz. exact Hz.
+                ** exact Hneg.
+          -- eapply Included_trans; [eapply Setminus_Included|].
+             rewrite occurs_free_Ehalt. intros z Hz. inv Hz.
+             destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_body) as [Hv | [Hs | Hcm]].
+             ++ rewrite FromList_app in Hv. inv Hv.
+                ** (* r1_0 ∈ FromList vars0 *)
+                   match goal with [Hrc : Ensembles.In _ (FromList vars0) _ |- _] =>
+                     left; right; constructor;
+                     [eapply Hsub_rest; eapply Hvars_sub; exact Hrc |
+                      intros Hc;
+                      assert (Htmp := anf_cvt_exp_subset _ _ _ _ _ _ _ _ _ _ Hcvt_body);
+                      apply Htmp in Hc; exact (proj2 Hc Hrc)]
+                   end.
+                ** (* r1_0 ∈ FromList vn0 *)
+                   match goal with [Hrc : Ensembles.In _ (FromList vn0) _ |- _] =>
+                     left; left; right; exact Hrc end.
+             ++ left. right. constructor.
+                ** eapply Hsub_rest. apply Setminus_Included in Hs. exact Hs.
+                ** intros Hc.
+                   eapply (anf_cvt_result_not_in_output _ _ _ _ _ _ _ _ _ _ Hcvt_body Hdis_body Hdis_cm_body).
+                   exact Hc.
+             ++ now right.
+      + (* tail branch: use IH_rest *)
+        assert (Hdis_rest : Disjoint _ (FromList vn0) S1_0) by exact Hdis.
+        assert (Hdis_cm_rest : Disjoint _ (cmap_vars cmap) S1_0) by exact Hdis_cm.
+        assert (Hih_tail := IH_rest Hdis_rest Hdis_cm_rest c1 e1 Hin_tail).
+        assert (Hsub_body_tail : S3_0 \subset S2_0).
+        { eapply Included_trans;
+            [eapply anf_cvt_exp_subset; exact Hcvt_body | eapply Setminus_Included]. }
+        eapply Included_trans; [exact Hih_tail|].
+        eapply Included_Union_compat; [| eapply Included_refl].
+        eapply Included_Union_compat; [eapply Included_refl |].
+        eapply Included_Setminus_compat; [eapply Included_refl | exact Hsub_body_tail].
+  Qed.
 
   (** Args version: free variables of args conversion context. *)
   Lemma anf_cvt_occurs_free_ctx_args S es vn S' C xs :
@@ -2029,14 +2626,6 @@ Section Correct.
         * lia.
         * exact Hwf_mfix.
       + apply IH. lia.
-  Qed.
-
-  Lemma FromList_rev {A : Type} (l : list A) :
-    FromList (rev l) <--> FromList l.
-  Proof.
-    split; intros x Hx; unfold FromList, Ensembles.In in *.
-    - apply in_rev in Hx. exact Hx.
-    - apply in_rev. rewrite rev_involutive. exact Hx.
   Qed.
 
   (* env_consistent for fix body: rev fnames ++ names, make_rec_env mfix rho.
