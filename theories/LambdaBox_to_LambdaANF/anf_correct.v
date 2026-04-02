@@ -329,6 +329,23 @@ Section Correct.
         * intros j Hj. apply (Hfirst (S j)). lia.
   Qed.
 
+  (** If [x ∈ xs] and [|xs| = |vs|], the value at [x] in [set_many] is
+      one of the [vs] entries (at a matching index). *)
+  Lemma set_many_In_nth x xs vs rho v :
+    M.get x (set_many xs vs rho) = Some v ->
+    List.In x xs ->
+    Datatypes.length xs = Datatypes.length vs ->
+    exists k, nth_error xs k = Some x /\ nth_error vs k = Some v.
+  Proof.
+    intros Hget Hin Hlen.
+    destruct (In_nth_error _ _ Hin) as [k0 Hk0].
+    change positive with var in Hk0.
+    destruct (first_occurrence_exists xs k0 x Hk0) as [k [Hle [Hk Hfirst]]].
+    destruct (set_many_get_first xs vs rho x k Hlen Hk Hfirst) as [vk [Hvk Hget_k]].
+    exists k. rewrite Hget_k in Hget. injection Hget as <-.
+    split; [exact Hk | exact Hvk].
+  Qed.
+
   Lemma get_list_exists xs (rho : M.t val) :
     (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
     exists vs, get_list xs rho = Some vs.
@@ -5131,12 +5148,129 @@ Section Correct.
                  - transitivity (Datatypes.length vs0);
                    [symmetry; eapply eval_fuel_many_length; eassumption
                    | eapply Forall2_length; exact H4]. }
-               (* x1 ∈ xs0: the set_many value is some l'[k] where xs0[k] = x1.
-                  Both y and l'[k] are related to v0 by alpha_equiv.
-                  Proof: extract k-th sub-conversion via anf_cvt_rel_args_nth_cvt,
-                  k-th eval via eval_fuel_many_nth, then anf_cvt_rel_var_lookup
-                  shows vs0[k] = v0. Uses set_many_get_first, Forall2_nth_error. *)
-               admit.
+               destruct (set_many_get_in x1 xs0 l' (M.set x1 y rho) Hin_x1 Hlen)
+                 as [v_sm Hget_sm].
+               eexists. split. { exact Hget_sm. }
+               (* v_sm is some l'[k] where xs0[k] = x1. Show anf_val_rel' v0 v_sm,
+                  then use alpha_equiv with H1 : anf_val_rel' v0 y. *)
+               (* Step 1: find k and show v_sm = l'[k] *)
+               destruct (In_nth_error _ _ Hin_x1) as [k0 Hk0_xs].
+               change positive with var in Hk0_xs.
+               (* Step 2: get es0[k0] and vs0[k0] *)
+               assert (Hk0_es : exists e_k0, nth_error es0 k0 = Some e_k0).
+               { apply nth_error_Some. intro Habs.
+                 rewrite (anf_cvt_rel_args_length _ _ _ _ _ _ Hcvt_tail) in Hk0_xs.
+                 apply nth_error_None in Habs. apply nth_error_Some in Hk0_xs. lia. }
+               destruct Hk0_es as [e_k0 He_k0].
+               assert (Hk0_vs : exists v_k0, nth_error vs0 k0 = Some v_k0).
+               { apply nth_error_Some. intro Habs.
+                 rewrite (anf_cvt_rel_args_length _ _ _ _ _ _ Hcvt_tail) in Hk0_xs.
+                 rewrite <- (eval_fuel_many_length _ _ _ _ _ Heval_es) in Hk0_xs.
+                 apply nth_error_None in Habs. apply nth_error_Some in Hk0_xs. lia. }
+               destruct Hk0_vs as [v_k0 Hv_k0].
+               (* Step 3: extract sub-conversion and evaluation *)
+               destruct (anf_cvt_rel_args_nth_cvt _ _ _ _ _ _ Hcvt_tail _ _ _ He_k0 Hk0_xs)
+                 as [S_k [S_k' [C_k [Hcvt_k Hsub_k]]]].
+               destruct (eval_fuel_many_nth _ _ _ _ _ _ _ _ Heval_es He_k0 Hv_k0)
+                 as [f_k [t_k Heval_k]].
+               (* Step 4: show v0 = v_k0 by anf_cvt_rel_var_lookup on shared variable x1 *)
+               assert (Hv_eq : v0 = v_k0).
+               { (* x1 is result of both head conversion and k0-th tail conversion.
+                    By anf_cvt_result_in_consumed, x1 ∈ vnames ∨ x1 ∈ S ∨ x1 ∈ cmap_vars.
+                    x1 ∈ S case is impossible (x1 ∉ S2 but xs0[k0] ∈ S2 range). *)
+                 destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_head)
+                   as [Hin_vn | [Hin_S | Hin_cm]].
+                 - (* x1 ∈ FromList vnames: both evals use the same rho0 entry *)
+                   unfold FromList, Ensembles.In in Hin_vn.
+                   destruct (In_nth_error _ _ Hin_vn) as [i0 Hi0].
+                   change positive with var in Hi0.
+                   assert (Hv0_i := anf_cvt_rel_var_lookup _ _ _ _ _
+                     Heval_e _ _ _ _ _ Hi0 Hcvt_head Hdis Hdis_cmap Hcons Hcmap).
+                   assert (Hvk_i := anf_cvt_rel_var_lookup _ _ _ _ _
+                     Heval_k _ _ _ _ Hi0 Hcvt_k
+                     (Disjoint_Included_r _ _ _ Hsub_k Hdis)
+                     (Disjoint_Included_r _ _ _ Hsub_k Hdis_cmap)
+                     Hcons Hcmap).
+                   congruence.
+                 - (* x1 ∈ S: contradiction — x1 ∉ S2 but xs0 result is in S2 range *)
+                   exfalso.
+                   assert (Hni : ~ x1 \in S2)
+                     by (eapply anf_cvt_result_not_in_output; try eassumption).
+                   destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_k)
+                     as [Hk_vn | [Hk_S | Hk_cm]].
+                   + eapply Hdis. constructor; [exact Hk_vn | exact Hin_S].
+                   + exact (Hni (Hsub_k _ Hk_S)).
+                   + eapply Hdis_cmap. constructor; [exact Hk_cm | exact Hin_S].
+                 - (* x1 ∈ cmap_vars: both evals produce same const body result *)
+                   destruct Hin_cm as [kn_x Hlk_x].
+                   assert (Hcmap_head : cmap_consistent vnames rho0) by exact Hcmap.
+                   destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_e
+                               _ _ _ _ _ kn_x
+                               Hcvt_head Hdis Hdis_cmap Hcons Hcmap Hlk_x)
+                     as [Hd_e [Hb_e [f_ce [t_ce Heval_ce]]]].
+                   destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_k
+                               _ _ _ _ _ kn_x
+                               Hcvt_k
+                               (Disjoint_Included_r _ _ _ Hsub_k Hdis)
+                               (Disjoint_Included_r _ _ _ Hsub_k Hdis_cmap)
+                               Hcons Hcmap Hlk_x)
+                     as [Hd_k [Hb_k [f_ck [t_ck Heval_ck]]]].
+                   eapply eval_val_det; eassumption. }
+               subst v_k0.
+               (* Step 5: identify which l'[j] v_sm is and get its relation *)
+               destruct (set_many_In_nth x1 xs0 l' (M.set x1 y rho) v_sm Hget_sm Hin_x1 Hlen)
+                 as [j [Hj_xs Hj_vs]].
+               (* Get anf_val_rel' vs0[j] l'[j] from Forall2 *)
+               assert (Hj_vs0 : exists v_j, nth_error vs0 j = Some v_j /\ anf_val_rel' v_j v_sm).
+               { eapply Forall2_nth_error_r; [exact H4 | exact Hj_vs]. }
+               destruct Hj_vs0 as [v_j [Hv_j Hrel_j]].
+               (* Show v_j = v0 using same argument as Hv_eq *)
+               assert (Hv_j_eq : v0 = v_j).
+               { destruct (anf_cvt_rel_args_nth_cvt _ _ _ _ _ _ Hcvt_tail _ _ _ He_k0 Hj_xs)
+                   as [S_j [S_j' [C_j [Hcvt_j Hsub_j]]]].
+                 destruct (eval_fuel_many_nth _ _ _ _ _ _ _ _ Heval_es He_k0 Hv_j)
+                   as [f_j [t_j Heval_j]].
+                 destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_head)
+                   as [Hin_vn | [Hin_S | Hin_cm]].
+                 - unfold FromList, Ensembles.In in Hin_vn.
+                   destruct (In_nth_error _ _ Hin_vn) as [i0 Hi0].
+                   change positive with var in Hi0.
+                   assert (Hv0_i := anf_cvt_rel_var_lookup _ _ _ _ _
+                     Heval_e _ _ _ _ _ Hi0 Hcvt_head Hdis Hdis_cmap Hcons Hcmap).
+                   assert (Hvj_i := anf_cvt_rel_var_lookup _ _ _ _ _
+                     Heval_j _ _ _ _ Hi0 Hcvt_j
+                     (Disjoint_Included_r _ _ _ Hsub_j Hdis)
+                     (Disjoint_Included_r _ _ _ Hsub_j Hdis_cmap)
+                     Hcons Hcmap).
+                   congruence.
+                 - exfalso.
+                   assert (Hni : ~ x1 \in S2)
+                     by (eapply anf_cvt_result_not_in_output; try eassumption).
+                   destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ Hcvt_j)
+                     as [Hj_vn | [Hj_S | Hj_cm]].
+                   + eapply Hdis. constructor; [exact Hj_vn | exact Hin_S].
+                   + exact (Hni (Hsub_j _ Hj_S)).
+                   + eapply Hdis_cmap. constructor; [exact Hj_cm | exact Hin_S].
+                 - destruct Hin_cm as [kn_x Hlk_x].
+                   destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_e
+                               _ _ _ _ _ kn_x
+                               Hcvt_head Hdis Hdis_cmap Hcons Hcmap Hlk_x)
+                     as [f_ce [t_ce Heval_ce]].
+                   destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_j
+                               _ _ _ _ _ kn_x
+                               Hcvt_j
+                               (Disjoint_Included_r _ _ _ Hsub_j Hdis)
+                               (Disjoint_Included_r _ _ _ Hsub_j Hdis_cmap)
+                               Hcons Hcmap Hlk_x)
+                     as [f_cj [t_cj Heval_cj]].
+                   eapply eval_val_det; eassumption. }
+               subst v_j.
+               eapply (@anf_cvt_val_alpha_equiv
+                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                         eq_fuel_compat (fun _ _ H => H)
+                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                         Σ box_dc Hglob_term func_tag default_tag);
+                 [exact H1 | exact Hrel_j].
             -- (* x1 ∉ xs0 *)
                eexists. split.
                { rewrite set_many_get_notin; [| exact Hni_x1]. rewrite M.gss. reflexivity. }
