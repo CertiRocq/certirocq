@@ -5707,6 +5707,6 @@ Section Correct.
       intros. eapply IH_step; eassumption.
 
     - exact Heval.
-  Admitted.
+  Qed.
 
 End Correct.
