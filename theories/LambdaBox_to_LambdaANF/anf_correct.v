@@ -5131,11 +5131,11 @@ Section Correct.
                  - transitivity (Datatypes.length vs0);
                    [symmetry; eapply eval_fuel_many_length; eassumption
                    | eapply Forall2_length; exact H4]. }
-               destruct (set_many_get_in x1 xs0 l' (M.set x1 y rho) Hin_x1 Hlen)
-                 as [v_sm Hget_sm].
-               eexists. split. { exact Hget_sm. }
-               (* Both y and v_sm are related to v0: y by H1, v_sm by H4 + anf_cvt_rel_var_lookup.
-                  Since x1 = xs0[j], both e0 and es0[j] produce x1, so same source value. *)
+               (* x1 ∈ xs0: the set_many value is some l'[k] where xs0[k] = x1.
+                  Both y and l'[k] are related to v0 by alpha_equiv.
+                  Proof: extract k-th sub-conversion via anf_cvt_rel_args_nth_cvt,
+                  k-th eval via eval_fuel_many_nth, then anf_cvt_rel_var_lookup
+                  shows vs0[k] = v0. Uses set_many_get_first, Forall2_nth_error. *)
                admit.
             -- (* x1 ∉ xs0 *)
                eexists. split.
