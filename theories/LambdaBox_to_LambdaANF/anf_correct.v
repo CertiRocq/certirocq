@@ -5042,7 +5042,122 @@ Section Correct.
       | [ Hc : anf_cvt_rel_args _ _ _ _ _ _ _ _ _ _ |- _ ] => rename Hc into Hcvt_tail
       | _ => idtac
       end.
-      Show. admit. (* Cons case: IH chaining *)
+      rewrite <- app_ctx_f_fuse.
+      (* Chain: post_monotonic + trans(IH_e with cont C2|[e_k]|, trans(IH_es, env bridge)) *)
+      eapply preord_exp_post_monotonic.
+      2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+          (* IH_e: evaluate e0 via C1, continuation = C2|[e_k]| *)
+          2:{ intros m.
+              edestruct (IH_e rho vnames C1 x1 S S2 m) as [IH_e_val _].
+              - exact Hwf.
+              - match goal with
+                | [ HF : Forall _ (e0 :: es0) |- _ ] => inversion HF; assumption
+                end.
+              - exact Hcons.
+              - exact Hcmap.
+              - exact Hdis.
+              - exact Hdis_cmap.
+              - exact Henv.
+              - eapply global_env_rel_mono; [exact Hglob |].
+                intros k0 Hk0. unfold kn_deps_list. constructor. exact Hk0.
+              - exact Hcvt_head.
+              - (* Disjoint (occurs_free (C2|[e_k]|)) ((S \\ S2) \\ [set x1]) *)
+                admit.
+              - eapply IH_e_val; eauto. }
+          (* IH_es: evaluate es0 via C2 in M.set x1 y rho *)
+          eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+          2:{ intros m.
+              eapply (IH_es (M.set x1 y rho) vnames C2 xs0 S2 S' m).
+              - exact Hwf.
+              - match goal with
+                | [ HF : Forall _ (e0 :: es0) |- _ ] => inversion HF; assumption
+                end.
+              - exact Hcons.
+              - exact Hcmap.
+              - eapply Disjoint_Included_r;
+                  [eapply anf_cvt_exp_subset; eassumption | exact Hdis].
+              - eapply Disjoint_Included_r;
+                  [eapply anf_cvt_exp_subset; eassumption | exact Hdis_cmap].
+              - eapply anf_env_rel_set; [exact Henv |].
+                intros k Hk.
+                assert (Hek : nth_error rho0 k = Some v0).
+                { eapply anf_cvt_rel_var_lookup;
+                    [exact Heval_e | exact Hcvt_head
+                    | exact Hdis | exact Hdis_cmap | exact Hcons | exact Hcmap | exact Hk]. }
+                exists v0. split; [exact Hek | exact H1].
+              - intros kn vn0 Hd Hl.
+                assert (Hd' : kn_deps_list (e0 :: es0) kn).
+                { unfold kn_deps_list. apply Exists_cons_tl. exact Hd. }
+                destruct (Hglob kn vn0 Hd' Hl) as [d1 [b1 [av [Hd1 [Hb1 [Hgv Hd3]]]]]].
+                destruct (Pos.eq_dec vn0 x1) as [-> | Hneq_vn].
+                + exists d1, b1, y. repeat (split; [assumption |]).
+                  split; [rewrite M.gss; reflexivity |].
+                  intros src_v f' t' Heval_src.
+                  destruct (anf_cvt_cmap_eval _ _ _ _ _ Heval_e
+                              _ _ _ _ _ kn d1 b1
+                              Hcvt_head Hdis Hdis_cmap Hcons Hcmap Hl Hd1 Hb1)
+                    as [f1' [t1' Heval_body_v0]].
+                  assert (Heq_sv : src_v = v0) by (eapply eval_val_det; eassumption).
+                  subst src_v. exact H1.
+                + exists d1, b1, av. repeat (split; [assumption |]).
+                  split; [rewrite M.gso; [exact Hgv | exact Hneq_vn] | exact Hd3].
+              - exact Hcvt_tail.
+              - exact H4.
+              - (* Disjoint (occurs_free e_k) ((S2 \\ S') \\ FromList xs0) *)
+                eapply Disjoint_Included_r; [| exact Hdis_ek].
+                intros z Hz. destruct Hz as [[Hz1 Hz2] Hz3].
+                constructor.
+                + constructor;
+                    [eapply anf_cvt_exp_subset; [exact Hcvt_head | exact Hz1] | exact Hz2].
+                + simpl. intros [Heq | Hin].
+                  * subst. eapply anf_cvt_result_not_in_output; try eassumption.
+                  * exact (Hz3 Hin). }
+          (* Env bridge: M.set x1 y (set_many xs0 l' rho) ≤ set_many xs0 l' (M.set x1 y rho) *)
+          eapply preord_exp_refl. exact eq_fuel_compat.
+          intros z Hz.
+          unfold preord_var_env. intros w Hget.
+          destruct (Pos.eq_dec z x1) as [Heq_zx1 | Hneq_zx1].
+          * (* z = x1 *)
+            subst z. simpl in Hget. rewrite M.gss in Hget. injection Hget as <-.
+            (* Need to find x1's value in set_many xs0 l' (M.set x1 y rho) *)
+            (* If x1 ∉ xs0, get y from M.set; if x1 ∈ xs0, get l'[j] from set_many.
+               In either case, the value is preord_val-related to y because
+               both are related to v0 (source value). *)
+            destruct (In_dec Pos.eq_dec x1 xs0) as [Hin_x1 | Hni_x1].
+            -- (* x1 ∈ xs0: both y and the set_many value related to v0 *)
+               assert (Hlen : Datatypes.length xs0 = Datatypes.length l').
+               { transitivity (Datatypes.length es0).
+                 - eapply anf_cvt_rel_args_length; eassumption.
+                 - transitivity (Datatypes.length vs0);
+                   [symmetry; eapply eval_fuel_many_length; eassumption
+                   | eapply Forall2_length; exact H4]. }
+               destruct (set_many_get_in x1 xs0 l' (M.set x1 y rho) Hin_x1 Hlen)
+                 as [v_sm Hget_sm].
+               eexists. split. { exact Hget_sm. }
+               (* Both y and v_sm are related to v0: y by H1, v_sm by H4 + anf_cvt_rel_var_lookup.
+                  Since x1 = xs0[j], both e0 and es0[j] produce x1, so same source value. *)
+               admit.
+            -- (* x1 ∉ xs0 *)
+               eexists. split.
+               { rewrite set_many_get_notin; [| exact Hni_x1]. rewrite M.gss. reflexivity. }
+               eapply preord_val_refl. tci.
+          * (* z ≠ x1 *)
+            simpl in Hget. rewrite M.gso in Hget; [| exact Hneq_zx1].
+            eexists. split.
+            { rewrite set_many_set_neq_base; [| exact Hneq_zx1]. exact Hget. }
+            eapply preord_val_refl. tci. }
+      (* Inclusion *)
+      { unfold inclusion, comp, anf_bound, eq_fuel.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?] Hcomp.
+        repeat match goal with
+        | [ H : exists _, _ |- _ ] => destruct H
+        | [ H : _ /\ _ |- _ ] => destruct H
+        | [ p : _ * _ * _ * _ |- _ ] => destruct p
+        end.
+        repeat match goal with
+        | [ p : _ * _ |- _ ] => destruct p
+        end.
+        unfold_all. cbn in *. lia. }
 
     (* ================================================================ *)
     (* P1 cases: eval_env_fuel (6 cases)                                *)
