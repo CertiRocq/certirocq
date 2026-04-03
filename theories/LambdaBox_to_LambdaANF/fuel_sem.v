@@ -256,4 +256,196 @@ Section FUEL_SEM.
     with eval_fuel_many_ind' := Minimality for eval_fuel_many Sort Prop
     with eval_env_fuel_ind' := Minimality for eval_env_fuel Sort Prop.
 
+
+  (** * Value determinism *)
+
+  Lemma eval_val_det rho e v1 v2 f1 t1 f2 t2 :
+    eval_env_fuel rho e (Val v1) f1 t1 ->
+    eval_env_fuel rho e (Val v2) f2 t2 ->
+    v1 = v2.
+  Proof.
+    intros Heval1. revert v2 f2 t2.
+    set (Pdet := fun (rho : env) (e : EAst.term) (r : result) (f : nat) (t : trace) =>
+      match r with
+      | Val v1 => forall v2 f2 t2,
+          eval_env_fuel rho e (Val v2) f2 t2 -> v1 = v2
+      | OOT => True
+      end).
+    set (Pmany := fun (rho : env) (es : list EAst.term) (vs : list value)
+                      (fs : nat) (ts : trace) =>
+      forall vs2 fs2 ts2,
+        eval_fuel_many rho es vs2 fs2 ts2 -> vs = vs2).
+    enough (Haux : Pdet rho e (Val v1) f1 t1) by exact Haux.
+    apply (eval_env_fuel_ind' Pdet Pmany Pdet); try exact Heval1;
+    unfold Pdet, Pmany; try solve [intros; exact I].
+    (* eval_App_step: e1 → Clos_v *)
+    - intros e1 e2 body v2' r na rho0 rho' f0 f2 f3 t0 t2 t3
+             _ IH1 _ IH2 _ IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tApp e1 e2) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tApp e1 e2) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate;
+        injection Heqea as <- <-; subst.
+      + specialize (IH1 _ _ _ H). injection IH1 as <- <- <-.
+        specialize (IH2 _ _ _ H0). subst. exact (IH3 _ _ _ H1).
+      + specialize (IH1 _ _ _ H). discriminate.
+    (* eval_FixApp_step: e1 → ClosFix_v *)
+    - intros e1 e2 body rho0 rho' rho'' idx na mfix v2' r
+             f0 f2 f3 t0 t2 t3
+             _ IH1 Hfb Hmre _ IH2 _ IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tApp e1 e2) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tApp e1 e2) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      + (* App_step from 2nd *)
+        injection Heqea as <- <-. subst.
+        specialize (IH1 _ _ _ H). discriminate.
+      + (* FixApp_step from 2nd *)
+        rename H into He1_2. rename H0 into Hfb2.
+        rename H2 into He2_2. rename H3 into Hbody2.
+        injection Heqea as <- <-. subst.
+        specialize (IH1 _ _ _ He1_2). injection IH1 as <- <- <-.
+        rewrite Hfb in Hfb2. injection Hfb2 as <- <-.
+        specialize (IH2 _ _ _ He2_2). subst. exact (IH3 _ _ _ Hbody2).
+    (* eval_LetIn_step *)
+    - intros na b t0 v1' r rho0 f0 f2 t2 t3 _ IH1 _ IH2.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tLetIn na b t0) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tLetIn na b t0) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <- <- <-. subst.
+      specialize (IH1 _ _ _ H). subst. exact (IH2 _ _ _ H0).
+    (* eval_Construct_step *)
+    - intros ind c args vs dc rho0 fs ts Hdc _ IHmany.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tConstruct ind c args) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tConstruct ind c args) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <- <- <-. injection Heqrv as <-.
+      specialize (IHmany _ _ _ H0). congruence.
+    (* eval_Case_step *)
+    - intros ind npars mch brs rho0 dc vs body c r f0 f2 t0 t2
+             _ IH1 Hdc Hfind _ IH2.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tCase (ind, npars) mch brs) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tCase (ind, npars) mch brs) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      assert (ind0 = ind) by congruence.
+      assert (mch0 = mch) by congruence.
+      assert (brs0 = brs) by congruence.
+      subst. clear Heqea.
+      specialize (IH1 _ _ _ H).
+      assert (vs0 = vs) by congruence. subst vs0.
+      assert (c0 = c).
+      { assert (Hde : dcon_of_con ind c = dcon_of_con ind c0) by congruence.
+        unfold dcon_of_con in Hde. injection Hde as HN.
+        now apply Nnat.Nat2N.inj. }
+      subst c0. rewrite Hfind in H1. injection H1 as <-.
+      exact (IH2 _ _ _ H2).
+    (* eval_Proj_step *)
+    - intros p c rho0 vs v f0 t0 _ IH Hnth.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tProj p c) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tProj p c) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <- <-. injection Heqrv as <-. subst.
+      specialize (IH _ _ _ H). injection IH as <-.
+      rewrite Hnth in H0. congruence.
+    (* eval_Const_step *)
+    - intros k body v decl rho0 t0 Hdecl Hbody _ IH.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tConst k) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tConst k) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <-. injection Heqrv as <-. subst.
+      assert (decl = decl0) by (unfold declared_constant in *; congruence).
+      subst decl0. rewrite Hbody in H0. injection H0 as <-.
+      exact (IH _ _ _ H1).
+    (* eval_many_nil *)
+    - intros rho0 vs2 fs2 ts2 Hmany2.
+      remember (@nil EAst.term) as es in Hmany2.
+      destruct Hmany2; [reflexivity | discriminate].
+    (* eval_many_cons *)
+    - intros rho0 e0 es v vs f0 fs t0 ts _ IH_e _ IH_es.
+      intros vs2 fs2 ts2 Hmany2.
+      remember (e0 :: es) as ees in Hmany2.
+      destruct Hmany2; [discriminate |].
+      injection Heqees as <- <-. f_equal.
+      + exact (IH_e _ _ _ H).
+      + exact (IH_es _ _ _ Hmany2).
+    (* eval_Rel_fuel *)
+    - intros n rho0 v Hnth v2 f2 t2 Heval2.
+      remember (EAst.tRel n) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate.
+      + injection Heqea as <-. injection Heqrv as <-. congruence.
+      + subst. exfalso. remember (EAst.tRel n) as ea in H.
+        destruct H; discriminate.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na v2 f2 t2 Heval2.
+      remember (EAst.tLambda na body) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate.
+      + injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
+      + subst. exfalso. remember (EAst.tLambda na body) as ea in H.
+        destruct H; discriminate.
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 v2 f2 t2 Heval2.
+      remember (EAst.tFix mfix idx) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate.
+      + injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
+      + subst. exfalso. remember (EAst.tFix mfix idx) as ea in H.
+        destruct H; discriminate.
+    (* eval_Box_fuel *)
+    - intros rho0 v2 f2 t2 Heval2.
+      remember EAst.tBox as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate.
+      + injection Heqrv as <-. reflexivity.
+      + subst. exfalso. remember EAst.tBox as ea in H.
+        destruct H; discriminate.
+    (* eval_step *)
+    - intros rho0 e0 r f0 t0 _ IH. destruct r; [exact IH | exact I].
+  Qed.
+
+  Lemma eval_many_det rho es vs1 vs2 fs1 ts1 fs2 ts2 :
+    eval_fuel_many rho es vs1 fs1 ts1 ->
+    eval_fuel_many rho es vs2 fs2 ts2 ->
+    vs1 = vs2.
+  Proof.
+    intros H1 H2. revert vs2 fs2 ts2 H2. induction H1; intros.
+    - remember (@nil EAst.term) as es in H2.
+      destruct H2; [reflexivity | discriminate].
+    - remember (e :: es) as ees in H2. destruct H2; [discriminate |].
+      injection Heqees as <- <-. f_equal.
+      + eapply eval_val_det; eassumption.
+      + exact (IHeval_fuel_many _ _ _ H2).
+  Qed.
+
 End FUEL_SEM.
