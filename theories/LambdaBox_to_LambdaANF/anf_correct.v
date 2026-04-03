@@ -1049,15 +1049,22 @@ Section Correct.
     src_eval rho0 e0 (fuel_sem.Val v1) f1 t1 ->
     src_eval rho0 e0 (fuel_sem.Val v2) f2 t2 ->
     v1 = v2.
-  Proof. admit. Admitted.
+  Proof. apply fuel_sem.eval_val_det. Qed.
 
   (** Evaluation preserves well-formedness of values. *)
-  Lemma eval_preserves_wf rho0 e0 v0 f0 t0 :
+  Lemma eval_preserves_wf
+    (Hglob_wf : forall k decl body,
+       declared_constant Σ k decl ->
+       decl.(EAst.cst_body) = Some body ->
+       wellformed Σ 0 body = true)
+    rho0 e0 v0 f0 t0 :
     well_formed_env Σ rho0 ->
     wellformed Σ (List.length rho0) e0 = true ->
     src_eval rho0 e0 (fuel_sem.Val v0) f0 t0 ->
     well_formed_val Σ v0.
-  Proof. admit. Admitted.
+  Proof.
+    apply (wf.eval_preserves_wf _ _ Hglob_wf).
+  Qed.
 
   (** Weakening: env_consistent over an extended list implies
       env_consistent over the original list with the first and last entries. *)
@@ -2459,6 +2466,11 @@ Section Correct.
 
   Context (Hglob_term : globals_terminate_prop).
 
+  Context (Hglob_wf : forall k decl body,
+    declared_constant Σ k decl ->
+    decl.(EAst.cst_body) = Some body ->
+    wellformed Σ 0 body = true).
+
   (** ** Post_properties instances *)
 
   Ltac unfold_all :=
@@ -3268,11 +3280,11 @@ Section Correct.
         intros v v' Heq Hrel'. subst r0.
         (* Well-formedness of intermediate values *)
         assert (Hwf_clos : well_formed_val Σ (Clos_v rho' na0 body0)).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval1].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval1].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj1 (wellformed_tApp _ _ _ Hwfe)). }
         assert (Hwf_v2 : well_formed_val Σ v2).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval2].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval2].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj2 (wellformed_tApp _ _ _ Hwfe)). }
         (* Target witnesses for closure and argument *)
@@ -3997,11 +4009,11 @@ Section Correct.
       + intros v v' Heq Hrel'. subst r0.
         (* Well-formedness of intermediate values *)
         assert (Hwf_fix : well_formed_val Σ (ClosFix_v rho' mfix0 idx0)).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval1].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval1].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj1 (wellformed_tApp _ _ _ Hwfe)). }
         assert (Hwf_v2 : well_formed_val Σ v2).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval2].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval2].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj2 (wellformed_tApp _ _ _ Hwfe)). }
         destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
@@ -4654,7 +4666,7 @@ Section Correct.
         intros v v' Heq Hrel'. subst r0.
         (* Need a target witness v1' for the intermediate value v1 *)
         assert (Hwf_v1 : well_formed_val Σ v1).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval1].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval1].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj1 (wellformed_tLetIn _ _ _ _ Hwfe)). }
         destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
@@ -5136,7 +5148,7 @@ Section Correct.
         assert (Hlen_env := anf_env_rel_length _ _ _ Henv).
         (* Well-formedness of scrutinee result *)
         assert (Hwf_con : well_formed_val Σ (Con_v (dcon_of_con ind c0) vs0)).
-        { eapply eval_preserves_wf; try eassumption.
+        { eapply eval_preserves_wf; [exact Hglob_wf | eassumption | | eassumption].
           rewrite Hlen_env. exact Hwfe_mch. }
         (* Get ANF value for constructor *)
         assert (Hcon_exists : exists v_con, anf_val_rel' (Con_v (dcon_of_con ind c0) vs0) v_con).
@@ -5633,7 +5645,7 @@ Section Correct.
       + intros v v' Heq Hrel'. injection Heq as <-.
         (* Well-formed constructor value *)
         assert (Hwf_con : well_formed_val Σ (Con_v (dcon_of_con (proj_ind p0) 0) vs0)).
-        { eapply eval_preserves_wf; [exact Hwf | | exact Heval_c].
+        { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval_c].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (wellformed_tProj _ _ _ Hwfe). }
         (* ANF witness for constructor *)
