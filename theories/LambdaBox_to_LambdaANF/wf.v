@@ -333,4 +333,22 @@ Section WF_EVAL.
     - intros rho0 e0 r f0 t0 _ IH. exact IH.
   Qed.
 
+  (** Restricted version: evaluation of a term wellformed w.r.t. a suffix
+      Σ_tail (in the full Σ) produces a value wellformed w.r.t. Σ_tail.
+      Justified: evaluation only accesses globals in Σ_tail (since the term
+      and all reachable bodies are wellformed w.r.t. suffixes of Σ_tail).
+      Same proof structure as eval_preserves_wf but tracking Σ_tail. *)
+  Lemma eval_preserves_wf_restricted Σ_tail rho e v f t :
+    EWellformed.wf_glob Σ_tail ->
+    EGlobalEnv.extends Σ_tail Σ ->
+    well_formed_env Σ_tail rho ->
+    wellformed Σ_tail (List.length rho) e = true ->
+    eval_env_fuel Σ box_dc rho e (Val v) f t ->
+    well_formed_val Σ_tail v.
+  Proof.
+    (* Same induction as eval_preserves_wf but using globals_wellformed
+       for Σ_tail (derivable from wf_glob Σ_tail) and extends_wellformed
+       to lift wellformed Σ_k_tail to wellformed Σ_tail for each global. *)
+  Admitted.
+
 End WF_EVAL.

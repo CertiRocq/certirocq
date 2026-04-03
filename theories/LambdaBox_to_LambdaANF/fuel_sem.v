@@ -448,4 +448,12 @@ Section FUEL_SEM.
       + exact (IHeval_fuel_many _ _ _ H2).
   Qed.
 
+  (** All global constant bodies terminate. *)
+  Definition globals_terminate :=
+    forall k decl body,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      exists src_v f t,
+        eval_env_fuel [] body (Val src_v) f t.
+
 End FUEL_SEM.
