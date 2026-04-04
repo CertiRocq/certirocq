@@ -827,6 +827,10 @@ Section ValRelExists.
   Context (no_prims : forall s, find_prim prims s = None).
   Context (cmap_complete : forall s d,
     lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
+  Context (cmap_sound : forall k v,
+    lookup_const cmap k = Some v ->
+    exists decl body,
+      declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
 
   Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
 
@@ -1140,18 +1144,24 @@ Section ValRelExists.
                 (* k = k0, but global_env_rel existentially provides body.
                    The query can still use globals_terminate to find the body via Σ. *)
                 apply ReflectEq.eqb_eq in Hkeq. subst k0. injection Hlk as <-.
-                (* k has no body in Σ0, but kn_deps e k means wellformed checks
-                   lookup_constant Σ0 k = Some (body exists). Contradiction. *)
-                admit.
+                (* cmap_sound: k must be a constant with body in Σ.
+                   But k has no body (Hbody0). Contradiction. *)
+                exfalso.
+                destruct (cmap_sound k v0 Hlk) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext Hlk0). rewrite Hdecl' in Heq.
+                injection Heq as <-. rewrite Hbody0 in Hbody'. discriminate.
               + (* k0 is InductiveDecl in Σ0: skip *)
                 exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
                 apply ReflectEq.eqb_eq in Hkeq. subst k0. injection Hlk as <-.
-                (* k is InductiveDecl in Σ0, but lookup_const cmap k = Some v_g
-                   and kn_deps e k: wellformed requires lookup_constant Σ0 k
-                   which needs ConstantDecl. Contradiction. *)
-                admit.
+                (* cmap_sound: k must be ConstantDecl in Σ.
+                   But k is InductiveDecl in Σ0, hence in Σ. Contradiction. *)
+                exfalso.
+                destruct (cmap_sound k v0 Hlk) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext Hlk0). rewrite Hdecl' in Heq. discriminate.
               + (* k0 not in Σ0: skip *)
                 exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
