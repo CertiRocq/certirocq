@@ -1336,6 +1336,7 @@ Section ValRelExists.
              get eval result, eval_wf_restricted gives wf Σ', IH gives anf_val. *)
           unfold global_env_rel, global_env_rel'.
           assert (Hbuild : forall cm, NoDup (map snd cm) ->
+            (forall ka va, List.In (ka, va) cm -> List.In ka (map fst cmap)) ->
             exists rho_g, forall k v_g,
             kn_deps e k -> lookup_const cm k = Some v_g ->
             exists decl body anf_v,
@@ -1345,13 +1346,14 @@ Section ValRelExists.
               (forall src_v f0 t0,
                 eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
                 anf_val_rel' src_v anf_v)).
-          { induction cm as [| [k0 v0] cm' IHcm]; intros Hnd_cm.
+          { induction cm as [| [k0 v0] cm' IHcm]; intros Hnd_cm Hsuffix.
             - (* cm = [] *) exists (M.empty val). intros. discriminate.
             - (* cm = (k0, v0) :: cm' *)
-              simpl in Hnd_cm. inversion Hnd_cm as [| ? ? Hv0_notin Hnd_cm']. subst.
-              destruct (IHcm Hnd_cm') as [rho_g' Hrho_g'].
-              (* Check if k0 is declared in Σ0 = (kn,d)::Σ' with a body.
-                 Using Σ0 (not Σ) so we can derive wellformed Σ' 0 body0. *)
+              simpl in Hnd_cm. apply NoDup_cons_iff in Hnd_cm.
+              destruct Hnd_cm as [Hv0_notin Hnd_cm'].
+              destruct (IHcm Hnd_cm'
+                ltac:(intros ka' va' Hin; eapply Hsuffix; right; exact Hin))
+                as [rho_g' Hrho_g'].
               destruct (EGlobalEnv.lookup_env ((kn, d) :: Σ') k0) as [[cb | ?] |] eqn:Hlk0;
                 [destruct (EAst.cst_body cb) as [body0 |] eqn:Hbody0 | |].
               + (* k0 is a constant in Σ0 with body body0 *)
@@ -1412,14 +1414,40 @@ Section ValRelExists.
                 exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
-                (* k = k0 but no body — contradiction via cmap_sound on full cmap *)
-                exfalso. admit.
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                (* k ∈ cmap via Hsuffix, so cmap_sound gives declared_constant with body *)
+                assert (Hin_cmap : List.In k (map fst cmap))
+                  by (exact (Hsuffix k v0 (or_introl eq_refl))).
+                assert (Hlk_cmap : exists vc, lookup_const cmap k = Some vc).
+                { clear -Hin_cmap. induction cmap as [| [k' v'] cm0 IH0]; [contradiction |].
+                  simpl. destruct (eq_kername k k') eqn:Heq0.
+                  - eexists. reflexivity.
+                  - simpl in Hin_cmap. destruct Hin_cmap as [Heq0' | Hin0].
+                    + subst k'. rewrite ReflectEq.eqb_refl in Heq0. discriminate.
+                    + exact (IH0 Hin0). }
+                destruct Hlk_cmap as [vc Hlk_cmap].
+                destruct (cmap_sound k vc Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq.
+                injection Heq as <-. rewrite Hbody0 in Hbody'. discriminate.
               + (* k0 is InductiveDecl in Σ0: skip *)
                 exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
-                (* k = k0 but InductiveDecl — contradiction via cmap_sound *)
-                exfalso. admit.
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                assert (Hin_cmap : List.In k (map fst cmap))
+                  by (exact (Hsuffix k v0 (or_introl eq_refl))).
+                assert (Hlk_cmap : exists vc, lookup_const cmap k = Some vc).
+                { clear -Hin_cmap. induction cmap as [| [k' v'] cm0 IH0]; [contradiction |].
+                  simpl. destruct (eq_kername k k') eqn:Heq0.
+                  - eexists. reflexivity.
+                  - simpl in Hin_cmap. destruct Hin_cmap as [Heq0' | Hin0].
+                    + subst k'. rewrite ReflectEq.eqb_refl in Heq0. discriminate.
+                    + exact (IH0 Hin0). }
+                destruct Hlk_cmap as [vc Hlk_cmap].
+                destruct (cmap_sound k vc Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq. discriminate.
               + (* k0 not in Σ0: skip *)
                 exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
@@ -1438,7 +1466,8 @@ Section ValRelExists.
                   -- subst. rewrite ReflectEq.eqb_refl in Heq. discriminate.
                   -- exact (IH Hlk0 Hin).
           }
-          exact (Hbuild cmap cmap_nodup_vals). }
+          exact (Hbuild cmap cmap_nodup_vals
+            (fun k0' v0' Hin => in_map fst _ _ Hin)). }
         destruct Hglob as [rho_g Hglob_rel].
         eapply anf_val_rel_clos_exists; [exact Hvs' | |exact Hglob_rel].
         eapply EWellformed.extends_wellformed; [exact Hwf_glob | exact Hext | exact H4].
@@ -1457,6 +1486,7 @@ Section ValRelExists.
             (kn_deps_mfix mfix) rho_g).
         { unfold global_env_rel, global_env_rel'.
           assert (Hbuild : forall cm, NoDup (map snd cm) ->
+            (forall ka va, List.In (ka, va) cm -> List.In ka (map fst cmap)) ->
             exists rho_g, forall k v_g,
             kn_deps_mfix mfix k -> lookup_const cm k = Some v_g ->
             exists decl body anf_v,
@@ -1466,10 +1496,13 @@ Section ValRelExists.
               (forall src_v f0 t0,
                 eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
                 anf_val_rel' src_v anf_v)).
-          { induction cm as [| [k0 v0] cm' IHcm]; intros Hnd_cm.
+          { induction cm as [| [k0 v0] cm' IHcm]; intros Hnd_cm Hsuffix.
             - exists (M.empty val). intros. discriminate.
-            - simpl in Hnd_cm. inversion Hnd_cm as [| ? ? Hv0_notin Hnd_cm']. subst.
-              destruct (IHcm Hnd_cm') as [rho_g' Hrho_g'].
+            - simpl in Hnd_cm. apply NoDup_cons_iff in Hnd_cm.
+              destruct Hnd_cm as [Hv0_notin Hnd_cm'].
+              destruct (IHcm Hnd_cm'
+                ltac:(intros ka' va' Hin; eapply Hsuffix; right; exact Hin))
+                as [rho_g' Hrho_g'].
               destruct (EGlobalEnv.lookup_env ((kn, d) :: Σ') k0) as [[cb | ?] |] eqn:Hlk0;
                 [destruct (EAst.cst_body cb) as [body0 |] eqn:Hbody0 | |].
               + assert (Hdecl0 : declared_constant Σ k0 cb) by (apply Hext; exact Hlk0).
@@ -1510,11 +1543,38 @@ Section ValRelExists.
               + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
-                exfalso. admit. (* skip: k = k0 but no body *)
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                assert (Hin_cmap : List.In k (map fst cmap))
+                  by (exact (Hsuffix k v0 (or_introl eq_refl))).
+                assert (Hlk_cmap : exists vc, lookup_const cmap k = Some vc).
+                { clear -Hin_cmap. induction cmap as [| [k' v'] cm0 IH0]; [contradiction |].
+                  simpl. destruct (eq_kername k k') eqn:Heq0.
+                  - eexists. reflexivity.
+                  - simpl in Hin_cmap. destruct Hin_cmap as [Heq0' | Hin0].
+                    + subst k'. rewrite ReflectEq.eqb_refl in Heq0. discriminate.
+                    + exact (IH0 Hin0). }
+                destruct Hlk_cmap as [vc Hlk_cmap].
+                destruct (cmap_sound k vc Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq.
+                injection Heq as <-. rewrite Hbody0 in Hbody'. discriminate.
               + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
-                exfalso. admit. (* skip: k = k0 but InductiveDecl *)
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                assert (Hin_cmap : List.In k (map fst cmap))
+                  by (exact (Hsuffix k v0 (or_introl eq_refl))).
+                assert (Hlk_cmap : exists vc, lookup_const cmap k = Some vc).
+                { clear -Hin_cmap. induction cmap as [| [k' v'] cm0 IH0]; [contradiction |].
+                  simpl. destruct (eq_kername k k') eqn:Heq0.
+                  - eexists. reflexivity.
+                  - simpl in Hin_cmap. destruct Hin_cmap as [Heq0' | Hin0].
+                    + subst k'. rewrite ReflectEq.eqb_refl in Heq0. discriminate.
+                    + exact (IH0 Hin0). }
+                destruct Hlk_cmap as [vc Hlk_cmap].
+                destruct (cmap_sound k vc Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq. discriminate.
               + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
                 destruct (eq_kername k k0) eqn:Hkeq;
                   [| exact (Hrho_g' k v_g Hkdep Hlk)].
@@ -1535,7 +1595,8 @@ Section ValRelExists.
                   -- subst. rewrite ReflectEq.eqb_refl in Heq. discriminate.
                   -- exact (IHΣ Hlk0 Hin).
           }
-          exact (Hbuild cmap cmap_nodup_vals). }
+          exact (Hbuild cmap cmap_nodup_vals
+            (fun k0' v0' Hin => in_map fst _ _ Hin)). }
         destruct Hglob as [rho_g Hglob_rel].
         eapply anf_val_rel_closfix_exists; [exact Hvs' | | | exact Hglob_rel].
         * match goal with H : (_ < List.length _)%nat |- _ => exact H end.
@@ -1543,6 +1604,7 @@ Section ValRelExists.
             eapply Forall_impl; [| exact Hmfix]; intros d0 [Hlam Hwf_d]; split;
             [exact Hlam | eapply EWellformed.extends_wellformed;
              [exact Hwf_glob | exact Hext | exact Hwf_d]] end.
-  Admitted.
+  Unshelve. all: exact (M.empty val).
+  Qed.
 
 End ValRelExists.
