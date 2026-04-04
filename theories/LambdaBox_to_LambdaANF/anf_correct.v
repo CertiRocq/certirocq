@@ -6,7 +6,7 @@ From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 
 (** MetaRocq *)
-From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv EWellformed.
+From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv EWellformed EPrimitive.
 From MetaRocq.Common Require Import BasicAst Kernames.
 
 (** CompCert *)
@@ -2471,6 +2471,32 @@ Section Correct.
     decl.(EAst.cst_body) = Some body ->
     wellformed Σ 0 body = true).
 
+  (* Hypotheses for anf_val_rel_exists *)
+  Context (prim_map : M.t primitive)
+          (prims : list (primitive * positive)).
+  Context (Hwf_glob : wf_glob Σ).
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+  Context (no_prims : forall s, find_prim prims s = None).
+  Context (cmap_complete : forall s d,
+    lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
+  Context (cmap_sound : forall k v,
+    lookup_const cmap k = Some v ->
+    exists decl body,
+      declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
+  Context (cmap_nodup_vals : NoDup (map snd cmap)).
+
+  Let val_rel_exists :=
+    @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
+      _ Σ box_dc nat LambdaBox_resource_fuel LambdaBox_resource_trace
+      Hglob_term Hwf_glob
+      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+      no_prims cmap_complete cmap_sound cmap_nodup_vals.
+
   (** ** Post_properties instances *)
 
   Ltac unfold_all :=
@@ -3288,13 +3314,9 @@ Section Correct.
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj2 (wellformed_tApp _ _ _ Hwfe)). }
         (* Target witnesses for closure and argument *)
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    (Clos_v rho' na0 body0) Hwf_clos)
+        destruct (val_rel_exists (Clos_v rho' na0 body0) Hwf_clos)
           as [v1' Hrel_clos].
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    v2 Hwf_v2)
+        destruct (val_rel_exists v2 Hwf_v2)
           as [v2' Hrel_v2].
         (* Chain: post_monotonic + trans(IH1, trans(IH2, Eletapp + body)) *)
         eapply preord_exp_post_monotonic.
@@ -4016,12 +4038,8 @@ Section Correct.
         { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval2].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj2 (wellformed_tApp _ _ _ Hwfe)). }
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    (ClosFix_v rho' mfix0 idx0) Hwf_fix) as [fix_v' Hrel_fix].
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    v2 Hwf_v2) as [v2' Hrel_v2].
+        destruct (val_rel_exists (ClosFix_v rho' mfix0 idx0) Hwf_fix) as [fix_v' Hrel_fix].
+        destruct (val_rel_exists v2 Hwf_v2) as [v2' Hrel_v2].
         pose proof Hrel_fix as Hrel_fix_saved.
         (* Invert ClosFix structure *)
         remember (ClosFix_v rho' mfix0 idx0) as fix_val eqn:Heqfix.
@@ -4669,9 +4687,7 @@ Section Correct.
         { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval1].
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (proj1 (wellformed_tLetIn _ _ _ _ Hwfe)). }
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    v1 Hwf_v1)
+        destruct (val_rel_exists v1 Hwf_v1)
           as [v1' Hrel1].
         (* Chain: post_monotonic + trans(IH1, trans(IH2, refl)) *)
         eapply preord_exp_post_monotonic.
@@ -5152,7 +5168,7 @@ Section Correct.
           rewrite Hlen_env. exact Hwfe_mch. }
         (* Get ANF value for constructor *)
         assert (Hcon_exists : exists v_con, anf_val_rel' (Con_v (dcon_of_con ind c0) vs0) v_con).
-        { eapply anf_val_rel_exists; eassumption. }
+        { eapply val_rel_exists; eassumption. }
         destruct Hcon_exists as [v_con Hcon_rel].
         (* Save constructor relation before inversion *)
         rename Hcon_rel into Hcon_rel_saved.
@@ -5649,9 +5665,7 @@ Section Correct.
           rewrite (anf_env_rel_length _ _ _ Henv).
           exact (wellformed_tProj _ _ _ Hwfe). }
         (* ANF witness for constructor *)
-        destruct (@anf_val_rel_exists func_tag default_tag tgm cmap _ Σ box_dc
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    (Con_v (dcon_of_con (proj_ind p0) 0) vs0) Hwf_con)
+        destruct (val_rel_exists (Con_v (dcon_of_con (proj_ind p0) 0) vs0) Hwf_con)
           as [v_con' Hrel_con].
         pose proof Hrel_con as Hrel_con_saved.
         (* Invert constructor relation: Vconstr c_tag vs_anf *)
