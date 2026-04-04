@@ -1220,8 +1220,7 @@ Section ValRelExists.
           assert (Hbd : (y <= max_cmap_var cmap)%positive)
             by (eapply max_cmap_var_bound; exists k0'; exact Hlk').
           unfold base in Hy_lo. admit. (* lia *)
-        * (* Disjoint (x |: ...) S1 *)
-          admit. (* Disjoint — same freshness proof, to be restored *)
+        * admit. (* Disjoint (x |: ...) S1 — freshness proof *)
         * admit. (* Disjoint (cmap_vars cmap) S1 *)
         * admit. (* ~ cmap_vars cmap x *)
         * admit. (* ~ cmap_vars cmap f *)
