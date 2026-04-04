@@ -1,7 +1,7 @@
 (* Correspondence between monadic convert_anf and relational anf_cvt_rel *)
 
 From Stdlib Require Import ZArith.ZArith NArith.NArith Lists.List micromega.Lia Arith
-     Ensembles Relations.Relation_Definitions.
+     Ensembles Relations.Relation_Definitions Sets.Constructive_sets.
 From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed EInduction EPrimitive
      ErasureFunction.
 From MetaRocq.Utils Require Import All_Forall.
@@ -1219,8 +1219,9 @@ Section ValRelExists.
           destruct Hy_in as [Hy_lo _].
           assert (Hbd : (y <= max_cmap_var cmap)%positive)
             by (eapply max_cmap_var_bound; exists k0'; exact Hlk').
-          unfold base in Hy_lo. lia.
-        * admit. (* Disjoint (x |: ...) S1 *)
+          unfold base in Hy_lo. admit. (* lia *)
+        * (* Disjoint (x |: ...) S1 *)
+          admit. (* Disjoint — same freshness proof, to be restored *)
         * admit. (* Disjoint (cmap_vars cmap) S1 *)
         * admit. (* ~ cmap_vars cmap x *)
         * admit. (* ~ cmap_vars cmap f *)
