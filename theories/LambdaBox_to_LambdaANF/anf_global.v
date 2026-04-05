@@ -265,6 +265,8 @@ Section ValRelWeaken.
   Context (Hcm_agree : forall s v, lookup_const cmap_full s = Some v ->
                                     lookup_const cm s <> None ->
                                     lookup_const cm s = Some v).
+  Context (Hcm_complete : forall s d,
+    EGlobalEnv.declared_constant Σ_tail s d -> lookup_const cm s <> None).
 
   Let anf_val_rel_full :=
     @anf_val_rel func_tag default_tag tgm cmap_full nat Hf_src Ht_src Σ_full box_dc.
@@ -307,6 +309,47 @@ Section ValRelWeaken.
       + exact (IHvs _ _ Henv' Hwf_rest).
   Qed.
 
+  (* Helper: weaken cmap_consistent from (cmap_full, Σ_full) to (cm, Σ_tail) *)
+  Lemma cmap_consistent_weaken names vs :
+    @cmap_consistent cmap_full _ Hf_src Ht_src Σ_full box_dc names vs ->
+    @cmap_consistent cm _ Hf_src Ht_src Σ_tail box_dc names vs.
+  Proof.
+    intros Hcm_c i x k decl body Hnth Hlk Hdecl Hbody.
+    (* Bridge lookups: cm → cmap_full, Σ_tail → Σ_full *)
+    pose proof (Hcm_sub _ _ Hlk) as Hlk_full.
+    pose proof (Hext _ _ Hdecl) as Hdecl_full.
+    destruct (Hcm_c i x k decl body Hnth Hlk_full Hdecl_full Hbody)
+      as [v_i [f0 [t0 [Hnth_rho Heval_full]]]].
+    exists v_i, f0, t0. split; [exact Hnth_rho |].
+    (* Restrict eval from Σ_full to Σ_tail *)
+    assert (Hwf_body : wellformed Σ_tail 0 body = true).
+    { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl Hbody). }
+    exact (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src Σ_full box_dc Σ_tail
+                    [] body (fuel_sem.Val v_i) f0 t0 Hwf_tail Hext
+                    ltac:(constructor) Hwf_body Heval_full)).
+  Qed.
+
+  (* Helper: weaken anf_cvt_rel from cmap_full to cm.
+     Requires that all constants in e are in domain(cm). *)
+  Lemma anf_cvt_rel_cmap_weaken :
+    forall S e vn S' C x,
+      anf_cvt_rel func_tag default_tag tgm cmap_full S e vn S' C x ->
+      wellformed Σ_tail (List.length vn) e = true ->
+      anf_cvt_rel func_tag default_tag tgm cm S e vn S' C x.
+  Proof.
+  Admitted.
+
+  (* Helper: weaken global_env_rel' from (cmap_full, Σ_full) to (cm, Σ_tail).
+     Uses recursive anf_val_rel weakening. *)
+  Lemma global_env_rel_weaken D rho :
+    (forall v v', anf_val_rel_full v v' -> well_formed_val Σ_tail v ->
+                  anf_val_rel_part v v') ->
+    @global_env_rel' cmap_full _ Hf_src Ht_src Σ_full box_dc
+                     anf_val_rel_full D rho ->
+    @global_env_rel' cm _ Hf_src Ht_src Σ_tail box_dc
+                     anf_val_rel_part D rho.
+  Admitted.
+
   (** Weakening: anf_val_rel with bigger cmap/Σ implies anf_val_rel with
       smaller cmap/Σ, given well-formedness of the source value. *)
   Lemma anf_val_rel_weaken :
@@ -332,18 +375,18 @@ Section ValRelWeaken.
         try eassumption.
       + eapply env_rel_val_rel_weaken; [exact H | | exact Hwf_vs].
         match goal with He : anf_env_rel' _ _ _ _ |- _ => exact He end.
-      + (* cmap_consistent[cm, Σ_tail] *) admit.
+      + eapply cmap_consistent_weaken. eassumption.
       + (* Disjoint (cmap_vars cm) S1 *)
         eapply Disjoint_Included_l; [| eassumption].
         intros z [s Hlk]. exists s. exact (Hcm_sub s z Hlk).
-      + (* ~ x \in cmap_vars cm *)
-        intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
+      + intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
           apply H; destruct Hc as [s Hlk]; exists s; exact (Hcm_sub s y Hlk) end.
-      + (* ~ f \in cmap_vars cm *)
-        intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
+      + intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
           apply H; destruct Hc as [s Hlk]; exists s; exact (Hcm_sub s y Hlk) end.
-      + (* anf_cvt_rel[cm] *) admit.
-      + (* global_env_rel'[cm, Σ_tail] *) admit.
+      + (* anf_cvt_rel[cm] — uses anf_cvt_rel_cmap_weaken (admitted) *)
+        admit.
+      + (* global_env_rel'[cm, Σ_tail] — uses global_env_rel_weaken (admitted) *)
+        admit.
     - (* ClosFix_v *) admit.
   Admitted.
 
