@@ -333,11 +333,43 @@ Section WF_EVAL.
     - intros rho0 e0 r f0 t0 _ IH. exact IH.
   Qed.
 
+  (* Helper: wf_glob gives globals_wellformed for any environment. *)
+  Lemma wf_glob_globals_wf Σ0 :
+    EWellformed.wf_glob Σ0 ->
+    forall k decl body,
+      declared_constant Σ0 k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      wellformed Σ0 0 body = true.
+  Proof.
+    induction 1 as [| kn0 d0 Σ0' Hwf0 IH Hwd Hfr].
+    - intros ? ? ? Hdecl. unfold declared_constant in Hdecl. discriminate.
+    - intros k0 decl0 body0 Hdecl Hbody.
+      unfold declared_constant in Hdecl. simpl in Hdecl.
+      assert (Hwf_full : EWellformed.wf_glob ((kn0, d0) :: Σ0')).
+      { exact (EWellformed.wf_glob_cons _ _ _ Hwf0 Hwd Hfr). }
+      eapply (EWellformed.extends_wellformed Hwf_full
+                (EWellformed.extends_fresh _ _ _ Hfr)).
+      destruct (ReflectEq.eqb k0 kn0) eqn:Hek.
+      + injection Hdecl as Heq. subst d0. simpl in Hwd. rewrite Hbody in Hwd. exact Hwd.
+      + exact (IH _ _ _ Hdecl Hbody).
+  Qed.
+
+  (* Helper: wellformed tConst implies lookup_constant succeeds. *)
+  Lemma wellformed_tConst_lookup Σ0 n k :
+    wellformed Σ0 n (EAst.tConst k) = true ->
+    exists d, lookup_constant Σ0 k = Some d.
+  Proof.
+    unfold wellformed. simpl. fold (@wellformed efl).
+    intro H. apply andb_true_iff in H as [_ H].
+    destruct (lookup_constant Σ0 k) as [d |] eqn:Hlk.
+    - exists d. reflexivity.
+    - simpl in H. discriminate.
+  Qed.
+
   (** Restricted version: evaluation of a term wellformed w.r.t. a suffix
       Σ_tail (in the full Σ) produces a value wellformed w.r.t. Σ_tail.
-      Justified: evaluation only accesses globals in Σ_tail (since the term
-      and all reachable bodies are wellformed w.r.t. suffixes of Σ_tail).
-      Same proof structure as eval_preserves_wf but tracking Σ_tail. *)
+      Same proof structure as eval_preserves_wf but deriving
+      globals_wellformed from wf_glob Σ_tail. *)
   Lemma eval_preserves_wf_restricted Σ_tail rho e v f t :
     EWellformed.wf_glob Σ_tail ->
     EGlobalEnv.extends Σ_tail Σ ->
@@ -346,9 +378,126 @@ Section WF_EVAL.
     eval_env_fuel Σ box_dc rho e (Val v) f t ->
     well_formed_val Σ_tail v.
   Proof.
-    (* Same induction as eval_preserves_wf but using globals_wellformed
-       for Σ_tail (derivable from wf_glob Σ_tail) and extends_wellformed
-       to lift wellformed Σ_k_tail to wellformed Σ_tail for each global. *)
-  Admitted.
+    intros Hwf_tail Hext.
+    (* Derive globals_wellformed for Σ_tail *)
+    pose proof (wf_glob_globals_wf Σ_tail Hwf_tail) as Hgw_tail.
+    (* Same induction as eval_preserves_wf *)
+    intros Hwf_env Hwf_e Heval.
+    set (Pwf := fun (rho : env) (e : EAst.term) (r : result) (f : nat) (t : trace) =>
+      well_formed_env Σ_tail rho ->
+      wellformed Σ_tail (List.length rho) e = true ->
+      match r with Val v => well_formed_val Σ_tail v | OOT => True end).
+    set (Pmany := fun (rho : env) (es : list EAst.term) (vs : list value)
+                      (fs : nat) (ts : trace) =>
+      well_formed_env Σ_tail rho ->
+      Forall (fun e => wellformed Σ_tail (List.length rho) e = true) es ->
+      Forall (well_formed_val Σ_tail) vs).
+    enough (Haux : Pwf rho e (Val v) f t) by exact (Haux Hwf_env Hwf_e).
+    apply (eval_env_fuel_ind' Σ box_dc Pwf Pmany Pwf); try exact Heval;
+    unfold Pwf, Pmany; try solve [intros; exact I].
+    (* eval_App_step: e1 → Clos_v *)
+    - intros e1 e2 body v2 r na rho0 rho' f1 f2 f3 t1 t2 t3
+             _ IH1 _ IH2 _ IH3 Hwfe Hwft.
+      destruct r; [| exact I].
+      apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
+      specialize (IH1 Hwfe Hwf1). inversion IH1 as [| ? ? ? Hwf_rho' Hwf_body |]. subst.
+      specialize (IH2 Hwfe Hwf2).
+      apply IH3.
+      + constructor; assumption.
+      + simpl. exact Hwf_body.
+    (* eval_FixApp_step: e1 → ClosFix_v *)
+    - intros e1 e2 body rho0 rho' rho'' idx na mfix v2 r
+             f1 f2 f3 t1 t2 t3
+             _ IH1 Hfb Hmre _ IH2 _ IH3 Hwfe Hwft.
+      destruct r; [| exact I].
+      apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
+      specialize (IH1 Hwfe Hwf1).
+      inversion IH1 as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix]. subst.
+      specialize (IH2 Hwfe Hwf2).
+      unfold fix_body in Hfb.
+      destruct (nth_error mfix idx) as [d |] eqn:Hd; [| discriminate].
+      injection Hfb as Hbody_eq.
+      assert (Hwf_d := proj1 (Forall_forall _ _) Hwf_mfix d (nth_error_In _ _ Hd)).
+      destruct Hwf_d as [Hlam_d Hwf_dbody].
+      apply IH3.
+      + constructor; [assumption |].
+        apply (well_formed_env_make_rec_env Σ_tail); assumption.
+      + simpl. rewrite make_rec_env_length.
+        rewrite Hbody_eq in Hwf_dbody.
+        now apply (wellformed_tLambda Σ_tail) in Hwf_dbody.
+    (* eval_LetIn_step *)
+    - intros na b t0 v1' r rho0 f1 f2 t1 t2 _ IH1 _ IH2 Hwfe Hwft.
+      destruct r; [| exact I].
+      apply (wellformed_tLetIn Σ_tail) in Hwft as [Hwfb Hwft0].
+      specialize (IH1 Hwfe Hwfb).
+      apply IH2.
+      + constructor; assumption.
+      + simpl. exact Hwft0.
+    (* eval_Construct_step *)
+    - intros ind c args vs dc rho0 fs ts Hdc _ IHmany Hwfe Hwft.
+      apply (wellformed_tConstruct Σ_tail) in Hwft.
+      constructor. exact (IHmany Hwfe Hwft).
+    (* eval_Case_step *)
+    - intros ind npars mch brs rho0 dc vs body c r f1 f2 t1 t2
+             _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
+      destruct r; [| exact I].
+      pose proof (wellformed_tCase_mch Σ_tail _ _ _ _ _ Hwft) as Hwf_mch.
+      specialize (IH1 Hwfe Hwf_mch). inversion IH1 as [? ? Hwf_vs | |]. subst.
+      pose proof (find_branch_wellformed Σ_tail _ _ _ _ _ _ _ _ Hwft Hfind) as Hwf_body.
+      apply IH2.
+      + unfold well_formed_env. apply Forall_app. split.
+        * apply Forall_rev. exact Hwf_vs.
+        * exact Hwfe.
+      + rewrite length_app, length_rev. rewrite Nat.add_comm.
+        exact Hwf_body.
+    (* eval_Proj_step *)
+    - intros p c rho0 vs v0 f1 t1 _ IH Hnth Hwfe Hwft.
+      apply (wellformed_tProj Σ_tail) in Hwft.
+      specialize (IH Hwfe Hwft). inversion IH as [? ? Hwf_vs | |]. subst.
+      eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
+      eapply nth_error_In. exact Hnth.
+    (* eval_Const_step — KEY CASE: bridge from Σ to Σ_tail *)
+    - intros k body v0 decl rho0 t0 Hdecl_Σ Hbody _ IH Hwfe Hwft.
+      (* From wellformed: lookup_constant Σ_tail k succeeds *)
+      destruct (wellformed_tConst_lookup Σ_tail _ _ Hwft) as [d_tail Hlk_tail].
+      (* Extract declared_constant from lookup_constant *)
+      unfold lookup_constant in Hlk_tail.
+      destruct (lookup_env Σ_tail k) as [[cb|ind]|] eqn:Hlenv;
+        simpl in Hlk_tail; try discriminate.
+      injection Hlk_tail as <-.
+      (* extends: lookup Σ_tail k lifts to lookup Σ k *)
+      pose proof (Hext _ _ Hlenv) as Hdecl_Σ'.
+      (* lookup determinism: decl = d_tail *)
+      rewrite Hdecl_Σ in Hdecl_Σ'. injection Hdecl_Σ' as <-.
+      apply IH.
+      + constructor.
+      + exact (Hgw_tail _ _ _ Hlenv Hbody).
+    (* eval_many_nil *)
+    - intros rho0 _ _. constructor.
+    (* eval_many_cons *)
+    - intros rho0 e0 es v0 vs f1 fs t1 ts _ IH_e _ IH_es Hwfe Hwft.
+      inversion Hwft as [| ? ? Hwf_hd Hwf_tl]. subst.
+      constructor.
+      + exact (IH_e Hwfe Hwf_hd).
+      + exact (IH_es Hwfe Hwf_tl).
+    (* eval_Rel_fuel *)
+    - intros n rho0 v0 Hnth Hwfe Hwft.
+      apply (wellformed_tRel Σ_tail) in Hwft.
+      unfold well_formed_env in Hwfe.
+      eapply Forall_forall in Hwfe; [exact Hwfe |].
+      eapply nth_error_In. exact Hnth.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na Hwfe Hwft.
+      apply (wellformed_tLambda Σ_tail) in Hwft.
+      apply (Wf_Clos Σ_tail); [exact Hwfe | exact Hwft].
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 Hwfe Hwft.
+      apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
+      apply (Wf_ClosFix Σ_tail); assumption.
+    (* eval_Box_fuel *)
+    - intros rho0 _ _. constructor. constructor.
+    (* eval_step *)
+    - intros rho0 e0 r f0 t0 _ IH. exact IH.
+  Qed.
 
 End WF_EVAL.
