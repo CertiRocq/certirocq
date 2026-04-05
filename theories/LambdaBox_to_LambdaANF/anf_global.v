@@ -376,24 +376,59 @@ Section GlobalBindingsCorrect.
   (* ----------------------------------------------------------------- *)
 
   (** The composed binding context [C_env] from [anf_cvt_rel_global],
-      when evaluated, produces an environment satisfying [global_env_rel'].
+      when evaluated starting from [rho_init], produces an environment
+      where all new global bindings are correctly related.
 
-      Proof strategy: induction on [anf_cvt_rel_global].
-      - Base: [C_env = Hole_c], environment unchanged.
-      - Step: [C_env = comp_ctx_f C C_rest]. Use [global_body_correct]
-        on the head body to extend [rho], then the IH for [C_rest]. *)
+      The proof goes by induction on [anf_cvt_rel_global]:
+      - Base: [C_env = Hole_c], [rho_g = rho_init], nothing to prove.
+      - Const step: [C_env = comp_ctx_f C C_rest].
+        [global_body_correct] gives a [preord_exp] for [C],
+        the IH gives one for [C_rest], and [preord_exp_trans] chains them.
+      - Skip steps: pass through to IH unchanged. *)
   Lemma global_ctx_correct :
     forall gd cm_acc cm C_env S S',
       anf_cvt_rel_global func_tag default_tag tgm
         S gd cm_acc cm C_env S' ->
       Disjoint _ (cmap_vars cmap) S ->
-      forall rho_g,
-        global_env_rel' (fun k => lookup_const cm k <> None) rho_g ->
-        forall e_k i,
-          preord_exp cenv (anf_bound 0 0) eq_fuel i
-            (e_k, rho_g) (C_env |[ e_k ]|, M.empty val).
+      forall rho_init,
+        (* rho_init already satisfies global_env_rel' for cm_acc *)
+        global_env_rel' (fun k => lookup_const cm_acc k <> None) rho_init ->
+        (* C_env extends the environment: exists rho_g with the full relation *)
+        exists rho_g,
+          global_env_rel' (fun k => lookup_const cm k <> None) rho_g /\
+          forall e_k i,
+            Disjoint _ (occurs_free e_k) (S \\ S') ->
+            preord_exp cenv (anf_bound 0 0) eq_fuel i
+              (e_k, rho_g) (C_env |[ e_k ]|, rho_init).
   Proof.
-    admit.
+    intros gd cm_acc cm C_env S S' Hcvt.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd' cm0 cm' C C_rest v Hbody_cvt Hrest IHrest
+      | S0 S' k gd' cm0 cm' C_rest Hrest IHrest
+      | S0 S' k ind gd' cm0 cm' C_rest Hrest IHrest ].
+    - (* cvt_global_nil: C_env = Hole_c, cm = cm_acc *)
+      intros Hdis rho_init Hglob.
+      exists rho_init. split; [exact Hglob |].
+      intros e_k i _. simpl.
+      (* Hole_c |[ e_k ]| = e_k, same env on both sides *)
+      intros v1 c1 cout1 Hle1 Hstep1.
+      exists v1, c1, cout1. split; [exact Hstep1 |]. split.
+      + unfold anf_bound. lia.
+      + (* preord_res reflexivity *)
+        unfold preord_res. destruct v1; [exact I |].
+        (* preord_val cenv eq_fuel (i-c1) v v — reflexivity *)
+        admit.
+    - (* cvt_global_const: C_env = comp_ctx_f C C_rest *)
+      intros Hdis rho_init Hglob.
+      (* Use global_body_correct for C *)
+      admit.
+    - (* cvt_global_no_body: skip, delegate to IH *)
+      intros Hdis rho_init Hglob.
+      exact (IHrest Hdis rho_init Hglob).
+    - (* cvt_global_ind: skip, delegate to IH *)
+      intros Hdis rho_init Hglob.
+      exact (IHrest Hdis rho_init Hglob).
   Admitted.
 
 End GlobalBindingsCorrect.
