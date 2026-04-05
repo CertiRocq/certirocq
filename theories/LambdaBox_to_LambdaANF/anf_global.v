@@ -235,6 +235,122 @@ End GlobalEnvExists.
 
 
 (* ================================================================= *)
+(** * Weakening anf_val_rel: from full cmap/Σ to partial cm/Σ_tail    *)
+(* ================================================================= *)
+
+Section ValRelWeaken.
+
+  Context (func_tag default_tag : positive)
+          (tgm : conId_map).
+
+  Context {efl : EEnvFlags}.
+
+  Context (box_dc : dcon)
+          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
+
+  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
+  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+
+  (** Full (source) parameters *)
+  Context (cmap_full : const_map) (Σ_full : EAst.global_context).
+
+  (** Partial (target) parameters *)
+  Context (cm : const_map) (Σ_tail : EAst.global_context).
+
+  (** Relationship between full and partial *)
+  Context (Hwf_tail : EWellformed.wf_glob Σ_tail).
+  Context (Hext : EGlobalEnv.extends Σ_tail Σ_full).
+  Context (Hcm_sub : forall s v, lookup_const cm s = Some v ->
+                                  lookup_const cmap_full s = Some v).
+  Context (Hcm_agree : forall s v, lookup_const cmap_full s = Some v ->
+                                    lookup_const cm s <> None ->
+                                    lookup_const cm s = Some v).
+
+  Let anf_val_rel_full :=
+    @anf_val_rel func_tag default_tag tgm cmap_full nat Hf_src Ht_src Σ_full box_dc.
+  Let anf_val_rel_part :=
+    @anf_val_rel func_tag default_tag tgm cm nat Hf_src Ht_src Σ_tail box_dc.
+
+  (* Helper: transfer Forall2 using pointwise IH + well-formedness *)
+  Lemma forall2_val_rel_weaken vs :
+    Forall (fun v => well_formed_val Σ_tail v ->
+                     forall v', anf_val_rel_full v v' -> anf_val_rel_part v v') vs ->
+    forall vs',
+    Forall2 (fun v v' => anf_val_rel_full v v') vs vs' ->
+    Forall (well_formed_val Σ_tail) vs ->
+    Forall2 (fun v v' => anf_val_rel_part v v') vs vs'.
+  Proof.
+    induction 1 as [| v0 vs0 IHv0 _ IHvs]; intros vs' Hf2 Hwf_vs.
+    - inversion Hf2. constructor.
+    - inversion Hf2 as [| ? ? ? ? Hrel0 Hf2']. subst.
+      inversion Hwf_vs as [| ? ? Hwf0 Hwf_rest]. subst.
+      constructor; [exact (IHv0 Hwf0 _ Hrel0) | exact (IHvs _ Hf2' Hwf_rest)].
+  Qed.
+
+  (* Helper: transfer anf_env_rel' using pointwise IH + well-formedness *)
+  Lemma env_rel_val_rel_weaken vs :
+    Forall (fun v => well_formed_val Σ_tail v ->
+                     forall v', anf_val_rel_full v v' -> anf_val_rel_part v v') vs ->
+    forall names rho,
+    anf_env_rel' anf_val_rel_full names vs rho ->
+    Forall (well_formed_val Σ_tail) vs ->
+    anf_env_rel' anf_val_rel_part names vs rho.
+  Proof.
+    unfold anf_env_rel' in *.
+    induction 1 as [| v0 vs0 IHv0 _ IHvs]; intros names rho Henv Hwf_vs.
+    - inversion Henv. constructor.
+    - destruct names as [| n0 ns0]; [inversion Henv |].
+      inversion Henv as [| ? ? ? ? [anf_v0 [Hget0 Hrel0]] Henv']. subst.
+      inversion Hwf_vs as [| ? ? Hwf0 Hwf_rest]. subst.
+      constructor.
+      + exists anf_v0. split; [exact Hget0 | exact (IHv0 Hwf0 _ Hrel0)].
+      + exact (IHvs _ _ Henv' Hwf_rest).
+  Qed.
+
+  (** Weakening: anf_val_rel with bigger cmap/Σ implies anf_val_rel with
+      smaller cmap/Σ, given well-formedness of the source value. *)
+  Lemma anf_val_rel_weaken :
+    forall v,
+    well_formed_val Σ_tail v ->
+    forall v',
+    anf_val_rel_full v v' ->
+    anf_val_rel_part v v'.
+  Proof.
+    intro v. induction v using fuel_sem.value_ind';
+      intros Hwf v' Hrel.
+    - (* Con_v *)
+      inversion Hwf as [? ? Hwf_vs | |]. subst.
+      inversion Hrel; subst.
+      apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail box_dc);
+        [| reflexivity].
+      eapply forall2_val_rel_weaken; [exact H | |exact Hwf_vs].
+      match goal with Hf : Forall2 _ _ _ |- _ => exact Hf end.
+    - (* Clos_v *)
+      inversion Hwf as [| ? ? ? Hwf_vs Hwf_body |]. subst.
+      inversion Hrel; subst.
+      eapply (@anf_rel_Clos func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail box_dc);
+        try eassumption.
+      + eapply env_rel_val_rel_weaken; [exact H | | exact Hwf_vs].
+        match goal with He : anf_env_rel' _ _ _ _ |- _ => exact He end.
+      + (* cmap_consistent[cm, Σ_tail] *) admit.
+      + (* Disjoint (cmap_vars cm) S1 *)
+        eapply Disjoint_Included_l; [| eassumption].
+        intros z [s Hlk]. exists s. exact (Hcm_sub s z Hlk).
+      + (* ~ x \in cmap_vars cm *)
+        intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
+          apply H; destruct Hc as [s Hlk]; exists s; exact (Hcm_sub s y Hlk) end.
+      + (* ~ f \in cmap_vars cm *)
+        intro Hc. match goal with H : ~ ?y \in cmap_vars cmap_full |- _ =>
+          apply H; destruct Hc as [s Hlk]; exists s; exact (Hcm_sub s y Hlk) end.
+      + (* anf_cvt_rel[cm] *) admit.
+      + (* global_env_rel'[cm, Σ_tail] *) admit.
+    - (* ClosFix_v *) admit.
+  Admitted.
+
+End ValRelWeaken.
+
+
+(* ================================================================= *)
 (** * Operational correctness of global binding contexts *)
 (* ================================================================= *)
 
@@ -421,8 +537,7 @@ Section GlobalBindingsCorrect.
         admit.
     - (* cvt_global_const: C_env = comp_ctx_f C C_rest *)
       intros Hdis rho_init Hglob.
-      (* Use global_body_correct for C *)
-      admit.
+      Show. admit.
     - (* cvt_global_no_body: skip, delegate to IH *)
       intros Hdis rho_init Hglob.
       exact (IHrest Hdis rho_init Hglob).
