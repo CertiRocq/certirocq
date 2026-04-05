@@ -1373,8 +1373,7 @@ Section ValRelExists.
                 (* eval_preserves_wf_restricted: well_formed_val Σ' src_v0 *)
                 assert (Hwf_src0 : well_formed_val Σ' src_v0).
                 { eapply eval_preserves_wf_restricted;
-                    [exact wf_glob_globals_wellformed
-                    | exact Hwf' | exact Hext' | constructor | exact Hwf_body0
+                    [exact Hwf' | exact Hext' | constructor | exact Hwf_body0
                     | exact Heval0]. }
                 (* Get ANF value from wf_glob IH *)
                 destruct (IH src_v0 Hwf_src0) as [anf_v0 Hrel0].
@@ -1515,8 +1514,7 @@ Section ValRelExists.
                   - exact (wf_glob_globals_wellformed_gen Σ' Hwf' k0 cb body0 Hlk0 Hbody0). }
                 assert (Hwf_src0 : well_formed_val Σ' src_v0).
                 { eapply eval_preserves_wf_restricted;
-                    [exact wf_glob_globals_wellformed
-                    | exact Hwf' | exact Hext' | constructor | exact Hwf_body0
+                    [exact Hwf' | exact Hext' | constructor | exact Hwf_body0
                     | exact Heval0]. }
                 destruct (IH src_v0 Hwf_src0) as [anf_v0 Hrel0].
                 exists (M.set v0 anf_v0 rho_g').
