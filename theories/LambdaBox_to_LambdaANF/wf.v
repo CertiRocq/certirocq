@@ -620,7 +620,17 @@ Section EVAL_RESTRICT.
       + eapply fuel_sem.eval_Construct_step; eassumption.
       + constructor. exact Hwf_vs.
     (* eval_Construct_step_OOT *)
-    - intros. split; [| exact I]. admit.
+    - intros ind c args args_done args_rest e0 vs rho0 fs f0 t0 ts
+             Hargs _ IHmany _ IHe Hwfe Hwft.
+      apply (wellformed_tConstruct Σ_tail) in Hwft.
+      pose proof Hargs as Hargs'.
+      rewrite Hargs in Hwft. apply Forall_app in Hwft as [Hwf_done Hwf_rest].
+      inversion Hwf_rest as [| ? ? Hwf_e0 _]. subst.
+      destruct (IHmany Hwfe Hwf_done) as [Hmany' _].
+      destruct (IHe Hwfe Hwf_e0) as [Heval_e' _].
+      split; [| exact I].
+      eapply fuel_sem.eval_Construct_step_OOT;
+        [exact Hargs' | exact Hmany' | exact Heval_e'].
     (* eval_Case_step *)
     - intros ind npars mch brs rho0 dc vs body c r0 f1 f2 t1 t2
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
@@ -712,6 +722,6 @@ Section EVAL_RESTRICT.
       destruct (IH Hwfe Hwft) as [Heval0' Hwf_r].
       split; [| exact Hwf_r].
       eapply fuel_sem.eval_step. eassumption.
-  Admitted. (* One admit: eval_Construct_step_OOT *)
+  Qed.
 
 End EVAL_RESTRICT.
