@@ -37,12 +37,12 @@ Section Refinement.
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
-  Context (cmap_inj : forall k1 k2 v,
-    lookup_const cmap k1 = Some v ->
-    lookup_const cmap k2 = Some v -> k1 = k2).
 
   Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
   Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+
+  Context (Hcmap_eval_coherent :
+    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
 
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
@@ -84,14 +84,14 @@ Section Refinement.
     lookup_const cmap k = Some v ->
     exists decl body,
       declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
-  Context (cmap_nodup_vals : NoDup (map snd cmap)).
+  Context (cmap_nodup_keys : NoDup (map fst cmap)).
 
   Let val_rel_exists :=
     @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
       _ Σ box_dc nat Hf_src Ht_src
       Hglob_term Hwf_glob
       HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-      no_prims cmap_complete cmap_sound cmap_nodup_vals.
+      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent.
 
   Fixpoint value_ref' (v1 : fuel_sem.value) (v2 : val) : Prop :=
     let fix Forall2_aux vs1 vs2 :=
@@ -192,11 +192,11 @@ Section Refinement.
                 HnoAxioms
                 dcon_to_tag_inj
                 box_dc box_tag
-                cenv_case_consistent cmap_inj
+                cenv_case_consistent Hcmap_eval_coherent
                 Hglob_term Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                no_prims cmap_complete cmap_sound cmap_nodup_vals
+                no_prims cmap_complete cmap_sound cmap_nodup_keys
                 C_env Sg Sg'
                 Hglob_cvt Hdis_glob (M.empty val))
       as [rho_g [F_glob [T_glob [Hglob_rho Hpre_glob]]]].
@@ -208,11 +208,8 @@ Section Refinement.
                   tgm cmap cenv Σ efl
                   dcon_to_tag_inj
                   box_dc box_tag
-                  cenv_case_consistent cmap_inj
-                  Hglob_term Hglob_wf
-                  prim_map prims Hwf_glob
-                  HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                  no_prims cmap_complete cmap_sound cmap_nodup_vals
+                  cenv_case_consistent Hcmap_eval_coherent
+                  Hglob_term Hglob_wf val_rel_exists
                   [] e (Val src_v) f t Heval)
       as Hcorr.
     unfold anf_cvt_correct_exp in Hcorr.

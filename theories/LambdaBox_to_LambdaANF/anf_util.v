@@ -98,6 +98,34 @@ Section ANF_Val.
         nth_error rho i = Some v_i /\
         @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val v_i) f t.
 
+  Definition cmap_eval_coherent : Prop :=
+    forall k1 k2 x decl1 body1 decl2 body2 src_v f t,
+      lookup_const cmap k1 = Some x ->
+      lookup_const cmap k2 = Some x ->
+      declared_constant Σ k1 decl1 ->
+      decl1.(EAst.cst_body) = Some body1 ->
+      declared_constant Σ k2 decl2 ->
+      decl2.(EAst.cst_body) = Some body2 ->
+      @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body1 (fuel_sem.Val src_v) f t ->
+      exists f' t',
+        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body2 (fuel_sem.Val src_v) f' t'.
+
+  Lemma cmap_inj_implies_eval_coherent :
+    (forall k1 k2 v,
+      lookup_const cmap k1 = Some v ->
+      lookup_const cmap k2 = Some v ->
+      k1 = k2) ->
+    cmap_eval_coherent.
+  Proof.
+    intros Hinj k1 k2 x decl1 body1 decl2 body2 src_v f t
+           Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
+    assert (Heqk : k1 = k2) by (eapply Hinj; eassumption). subst k2.
+    unfold declared_constant in Hdecl1, Hdecl2.
+    rewrite Hdecl1 in Hdecl2. injection Hdecl2 as <-.
+    rewrite Hbody1 in Hbody2. injection Hbody2 as <-.
+    exists f, t. exact Heval1.
+  Qed.
+
   Inductive anf_val_rel : fuel_sem.value -> val -> Prop :=
   | anf_rel_Con :
       forall vs vs' dc c_tag,
@@ -522,6 +550,18 @@ Proof.
         -- injection Hlk1 as <-. now left.
         -- right. eapply IHcm. exact Hlk1.
     + eapply IH; eauto.
+Qed.
+
+Lemma lookup_const_in_map_fst (cm : const_map) k v :
+  lookup_const cm k = Some v ->
+  List.In k (map fst cm).
+Proof.
+  induction cm as [| [k' v'] cm' IH]; simpl.
+  - discriminate.
+  - intros Hlk.
+    destruct (eq_kername k k') eqn:Hkk'.
+    + apply eq_kername_bool_eq in Hkk'. subst k'. now left.
+    + right. eapply IH. exact Hlk.
 Qed.
 
 Section GlobalCMapFacts.
