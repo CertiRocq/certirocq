@@ -468,11 +468,56 @@ Section ANF.
             S1 ind ((lnames, e) :: brs') n vn r S3
             ((tg, app_ctx_f ctx_p (C1 |[ Ehalt r1 ]|)) :: pats').
 
-    Scheme anf_cvt_rel_ind' := Minimality for anf_cvt_rel Sort Prop
-      with anf_cvt_rel_args_ind' := Minimality for anf_cvt_rel_args Sort Prop
-      with anf_cvt_rel_mfix_ind' := Minimality for anf_cvt_rel_mfix Sort Prop
-      with anf_cvt_rel_branches_ind' := Minimality for anf_cvt_rel_branches Sort Prop.
+	    Scheme anf_cvt_rel_ind' := Minimality for anf_cvt_rel Sort Prop
+	      with anf_cvt_rel_args_ind' := Minimality for anf_cvt_rel_args Sort Prop
+	      with anf_cvt_rel_mfix_ind' := Minimality for anf_cvt_rel_mfix Sort Prop
+	      with anf_cvt_rel_branches_ind' := Minimality for anf_cvt_rel_branches Sort Prop.
 
-  End Spec.
+	  End Spec.
 
-End ANF.
+	  Section GlobalSpec.
+
+	    Context (tgm : conId_map).
+
+	    (** Relational specification for [convert_global_decls].
+	        Mirrors the monadic function: for each constant with a body,
+	        convert the body and compose its binding context. Skip constants
+	        without bodies and inductive declarations. *)
+	    Inductive anf_cvt_rel_global :
+	      Ensemble var ->
+	      EAst.global_declarations ->
+	      const_map ->           (* cm_acc: accumulated const_map *)
+	      const_map ->           (* cm: final const_map *)
+	      exp_ctx ->             (* C_env: composed binding context *)
+	      Ensemble var ->
+	      Prop :=
+	    | cvt_global_nil :
+	        forall S cm_acc,
+	          anf_cvt_rel_global S [] cm_acc cm_acc Hole_c S
+
+	    | cvt_global_const :
+	        forall S S1 S2 k body gd' cm_acc cm' C C_rest v,
+	          anf_cvt_rel tgm cm_acc
+	            S body [] S1 C v ->
+	          anf_cvt_rel_global S1 gd' ((k, v) :: cm_acc) cm' C_rest S2 ->
+	          anf_cvt_rel_global S
+	            ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: gd')
+	            cm_acc cm' (comp_ctx_f C C_rest) S2
+
+	    | cvt_global_no_body :
+	        forall S S' k gd' cm_acc cm' C_rest,
+	          anf_cvt_rel_global S gd' cm_acc cm' C_rest S' ->
+	          anf_cvt_rel_global S
+	            ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: gd')
+	            cm_acc cm' C_rest S'
+
+	    | cvt_global_ind :
+	        forall S S' k ind gd' cm_acc cm' C_rest,
+	          anf_cvt_rel_global S gd' cm_acc cm' C_rest S' ->
+	          anf_cvt_rel_global S
+	            ((k, EAst.InductiveDecl ind) :: gd')
+	            cm_acc cm' C_rest S'.
+
+	  End GlobalSpec.
+
+	End ANF.
