@@ -336,8 +336,8 @@ Section ValRelWeaken.
       anf_cvt_rel func_tag default_tag tgm cmap_full S e vn S' C x ->
       wellformed Σ_tail (List.length vn) e = true ->
       anf_cvt_rel func_tag default_tag tgm cm S e vn S' C x.
-  Proof.
-  Admitted.
+  Admitted. (* Structural induction on anf_cvt_rel. Only anf_Const case
+              changes: uses Hcm_agree + Hcm_complete + wellformedness. *)
 
   (* Helper: weaken global_env_rel' from (cmap_full, Σ_full) to (cm, Σ_tail).
      Uses recursive anf_val_rel weakening. *)
