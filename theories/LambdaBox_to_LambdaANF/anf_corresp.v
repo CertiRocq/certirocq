@@ -823,6 +823,199 @@ Section Corresp.
 End Corresp.
 
 
+Section GlobalCorresp.
+
+  Context (func_tag default_tag : positive)
+          (prim_map : M.t primitive)
+          (tgm : conId_map)
+          (prims : list (primitive * positive)).
+
+  Context {efl : EEnvFlags}.
+  Context (Σ : global_context).
+  Context (Hwf_glob : wf_glob Σ).
+  Context (HnoAxioms : has_axioms = false).
+
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+
+  Context (no_prims : forall s, find_prim prims s = None).
+
+  Let convert_global_decls' :=
+    convert_global_decls func_tag default_tag prim_map tgm prims.
+
+  Local Open Scope list_scope.
+
+  Lemma suffix_wf (prefix Σ0 : global_context) :
+    wf_glob (List.app prefix Σ0) ->
+    wf_glob Σ0.
+  Proof.
+    intros Hwf.
+    eapply EExtends.extends_wf_glob.
+    - exists prefix. reflexivity.
+    - exact Hwf.
+  Qed.
+
+  Lemma wf_glob_head_const_some_wf Σ0 k body :
+    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
+    wellformed Σ0 0 body = true.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. exact Hwd.
+  Qed.
+
+  Lemma wf_glob_head_const_none_absurd Σ0 k :
+    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
+    False.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. rewrite HnoAxioms in Hwd. discriminate.
+  Qed.
+
+  Lemma anf_cvt_global_corresp :
+    forall (gd : global_context) (cm_acc : const_map)
+           (Σ_proc : global_context) (S0 : Ensemble var),
+      Σ = List.rev gd ++ Σ_proc ->
+      (forall s d, lookup_constant Σ_proc s = Some d ->
+                   lookup_const cm_acc s <> None) ->
+      {{ fun _ s => fresh S0 (next_var (fst s)) }}
+        convert_global_decls' gd cm_acc
+      {{ fun _ s p s' =>
+           let '(cm, C_env) := p in
+           exists S',
+             anf_cvt_rel_global func_tag default_tag tgm S0 gd cm_acc cm C_env S' /\
+             fresh S' (next_var (fst s')) /\
+             (forall k decl, lookup_constant Σ k = Some decl ->
+                             lookup_const cm k <> None) }}.
+  Proof.
+    induction gd as [| [k decl] gd' IH];
+      intros cm_acc Σ_proc S0 HΣ_eq Hcm_complete_proc.
+    - simpl in HΣ_eq.
+      eapply return_triple. intros _ s Hfr.
+      exists S0. split.
+      + constructor.
+      + split; [exact Hfr |].
+        intros k decl Hlk.
+        rewrite HΣ_eq in Hlk.
+        exact (Hcm_complete_proc _ _ Hlk).
+    - destruct decl as [[body_opt] | ind].
+      + destruct body_opt as [body |].
+        * simpl in HΣ_eq.
+          rewrite <- app_assoc in HΣ_eq.
+          simpl in HΣ_eq.
+          assert (Hwf_proc1 :
+            wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+          { eapply suffix_wf with (prefix := List.rev gd').
+            rewrite <- HΣ_eq. exact Hwf_glob. }
+          assert (Hwf_body : wellformed Σ_proc 0 body = true).
+          { eapply wf_glob_head_const_some_wf. exact Hwf_proc1. }
+          eapply bind_triple.
+          { eapply (@anf_cvt_exp_corresp
+                      func_tag default_tag prim_map tgm prims cm_acc
+                      efl Σ_proc
+                      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                      no_prims Hcm_complete_proc
+                      body [] new_var_map S0 Hwf_body var_map_correct_nil). }
+          intros [v C] w.
+          eapply pre_existential; intros S1.
+          eapply pre_curry_l; intros Hcvt_body.
+          assert (Hcm_complete_proc1 :
+            forall s d,
+              lookup_constant
+                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) s = Some d ->
+              lookup_const ((k, v) :: cm_acc) s <> None).
+          { intros s d Hlk.
+            unfold lookup_constant in Hlk.
+            simpl in Hlk. simpl.
+            destruct (eq_kername s k) eqn:Hsk.
+            - discriminate.
+            - exact (Hcm_complete_proc _ _ Hlk). }
+          eapply bind_triple.
+          { eapply (IH ((k, v) :: cm_acc)
+                       ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                       S1);
+              eauto. }
+          intros [cm C_rest] w'.
+          eapply pre_existential; intros S2.
+          eapply pre_curry_l; intros Hcvt_rest.
+          eapply return_triple. intros _ s [Hfr Hcm_complete].
+          exists S2. split.
+          { econstructor; eauto. }
+          split; [exact Hfr | exact Hcm_complete].
+        * simpl in HΣ_eq.
+          rewrite <- app_assoc in HΣ_eq.
+          simpl in HΣ_eq.
+          assert (Hwf_proc1 :
+            wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+          { eapply suffix_wf with (prefix := List.rev gd').
+            rewrite <- HΣ_eq. exact Hwf_glob. }
+          exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+      + simpl in HΣ_eq.
+        rewrite <- app_assoc in HΣ_eq.
+        simpl in HΣ_eq.
+        simpl.
+        assert (Hcm_complete_proc1 :
+          forall s d,
+            lookup_constant ((k, EAst.InductiveDecl ind) :: Σ_proc) s = Some d ->
+            lookup_const cm_acc s <> None).
+        { intros s d Hlk.
+          unfold lookup_constant in Hlk.
+          simpl in Hlk.
+          destruct (eq_kername s k) eqn:Hsk.
+          - discriminate.
+          - exact (Hcm_complete_proc _ _ Hlk). }
+        eapply post_weakening.
+        2:{ eapply (IH cm_acc ((k, EAst.InductiveDecl ind) :: Σ_proc) S0);
+              eauto. }
+        intros r0 w0 [cm C_rest] w1 HP [S' [Hcvt [Hfr Hcm_complete]]].
+        exists S'. split.
+        * econstructor. exact Hcvt.
+        * split; [exact Hfr | exact Hcm_complete].
+  Qed.
+
+  Lemma anf_cvt_rel_global_exists m :
+    exists cm C_env S',
+      anf_cvt_rel_global func_tag default_tag tgm
+        (fun x => (m <= x)%positive) (List.rev Σ) [] cm C_env S' /\
+      (forall k decl, lookup_constant Σ k = Some decl ->
+                      lookup_const cm k <> None).
+  Proof.
+    set (S0 := fun x => (m <= x)%positive).
+    set (comp_d := pack_data m 1%positive 1%positive 1%positive
+                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
+
+    destruct (runState (convert_global_decls' (List.rev Σ) []) tt (comp_d, tt))
+      as [cvt_res cvt_st] eqn:Hrun.
+
+    assert (HΣ_top : Σ = List.rev (List.rev Σ) ++ []).
+    { rewrite rev_involutive. rewrite app_nil_r. reflexivity. }
+    assert (Hcm_empty :
+      forall s d, lookup_constant ([] : EAst.global_context) s = Some d ->
+                  lookup_const ([] : const_map) s <> None).
+    { intros s d Hlk. discriminate. }
+    assert (Hf : fresh S0 m).
+    { unfold S0, fresh, Ensembles.In. lia. }
+
+    pose proof (anf_cvt_global_corresp (List.rev Σ) [] [] S0 HΣ_top Hcm_empty)
+      as Hcorresp.
+    unfold triple in Hcorresp.
+    specialize (Hcorresp tt (comp_d, tt) Hf).
+    rewrite Hrun in Hcorresp.
+    destruct cvt_res as [msg | [cm C_env]].
+    - contradiction.
+    - simpl in Hcorresp.
+      destruct Hcorresp as [S' [Hrel [_ Hcm_complete]]].
+      exists cm, C_env, S'. split; [exact Hrel | exact Hcm_complete].
+  Qed.
+
+End GlobalCorresp.
+
+
 (* ================================================================= *)
 (** * Helpers for ValRelExists                                        *)
 (* ================================================================= *)

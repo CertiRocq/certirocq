@@ -724,4 +724,50 @@ Section EVAL_RESTRICT.
       eapply fuel_sem.eval_step. eassumption.
   Qed.
 
+  (** Eval monotonicity: evaluation under a sub-environment lifts to the
+      full environment. This is the easy direction (more globals available).
+      Doesn't need well-formedness. *)
+  Lemma eval_env_fuel_extends Σ_tail rho e r f t :
+    EGlobalEnv.extends Σ_tail Σ ->
+    @eval_env_fuel trace Hf Ht Σ_tail box_dc rho e r f t ->
+    @eval_env_fuel trace Hf Ht Σ box_dc rho e r f t.
+  Proof.
+    intros Hext Heval.
+    set (Pstep := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : trace) =>
+      @fuel_sem.eval_env_step trace Hf Ht Σ box_dc rho e r f t).
+    set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
+                      (vs : list fuel_sem.value) (fs : nat) (ts : trace) =>
+      @fuel_sem.eval_fuel_many trace Hf Ht Σ box_dc rho es vs fs ts).
+    set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : trace) =>
+      @eval_env_fuel trace Hf Ht Σ box_dc rho e r f t).
+    enough (Haux : Pfuel rho e r f t) by exact Haux.
+    apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ_tail box_dc Pstep Pmany Pfuel);
+      try exact Heval; unfold Pstep, Pmany, Pfuel; intros.
+    - eapply fuel_sem.eval_App_step; eassumption.
+    - eapply fuel_sem.eval_App_step_OOT1; eassumption.
+    - eapply fuel_sem.eval_App_step_OOT2; eassumption.
+    - eapply fuel_sem.eval_FixApp_step; eassumption.
+    - eapply fuel_sem.eval_LetIn_step; eassumption.
+    - eapply fuel_sem.eval_LetIn_step_OOT; eassumption.
+    - eapply fuel_sem.eval_Construct_step; eassumption.
+    - eapply fuel_sem.eval_Construct_step_OOT; eassumption.
+    - eapply fuel_sem.eval_Case_step; eassumption.
+    - eapply fuel_sem.eval_Case_step_OOT; eassumption.
+    - eapply fuel_sem.eval_Proj_step; eassumption.
+    - eapply fuel_sem.eval_Proj_step_OOT; eassumption.
+    - (* eval_Const_step *)
+      eapply fuel_sem.eval_Const_step; [| eassumption | eassumption].
+      unfold declared_constant in *. exact (Hext _ _ H).
+    - constructor.
+    - eapply fuel_sem.eval_many_cons; eassumption.
+    - eapply fuel_sem.eval_Rel_fuel; eassumption.
+    - eapply fuel_sem.eval_Lam_fuel.
+    - eapply fuel_sem.eval_Fix_fuel.
+    - eapply fuel_sem.eval_Box_fuel.
+    - eapply fuel_sem.eval_OOT. exact H.
+    - eapply fuel_sem.eval_step. eassumption.
+  Qed.
+
 End EVAL_RESTRICT.

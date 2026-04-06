@@ -3,7 +3,7 @@
 
 From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv.
+From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv EWellformed.
 From MetaRocq.Common Require Import BasicAst Kernames.
 From MetaRocq.Utils Require Import bytestring.
 From compcert Require Import lib.Maps lib.Coqlib.
@@ -483,6 +483,241 @@ Section ANF_Val.
   Qed.
 
 End ANF_Val.
+
+
+(* ================================================================= *)
+(** * Global const_map construction facts                             *)
+(* ================================================================= *)
+
+Lemma lookup_const_nodup_snd_inj (cm : const_map) :
+  NoDup (map snd cm) ->
+  forall k1 k2 v,
+    lookup_const cm k1 = Some v ->
+    lookup_const cm k2 = Some v ->
+    k1 = k2.
+Proof.
+  intros Hnd.
+  induction cm as [| [k v0] cm' IH]; intros k1 k2 v Hlk1 Hlk2.
+  - discriminate.
+  - simpl in Hnd. apply NoDup_cons_iff in Hnd as [Hv_notin Hnd'].
+    simpl in Hlk1, Hlk2.
+    destruct (eq_kername k1 k) eqn:Hk1, (eq_kername k2 k) eqn:Hk2.
+    + now apply eq_kername_bool_eq in Hk1; apply eq_kername_bool_eq in Hk2; subst.
+    + injection Hlk1 as <-.
+      exfalso. apply Hv_notin.
+      clear -Hlk2.
+      induction cm' as [| [k' v'] cm'' IHcm].
+      * discriminate.
+      * simpl in Hlk2.
+        destruct (eq_kername k2 k') eqn:Hkk'.
+        -- injection Hlk2 as <-. now left.
+        -- right. eapply IHcm. exact Hlk2.
+    + injection Hlk2 as <-.
+      exfalso. apply Hv_notin.
+      clear -Hlk1.
+      induction cm' as [| [k' v'] cm'' IHcm].
+      * discriminate.
+      * simpl in Hlk1.
+        destruct (eq_kername k1 k') eqn:Hkk'.
+        -- injection Hlk1 as <-. now left.
+        -- right. eapply IHcm. exact Hlk1.
+    + eapply IH; eauto.
+Qed.
+
+Section GlobalCMapFacts.
+
+  Context (func_tag default_tag : positive)
+          (tgm : conId_map).
+
+  Context {efl : EEnvFlags}.
+  Context (Σ : EAst.global_context).
+  Context (Hwf_glob : wf_glob Σ).
+  Context (HnoAxioms : has_axioms = false).
+
+  Lemma suffix_wf (prefix Σ0 : global_context) :
+    wf_glob (List.app prefix Σ0) ->
+    wf_glob Σ0.
+  Proof.
+    intros Hwf.
+    eapply EExtends.extends_wf_glob.
+    - exists prefix. reflexivity.
+    - exact Hwf.
+  Qed.
+
+  Lemma wf_glob_head_const_none_absurd Σ0 k :
+    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
+    False.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. rewrite HnoAxioms in Hwd. discriminate.
+  Qed.
+
+  Lemma declared_constant_cons_neq kn d Σ0 kn' decl :
+    kn <> kn' ->
+    declared_constant Σ0 kn' decl ->
+    declared_constant ((kn, d) :: Σ0) kn' decl.
+  Proof.
+    intros Hneq Hdecl.
+    unfold declared_constant in *.
+    simpl. rewrite eq_kername_bool_neq; eauto.
+  Qed.
+
+  Lemma declared_constant_from_in Σ0 k decl :
+    wf_glob Σ0 ->
+    List.In (k, EAst.ConstantDecl decl) Σ0 ->
+    declared_constant Σ0 k decl.
+  Proof.
+    intros Hwf0 Hin.
+    pose proof (EExtends.lookup_env_In efl (k, EAst.ConstantDecl decl) Σ0 Hwf0) as Hiff.
+    exact ((proj2 Hiff) Hin).
+  Qed.
+
+  Lemma anf_cvt_rel_global_complete :
+    forall S gd cm_acc cm C_env S' Σ_proc,
+      anf_cvt_rel_global func_tag default_tag tgm S gd cm_acc cm C_env S' ->
+      Σ = List.app (List.rev gd) Σ_proc ->
+      (forall s d, lookup_constant Σ_proc s = Some d ->
+                   lookup_const cm_acc s <> None) ->
+      forall s d,
+        lookup_constant Σ s = Some d ->
+        lookup_const cm s <> None.
+  Proof.
+    intros S gd cm_acc cm C_env S' Σ_proc Hcvt.
+    revert Σ_proc.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd' cm0 cm' C C_rest v Hbody Hrest IH
+      | S0 S0' k gd' cm0 cm' C_rest Hrest IH
+      | S0 S0' k ind gd' cm0 cm' C_rest Hrest IH ];
+      intros Σ_proc HΣ_eq Hcm_complete_proc s d Hlk.
+    - rewrite HΣ_eq in Hlk. exact (Hcm_complete_proc _ _ Hlk).
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      assert (Hcm_complete_proc1 :
+        forall s0 d0,
+          lookup_constant
+            ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) s0 = Some d0 ->
+          lookup_const ((k, v) :: cm0) s0 <> None).
+      { intros s0 d0 Hlk0.
+        unfold lookup_constant in Hlk0.
+        simpl in Hlk0. simpl.
+        destruct (eq_kername s0 k) eqn:Hsk; [discriminate |].
+        exact (Hcm_complete_proc _ _ Hlk0). }
+      eapply (IH ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc));
+        eauto.
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      assert (Hwf_proc1 :
+        wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+      { eapply suffix_wf with (prefix := List.rev gd').
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      assert (Hcm_complete_proc1 :
+        forall s0 d0,
+          lookup_constant ((k, EAst.InductiveDecl ind) :: Σ_proc) s0 = Some d0 ->
+          lookup_const cm0 s0 <> None).
+      { intros s0 d0 Hlk0.
+        unfold lookup_constant in Hlk0.
+        simpl in Hlk0.
+        destruct (eq_kername s0 k) eqn:Hsk.
+        - discriminate.
+        - exact (Hcm_complete_proc _ _ Hlk0). }
+      eapply (IH ((k, EAst.InductiveDecl ind) :: Σ_proc)); eauto.
+  Qed.
+
+  Lemma anf_cvt_rel_global_sound :
+    forall S gd cm_acc cm C_env S' Σ_proc,
+      anf_cvt_rel_global func_tag default_tag tgm S gd cm_acc cm C_env S' ->
+      Σ = List.app (List.rev gd) Σ_proc ->
+      (forall k v, lookup_const cm_acc k = Some v ->
+                   exists decl body,
+                     declared_constant Σ k decl /\
+                     decl.(EAst.cst_body) = Some body) ->
+      forall k v,
+        lookup_const cm k = Some v ->
+        exists decl body,
+          declared_constant Σ k decl /\
+          decl.(EAst.cst_body) = Some body.
+  Proof.
+    intros S gd cm_acc cm C_env S' Σ_proc Hcvt.
+    revert Σ_proc.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd' cm0 cm' C C_rest v Hbody Hrest IH
+      | S0 S0' k gd' cm0 cm' C_rest Hrest IH
+      | S0 S0' k ind gd' cm0 cm' C_rest Hrest IH ];
+      intros Σ_proc HΣ_eq Hcm_sound_proc k0 v0 Hlk.
+    - exact (Hcm_sound_proc _ _ Hlk).
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      assert (Hcm_sound_proc1 :
+        forall k1 v1,
+          lookup_const ((k, v) :: cm0) k1 = Some v1 ->
+          exists decl body0,
+            declared_constant Σ k1 decl /\
+            decl.(EAst.cst_body) = Some body0).
+      { intros k1 v1 Hlk1.
+        simpl in Hlk1.
+        destruct (eq_kername k1 k) eqn:Hk1.
+        + apply eq_kername_bool_eq in Hk1. subst k1.
+          injection Hlk1 as <-.
+          exists {| EAst.cst_body := Some body |}, body.
+          split.
+          * eapply declared_constant_from_in; [exact Hwf_glob |].
+            rewrite HΣ_eq. apply in_or_app. right. simpl. now left.
+          * reflexivity.
+        + destruct (Hcm_sound_proc _ _ Hlk1) as [decl [body0 [Hdecl Hbody0]]].
+          exists decl, body0. split.
+          * exact Hdecl.
+          * exact Hbody0. }
+      eapply (IH ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc));
+        eauto.
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      eapply (IH ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)); eauto.
+    - simpl in HΣ_eq.
+      rewrite <- app_assoc in HΣ_eq.
+      simpl in HΣ_eq.
+      eapply (IH ((k, EAst.InductiveDecl ind) :: Σ_proc)); eauto.
+  Qed.
+
+  Corollary anf_cvt_rel_global_complete_top :
+    forall S cm C_env S',
+      anf_cvt_rel_global func_tag default_tag tgm S (List.rev Σ) [] cm C_env S' ->
+      forall s d,
+        lookup_constant Σ s = Some d ->
+        lookup_const cm s <> None.
+  Proof.
+    intros S cm C_env S' Hcvt s d Hlk.
+    eapply anf_cvt_rel_global_complete with (Σ_proc := []); eauto.
+    - rewrite rev_involutive. rewrite app_nil_r. reflexivity.
+    - intros s0 d0 Hlk0. discriminate.
+  Qed.
+
+  Corollary anf_cvt_rel_global_sound_top :
+    forall S cm C_env S',
+      anf_cvt_rel_global func_tag default_tag tgm S (List.rev Σ) [] cm C_env S' ->
+      forall k v,
+        lookup_const cm k = Some v ->
+        exists decl body,
+          declared_constant Σ k decl /\
+          decl.(EAst.cst_body) = Some body.
+  Proof.
+    intros S cm C_env S' Hcvt k v Hlk.
+    eapply anf_cvt_rel_global_sound with (Σ_proc := []); eauto.
+    - rewrite rev_involutive. rewrite app_nil_r. reflexivity.
+    - intros k0 v0 Hlk0. discriminate.
+  Qed.
+
+End GlobalCMapFacts.
 
 
 Section AlphaEquiv.

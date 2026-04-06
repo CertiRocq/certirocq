@@ -50,6 +50,7 @@ LambdaBox_to_LambdaANF/anf_util.v
 LambdaBox_to_LambdaANF/wf.v
 LambdaBox_to_LambdaANF/anf_correct.v
 LambdaBox_to_LambdaANF/anf_global.v
+LambdaBox_to_LambdaANF/anf_toplevel.v
 
 # LambdaANF
 LambdaANF/Frame.v
