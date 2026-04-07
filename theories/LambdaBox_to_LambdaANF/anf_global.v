@@ -1039,6 +1039,125 @@ Section GlobalBindingsCorrect.
     exact (Hterm src_v anf_v eq_refl Hrel_v).
   Qed.
 
+  Lemma global_body_correct_acc :
+    forall cm_acc Σ_proc,
+      EWellformed.wf_glob Σ_proc ->
+      EGlobalEnv.extends Σ_proc Σ ->
+      (forall s v, lookup_const cm_acc s = Some v -> lookup_const cmap s = Some v) ->
+      (forall s d, lookup_constant Σ_proc s = Some d ->
+                   lookup_const cm_acc s <> None) ->
+      (forall k v, lookup_const cm_acc k = Some v ->
+                   exists decl body,
+                     declared_constant Σ_proc k decl /\
+                     decl.(EAst.cst_body) = Some body) ->
+      NoDup (map fst cm_acc) ->
+      @cmap_eval_coherent cm_acc _ Hf_src Ht_src Σ_proc box_dc ->
+      forall body v C S S' rho src_v f t,
+        wellformed Σ_proc 0 body = true ->
+        cvt_rel_at cm_acc S body [] S' C v ->
+        Disjoint _ (cmap_vars cm_acc) S ->
+        glob_rel_at cm_acc Σ_proc (kn_deps body) rho ->
+        eval_at Σ_proc [] body (Val src_v) f t ->
+        exists anf_v,
+          anf_val_rel' src_v anf_v /\
+          forall e_k i,
+            Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set v]) ->
+            preord_exp cenv (anf_bound f t) eq_fuel i
+              (e_k, M.set v anf_v rho) (C |[ e_k ]|, rho).
+  Proof.
+    intros cm_acc Σ_proc Hwf_proc Hext_proc Hcm_sub
+           Hcm_complete_proc Hcm_sound_proc Hnd_acc Hcoh_acc
+           body v C S S' rho src_v f t
+           Hwf Hcvt Hdis Hglob Heval.
+    assert (Hcm_agree :
+      forall s v0, lookup_const cmap s = Some v0 ->
+                   lookup_const cm_acc s <> None ->
+                   lookup_const cm_acc s = Some v0).
+    { intros s v0 Hlk_full Hlk_some.
+      destruct (lookup_const cm_acc s) as [v1|] eqn:Hlk_acc; [| contradiction].
+      pose proof (Hcm_sub _ _ Hlk_acc) as Hlk_full_acc.
+      rewrite Hlk_full in Hlk_full_acc. injection Hlk_full_acc as Heq.
+      subst v1.
+      reflexivity. }
+    assert (Hcm_complete_decl :
+      forall s decl, declared_constant Σ_proc s decl -> lookup_const cm_acc s <> None).
+    { intros s decl Hdecl.
+      eapply Hcm_complete_proc.
+      exact (EGlobalEnv.declared_constant_lookup Hdecl). }
+    assert (Hcm_sound_decl :
+      forall k v0, lookup_const cm_acc k = Some v0 ->
+                   exists decl, declared_constant Σ_proc k decl).
+    { intros k v0 Hlk.
+      destruct (Hcm_sound_proc _ _ Hlk) as [decl [body0 [Hdecl _]]].
+      exists decl. exact Hdecl. }
+    assert (Hglob_term_proc :
+      forall k decl body0,
+        declared_constant Σ_proc k decl ->
+        decl.(EAst.cst_body) = Some body0 ->
+        exists src_v0 f0 t0,
+          eval_at Σ_proc [] body0 (Val src_v0) f0 t0).
+    { intros k decl body0 Hdecl Hbody0.
+      pose proof Hdecl as Hlk_proc.
+      unfold declared_constant in Hlk_proc.
+      pose proof (Hext_proc _ _ Hlk_proc) as Hlk_full.
+      destruct (Hglob_term _ _ _ Hlk_full Hbody0) as [src_v0 [f0 [t0 Heval_full]]].
+      assert (Hwf_body0 : wellformed Σ_proc 0 body0 = true).
+      { eapply wf_glob_globals_wf; eauto. }
+      pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                           Σ box_dc Σ_proc
+                           [] body0 (fuel_sem.Val src_v0) f0 t0
+                           Hwf_proc Hext_proc ltac:(constructor)
+                           Hwf_body0 Heval_full))
+        as Heval_proc.
+      exists src_v0, f0, t0. exact Heval_proc. }
+    assert (Hglob_wf_proc :
+      forall k decl body0,
+        declared_constant Σ_proc k decl ->
+        decl.(EAst.cst_body) = Some body0 ->
+        wellformed Σ_proc 0 body0 = true).
+    { intros k decl body0 Hdecl Hbody0.
+      eapply wf_glob_globals_wf; eauto. }
+    assert (Hval_rel_exists_acc :
+      forall src_v0,
+        well_formed_val Σ_proc src_v0 ->
+        exists anf_v0, val_rel_at cm_acc Σ_proc src_v0 anf_v0).
+    { intros src_v0 Hwf_src0.
+      assert (Hwf_src_full : well_formed_val Σ src_v0).
+      { eapply well_formed_val_extends; eauto. }
+      destruct (val_rel_exists src_v0 Hwf_src_full) as [anf_v0 Hrel_full].
+      exists anf_v0.
+      eapply anf_val_rel_weaken; eauto.
+    }
+    assert (Hcons : @env_consistent [] []).
+    { intros i0 j0 x0 Hi. rewrite nth_error_nil in Hi. discriminate. }
+    assert (Hcmap_c : @cmap_consistent cm_acc _ Hf_src Ht_src Σ_proc box_dc [] []).
+    { intros i0 x0 k0 decl0 body0 Hnth. rewrite nth_error_nil in Hnth. discriminate. }
+    assert (Hdis_fn : Disjoint _ (FromList []) S).
+    { rewrite FromList_nil. now apply Disjoint_Empty_set_l. }
+    assert (Henv : env_rel_at cm_acc Σ_proc [] [] rho) by constructor.
+    assert (Hwfe : well_formed_env Σ_proc []) by constructor.
+    assert (Hwf_src : well_formed_val Σ_proc src_v).
+    { eapply eval_preserves_wf; [exact Hglob_wf_proc | constructor | exact Hwf | exact Heval]. }
+    assert (Hwf_src_full : well_formed_val Σ src_v).
+    { eapply well_formed_val_extends; eauto. }
+    destruct (val_rel_exists src_v Hwf_src_full) as [anf_v Hrel_v].
+    assert (Hrel_v_acc : val_rel_at cm_acc Σ_proc src_v anf_v).
+    { eapply anf_val_rel_weaken; eauto. }
+    pose proof (@anf_cvt_correct
+                  func_tag default_tag kon_tag
+                  tgm cm_acc cenv Σ_proc _ dcon_to_tag_inj box_dc box_tag
+                  cenv_case_consistent Hcoh_acc
+                  Hglob_term_proc Hglob_wf_proc Hval_rel_exists_acc
+                  [] body (fuel_sem.Val src_v) f t Heval)
+      as Hcorrect.
+    unfold anf_cvt_correct_exp in Hcorrect.
+    exists anf_v. split; [exact Hrel_v |].
+    intros e_k i Hdis_ek.
+    destruct (Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob Hcvt e_k Hdis_ek)
+      as [Hterm _].
+    exact (Hterm src_v anf_v eq_refl Hrel_v_acc).
+  Qed.
+
 
   (* ----------------------------------------------------------------- *)
   (** ** Composed global context correctness *)
@@ -1063,6 +1182,44 @@ Section GlobalBindingsCorrect.
       eapply anf_cvt_exp_subset. exact Hbody.
     - exact IH.
     - exact IH.
+  Qed.
+
+  Lemma anf_cvt_global_disjoint_acc :
+    forall S gd cm_acc cm C_env S',
+      anf_cvt_rel_global func_tag default_tag tgm S gd cm_acc cm C_env S' ->
+      Disjoint _ (cmap_vars cm_acc) S ->
+      Disjoint _ (cmap_vars cm) S'.
+  Proof.
+    intros S gd cm_acc cm C_env S' Hcvt.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd0 cm0 cm1 C0 C_rest0 v0 Hbody Hrest IH
+      | S0 S0' k gd0 cm0 cm1 C_rest0 Hrest IH
+      | S0 S0' k ind0 gd0 cm0 cm1 C_rest0 Hrest IH ];
+      intros Hdis_acc.
+    - exact Hdis_acc.
+    - assert (Hdis_cm1 : Disjoint _ (cmap_vars ((k, v0) :: cm0)) S1).
+      { constructor. intros z Hc.
+        inversion Hc as [? Hzcm HzS1]; subst; clear Hc.
+        destruct Hzcm as [s Hlk].
+        simpl in Hlk.
+        destruct (eq_kername s k) eqn:Hsk.
+        + apply eq_kername_bool_eq in Hsk. subst s.
+          injection Hlk as <-.
+          eapply (anf_cvt_result_not_in_output
+                    func_tag default_tag tgm cm0
+                    S0 body [] S1 C0 v0 Hbody).
+          * rewrite FromList_nil. now apply Disjoint_Empty_set_l.
+          * exact Hdis_acc.
+          * exact HzS1.
+        + eapply Hdis_acc.
+          constructor.
+          * exists s. exact Hlk.
+          * eapply anf_cvt_exp_subset; [exact Hbody | exact HzS1].
+      }
+      eapply IH. exact Hdis_cm1.
+    - eapply IH. exact Hdis_acc.
+    - eapply IH. exact Hdis_acc.
   Qed.
 
   Lemma comp_anf_bound_inclusion f1 t1 f2 t2 :
@@ -1107,6 +1264,16 @@ Section GlobalBindingsCorrect.
     simpl. rewrite eq_kername_bool_neq; eauto.
   Qed.
 
+  Lemma declared_constant_cons_inv_neq kn d Σ0 kn' decl :
+    kn <> kn' ->
+    declared_constant ((kn, d) :: Σ0) kn' decl ->
+    declared_constant Σ0 kn' decl.
+  Proof.
+    intros Hneq Hdecl.
+    unfold declared_constant in *.
+    simpl in Hdecl. rewrite eq_kername_bool_neq in Hdecl; eauto.
+  Qed.
+
   Lemma wf_glob_head_const_some_wf Σ0 k body :
     EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
     wellformed Σ0 0 body = true.
@@ -1149,6 +1316,325 @@ Section GlobalBindingsCorrect.
       simpl in Hnotin. intro Hin. apply Hnotin. right. exact Hin.
     - eapply IHHcvt; eauto.
       simpl in Hnotin. intro Hin. apply Hnotin. right. exact Hin.
+  Qed.
+
+  Lemma cmap_eval_coherent_lift_head cm Σ_tail k d :
+    EWellformed.wf_glob ((k, d) :: Σ_tail) ->
+    (forall k0 v0, lookup_const cm k0 = Some v0 ->
+       exists decl body,
+         declared_constant Σ_tail k0 decl /\
+         decl.(EAst.cst_body) = Some body) ->
+    @cmap_eval_coherent cm _ Hf_src Ht_src Σ_tail box_dc ->
+    @cmap_eval_coherent cm _ Hf_src Ht_src ((k, d) :: Σ_tail) box_dc.
+  Proof.
+    intros Hwf_cons Hcm_sound_tail Hcoh
+           k1 k2 x decl1 body1 decl2 body2 src_v f t
+           Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
+    assert (Hwf_tail : EWellformed.wf_glob Σ_tail).
+    { eapply suffix_wf with (prefix := [(k, d)]). exact Hwf_cons. }
+    assert (Hext_tail :
+      EGlobalEnv.extends Σ_tail ((k, d) :: Σ_tail)).
+    { eapply suffix_extends with (prefix := [(k, d)]). exact Hwf_cons. }
+    assert (Hnotin_tail : ~ List.In k (map fst Σ_tail)).
+    { eapply key_not_in_suffix with (prefix := []) (decl := d). exact Hwf_cons. }
+    assert (Hneq1 : k1 <> k).
+    { intro Heq. subst k1.
+      destruct (Hcm_sound_tail _ _ Hlk1) as [decl [body [Hdecl _]]].
+      apply Hnotin_tail.
+      eapply declared_constant_in_map_fst; [exact Hwf_tail | exact Hdecl]. }
+    assert (Hneq2 : k2 <> k).
+    { intro Heq. subst k2.
+      destruct (Hcm_sound_tail _ _ Hlk2) as [decl [body [Hdecl _]]].
+      apply Hnotin_tail.
+      eapply declared_constant_in_map_fst; [exact Hwf_tail | exact Hdecl]. }
+    assert (Hdecl1_tail : declared_constant Σ_tail k1 decl1).
+    { eapply declared_constant_cons_inv_neq; eauto. }
+    assert (Hdecl2_tail : declared_constant Σ_tail k2 decl2).
+    { eapply declared_constant_cons_inv_neq; eauto. }
+    assert (Hwf_body1_tail : wellformed Σ_tail 0 body1 = true).
+    { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl1_tail Hbody1). }
+    pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                         ((k, d) :: Σ_tail) box_dc Σ_tail
+                         [] body1 (fuel_sem.Val src_v) f t
+                         Hwf_tail Hext_tail ltac:(constructor)
+                         Hwf_body1_tail Heval1))
+      as Heval1_tail.
+    destruct (Hcoh _ _ _ _ _ _ _ _ _ _ Hlk1 Hlk2
+                    Hdecl1_tail Hbody1 Hdecl2_tail Hbody2 Heval1_tail)
+      as [f' [t' Heval2_tail]].
+    exists f', t'. eapply eval_env_fuel_extends; eauto.
+  Qed.
+
+  Lemma global_ctx_cmap_eval_coherent_strong :
+    forall (Σ_proc : EAst.global_context) gd cm_acc C_env S S',
+      anf_cvt_rel_global func_tag default_tag tgm
+        S gd cm_acc cmap C_env S' ->
+      Σ = List.rev gd ++ Σ_proc ->
+      EWellformed.wf_glob Σ_proc ->
+      (forall s v, lookup_const cm_acc s = Some v -> lookup_const cmap s = Some v) ->
+      (forall k v, lookup_const cm_acc k = Some v ->
+                   exists decl body,
+                     declared_constant Σ_proc k decl /\
+                     decl.(EAst.cst_body) = Some body) ->
+      Disjoint _ (cmap_vars cmap) S ->
+      @cmap_eval_coherent cm_acc _ Hf_src Ht_src Σ_proc box_dc ->
+      @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc.
+  Proof.
+    intros Σ_proc gd cm_acc C_env S S' Hcvt.
+    revert Σ_proc.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd' cm0 cm' C C_rest v Hbody_cvt Hrest IHrest
+      | S0 S0' k gd' cm0 cm' C_rest Hrest IHrest
+      | S0 S0' k ind gd' cm0 cm' C_rest Hrest IHrest ];
+      intros Σ_proc HΣ_eq Hwf_proc Hcm_sub Hcm_sound_proc Hdis Hcoh_acc.
+    - simpl in HΣ_eq. symmetry in HΣ_eq. subst Σ_proc. exact Hcoh_acc.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (HΣ_rest : Σ = List.rev gd' ++
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { replace (List.rev gd' ++
+                   ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc))
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        exact HΣ_eq. }
+      assert (Hwf_proc1 : EWellformed.wf_glob
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { eapply suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      assert (Hwf_split_app : EWellformed.wf_glob
+          ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc)).
+      { replace
+          ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc)
+          with (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+          by (rewrite <- app_assoc; simpl; reflexivity).
+        exact Hwf_split. }
+      assert (Hwf_body_proc : wellformed Σ_proc 0 body = true).
+      { eapply wf_glob_head_const_some_wf. exact Hwf_proc1. }
+      assert (Hext_proc_small :
+        EGlobalEnv.extends Σ_proc ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { eapply suffix_extends with
+          (prefix := [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]).
+        exact Hwf_proc1. }
+      assert (Hext_proc_full : EGlobalEnv.extends Σ_proc Σ).
+      { rewrite HΣ_eq.
+        eapply suffix_extends with
+          (prefix := List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]).
+        exact Hwf_split_app. }
+      assert (Hnotin_proc : ~ List.In k (map fst Σ_proc)).
+      { eapply key_not_in_suffix
+          with (prefix := List.rev gd')
+               (decl := EAst.ConstantDecl {| EAst.cst_body := Some body |}).
+        exact Hwf_split. }
+      assert (Hnotin_rev_gd' : ~ List.In k (map fst (List.rev gd'))).
+      { eapply key_not_in_prefix with
+          (decl := EAst.ConstantDecl {| EAst.cst_body := Some body |})
+          (suffix := Σ_proc).
+        exact Hwf_split. }
+      assert (Hnotin_gd' : ~ List.In k (map fst gd')).
+      { intro Hin. apply Hnotin_rev_gd'. rewrite map_rev. rewrite <- in_rev. exact Hin. }
+      assert (Hlk_cmap_k : lookup_const cm' k = Some v).
+      { eapply anf_cvt_rel_global_lookup_preserved with
+          (S := S1) (gd := gd') (cm_acc := (k, v) :: cm0) (C_env := C_rest) (S' := S2).
+        - exact Hrest.
+        - simpl. rewrite eq_kername_refl. reflexivity.
+        - exact Hnotin_gd'. }
+      assert (Hdis_cm0 : Disjoint _ (cmap_vars cm0) S0).
+      { eapply Disjoint_Included_l.
+        - intros z Hz. unfold Ensembles.In, cmap_vars in Hz |- *.
+          destruct Hz as [kz Hlkz].
+          exact (ex_intro _ kz (Hcm_sub _ _ Hlkz)).
+        - exact Hdis. }
+      assert (Hdis_nil : Disjoint _ (FromList []) S0).
+      { rewrite FromList_nil. now apply Disjoint_Empty_set_l. }
+      assert (Hcons_nil : @env_consistent [] []).
+      { intros i j x Hi. rewrite nth_error_nil in Hi. discriminate. }
+      assert (Hcmap_nil : @cmap_consistent cm0 _ Hf_src Ht_src Σ_proc box_dc [] []).
+      { intros i x k0 decl0 body0 Hnth. rewrite nth_error_nil in Hnth. discriminate. }
+      assert (Hcoh_old1 :
+        @cmap_eval_coherent cm0 _ Hf_src Ht_src
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) box_dc).
+      { eapply cmap_eval_coherent_lift_head; eauto. }
+      assert (Hdecl_cur_full :
+        declared_constant Σ k {| EAst.cst_body := Some body |}).
+      { eapply declared_constant_from_in; [exact Hwf_glob |].
+        rewrite HΣ_rest. apply in_or_app. right. simpl. left. reflexivity. }
+      assert (Hcm_sound_proc1 :
+        forall k0 v0, lookup_const ((k, v) :: cm0) k0 = Some v0 ->
+                      exists decl body0,
+                        declared_constant
+                          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) k0 decl /\
+                        decl.(EAst.cst_body) = Some body0).
+      { intros k0 v0 Hlk.
+        simpl in Hlk. destruct (eq_kername k0 k) eqn:Hk0k.
+        - apply eq_kername_bool_eq in Hk0k. subst k0.
+          injection Hlk as <-.
+          exists {| EAst.cst_body := Some body |}, body.
+          split.
+          + unfold declared_constant. simpl. rewrite eq_kername_refl. reflexivity.
+          + reflexivity.
+        - destruct (Hcm_sound_proc _ _ Hlk) as [decl [body0 [Hdecl0 Hbody0]]].
+          exists decl, body0. split.
+          + eapply declared_constant_cons_neq; [| exact Hdecl0 ].
+            intro Heq. apply (eq_kername_bool_neq_inv Hk0k). symmetry. exact Heq.
+          + exact Hbody0. }
+      assert (Hcoh_proc1 :
+        @cmap_eval_coherent ((k, v) :: cm0) _ Hf_src Ht_src
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) box_dc).
+      { intros k1 k2 x decl1 body1 decl2 body2 src_v f t
+               Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
+        simpl in Hlk1, Hlk2.
+        destruct (eq_kername k1 k) eqn:Hk1;
+        destruct (eq_kername k2 k) eqn:Hk2.
+        - apply eq_kername_bool_eq in Hk1. apply eq_kername_bool_eq in Hk2.
+          subst k1 k2. injection Hlk1 as <-.
+          unfold declared_constant in Hdecl1, Hdecl2.
+          simpl in Hdecl1, Hdecl2.
+          rewrite eq_kername_refl in Hdecl1, Hdecl2.
+          injection Hdecl1 as <-. injection Hdecl2 as <-.
+          rewrite Hbody1 in Hbody2. injection Hbody2 as <-.
+          exists f, t. exact Heval1.
+        - apply eq_kername_bool_eq in Hk1. subst k1.
+          injection Hlk1 as <-.
+          unfold declared_constant in Hdecl1.
+          simpl in Hdecl1. rewrite eq_kername_refl in Hdecl1.
+          injection Hdecl1 as <-.
+          simpl in Hbody1. injection Hbody1 as <-.
+          assert (Hlk2_tail : lookup_const cm0 k2 = Some v).
+          { exact Hlk2. }
+          assert (Hdecl2_tail : declared_constant Σ_proc k2 decl2).
+          { eapply declared_constant_cons_inv_neq.
+            - intro Heq. apply (eq_kername_bool_neq_inv Hk2). symmetry. exact Heq.
+            - exact Hdecl2. }
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                               box_dc Σ_proc
+                               [] body (fuel_sem.Val src_v) f t
+                               Hwf_proc Hext_proc_small ltac:(constructor)
+                               Hwf_body_proc Heval1))
+            as Heval1_tail.
+          destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
+                      box_tag Hcoh_acc
+                      [] body src_v f t Heval1_tail
+                      S0 [] S1 C v k2 decl2 body2
+                      Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
+                      Hlk2_tail Hdecl2_tail Hbody2)
+            as [f' [t' Heval2_tail]].
+          exists f', t'. exact (@eval_env_fuel_extends _ Hf_src Ht_src
+                                 ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                                 box_dc Σ_proc [] body2 (fuel_sem.Val src_v) f' t'
+                                 Hext_proc_small Heval2_tail).
+        - apply eq_kername_bool_eq in Hk2. subst k2.
+          injection Hlk2 as <-.
+          unfold declared_constant in Hdecl2.
+          simpl in Hdecl2. rewrite eq_kername_refl in Hdecl2.
+          injection Hdecl2 as <-.
+          simpl in Hbody2. injection Hbody2 as <-.
+          assert (Hlk1_tail : lookup_const cm0 k1 = Some v).
+          { exact Hlk1. }
+          assert (Hdecl1_tail : declared_constant Σ_proc k1 decl1).
+          { eapply declared_constant_cons_inv_neq.
+            - intro Heq. apply (eq_kername_bool_neq_inv Hk1). symmetry. exact Heq.
+            - exact Hdecl1. }
+          assert (Hwf_body1_tail : wellformed Σ_proc 0 body1 = true).
+          { exact (wf_glob_globals_wf Σ_proc Hwf_proc _ _ _ Hdecl1_tail Hbody1). }
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                               box_dc Σ_proc
+                               [] body1 (fuel_sem.Val src_v) f t
+                               Hwf_proc Hext_proc_small ltac:(constructor)
+                               Hwf_body1_tail Heval1))
+            as Heval1_tail.
+          destruct (Hglob_term k {| EAst.cst_body := Some body |} body Hdecl_cur_full eq_refl)
+            as [src_v_new [f_new [t_new Heval_new_full]]].
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               Σ box_dc Σ_proc
+                               [] body (fuel_sem.Val src_v_new) f_new t_new
+                               Hwf_proc Hext_proc_full ltac:(constructor)
+                               Hwf_body_proc Heval_new_full))
+            as Heval_new_tail.
+          destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
+                      box_tag Hcoh_acc
+                      [] body src_v_new f_new t_new Heval_new_tail
+                      S0 [] S1 C v k1 decl1 body1
+                      Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
+                      Hlk1_tail Hdecl1_tail Hbody1)
+            as [f' [t' Heval1_from_new]].
+          assert (src_v_new = src_v) by (eapply eval_val_det; eassumption).
+          subst src_v_new.
+          exists f_new, t_new.
+          exact (@eval_env_fuel_extends _ Hf_src Ht_src
+                   ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                   box_dc Σ_proc [] body (fuel_sem.Val src_v) f_new t_new
+                   Hext_proc_small Heval_new_tail).
+        - assert (Hlk1_tail : lookup_const cm0 k1 = Some x) by exact Hlk1.
+          assert (Hlk2_tail : lookup_const cm0 k2 = Some x) by exact Hlk2.
+          exact (Hcoh_old1 _ _ _ _ _ _ _ _ _ _ Hlk1_tail Hlk2_tail
+                           Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1). }
+      assert (Hcm_sub_rest :
+        forall s v0, lookup_const ((k, v) :: cm0) s = Some v0 -> lookup_const cm' s = Some v0).
+      { intros s v0 Hlk.
+        simpl in Hlk. destruct (eq_kername s k) eqn:Hsk.
+        - apply eq_kername_bool_eq in Hsk. subst s.
+          injection Hlk as <-. exact Hlk_cmap_k.
+        - exact (Hcm_sub _ _ Hlk). }
+      assert (Hdis1 : Disjoint _ (cmap_vars cm') S1).
+      { eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hbody_cvt | exact Hdis]. }
+      eapply IHrest with
+        (Σ_proc := (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc); eauto.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := None |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (Hwf_proc1 : EWellformed.wf_glob
+          ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+      { eapply suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.InductiveDecl ind)]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (HΣ_rest : Σ = List.rev gd' ++ ((k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { replace (List.rev gd' ++ ((k, EAst.InductiveDecl ind) :: Σ_proc))
+          with ((List.rev gd' ++ [(k, EAst.InductiveDecl ind)]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        exact HΣ_eq. }
+      assert (Hwf_proc1 : EWellformed.wf_glob ((k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { eapply suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      assert (Hcm_sound_proc1 :
+        forall k0 v0, lookup_const cm0 k0 = Some v0 ->
+                      exists decl body0,
+                        declared_constant ((k, EAst.InductiveDecl ind) :: Σ_proc) k0 decl /\
+                        decl.(EAst.cst_body) = Some body0).
+      { intros k0 v0 Hlk.
+        destruct (Hcm_sound_proc _ _ Hlk) as [decl [body0 [Hdecl0 Hbody0]]].
+        assert (Hneq : k <> k0).
+        { intro Heq. subst k0.
+          assert (Hnotin : ~ List.In k (map fst Σ_proc)).
+          { eapply key_not_in_suffix with
+              (prefix := List.rev gd')
+              (decl := EAst.InductiveDecl ind).
+            exact Hwf_split. }
+          apply Hnotin.
+          eapply declared_constant_in_map_fst; [exact Hwf_proc | exact Hdecl0]. }
+        exists decl, body0. split.
+        - eapply declared_constant_cons_neq; [exact Hneq | exact Hdecl0].
+        - exact Hbody0. }
+      assert (Hcoh_proc1 :
+        @cmap_eval_coherent cm0 _ Hf_src Ht_src
+          ((k, EAst.InductiveDecl ind) :: Σ_proc) box_dc).
+      { eapply cmap_eval_coherent_lift_head; eauto. }
+      eapply IHrest with (Σ_proc := (k, EAst.InductiveDecl ind) :: Σ_proc); eauto.
   Qed.
 
   Lemma global_ctx_correct_strong :
@@ -1522,6 +2008,525 @@ End GlobalBindingsCorrect.
 
 
 (* ================================================================= *)
+(** * Coherence of [cmap] by construction                           *)
+(* ================================================================= *)
+
+Section GlobalBindingsCoherence.
+
+  Context (func_tag default_tag : positive)
+          (tgm : conId_map)
+          (cmap : const_map)
+          (Σ : EAst.global_context).
+
+  Context {efl : EEnvFlags}.
+  Context (HnoAxioms : has_axioms = false).
+
+  Context (box_dc : dcon)
+          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
+
+  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
+  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+
+  Local Notation cvt_rel_at cm0 :=
+    (@anf_cvt_rel func_tag default_tag tgm cm0).
+  Local Notation eval_at Σ0 :=
+    (@eval_env_fuel nat Hf_src Ht_src Σ0 box_dc).
+
+  Context (Hglob_term :
+    forall k decl body,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      exists src_v f t, eval_at Σ [] body (Val src_v) f t).
+
+  Context (Hwf_glob : wf_glob Σ).
+
+  Lemma coh_declared_constant_from_in Σ0 k decl :
+    EWellformed.wf_glob Σ0 ->
+    List.In (k, EAst.ConstantDecl decl) Σ0 ->
+    declared_constant Σ0 k decl.
+  Proof.
+    intros Hwf0 Hin.
+    pose proof (EExtends.lookup_env_In efl (k, EAst.ConstantDecl decl) Σ0 Hwf0) as Hiff.
+    exact ((proj2 Hiff) Hin).
+  Qed.
+
+  Lemma coh_declared_constant_in_map_fst Σ0 k decl :
+    EWellformed.wf_glob Σ0 ->
+    declared_constant Σ0 k decl ->
+    List.In k (map fst Σ0).
+  Proof.
+    intros Hwf0 Hdecl.
+    pose proof (EExtends.lookup_env_In efl (k, EAst.ConstantDecl decl) Σ0 Hwf0) as Hiff.
+    exact (in_map fst _ _ ((proj1 Hiff) Hdecl)).
+  Qed.
+
+  Lemma coh_declared_constant_cons_neq kn d Σ0 kn' decl :
+    kn <> kn' ->
+    declared_constant Σ0 kn' decl ->
+    declared_constant ((kn, d) :: Σ0) kn' decl.
+  Proof.
+    intros Hneq Hdecl.
+    unfold declared_constant in *.
+    simpl. rewrite eq_kername_bool_neq; eauto.
+  Qed.
+
+  Lemma coh_declared_constant_cons_inv_neq kn d Σ0 kn' decl :
+    kn <> kn' ->
+    declared_constant ((kn, d) :: Σ0) kn' decl ->
+    declared_constant Σ0 kn' decl.
+  Proof.
+    intros Hneq Hdecl.
+    unfold declared_constant in *.
+    simpl in Hdecl. rewrite eq_kername_bool_neq in Hdecl; eauto.
+  Qed.
+
+  Lemma coh_suffix_wf prefix Σ0 :
+    EWellformed.wf_glob (prefix ++ Σ0) ->
+    EWellformed.wf_glob Σ0.
+  Proof.
+    intros Hwf.
+    eapply EExtends.extends_wf_glob.
+    - exists prefix. reflexivity.
+    - exact Hwf.
+  Qed.
+
+  Lemma coh_suffix_extends prefix Σ0 :
+    EWellformed.wf_glob (prefix ++ Σ0) ->
+    EGlobalEnv.extends Σ0 (prefix ++ Σ0).
+  Proof.
+    intro Hwf.
+    eapply EExtends.extends_prefix_extends.
+    - exists prefix. reflexivity.
+    - exact Hwf.
+  Qed.
+
+  Lemma coh_key_not_in_prefix prefix k decl suffix :
+    EWellformed.wf_glob (prefix ++ (k, decl) :: suffix) ->
+    ~ List.In k (map fst prefix).
+  Proof.
+    intros Hwf Hin.
+    pose proof (EProgram.wf_glob_fresh _ Hwf) as Hfg.
+    apply EnvMap.EnvMap.fresh_globals_iff_NoDup in Hfg.
+    rewrite map_app in Hfg. simpl in Hfg.
+    assert (Hnotin : ~ List.In k (map fst prefix ++ map fst suffix)).
+    { eapply NoDup_remove_2. exact Hfg. }
+    apply Hnotin. apply in_or_app. left. exact Hin.
+  Qed.
+
+  Lemma coh_key_not_in_suffix prefix k decl suffix :
+    EWellformed.wf_glob (prefix ++ (k, decl) :: suffix) ->
+    ~ List.In k (map fst suffix).
+  Proof.
+    intros Hwf Hin.
+    pose proof (EProgram.wf_glob_fresh _ Hwf) as Hfg.
+    apply EnvMap.EnvMap.fresh_globals_iff_NoDup in Hfg.
+    rewrite map_app in Hfg. simpl in Hfg.
+    assert (Hnotin : ~ List.In k (map fst prefix ++ map fst suffix)).
+    { eapply NoDup_remove_2. exact Hfg. }
+    apply Hnotin. apply in_or_app. right. exact Hin.
+  Qed.
+
+  Lemma coh_wf_glob_head_const_some_wf Σ0 k body :
+    EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
+    wellformed Σ0 0 body = true.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. exact Hwd.
+  Qed.
+
+  Lemma coh_wf_glob_head_const_none_absurd Σ0 k :
+    EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
+    False.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. rewrite HnoAxioms in Hwd. discriminate.
+  Qed.
+
+  Lemma coh_anf_cvt_rel_global_lookup_preserved :
+    forall S gd cm_acc cm C_env S' k v,
+      anf_cvt_rel_global func_tag default_tag tgm S gd cm_acc cm C_env S' ->
+      lookup_const cm_acc k = Some v ->
+      ~ List.In k (map fst gd) ->
+      lookup_const cm k = Some v.
+  Proof.
+    intros S gd cm_acc cm C_env S' k v Hcvt.
+    induction Hcvt; intros Hlk Hnotin.
+    - exact Hlk.
+    - simpl in Hnotin.
+      assert (Hneq : k <> k0).
+      { intro Heq. apply Hnotin. left. symmetry. exact Heq. }
+      assert (Hnotin' : ~ List.In k (map fst gd')).
+      { intro Hin. apply Hnotin. right. exact Hin. }
+      simpl. destruct (eq_kername k k0) eqn:Hkk0.
+      { exfalso. apply Hneq. now apply eq_kername_bool_eq in Hkk0. }
+      { eapply IHHcvt.
+        - simpl. rewrite Hkk0. exact Hlk.
+        - exact Hnotin'. }
+    - eapply IHHcvt; eauto.
+      simpl in Hnotin. intro Hin. apply Hnotin. right. exact Hin.
+    - eapply IHHcvt; eauto.
+      simpl in Hnotin. intro Hin. apply Hnotin. right. exact Hin.
+  Qed.
+
+  Lemma coh_cmap_eval_coherent_lift_head cm Σ_tail k d :
+    EWellformed.wf_glob ((k, d) :: Σ_tail) ->
+    (forall k0 v0, lookup_const cm k0 = Some v0 ->
+       exists decl body,
+         declared_constant Σ_tail k0 decl /\
+         decl.(EAst.cst_body) = Some body) ->
+    @cmap_eval_coherent cm _ Hf_src Ht_src Σ_tail box_dc ->
+    @cmap_eval_coherent cm _ Hf_src Ht_src ((k, d) :: Σ_tail) box_dc.
+  Proof.
+    intros Hwf_cons Hcm_sound_tail Hcoh
+           k1 k2 x decl1 body1 decl2 body2 src_v f t
+           Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
+    assert (Hwf_tail : EWellformed.wf_glob Σ_tail).
+    { eapply coh_suffix_wf with (prefix := [(k, d)]). exact Hwf_cons. }
+    assert (Hext_tail :
+      EGlobalEnv.extends Σ_tail ((k, d) :: Σ_tail)).
+    { eapply coh_suffix_extends with (prefix := [(k, d)]). exact Hwf_cons. }
+    assert (Hnotin_tail : ~ List.In k (map fst Σ_tail)).
+    { eapply coh_key_not_in_suffix with (prefix := []) (decl := d). exact Hwf_cons. }
+    assert (Hneq1 : k1 <> k).
+    { intro Heq. subst k1.
+      destruct (Hcm_sound_tail _ _ Hlk1) as [decl [body [Hdecl _]]].
+      apply Hnotin_tail.
+      eapply coh_declared_constant_in_map_fst; [exact Hwf_tail | exact Hdecl]. }
+    assert (Hneq2 : k2 <> k).
+    { intro Heq. subst k2.
+      destruct (Hcm_sound_tail _ _ Hlk2) as [decl [body [Hdecl _]]].
+      apply Hnotin_tail.
+      eapply coh_declared_constant_in_map_fst; [exact Hwf_tail | exact Hdecl]. }
+    assert (Hdecl1_tail : declared_constant Σ_tail k1 decl1).
+    { eapply coh_declared_constant_cons_inv_neq; eauto. }
+    assert (Hdecl2_tail : declared_constant Σ_tail k2 decl2).
+    { eapply coh_declared_constant_cons_inv_neq; eauto. }
+    assert (Hwf_body1_tail : wellformed Σ_tail 0 body1 = true).
+    { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl1_tail Hbody1). }
+    pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                         ((k, d) :: Σ_tail) box_dc Σ_tail
+                         [] body1 (fuel_sem.Val src_v) f t
+                         Hwf_tail Hext_tail ltac:(constructor)
+                         Hwf_body1_tail Heval1))
+      as Heval1_tail.
+    destruct (Hcoh _ _ _ _ _ _ _ _ _ _ Hlk1 Hlk2
+                    Hdecl1_tail Hbody1 Hdecl2_tail Hbody2 Heval1_tail)
+      as [f' [t' Heval2_tail]].
+    exists f', t'. eapply eval_env_fuel_extends; eauto.
+  Qed.
+
+  Lemma global_ctx_cmap_eval_coherent_strong_by_construction :
+    forall (Σ_proc : EAst.global_context) gd cm_acc C_env S S',
+      anf_cvt_rel_global func_tag default_tag tgm
+        S gd cm_acc cmap C_env S' ->
+      Σ = List.rev gd ++ Σ_proc ->
+      EWellformed.wf_glob Σ_proc ->
+      (forall s v, lookup_const cm_acc s = Some v -> lookup_const cmap s = Some v) ->
+      (forall k v, lookup_const cm_acc k = Some v ->
+                   exists decl body,
+                     declared_constant Σ_proc k decl /\
+                     decl.(EAst.cst_body) = Some body) ->
+      Disjoint _ (cmap_vars cmap) S ->
+      @cmap_eval_coherent cm_acc _ Hf_src Ht_src Σ_proc box_dc ->
+      @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc.
+  Proof.
+    intros Σ_proc gd cm_acc C_env S S' Hcvt.
+    revert Σ_proc.
+    induction Hcvt as
+      [ S0 cm0
+      | S0 S1 S2 k body gd' cm0 cm' C C_rest v Hbody_cvt Hrest IHrest
+      | S0 S0' k gd' cm0 cm' C_rest Hrest IHrest
+      | S0 S0' k ind gd' cm0 cm' C_rest Hrest IHrest ];
+      intros Σ_proc HΣ_eq Hwf_proc Hcm_sub Hcm_sound_proc Hdis Hcoh_acc.
+    - simpl in HΣ_eq. symmetry in HΣ_eq. subst Σ_proc. exact Hcoh_acc.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (HΣ_rest : Σ = List.rev gd' ++
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { replace (List.rev gd' ++
+                   ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc))
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        exact HΣ_eq. }
+      assert (Hwf_proc1 : EWellformed.wf_glob
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { eapply coh_suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      assert (Hwf_split_app : EWellformed.wf_glob
+          ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc)).
+      { replace
+          ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]) ++ Σ_proc)
+          with (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+          by (rewrite <- app_assoc; simpl; reflexivity).
+        exact Hwf_split. }
+      assert (Hwf_body_proc : wellformed Σ_proc 0 body = true).
+      { eapply coh_wf_glob_head_const_some_wf. exact Hwf_proc1. }
+      assert (Hext_proc_small :
+        EGlobalEnv.extends Σ_proc ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+      { eapply coh_suffix_extends with
+          (prefix := [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]).
+        exact Hwf_proc1. }
+      assert (Hext_proc_full : EGlobalEnv.extends Σ_proc Σ).
+      { rewrite HΣ_eq.
+        eapply coh_suffix_extends with
+          (prefix := List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := Some body |})]).
+        exact Hwf_split_app. }
+      assert (Hnotin_proc : ~ List.In k (map fst Σ_proc)).
+      { eapply coh_key_not_in_suffix
+          with (prefix := List.rev gd')
+               (decl := EAst.ConstantDecl {| EAst.cst_body := Some body |}).
+        exact Hwf_split. }
+      assert (Hnotin_rev_gd' : ~ List.In k (map fst (List.rev gd'))).
+      { eapply coh_key_not_in_prefix with
+          (decl := EAst.ConstantDecl {| EAst.cst_body := Some body |})
+          (suffix := Σ_proc).
+        exact Hwf_split. }
+      assert (Hnotin_gd' : ~ List.In k (map fst gd')).
+      { intro Hin. apply Hnotin_rev_gd'. rewrite map_rev. rewrite <- in_rev. exact Hin. }
+      assert (Hlk_cmap_k : lookup_const cm' k = Some v).
+      { eapply coh_anf_cvt_rel_global_lookup_preserved with
+          (S := S1) (gd := gd') (cm_acc := (k, v) :: cm0) (C_env := C_rest) (S' := S2).
+        - exact Hrest.
+        - simpl. rewrite eq_kername_refl. reflexivity.
+        - exact Hnotin_gd'. }
+      assert (Hdis_cm0 : Disjoint _ (cmap_vars cm0) S0).
+      { eapply Disjoint_Included_l.
+        - intros z Hz. unfold Ensembles.In, cmap_vars in Hz |- *.
+          destruct Hz as [kz Hlkz].
+          exact (ex_intro _ kz (Hcm_sub _ _ Hlkz)).
+        - exact Hdis. }
+      assert (Hdis_nil : Disjoint _ (FromList []) S0).
+      { rewrite FromList_nil. now apply Disjoint_Empty_set_l. }
+      assert (Hcons_nil : @env_consistent [] []).
+      { intros i j x Hi. rewrite nth_error_nil in Hi. discriminate. }
+      assert (Hcmap_nil : @cmap_consistent cm0 _ Hf_src Ht_src Σ_proc box_dc [] []).
+      { intros i x k0 decl0 body0 Hnth. rewrite nth_error_nil in Hnth. discriminate. }
+      assert (Hcoh_old1 :
+        @cmap_eval_coherent cm0 _ Hf_src Ht_src
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) box_dc).
+      { eapply coh_cmap_eval_coherent_lift_head; eauto. }
+      assert (Hdecl_cur_full :
+        declared_constant Σ k {| EAst.cst_body := Some body |}).
+      { eapply coh_declared_constant_from_in; [exact Hwf_glob |].
+        rewrite HΣ_rest. apply in_or_app. right. simpl. left. reflexivity. }
+      assert (Hcm_sound_proc1 :
+        forall k0 v0, lookup_const ((k, v) :: cm0) k0 = Some v0 ->
+                      exists decl body0,
+                        declared_constant
+                          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) k0 decl /\
+                        decl.(EAst.cst_body) = Some body0).
+      { intros k0 v0 Hlk.
+        simpl in Hlk. destruct (eq_kername k0 k) eqn:Hk0k.
+        - apply eq_kername_bool_eq in Hk0k. subst k0.
+          injection Hlk as <-.
+          exists {| EAst.cst_body := Some body |}, body.
+          split.
+          + unfold declared_constant. simpl. rewrite eq_kername_refl. reflexivity.
+          + reflexivity.
+        - destruct (Hcm_sound_proc _ _ Hlk) as [decl [body0 [Hdecl0 Hbody0]]].
+          exists decl, body0. split.
+          + eapply coh_declared_constant_cons_neq; [| exact Hdecl0 ].
+            intro Heq. apply (eq_kername_bool_neq_inv Hk0k). symmetry. exact Heq.
+          + exact Hbody0. }
+      assert (Hcoh_proc1 :
+        @cmap_eval_coherent ((k, v) :: cm0) _ Hf_src Ht_src
+          ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) box_dc).
+      { intros k1 k2 x decl1 body1 decl2 body2 src_v f t
+               Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
+        simpl in Hlk1, Hlk2.
+        destruct (eq_kername k1 k) eqn:Hk1;
+        destruct (eq_kername k2 k) eqn:Hk2.
+        - apply eq_kername_bool_eq in Hk1. apply eq_kername_bool_eq in Hk2.
+          subst k1 k2. injection Hlk1 as <-.
+          unfold declared_constant in Hdecl1, Hdecl2.
+          simpl in Hdecl1, Hdecl2.
+          rewrite eq_kername_refl in Hdecl1, Hdecl2.
+          injection Hdecl1 as <-. injection Hdecl2 as <-.
+          rewrite Hbody1 in Hbody2. injection Hbody2 as <-.
+          exists f, t. exact Heval1.
+        - apply eq_kername_bool_eq in Hk1. subst k1.
+          injection Hlk1 as <-.
+          unfold declared_constant in Hdecl1.
+          simpl in Hdecl1. rewrite eq_kername_refl in Hdecl1.
+          injection Hdecl1 as <-.
+          simpl in Hbody1. injection Hbody1 as <-.
+          assert (Hlk2_tail : lookup_const cm0 k2 = Some v).
+          { exact Hlk2. }
+          assert (Hdecl2_tail : declared_constant Σ_proc k2 decl2).
+          { eapply coh_declared_constant_cons_inv_neq.
+            - intro Heq. apply (eq_kername_bool_neq_inv Hk2). symmetry. exact Heq.
+            - exact Hdecl2. }
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                               box_dc Σ_proc
+                               [] body (fuel_sem.Val src_v) f t
+                               Hwf_proc Hext_proc_small ltac:(constructor)
+                               Hwf_body_proc Heval1))
+            as Heval1_tail.
+          destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
+                      box_tag Hcoh_acc
+                      [] body src_v f t Heval1_tail
+                      S0 [] S1 C v k2 decl2 body2
+                      Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
+                      Hlk2_tail Hdecl2_tail Hbody2)
+            as [f' [t' Heval2_tail]].
+          exists f', t'. exact (@eval_env_fuel_extends _ Hf_src Ht_src
+                                 ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                                 box_dc Σ_proc [] body2 (fuel_sem.Val src_v) f' t'
+                                 Hext_proc_small Heval2_tail).
+        - apply eq_kername_bool_eq in Hk2. subst k2.
+          injection Hlk2 as <-.
+          unfold declared_constant in Hdecl2.
+          simpl in Hdecl2. rewrite eq_kername_refl in Hdecl2.
+          injection Hdecl2 as <-.
+          simpl in Hbody2. injection Hbody2 as <-.
+          assert (Hlk1_tail : lookup_const cm0 k1 = Some v).
+          { exact Hlk1. }
+          assert (Hdecl1_tail : declared_constant Σ_proc k1 decl1).
+          { eapply coh_declared_constant_cons_inv_neq.
+            - intro Heq. apply (eq_kername_bool_neq_inv Hk1). symmetry. exact Heq.
+            - exact Hdecl1. }
+          assert (Hwf_body1_tail : wellformed Σ_proc 0 body1 = true).
+          { exact (wf_glob_globals_wf Σ_proc Hwf_proc _ _ _ Hdecl1_tail Hbody1). }
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                               box_dc Σ_proc
+                               [] body1 (fuel_sem.Val src_v) f t
+                               Hwf_proc Hext_proc_small ltac:(constructor)
+                               Hwf_body1_tail Heval1))
+            as Heval1_tail.
+          destruct (Hglob_term k {| EAst.cst_body := Some body |} body Hdecl_cur_full eq_refl)
+            as [src_v_new [f_new [t_new Heval_new_full]]].
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+                               Σ box_dc Σ_proc
+                               [] body (fuel_sem.Val src_v_new) f_new t_new
+                               Hwf_proc Hext_proc_full ltac:(constructor)
+                               Hwf_body_proc Heval_new_full))
+            as Heval_new_tail.
+          destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
+                      box_tag Hcoh_acc
+                      [] body src_v_new f_new t_new Heval_new_tail
+                      S0 [] S1 C v k1 decl1 body1
+                      Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
+                      Hlk1_tail Hdecl1_tail Hbody1)
+            as [f' [t' Heval1_from_new]].
+          assert (src_v_new = src_v) by (eapply eval_val_det; eassumption).
+          subst src_v_new.
+          exists f_new, t_new.
+          exact (@eval_env_fuel_extends _ Hf_src Ht_src
+                   ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                   box_dc Σ_proc [] body (fuel_sem.Val src_v) f_new t_new
+                   Hext_proc_small Heval_new_tail).
+        - assert (Hlk1_tail : lookup_const cm0 k1 = Some x) by exact Hlk1.
+          assert (Hlk2_tail : lookup_const cm0 k2 = Some x) by exact Hlk2.
+          exact (Hcoh_old1 _ _ _ _ _ _ _ _ _ _ Hlk1_tail Hlk2_tail
+                           Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1). }
+      assert (Hcm_sub_rest :
+        forall s v0, lookup_const ((k, v) :: cm0) s = Some v0 -> lookup_const cm' s = Some v0).
+      { intros s v0 Hlk.
+        simpl in Hlk. destruct (eq_kername s k) eqn:Hsk.
+        - apply eq_kername_bool_eq in Hsk. subst s.
+          injection Hlk as <-. exact Hlk_cmap_k.
+        - exact (Hcm_sub _ _ Hlk). }
+      assert (Hdis1 : Disjoint _ (cmap_vars cm') S1).
+      { eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; exact Hbody_cvt | exact Hdis]. }
+      eapply IHrest with
+        (Σ_proc := (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc); eauto.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.ConstantDecl {| EAst.cst_body := None |})]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (Hwf_proc1 : EWellformed.wf_glob
+          ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+      { eapply coh_suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      exfalso. eapply coh_wf_glob_head_const_none_absurd. exact Hwf_proc1.
+    - simpl in HΣ_eq.
+      assert (Hwf_split : EWellformed.wf_glob
+          (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { replace (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)
+          with ((List.rev gd' ++ [(k, EAst.InductiveDecl ind)]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        rewrite <- HΣ_eq. exact Hwf_glob. }
+      assert (HΣ_rest : Σ = List.rev gd' ++ ((k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { replace (List.rev gd' ++ ((k, EAst.InductiveDecl ind) :: Σ_proc))
+          with ((List.rev gd' ++ [(k, EAst.InductiveDecl ind)]) ++ Σ_proc).
+        2:{ rewrite <- app_assoc. simpl. reflexivity. }
+        exact HΣ_eq. }
+      assert (Hwf_proc1 : EWellformed.wf_glob ((k, EAst.InductiveDecl ind) :: Σ_proc)).
+      { eapply coh_suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
+      assert (Hcm_sound_proc1 :
+        forall k0 v0, lookup_const cm0 k0 = Some v0 ->
+                      exists decl body0,
+                        declared_constant ((k, EAst.InductiveDecl ind) :: Σ_proc) k0 decl /\
+                        decl.(EAst.cst_body) = Some body0).
+      { intros k0 v0 Hlk.
+        destruct (Hcm_sound_proc _ _ Hlk) as [decl [body0 [Hdecl0 Hbody0]]].
+        assert (Hneq : k <> k0).
+        { intro Heq. subst k0.
+          assert (Hnotin : ~ List.In k (map fst Σ_proc)).
+          { eapply coh_key_not_in_suffix with
+              (prefix := List.rev gd')
+              (decl := EAst.InductiveDecl ind).
+            exact Hwf_split. }
+          apply Hnotin.
+          eapply coh_declared_constant_in_map_fst; [exact Hwf_proc | exact Hdecl0]. }
+        exists decl, body0. split.
+        - eapply coh_declared_constant_cons_neq; [exact Hneq | exact Hdecl0].
+        - exact Hbody0. }
+      assert (Hcoh_proc1 :
+        @cmap_eval_coherent cm0 _ Hf_src Ht_src
+          ((k, EAst.InductiveDecl ind) :: Σ_proc) box_dc).
+      { eapply coh_cmap_eval_coherent_lift_head; eauto. }
+      eapply IHrest with (Σ_proc := (k, EAst.InductiveDecl ind) :: Σ_proc); eauto.
+  Qed.
+
+  Lemma global_ctx_cmap_eval_coherent_top_by_construction :
+    forall C_env S S',
+      anf_cvt_rel_global func_tag default_tag tgm
+        S (List.rev Σ) [] cmap C_env S' ->
+      Disjoint _ (cmap_vars cmap) S ->
+      @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc.
+  Proof.
+    intros C_env S S' Hcvt Hdis.
+    assert (HΣ_top : Σ = List.rev (List.rev Σ) ++ []).
+    { rewrite rev_involutive. rewrite app_nil_r. reflexivity. }
+    assert (Hcm_acc_sub :
+      forall s v, lookup_const ([] : const_map) s = Some v -> lookup_const cmap s = Some v).
+    { intros s v Hlk. discriminate. }
+    assert (Hcm_acc_sound :
+      forall k v, lookup_const ([] : const_map) k = Some v ->
+                  exists decl body,
+                    declared_constant ([] : EAst.global_context) k decl /\
+                    decl.(EAst.cst_body) = Some body).
+    { intros k v Hlk. discriminate. }
+    assert (Hcoh_empty :
+      @cmap_eval_coherent ([] : const_map) _ Hf_src Ht_src ([] : EAst.global_context) box_dc).
+    { intros k1 k2 x decl1 body1 decl2 body2 src_v f t Hlk1. discriminate. }
+    eapply global_ctx_cmap_eval_coherent_strong_by_construction
+      with (Σ_proc := []) (gd := List.rev Σ) (cm_acc := []) (C_env := C_env)
+           (S := S) (S' := S').
+    - exact Hcvt.
+    - exact HΣ_top.
+    - constructor.
+    - exact Hcm_acc_sub.
+    - exact Hcm_acc_sound.
+    - exact Hdis.
+    - exact Hcoh_empty.
+  Qed.
+
+End GlobalBindingsCoherence.
+
+
+(* ================================================================= *)
 (** * Top-level packaging for global binding contexts                 *)
 (* ================================================================= *)
 
@@ -1544,12 +2549,8 @@ Section GlobalBindingsTopLevel.
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
-
   Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
   Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
-
-  Context (Hcmap_eval_coherent :
-    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
 
   Let global_env_rel' :=
     @global_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
@@ -1578,13 +2579,20 @@ Section GlobalBindingsTopLevel.
           (Hblocks : cstr_as_blocks = true)
           (HnoArray : has_primarray = false).
   Context (no_prims : forall s, find_prim prims s = None).
-  Context (cmap_complete : forall s d,
-    lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
-  Context (cmap_sound : forall k v,
-    lookup_const cmap k = Some v ->
-    exists decl body,
-      declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
-  Context (cmap_nodup_keys : NoDup (map fst cmap)).
+
+  Lemma global_ctx_cmap_eval_coherent_top :
+    forall C_env S S',
+      anf_cvt_rel_global func_tag default_tag tgm
+        S (List.rev Σ) [] cmap C_env S' ->
+      Disjoint _ (cmap_vars cmap) S ->
+      @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc.
+  Proof.
+    intros C_env S S' Hcvt Hdis.
+    exact (@global_ctx_cmap_eval_coherent_top_by_construction
+             func_tag default_tag tgm cmap Σ efl HnoAxioms
+             box_dc box_tag Hglob_term Hwf_glob
+             C_env S S' Hcvt Hdis).
+  Qed.
 
   Lemma global_env_rel_empty_acc rho :
     global_env_rel' (fun k => lookup_const ([] : const_map) k <> None) rho.
@@ -1600,20 +2608,33 @@ Section GlobalBindingsTopLevel.
       The initial global-domain assumption is empty, so it holds for any
       starting environment [rho_init]. *)
   Lemma global_ctx_correct_init :
-    forall cm C_env S S',
+    forall C_env S S',
       anf_cvt_rel_global func_tag default_tag tgm
-        S (List.rev Σ) [] cm C_env S' ->
-      (forall s v, lookup_const cm s = Some v -> lookup_const cmap s = Some v) ->
+        S (List.rev Σ) [] cmap C_env S' ->
       Disjoint _ (cmap_vars cmap) S ->
       forall rho_init,
         exists rho_g F T,
-          global_env_rel' (fun k => lookup_const cm k <> None) rho_g /\
+          global_env_rel' (fun k => lookup_const cmap k <> None) rho_g /\
           forall e_k i,
             Disjoint _ (occurs_free e_k) (S \\ S') ->
             preord_exp cenv (anf_bound F T) eq_fuel i
               (e_k, rho_g) (C_env |[ e_k ]|, rho_init).
   Proof.
-    intros cm C_env S S' Hcvt Hcm_sub_final Hdis rho_init.
+    intros C_env S S' Hcvt Hdis rho_init.
+    pose proof (@anf_cvt_rel_global_complete_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  S cmap C_env S' Hcvt)
+      as Hcmap_complete.
+    pose proof (@anf_cvt_rel_global_sound_top
+                  func_tag default_tag tgm efl Σ Hwf_glob
+                  S cmap C_env S' Hcvt)
+      as Hcmap_sound.
+    pose proof (@anf_cvt_rel_global_nodup_keys_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  S cmap C_env S' Hcvt)
+      as Hcmap_nodup_keys.
+    pose proof (global_ctx_cmap_eval_coherent_top C_env S S' Hcvt Hdis)
+      as Hcmap_eval_coherent.
     assert (HΣ_top : Σ = List.rev (List.rev Σ) ++ []).
     { rewrite rev_involutive. rewrite app_nil_r. reflexivity. }
     assert (Hcm_acc_sub :
@@ -1639,9 +2660,9 @@ Section GlobalBindingsTopLevel.
                 Hglob_term Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                no_prims cmap_complete cmap_sound cmap_nodup_keys
-                [] (List.rev Σ) [] cm C_env S S'
-                Hcvt HΣ_top Hcm_acc_sub Hcm_sub_final
+                no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys
+                [] (List.rev Σ) [] cmap C_env S S'
+                Hcvt HΣ_top Hcm_acc_sub (fun s v Hlk => Hlk)
                 Hcm_acc_complete Hcm_acc_sound Hdis rho_init
                 (global_env_rel_empty_acc rho_init))
       as [rho_g [F [T [Hglob_g Hpre]]]].
