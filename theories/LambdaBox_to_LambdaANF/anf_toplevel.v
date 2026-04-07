@@ -41,9 +41,6 @@ Section Refinement.
   Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
   Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
 
-  Context (Hcmap_eval_coherent :
-    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
-
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
   Let anf_env_rel0 :=
@@ -78,20 +75,6 @@ Section Refinement.
           (Hblocks : cstr_as_blocks = true)
           (HnoArray : has_primarray = false).
   Context (no_prims : forall s, find_prim prims s = None).
-  Context (cmap_complete : forall s d,
-    lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
-  Context (cmap_sound : forall k v,
-    lookup_const cmap k = Some v ->
-    exists decl body,
-      declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
-  Context (cmap_nodup_keys : NoDup (map fst cmap)).
-
-  Let val_rel_exists :=
-    @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
-      _ Σ box_dc nat Hf_src Ht_src
-      Hglob_term Hwf_glob
-      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent.
 
   Fixpoint value_ref' (v1 : fuel_sem.value) (v2 : val) : Prop :=
     let fix Forall2_aux vs1 vs2 :=
@@ -186,17 +169,40 @@ Section Refinement.
     exists M, refines M e (C_env |[ C |[ Ehalt r ]| ]|).
   Proof.
     intros Hwf Hglob_cvt Hmain_cvt Hdis_glob.
+    pose proof (@anf_cvt_rel_global_complete_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_complete.
+    pose proof (@anf_cvt_rel_global_sound_top
+                  func_tag default_tag tgm efl Σ Hwf_glob
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_sound.
+    pose proof (@anf_cvt_rel_global_nodup_keys_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_nodup_keys.
+    pose proof (@global_ctx_cmap_eval_coherent_top
+                  func_tag default_tag tgm cmap Σ efl HnoAxioms
+                  box_dc box_tag Hglob_term Hwf_glob
+                  C_env Sg Sg' Hglob_cvt Hdis_glob)
+      as Hcmap_eval_coherent.
+    pose (val_rel_exists :=
+      @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
+        _ Σ box_dc nat Hf_src Ht_src
+        Hglob_term Hwf_glob
+        HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
     destruct (@global_ctx_correct_top
                 func_tag kon_tag default_tag default_itag
                 tgm cmap cenv Σ efl
                 HnoAxioms
                 dcon_to_tag_inj
                 box_dc box_tag
-                cenv_case_consistent Hcmap_eval_coherent
+                cenv_case_consistent
                 Hglob_term Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                no_prims cmap_complete cmap_sound cmap_nodup_keys
+                no_prims
                 C_env Sg Sg'
                 Hglob_cvt Hdis_glob (M.empty val))
       as [rho_g [F_glob [T_glob [Hglob_rho Hpre_glob]]]].
