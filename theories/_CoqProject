@@ -48,6 +48,7 @@ LambdaBox_to_LambdaANF/fuel_sem.v
 LambdaBox_to_LambdaANF/anf_corresp.v
 LambdaBox_to_LambdaANF/anf_util.v
 LambdaBox_to_LambdaANF/wf.v
+LambdaBox_to_LambdaANF/anf_budget.v
 LambdaBox_to_LambdaANF/anf_correct.v
 LambdaBox_to_LambdaANF/anf_global.v
 LambdaBox_to_LambdaANF/anf_toplevel.v

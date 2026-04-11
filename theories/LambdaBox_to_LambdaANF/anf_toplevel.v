@@ -41,8 +41,8 @@ Section Refinement.
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
@@ -185,7 +185,7 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  box_dc box_tag Hglob_term Hwf_glob
+                  box_dc Hglob_term Hwf_glob
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
@@ -242,7 +242,7 @@ Section Refinement.
       - intro Hnone. rewrite Hlk in Hnone. discriminate.
       - exact Hlk. }
 
-    specialize (Hcorr rho_g [] C r Sg' S' 1%nat
+    specialize (Hcorr 0 rho_g [] C r Sg' S' 1%nat
                   Hwf_nil Hwf Hcons_nil Hcmap_nil
                   Hdis_nil Hdis_main Henv_nil Hglob_main Hmain_cvt).
 
@@ -267,7 +267,7 @@ Section Refinement.
     assert (Hctx_main0 :
       occurs_free_ctx C \subset FromList [] :|: (Sg' \\ S') :|: cmap_vars cmap).
     { exact (@anf_cvt_occurs_free_ctx_exp
-               func_tag default_tag tgm cmap Σ box_dc box_tag
+               func_tag default_tag tgm cmap Σ box_dc
                Sg' e [] S' C r Hmain_cvt Hdis_nil Hdis_main). }
     assert (Hctx_main :
       occurs_free_ctx C \subset (Sg' \\ S') :|: cmap_vars cmap).
@@ -493,8 +493,8 @@ Section ComputationalRefinement.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, @eval_env_fuel nat
-        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
+        LambdaBox_resource_fuel
+        LambdaBox_resource_trace
         Σ box_dc [] body (Val src_v) f t).
 
   Context (Hglob_wf :
@@ -520,7 +520,7 @@ Section ComputationalRefinement.
     end.
 
   Definition refines_top (ie : ienv) (M : nat) (e_src : EAst.term) (e_tgt : exp) : Prop :=
-    refines default_tag tgm (top_cenv ie) Σ box_dc box_tag M e_src e_tgt.
+    refines default_tag tgm (top_cenv ie) Σ box_dc M e_src e_tgt.
 
   Context (ie : ienv).
   Context (cenv_case_consistent_top :

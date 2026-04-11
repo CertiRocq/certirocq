@@ -45,8 +45,8 @@ Section GlobalEnvExists.
           (box_dc : dcon)
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
@@ -206,8 +206,8 @@ Section ValRelWeaken.
   Context (box_dc : dcon)
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   (** Full (source) parameters *)
   Context (cmap_full : const_map) (Σ_full : EAst.global_context).
@@ -772,8 +772,8 @@ Section GlobalBindingsCorrect.
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Context (Hcmap_eval_coherent :
     @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
@@ -1034,7 +1034,7 @@ Section GlobalBindingsCorrect.
     unfold anf_cvt_correct_exp in Hcorrect.
     exists anf_v. split; [exact Hrel_v |].
     intros e_k i Hdis_ek.
-    destruct (Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob_body Hcvt_full e_k Hdis_ek)
+    destruct (Hcorrect 0 rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob_body Hcvt_full e_k Hdis_ek)
       as [Hterm _].
     exact (Hterm src_v anf_v eq_refl Hrel_v).
   Qed.
@@ -1551,7 +1551,7 @@ Section GlobalBindingsCorrect.
                                Hwf_body_proc Heval1))
             as Heval1_tail.
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v f t Heval1_tail
                       S0 [] S1 C v k2 decl2 body2
                       Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
@@ -1591,7 +1591,7 @@ Section GlobalBindingsCorrect.
                                Hwf_body_proc Heval_new_full))
             as Heval_new_tail.
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v_new f_new t_new Heval_new_tail
                       S0 [] S1 C v k1 decl1 body1
                       Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
@@ -1836,7 +1836,7 @@ Section GlobalBindingsCorrect.
         assert (Hrel_part : val_rel_at cm0 Σ_proc src_v1 anf_v0).
         { exact (@anf_val_rel_weaken
                    func_tag default_tag tgm efl
-                   box_dc box_tag
+                   box_dc
                    cmap Σ
                    cm0 Σ_proc
                    Hwf_proc Hext_proc
@@ -1938,7 +1938,7 @@ Section GlobalBindingsCorrect.
           assert (Hcmap_nil : @cmap_consistent cm0 _ Hf_src Ht_src Σ_proc box_dc [] []).
           { intros i0 x0 k0 decl0 body0 Hnth. rewrite nth_error_nil in Hnth. discriminate. }
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v0 f0 t0 Heval1_tail
                       S0 [] S1 C v k2 decl2 body2
                       Hbody_cvt Hdis_nil Hdis_acc Hcons_nil Hcmap_nil
@@ -1984,7 +1984,7 @@ Section GlobalBindingsCorrect.
           assert (Hcmap_nil : @cmap_consistent cm0 _ Hf_src Ht_src Σ_proc box_dc [] []).
           { intros i0 x0 k0 decl0 body0 Hnth. rewrite nth_error_nil in Hnth. discriminate. }
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v_new f_new t_new Heval_new_tail
                       S0 [] S1 C v k1 decl1 body1
                       Hbody_cvt Hdis_nil Hdis_acc Hcons_nil Hcmap_nil
@@ -2086,7 +2086,7 @@ Section GlobalBindingsCorrect.
         assert (Hctx_body0 :
           occurs_free_ctx C \subset FromList [] :|: (S0 \\ S1) :|: cmap_vars cm0).
         { exact (@anf_cvt_occurs_free_ctx_exp
-                   func_tag default_tag tgm cm0 Σ_proc box_dc box_tag
+                   func_tag default_tag tgm cm0 Σ_proc box_dc
                    S0 body [] S1 C v
                    Hbody_cvt Hdis_nil Hdis_acc). }
         assert (Hctx_body : occurs_free_ctx C \subset (S0 \\ S1) :|: cmap_vars cm0).
@@ -2338,8 +2338,8 @@ Section GlobalBindingsCoherence.
   Context (box_dc : dcon)
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Local Notation cvt_rel_at cm0 :=
     (@anf_cvt_rel func_tag default_tag tgm cm0).
@@ -2680,7 +2680,7 @@ Section GlobalBindingsCoherence.
                                Hwf_body_proc Heval1))
             as Heval1_tail.
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v f t Heval1_tail
                       S0 [] S1 C v k2 decl2 body2
                       Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
@@ -2720,7 +2720,7 @@ Section GlobalBindingsCoherence.
                                Hwf_body_proc Heval_new_full))
             as Heval_new_tail.
           destruct (@anf_cvt_cmap_eval func_tag default_tag tgm cm0 Σ_proc box_dc
-                      box_tag Hcoh_acc
+                      Hcoh_acc
                       [] body src_v_new f_new t_new Heval_new_tail
                       S0 [] S1 C v k1 decl1 body1
                       Hbody_cvt Hdis_nil Hdis_cm0 Hcons_nil Hcmap_nil
@@ -2879,8 +2879,8 @@ Section GlobalBindingsTopLevel.
           (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Let global_env_rel' :=
     @global_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
@@ -2919,7 +2919,7 @@ Section GlobalBindingsTopLevel.
     intros C_env S S' Hcvt.
     exact (@global_ctx_cmap_eval_coherent_top_by_construction
              func_tag default_tag tgm cmap Σ efl HnoAxioms
-             box_dc box_tag Hglob_term Hwf_glob
+             box_dc Hglob_term Hwf_glob
              C_env S S' Hcvt).
   Qed.
 
