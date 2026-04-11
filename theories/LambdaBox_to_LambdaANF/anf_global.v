@@ -58,6 +58,12 @@ Section GlobalEnvExists.
 
   Context (Hwf_glob : wf_glob Σ).
   Context (Hglob_term : @globals_terminate nat Hf_src Ht_src Σ box_dc).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      src_eval [] body (Val src_v) f t ->
+      f = 0).
 
   (* Hypotheses for anf_val_rel_exists *)
   Context (HnoVar : has_tVar = false)
@@ -809,6 +815,12 @@ Section GlobalBindingsCorrect.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, src_eval [] body (Val src_v) f t).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      src_eval [] body (Val src_v) f t ->
+      f = 0).
 
   Context (Hglob_wf :
     forall k decl body,
@@ -846,7 +858,7 @@ Section GlobalBindingsCorrect.
     @anf_cvt_correct func_tag default_tag kon_tag
       tgm cmap cenv Σ _ dcon_to_tag_inj box_dc box_tag
       cenv_case_consistent Hcmap_eval_coherent
-      Hglob_term Hglob_wf val_rel_exists.
+      Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists.
 
   Lemma in_map_fst_exists (l : list (kername * EAst.global_decl)) k :
     List.In k (map fst l) ->
@@ -1110,6 +1122,24 @@ Section GlobalBindingsCorrect.
                            Hwf_body0 Heval_full))
         as Heval_proc.
       exists src_v0, f0, t0. exact Heval_proc. }
+    assert (Hglob_fuel_zero_proc :
+      forall k decl body0 src_v0 f0 t0,
+        declared_constant Σ_proc k decl ->
+        decl.(EAst.cst_body) = Some body0 ->
+        eval_at Σ_proc [] body0 (Val src_v0) f0 t0 ->
+        f0 = 0).
+    { intros k decl body0 src_v0 f0 t0 Hdecl Hbody0 Heval_proc.
+      pose proof Hdecl as Hdecl_proc.
+      unfold declared_constant in Hdecl_proc.
+      pose proof (Hext_proc _ _ Hdecl_proc) as Hdecl_full.
+      pose proof (@eval_env_fuel_extends _ Hf_src Ht_src
+                    Σ box_dc Σ_proc
+                    [] body0 (fuel_sem.Val src_v0) f0 t0
+                    Hext_proc Heval_proc) as Heval_full.
+      eapply Hglob_fuel_zero.
+      - exact Hdecl_full.
+      - exact Hbody0.
+      - exact Heval_full. }
     assert (Hglob_wf_proc :
       forall k decl body0,
         declared_constant Σ_proc k decl ->
@@ -1147,7 +1177,7 @@ Section GlobalBindingsCorrect.
                   func_tag default_tag kon_tag
                   tgm cm_acc cenv Σ_proc _ dcon_to_tag_inj box_dc box_tag
                   cenv_case_consistent Hcoh_acc
-                  Hglob_term_proc Hglob_wf_proc Hval_rel_exists_acc
+                  Hglob_term_proc Hglob_fuel_zero_proc Hglob_wf_proc Hval_rel_exists_acc
                   [] body (fuel_sem.Val src_v) f t Heval)
       as Hcorrect.
     unfold anf_cvt_correct_exp in Hcorrect.
@@ -2351,6 +2381,12 @@ Section GlobalBindingsCoherence.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, eval_at Σ [] body (Val src_v) f t).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      eval_at Σ [] body (Val src_v) f t ->
+      f = 0).
 
   Context (Hwf_glob : wf_glob Σ).
 
@@ -2892,6 +2928,12 @@ Section GlobalBindingsTopLevel.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, src_eval [] body (Val src_v) f t).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      src_eval [] body (Val src_v) f t ->
+      f = 0).
 
   Context (Hglob_wf :
     forall k decl body,
@@ -2919,7 +2961,7 @@ Section GlobalBindingsTopLevel.
     intros C_env S S' Hcvt.
     exact (@global_ctx_cmap_eval_coherent_top_by_construction
              func_tag default_tag tgm cmap Σ efl HnoAxioms
-             box_dc box_tag Hglob_term Hwf_glob
+             box_dc box_tag Hglob_term Hglob_fuel_zero Hwf_glob
              C_env S S' Hcvt).
   Qed.
 
@@ -2994,7 +3036,7 @@ Section GlobalBindingsTopLevel.
                 dcon_to_tag_inj
                 box_dc box_tag
                 cenv_case_consistent Hcmap_eval_coherent
-                Hglob_term Hglob_wf
+                Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                 no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys
