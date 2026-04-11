@@ -61,6 +61,12 @@ Section Refinement.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, src_eval [] body (Val src_v) f t).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      src_eval [] body (Val src_v) f t ->
+      f = 0).
 
   Context (Hglob_wf :
     forall k decl body,
@@ -185,7 +191,7 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  box_dc box_tag Hglob_term Hwf_glob
+                  box_dc box_tag Hglob_term Hglob_fuel_zero Hwf_glob
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
@@ -201,7 +207,7 @@ Section Refinement.
                 dcon_to_tag_inj
                 box_dc box_tag
                 cenv_case_consistent
-                Hglob_term Hglob_wf
+                Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                 no_prims
@@ -217,7 +223,7 @@ Section Refinement.
                   dcon_to_tag_inj
                   box_dc box_tag
                   cenv_case_consistent Hcmap_eval_coherent
-                  Hglob_term Hglob_wf val_rel_exists
+                  Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                   [] e (Val src_v) f t Heval)
       as Hcorr.
     unfold anf_cvt_correct_exp in Hcorr.
@@ -496,6 +502,15 @@ Section ComputationalRefinement.
         (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
         (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
         Σ box_dc [] body (Val src_v) f t).
+  Context (Hglob_fuel_zero :
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      @eval_env_fuel nat
+        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
+        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
+        Σ box_dc [] body (Val src_v) f t ->
+      f = 0).
 
   Context (Hglob_wf :
     forall k decl body,
@@ -548,7 +563,7 @@ Section ComputationalRefinement.
               dcon_to_tag_inj
               box_dc box_tag
               cenv_case_consistent_top
-              Hglob_term Hglob_wf
+              Hglob_term Hglob_fuel_zero Hglob_wf
               prim_map prims Hwf_glob
               HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
               no_prims

@@ -182,6 +182,17 @@ Section Correct.
         @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
                        Σ box_dc [] body (fuel_sem.Val src_v) f t.
 
+  Definition globals_zero_fuel_prop :=
+    (* Source constant unfolding is now semantic rather than hardcoded at fuel 0,
+       so correctness uses an explicit proof-side hypothesis when a global body
+       is known to return a value only at zero fuel. *)
+    forall k decl body src_v f t,
+      declared_constant Σ k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                     Σ box_dc [] body (fuel_sem.Val src_v) f t ->
+      f = 0.
+
 
   (** ** LambdaANF trivial trace *)
 
@@ -1307,8 +1318,8 @@ Section Correct.
         * exists k_f. exact Hlk_f.
         * eapply anf_cvt_exp_subset; eassumption.
 
-    - (* Const — globals are values: r = Val v0, f = 0 *)
-      intros k0 body0 v_const0 decl0 rho0 t0
+    - (* Const *)
+      intros k0 body0 v_const0 decl0 rho0 f0 t0
              Hdecl0 Hbody0 Heval_body IH_body
              v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
       injection Hv as ->.
@@ -2454,6 +2465,7 @@ Section Correct.
   Qed.
 
   Context (Hglob_term : globals_terminate_prop).
+  Context (Hglob_fuel_zero : globals_zero_fuel_prop).
 
   Context (Hglob_wf : forall k decl body,
     declared_constant Σ k decl ->
@@ -5816,8 +5828,8 @@ Section Correct.
       split; [intros; congruence |
               intros _; exists 0; eapply bstep_fuel_zero_OOT].
 
-    (* eval_Const_step — globals are values, so f=0, r=Val v0 *)
-    - intros k0 body0 v0 decl0 rho0 t0
+    (* eval_Const_step *)
+    - intros k0 body0 v0 decl0 rho0 f0 t0
              Hdecl Hbody Heval_body IH_body.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap
@@ -5830,10 +5842,13 @@ Section Correct.
       end.
       split.
       + intros v1 v1' Heq Hrel1. injection Heq as <-.
+        assert (Hf0_zero : f0 = 0).
+        { eapply Hglob_fuel_zero; eassumption. }
         change (Hole_c |[ e_k ]|) with e_k.
         eapply (preord_exp_post_monotonic cenv _ eq_fuel).
         { intros [[[? ?] ?] ?] [[[? ?] ?] ?] Heq.
-          unfold anf_bound, eq_fuel in *. cbn in *. lia. }
+          unfold anf_bound, eq_fuel in *. cbn in *.
+          subst f0. lia. }
         eapply preord_exp_refl. exact eq_fuel_compat.
         intros z Hz.
         destruct (Pos.eq_dec z x) as [-> | Hneq_zx].
@@ -6458,7 +6473,7 @@ Section Correct.
         unfold_all. cbn in *. lia.
       + intros Habs. congruence.
     (* eval_OOT *)
-    - intros rho0 e0 f0 t0 Hfuel_lt.
+    - intros rho0 e0 f0 Hfuel_lt.
       unfold anf_cvt_correct_exp.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split.

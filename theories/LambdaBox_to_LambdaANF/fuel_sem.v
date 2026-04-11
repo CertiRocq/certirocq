@@ -200,15 +200,14 @@ Section FUEL_SEM.
         eval_env_fuel rho c OOT f1 t1 ->
         eval_env_step rho (EAst.tProj p c) OOT f1 t1
 
-  (** ** Constant (delta reduction) — globals are assumed to be values,
-      so the body evaluates with zero fuel. *)
+  (** ** Constant (delta reduction) *)
   | eval_Const_step :
       forall (k : kername) (body : EAst.term) (v : value)
-             (decl : EAst.constant_body) (rho : env) t,
+             (decl : EAst.constant_body) (rho : env) f t,
         declared_constant Σ k decl ->
         decl.(EAst.cst_body) = Some body ->
-        eval_env_fuel [] body (Val v) <0> t ->
-        eval_env_step rho (EAst.tConst k) (Val v) <0> t
+        eval_env_fuel [] body (Val v) f t ->
+        eval_env_step rho (EAst.tConst k) (Val v) f t
 
   (** ** Mutual evaluation of argument lists *)
   with eval_fuel_many : env -> list EAst.term -> list value -> nat -> trace -> Prop :=
@@ -227,25 +226,32 @@ Section FUEL_SEM.
   | eval_Rel_fuel :
       forall (n : nat) (rho : env) (v : value),
         nth_error rho n = Some v ->
-        eval_env_fuel rho (EAst.tRel n) (Val v) <0> <0>
+        eval_env_fuel rho (EAst.tRel n) (Val v)
+                      <0>
+                      (one_i (EAst.tRel n))
   | eval_Lam_fuel :
       forall (body : EAst.term) (rho : env) (na : name),
         eval_env_fuel rho (EAst.tLambda na body)
-                      (Val (Clos_v rho na body)) <0> (one_i (EAst.tLambda na body))
+                      (Val (Clos_v rho na body))
+                      <0>
+                      (one_i (EAst.tLambda na body))
   | eval_Fix_fuel :
       forall (mfix : list (EAst.def EAst.term)) (idx : nat) (rho : env),
         eval_env_fuel rho (EAst.tFix mfix idx)
-                      (Val (ClosFix_v rho mfix idx)) <0> (one_i (EAst.tFix mfix idx))
+                      (Val (ClosFix_v rho mfix idx))
+                      <0>
+                      (one_i (EAst.tFix mfix idx))
   | eval_Box_fuel :
       forall (rho : env),
         eval_env_fuel rho EAst.tBox
                       (Val (Con_v box_dc []))
-                      <0> (one_i EAst.tBox)
+                      <0>
+                      (one_i EAst.tBox)
   (* OOT *)
   | eval_OOT :
-      forall rho (e : EAst.term) f t,
+      forall rho (e : EAst.term) f,
         (f < one_i e)%nat ->
-        eval_env_fuel rho e OOT f t
+        eval_env_fuel rho e OOT f <0>
   (* STEP *)
   | eval_step :
       forall rho (e : EAst.term) r (f : nat) t,
@@ -374,7 +380,7 @@ Section FUEL_SEM.
       specialize (IH _ _ _ H). injection IH as <-.
       rewrite Hnth in H0. congruence.
     (* eval_Const_step *)
-    - intros k body v decl rho0 t0 Hdecl Hbody _ IH.
+    - intros k body v decl rho0 f0 t0 Hdecl Hbody _ IH.
       intros v_target f_t t_t Heval2.
       remember (EAst.tConst k) as ea in Heval2.
       remember (Val v_target) as rv in Heval2.
