@@ -301,7 +301,7 @@ Section WF_EVAL.
       eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
       eapply nth_error_In. exact Hnth.
     (* eval_Const_step *)
-    - intros k body v0 decl rho0 t0 Hdecl Hbody _ IH Hwfe Hwft.
+    - intros k body v0 decl rho0 f0 t0 Hdecl Hbody _ IH Hwfe Hwft.
       apply IH.
       + constructor.
       + exact (globals_wellformed _ _ _ Hdecl Hbody).
@@ -457,7 +457,7 @@ Section WF_EVAL.
       eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
       eapply nth_error_In. exact Hnth.
     (* eval_Const_step — KEY CASE: bridge from Σ to Σ_tail *)
-    - intros k body v0 decl rho0 t0 Hdecl_Σ Hbody _ IH Hwfe Hwft.
+    - intros k body v0 decl rho0 f0 t0 Hdecl_Σ Hbody _ IH Hwfe Hwft.
       (* From wellformed: lookup_constant Σ_tail k succeeds *)
       destruct (wellformed_tConst_lookup Σ_tail _ _ Hwft) as [d_tail Hlk_tail].
       (* Extract declared_constant from lookup_constant *)
@@ -670,8 +670,8 @@ Section EVAL_RESTRICT.
       split; [| exact I].
       eapply fuel_sem.eval_Proj_step_OOT; eassumption.
     (* eval_Const_step — bridge declared_constant from Σ to Σ_tail.
-       Body eval has fuel <0>: IH gives eval under Σ_tail with same fuel. *)
-    - intros k body v0 decl rho0 t0 Hdecl_Σ Hbody Heval_body IH Hwfe Hwft.
+       The body evaluation now keeps its explicit source fuel parameter. *)
+    - intros k body v0 decl rho0 f0 t0 Hdecl_Σ Hbody Heval_body IH Hwfe Hwft.
       destruct (wellformed_tConst_lookup Σ_tail _ _ Hwft) as [d_tail Hlk_tail].
       unfold lookup_constant in Hlk_tail.
       destruct (lookup_env Σ_tail k) as [[cb|ind]|] eqn:Hlenv;
@@ -714,7 +714,7 @@ Section EVAL_RESTRICT.
       + eapply fuel_sem.eval_Box_fuel.
       + constructor. constructor.
     (* eval_OOT *)
-    - intros rho0 e0 f0 t0 Hlt Hwfe Hwft. split.
+    - intros rho0 e0 f0 Hlt Hwfe Hwft. split.
       + eapply fuel_sem.eval_OOT. exact Hlt.
       + exact I.
     (* eval_step *)
