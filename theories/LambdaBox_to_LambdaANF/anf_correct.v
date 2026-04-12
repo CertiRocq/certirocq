@@ -66,6 +66,7 @@ Section Correct.
 
   Definition fuel_exp (e : EAst.term) : nat :=
     match e with
+    | EAst.tRel _ => 0  (* variables translate to [Hole_c], so no target step *)
     | EAst.tLetIn _ _ _ => 0
     | EAst.tConst _ => 0  (* globals are values: no fuel overhead *)
     | _ => 1
@@ -241,6 +242,8 @@ Section Correct.
      distinguish them by type. *)
   Let src_eval := @eval_env_fuel nat LambdaBox_resource_fuel
                                      LambdaBox_resource_trace Σ box_dc.
+  Let src_not_stuck := @fuel_sem.not_stuck nat LambdaBox_resource_fuel
+                                          LambdaBox_resource_trace Σ box_dc.
 
   Context (Hcmap_eval_coherent :
     @cmap_eval_coherent cmap _ LambdaBox_resource_fuel
@@ -1061,6 +1064,479 @@ Section Correct.
     v1 = v2.
   Proof. apply fuel_sem.eval_val_det. Qed.
 
+  Lemma eval_val_exact_det rho0 e0 v1 v2 f1 t1 f2 t2 :
+    src_eval rho0 e0 (fuel_sem.Val v1) f1 t1 ->
+    src_eval rho0 e0 (fuel_sem.Val v2) f2 t2 ->
+    v1 = v2 /\ f1 = f2 /\ t1 = t2.
+  Proof. apply fuel_sem.eval_val_exact_det. Qed.
+
+  (** Source-side fuel monotonicity towards [OOT].
+
+      This is proved in the concrete nat-instantiated ANF proof rather than in
+      [fuel_sem], because here the source fuel resource is definitionally
+      ordinary addition and [lia] can reason about the decompositions created by
+      app/let/case/construct steps. *)
+  Lemma src_eval_lt_OOT_any
+        (Hglob_fuel_zero : globals_zero_fuel_prop)
+        rho0 e0 r0 f0 t0 :
+    src_eval rho0 e0 r0 f0 t0 ->
+    forall f', f' < f0 ->
+    exists t', src_eval rho0 e0 fuel_sem.OOT f' t'.
+  Proof.
+    intros Heval.
+    set (Pstep := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : nat) =>
+      forall f', f' < f ->
+      exists t', @eval_env_step _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                                 Σ box_dc rho e fuel_sem.OOT f' t').
+    set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
+                      (vs : list fuel_sem.value) (fs : nat) (ts : nat) =>
+      forall f',
+        f' < fs ->
+        exists args_done e args_rest vs_done fs' f_oot t_oot ts',
+          es = args_done ++ e :: args_rest /\
+          @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                          Σ box_dc rho args_done vs_done fs' ts' /\
+          src_eval rho e fuel_sem.OOT f_oot t_oot /\
+          f' = fs' + f_oot).
+    set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : nat) =>
+      forall f', f' < f ->
+      exists t', src_eval rho e fuel_sem.OOT f' t').
+    enough (Haux : Pfuel rho0 e0 r0 f0 t0) by exact Haux.
+    eapply (@eval_env_fuel_ind'
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace
+              Σ box_dc Pstep Pmany Pfuel); try exact Heval;
+      unfold Pstep, Pmany, Pfuel;
+      simpl in *.
+    - intros n rho v Hnth f' Hlt. exfalso. lia.
+    - intros body rho na f' Hlt. exfalso. lia.
+    - intros mfix idx rho f' Hlt. exfalso. lia.
+    - intros rho f' Hlt. exfalso. lia.
+    - intros e1 e2 body v2 r na rho rho' f1 f2 f3 t1 t2 t3
+             He1 IH1 He2 IH2 Hbody IH3 f' Hlt.
+      destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
+      + destruct (IH1 _ Hlt1) as [t_oot Hoot].
+        exists t_oot. now eapply fuel_sem.eval_App_step_OOT1.
+      + assert (Hlt23 : f' - f1 < f2 + f3) by lia.
+        destruct (Nat.lt_ge_cases (f' - f1) f2) as [Hlt2 | Hge2].
+        * destruct (IH2 _ Hlt2) as [t_oot Hoot].
+          exists (t1 + t_oot).
+          assert (Heqf : f' = (f1 + (f' - f1))) by lia.
+          rewrite Heqf.
+          exact (@fuel_sem.eval_App_step_OOT2
+                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                   Σ box_dc e1 e2 (fuel_sem.Clos_v rho' na body) rho
+                   f1 (f' - f1) t1 t_oot He1 Hoot).
+        * assert (Hlt3 : f' - f1 - f2 < f3) by lia.
+          destruct (IH3 _ Hlt3) as [t_oot Hoot].
+          exists (t1 + t2 + t_oot).
+          assert (Heqf : f' = (f1 + f2 + (f' - f1 - f2))) by lia.
+          rewrite Heqf.
+          exact (@fuel_sem.eval_App_step
+                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                   Σ box_dc e1 e2 body v2 fuel_sem.OOT na rho rho'
+                   f1 f2 (f' - f1 - f2) t1 t2 t_oot
+                   He1 He2 Hoot).
+    - intros e1 e2 rho f1 t1 He1 IH1 f' Hlt.
+      destruct (IH1 _ Hlt) as [t_oot Hoot].
+      exists t_oot. now eapply fuel_sem.eval_App_step_OOT1.
+    - intros e1 e2 v rho f1 f2 t1 t2 He1 IH1 He2 IH2 f' Hlt.
+      destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
+      + destruct (IH1 _ Hlt1) as [t_oot Hoot].
+        exists t_oot. now eapply fuel_sem.eval_App_step_OOT1.
+      + assert (Hlt2 : f' - f1 < f2) by lia.
+        destruct (IH2 _ Hlt2) as [t_oot Hoot].
+        exists (t1 + t_oot).
+        assert (Heqf : f' = (f1 + (f' - f1))) by lia.
+        rewrite Heqf.
+        exact (@fuel_sem.eval_App_step_OOT2
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc e1 e2 v rho f1 (f' - f1) t1 t_oot He1 Hoot).
+    - intros e1 e2 body rho rho' rho'' idx na mfix v2 r f1 f2 f3 t1 t2 t3
+             He1 IH1 Hfix Hrec He2 IH2 Hbody IH3 f' Hlt.
+      destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
+      + destruct (IH1 _ Hlt1) as [t_oot Hoot].
+        exists t_oot. now eapply fuel_sem.eval_App_step_OOT1.
+      + assert (Hlt23 : f' - f1 < f2 + f3) by lia.
+        destruct (Nat.lt_ge_cases (f' - f1) f2) as [Hlt2 | Hge2].
+        * destruct (IH2 _ Hlt2) as [t_oot Hoot].
+          exists (t1 + t_oot).
+          assert (Heqf : f' = (f1 + (f' - f1))) by lia.
+          rewrite Heqf.
+          exact (@fuel_sem.eval_App_step_OOT2
+                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                   Σ box_dc e1 e2 (fuel_sem.ClosFix_v rho' mfix idx) rho
+                   f1 (f' - f1) t1 t_oot He1 Hoot).
+        * assert (Hlt3 : f' - f1 - f2 < f3) by lia.
+          destruct (IH3 _ Hlt3) as [t_oot Hoot].
+          exists (t1 + t2 + t_oot).
+          assert (Heqf : f' = (f1 + f2 + (f' - f1 - f2))) by lia.
+          rewrite Heqf.
+          exact (@fuel_sem.eval_FixApp_step
+                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                   Σ box_dc e1 e2 body rho rho' rho'' idx na mfix v2
+                   fuel_sem.OOT f1 f2 (f' - f1 - f2) t1 t2 t_oot
+                   He1 Hfix Hrec He2 Hoot).
+    - intros na b t v1 r rho f1 f2 t1 t2
+             Heb IHb Het IHt f' Hlt.
+      destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
+      + destruct (IHb _ Hlt1) as [t_oot Hoot].
+        exists t_oot. now eapply fuel_sem.eval_LetIn_step_OOT.
+      + assert (Hlt2 : f' - f1 < f2) by lia.
+        destruct (IHt _ Hlt2) as [t_oot Hoot].
+        exists (t1 + t_oot).
+        assert (Heqf : f' = (f1 + (f' - f1))) by lia.
+        rewrite Heqf.
+        exact (@fuel_sem.eval_LetIn_step
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc na b t v1 fuel_sem.OOT rho f1 (f' - f1) t1 t_oot
+                 Heb Hoot).
+    - intros na b t rho f1 t1 Heb IHb f' Hlt.
+      destruct (IHb _ Hlt) as [t_oot Hoot].
+      exists t_oot. now eapply fuel_sem.eval_LetIn_step_OOT.
+    - intros ind c args vs rho dc fs ts Hdc Hmany IHmany f' Hlt.
+      destruct (IHmany _ Hlt) as
+        (args_done & e & args_rest & vs_done & fs' & f_oot & t_oot & ts' &
+         Hargs & Hmany_done & Hoot & Hfuel).
+      subst.
+      exists (ts' + t_oot).
+      exact (@fuel_sem.eval_Construct_step_OOT
+               nat LambdaBox_resource_fuel LambdaBox_resource_trace
+               Σ box_dc ind c (args_done ++ e :: args_rest)
+               args_done args_rest e vs_done rho fs' f_oot t_oot ts'
+               eq_refl Hmany_done Hoot).
+    - intros ind c args args_done args_rest e vs rho fs f t ts
+             Hargs Hdone IHdone Hoot IHoot f' Hlt.
+      destruct (Nat.lt_ge_cases f' fs) as [Hlt_done | Hge_done].
+      + destruct (IHdone _ Hlt_done) as
+          (args_done' & e' & args_rest' & vs_done & fs' & f_oot & t_oot & ts' &
+           Hargs' & Hmany_done & Hoot' & Hfuel).
+        exists (ts' + t_oot).
+        assert (Hargs_total :
+                  args = args_done' ++ e' :: (args_rest' ++ e :: args_rest)).
+        { rewrite Hargs. rewrite Hargs'. rewrite <- app_assoc. reflexivity. }
+        rewrite Hfuel.
+        exact (@fuel_sem.eval_Construct_step_OOT
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc ind c args
+                 args_done' (args_rest' ++ e :: args_rest) e'
+                 vs_done rho fs' f_oot t_oot ts'
+                 Hargs_total Hmany_done Hoot').
+      + assert (Hlt_oot : f' - fs < f) by lia.
+        destruct (IHoot _ Hlt_oot) as [t_oot' Hoot'].
+        exists (ts + t_oot').
+        assert (Heqf : f' = (fs + (f' - fs))) by lia.
+        rewrite Heqf.
+        exact (@fuel_sem.eval_Construct_step_OOT
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc ind c args
+                 args_done args_rest e vs rho fs (f' - fs) t_oot' ts
+                 Hargs Hdone Hoot').
+    - intros ind npars mch brs rho dc vs body c r f1 f2 t1 t2
+             Hmch IHmch Hdc Hfind Hbody IHbody f' Hlt.
+      destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
+      + destruct (IHmch _ Hlt1) as [t_oot Hoot].
+        exists t_oot. now eapply fuel_sem.eval_Case_step_OOT.
+      + assert (Hlt2 : f' - f1 < f2) by lia.
+        destruct (IHbody _ Hlt2) as [t_oot Hoot].
+        exists (t1 + t_oot).
+        assert (Heqf : f' = (f1 + (f' - f1))) by lia.
+        rewrite Heqf.
+        exact (@fuel_sem.eval_Case_step
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc ind npars mch brs rho dc vs body c fuel_sem.OOT
+                 f1 (f' - f1) t1 t_oot
+                 Hmch Hdc Hfind Hoot).
+    - intros ind npars mch brs rho f1 t1 Hmch IHmch f' Hlt.
+      destruct (IHmch _ Hlt) as [t_oot Hoot].
+      exists t_oot. now eapply fuel_sem.eval_Case_step_OOT.
+    - intros p c rho vs v f1 t1 Hc IHc Hnth f' Hlt.
+      destruct (IHc _ Hlt) as [t_oot Hoot].
+      exists t_oot. now eapply fuel_sem.eval_Proj_step_OOT.
+    - intros p c rho f1 t1 Hc IHc f' Hlt.
+      destruct (IHc _ Hlt) as [t_oot Hoot].
+      exists t_oot. now eapply fuel_sem.eval_Proj_step_OOT.
+    - intros k body v decl rho f t Hdecl Hbody Hbody_eval IHbody f' Hlt.
+      assert (Hf_zero : f = 0).
+      { eapply Hglob_fuel_zero; eauto. }
+      exfalso. lia.
+    - intros rho f' Hlt. exfalso. lia.
+    - intros rho e es v vs f fs t ts He IH_e Hes IH_es f' Hlt.
+      destruct (Nat.lt_ge_cases f' f) as [Hlt_hd | Hge_hd].
+      + destruct (IH_e _ Hlt_hd) as [t_oot Hoot].
+        exists [], e, es, [], 0, f', t_oot, 0.
+        split.
+        * reflexivity.
+        * split.
+          -- constructor.
+          -- split.
+             ++ exact Hoot.
+             ++ lia.
+      + assert (Hlt_tl : f' - f < fs) by lia.
+        destruct (IH_es _ Hlt_tl) as
+          (args_done & e' & args_rest & vs_done & fs' & f_oot & t_oot & ts' &
+           Hes' & Hmany_done & Hoot & Hfuel).
+        exists (e :: args_done), e', args_rest, (v :: vs_done),
+               (f + fs'), f_oot, t_oot, (t + ts').
+        split.
+        * simpl. now rewrite Hes'.
+        * split.
+          -- exact (@fuel_sem.eval_many_cons
+                      nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                      Σ box_dc rho e args_done v vs_done f fs' t ts'
+                      He Hmany_done).
+          -- split.
+             ++ exact Hoot.
+             ++ lia.
+    - intros rho e f Hlt0 f' Hlt.
+      exists 0%nat.
+      assert (Hlt0' : (f' < fuel_exp e)%nat) by lia.
+      exact (@fuel_sem.eval_OOT
+               nat LambdaBox_resource_fuel LambdaBox_resource_trace
+               Σ box_dc rho e f' Hlt0').
+    - intros rho e r f t Hstep IHstep f' Hlt.
+      destruct (Nat.lt_ge_cases f' (fuel_exp e)) as [Hlt0 | Hge0].
+      + exists 0%nat.
+        exact (@fuel_sem.eval_OOT
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc rho e f' Hlt0).
+      + assert (Hlt_step : f' - fuel_exp e < f) by lia.
+        destruct (IHstep _ Hlt_step) as [t_oot Hoot].
+        exists (t_oot + anf_trace_exp e).
+        assert (Heqf : f' = ((f' - fuel_exp e) + fuel_exp e)) by lia.
+        rewrite Heqf.
+        exact (@fuel_sem.eval_step
+                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                 Σ box_dc rho e fuel_sem.OOT (f' - fuel_exp e) t_oot Hoot).
+  Qed.
+
+  Lemma src_eval_lt_OOT
+        (Hglob_fuel_zero : globals_zero_fuel_prop)
+        rho0 e0 v0 f0 t0 f' :
+    src_eval rho0 e0 (fuel_sem.Val v0) f0 t0 ->
+    f' < f0 ->
+    exists t', src_eval rho0 e0 fuel_sem.OOT f' t'.
+  Proof.
+    intros Heval Hlt. eapply src_eval_lt_OOT_any; eauto.
+  Qed.
+
+  Lemma src_eval_OOT_monotonic
+        (Hglob_fuel_zero : globals_zero_fuel_prop)
+        rho0 e0 f0 t0 f' :
+    src_eval rho0 e0 fuel_sem.OOT f0 t0 ->
+    f' < f0 ->
+    exists t', src_eval rho0 e0 fuel_sem.OOT f' t'.
+  Proof.
+    intros Heval Hlt. eapply src_eval_lt_OOT_any; eauto.
+  Qed.
+
+  Lemma src_eval_val_gt_oot
+        rho0 e0 v0 f_val t_val :
+    src_eval rho0 e0 (fuel_sem.Val v0) f_val t_val ->
+    forall f_oot t_oot,
+      src_eval rho0 e0 fuel_sem.OOT f_oot t_oot ->
+      f_oot < f_val.
+  Proof.
+    intros Hval.
+    set (Pstep := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : nat) =>
+      match r with
+      | fuel_sem.Val _ =>
+        forall f_oot t_oot,
+          @eval_env_step _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                         Σ box_dc rho e fuel_sem.OOT f_oot t_oot ->
+          f_oot < f
+      | fuel_sem.OOT => True
+      end).
+    set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
+                      (vs : list fuel_sem.value) (fs : nat) (ts : nat) =>
+      forall args_done e args_rest vs_done fs' f_oot t_oot ts',
+        es = args_done ++ e :: args_rest ->
+        @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc rho args_done vs_done fs' ts' ->
+        src_eval rho e fuel_sem.OOT f_oot t_oot ->
+        fs' + f_oot < fs).
+    set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
+                      (r : fuel_sem.result) (f : nat) (t : nat) =>
+      match r with
+      | fuel_sem.Val _ =>
+        forall f_oot t_oot,
+          src_eval rho e fuel_sem.OOT f_oot t_oot ->
+          f_oot < f
+      | fuel_sem.OOT => True
+      end).
+    enough (Haux : Pfuel rho0 e0 (fuel_sem.Val v0) f_val t_val) by exact Haux.
+    eapply (@eval_env_fuel_ind'
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace
+              Σ box_dc Pstep Pmany Pfuel); try exact Hval;
+      unfold Pstep, Pmany, Pfuel; simpl in *.
+    - intros n rho v Hnth f_oot t_oot Hoot.
+      remember (EAst.tRel n) as e_rel in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+    - intros body rho na f_oot t_oot Hoot.
+      remember (EAst.tLambda na body) as e_lam in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+    - intros mfix idx rho f_oot t_oot Hoot.
+      remember (EAst.tFix mfix idx) as e_fix in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+    - intros rho f_oot t_oot Hoot.
+      remember EAst.tBox as e_box in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+    - intros e1 e2 body v2 r na rho rho' f1 f2 f3 t1 t2 t3
+             He1 IH1 He2 IH2 Hbody IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros f_oot t_oot Hoot.
+      remember (EAst.tApp e1 e2) as e_app in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 H) as [Heq1 [-> ->]].
+        injection Heq1 as <- <- <-.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He2 H0) as [-> [-> ->]].
+        pose proof (IH3 _ _ H1) as Hlt_body. simpl in *. lia.
+      + injection Heqe_app as <- <-. subst.
+        specialize (IH1 _ _ H). lia.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 H) as [_ [-> ->]].
+        pose proof (IH2 _ _ H0) as Hlt_arg. simpl in *. lia.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 H) as [Heq1 _].
+        discriminate.
+    - intros e1 e2 rho f1 t1 He1 IH1. exact I.
+    - intros e1 e2 v rho f1 f2 t1 t2 He1 IH1 He2 IH2. exact I.
+    - intros e1 e2 body rho rho' rho'' idx na mfix v2 r f1 f2 f3 t1 t2 t3
+             He1 IH1 Hfix Hrec He2 IH2 Hbody IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros f_oot t_oot Hoot.
+      remember (EAst.tApp e1 e2) as e_app in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 H) as [Heq1 _].
+        discriminate.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (IH1 _ _ H) as Hlt_fun. simpl in *. lia.
+      + injection Heqe_app as <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 H) as [_ [-> ->]].
+        pose proof (IH2 _ _ H0) as Hlt_arg. simpl in *. lia.
+      + injection Heqe_app as <- <-. subst.
+        rename H into He1_2. rename H0 into Hfix2.
+        rename H2 into He2_2. rename H3 into Hbody2.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He1 He1_2) as [Heq1 [-> ->]].
+        injection Heq1 as <- <- <-.
+        rewrite Hfix in Hfix2. injection Hfix2 as <- <-.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He2 He2_2) as [-> [-> ->]].
+        pose proof (IH3 _ _ Hbody2) as Hlt_body. simpl in *. lia.
+    - intros na b t v1 r rho f1 f2 t1 t2
+             Heb IHb Het IHt.
+      destruct r as [v_r |]; [| exact I].
+      intros f_oot t_oot Hoot.
+      remember (EAst.tLetIn na b t) as e_let in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      + injection Heqe_let as <- <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ Heb H) as [-> [-> ->]].
+        pose proof (IHt _ _ H0) as Hlt_body. simpl in *. lia.
+      + injection Heqe_let as <- <- <-. subst.
+        pose proof (IHb _ _ H) as Hlt_bind. simpl in *. lia.
+    - intros na b t rho f1 t1 Heb IHb.
+      exact I.
+    - intros ind c args vs rho dc fs ts Hdc Hmany IHmany f_oot t_oot Hoot.
+      remember (EAst.tConstruct ind c args) as e_con in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      injection Heqe_con as <- <- <-. subst.
+      eapply IHmany; eauto.
+    - intros ind c args args_done args_rest e vs rho fs f t ts
+             Hargs Hdone IHdone Hoot IHoot.
+      exact I.
+    - intros ind npars mch brs rho dc vs body c r f1 f2 t1 t2
+             Hmch IHmch Hdc Hfind Hbody IHbody.
+      destruct r as [v_r |]; [| exact I].
+      intros f_oot t_oot Hoot.
+      remember (EAst.tCase (ind, npars) mch brs) as e_case in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      + injection Heqe_case as <- <- <-. subst.
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ Hmch H) as [Heq1 [-> ->]].
+        inversion Heq1; subst.
+        apply Nnat.Nat2N.inj in H3. subst c0.
+        rewrite Hfind in H1. injection H1 as <-.
+        pose proof (IHbody _ _ H2) as Hlt_body. simpl in *. lia.
+      + injection Heqe_case as <- <- <-. subst.
+        pose proof (IHmch _ _ H) as Hlt_mch. simpl in *. lia.
+    - intros ind npars mch brs rho f1 t1 Hmch IHmch.
+      exact I.
+    - intros p c rho vs v f1 t1 Hc IHc Hnth f_oot t_oot Hoot.
+      remember (EAst.tProj p c) as e_proj in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      injection Heqe_proj as <- <-. subst.
+      specialize (IHc _ _ H). lia.
+    - intros p c rho f1 t1 Hc IHc.
+      exact I.
+    - intros k body v decl rho f t Hdecl Hbody Hbody_eval IHbody f_oot t_oot Hoot.
+      remember (EAst.tConst k) as e_const in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+    - intros rho args_done e args_rest vs_done fs' f_oot t_oot ts'
+             Hargs Hdone Hoot.
+      destruct args_done; simpl in Hargs; discriminate.
+    - intros rho e es v vs f fs t ts He IH_e Hes IH_es
+             args_done e' args_rest vs_done fs' f_oot t_oot ts'
+             Hargs Hdone Hoot.
+      destruct args_done as [| a args_done'].
+      + simpl in Hargs. inversion Hargs; subst.
+        inversion Hdone; subst.
+        specialize (IH_e _ _ Hoot).
+        change (0 + f_oot < f + fs)%nat.
+        lia.
+      + inversion Hdone; subst.
+        assert (Ha : a = e /\ es = args_done' ++ e' :: args_rest).
+        { simpl in Hargs. inversion Hargs. subst. split; reflexivity. }
+        destruct Ha as [-> Hargs'].
+        pose proof (eval_val_exact_det _ _ _ _
+                      _ _ _ _ He H2) as [_ [-> ->]].
+        specialize (IH_es _ _ _ _ _ _ _ _ Hargs' H6 Hoot).
+        simpl in *. lia.
+    - intros rho e f Hlt0.
+      exact I.
+    - intros rho e r f t Hstep IHstep.
+      destruct r as [v|]; [| exact I].
+      intros f_oot t_oot Hoot.
+      remember e as e_cur in Hoot.
+      remember fuel_sem.OOT as r_oot in Hoot.
+      destruct Hoot; try discriminate.
+      + subst. simpl in *. lia.
+      + subst.
+        specialize (IHstep _ _ H). simpl in *. lia.
+  Qed.
+
+  Lemma src_eval_val_oot_absurd rho0 e0 v0 f0 t_val t_oot :
+    src_eval rho0 e0 (fuel_sem.Val v0) f0 t_val ->
+    src_eval rho0 e0 fuel_sem.OOT f0 t_oot ->
+    False.
+  Proof.
+    intros Hval Hoot.
+      pose proof (src_eval_val_gt_oot _ _ _ _ _ Hval _ _ Hoot).
+      lia.
+  Qed.
+
   (** Evaluation preserves well-formedness of values. *)
   Lemma eval_preserves_wf
     (Hglob_wf : forall k decl body,
@@ -1197,7 +1673,77 @@ Section Correct.
       try (intros; exact I);
       try (intros; congruence).
 
-    (* Remaining 12 goals. Each case intros shared hypotheses, then splits. *)
+    (* Remaining step cases. *)
+
+    - (* Rel *)
+      intros n rho_r v0 Hnth_rho
+             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
+      injection Hv as <-.
+      remember (EAst.tRel n) as e_r.
+      destruct Hcvt; try discriminate.
+      rename H into Hnth_src.
+      injection Heqe_r as <-.
+      split.
+      + intros i Hnth_vn.
+        unfold env_consistent in Hcons.
+        rewrite (Hcons _ _ _ Hnth_vn Hnth_src). exact Hnth_rho.
+      + intros k decl body_k Hlk Hdecl Hbody.
+        edestruct Hcmap as [v_i [f' [t' [Hnth_i Hev]]]];
+          [exact Hnth_src | exact Hlk | exact Hdecl | exact Hbody |].
+        rewrite Hnth_rho in Hnth_i. injection Hnth_i as <-.
+        exists f', t'. exact Hev.
+
+    - (* Lam *)
+      intros ? ? ?
+             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
+      injection Hv as <-.
+      remember (EAst.tLambda _ _) as e_lam.
+      destruct Hcvt; try discriminate.
+      injection Heqe_lam as <- <-.
+      split.
+      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
+        * eapply nth_error_In. exact Hnth_i.
+        * eapply Setminus_Included.
+          match goal with [ H : _ \in _ |- _ ] => exact H end.
+      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
+        * exists k_f. exact Hlk_f.
+        * eapply Setminus_Included.
+          match goal with [ H : _ \in _ |- _ ] => exact H end.
+
+    - (* Fix *)
+      intros ? ? ?
+             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
+      injection Hv as <-.
+      remember (EAst.tFix _ _) as e_fix.
+      destruct Hcvt; try discriminate.
+      injection Heqe_fix as <- <-.
+      split.
+      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
+        * eapply nth_error_In. exact Hnth_i.
+        * match goal with
+          | [ H : FromList _ \subset _ |- _ ] =>
+            eapply H; eapply nth_error_In; eassumption
+          end.
+      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
+        * exists k_f. exact Hlk_f.
+        * match goal with
+          | [ H : FromList _ \subset _ |- _ ] =>
+            eapply H; eapply nth_error_In; eassumption
+          end.
+
+    - (* Box *)
+      intros ?
+             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
+      injection Hv as <-.
+      remember EAst.tBox as e_box.
+      destruct Hcvt; try discriminate. clear Heqe_box.
+      split.
+      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
+        * eapply nth_error_In. exact Hnth_i.
+        * assumption.
+      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
+        * exists k_f. exact Hlk_f.
+        * assumption.
 
     - (* App: x ∈ S3 ⊆ S2 ⊆ S, contradiction *)
       intros ? ? ? ? ? ? ? ? ? ? ? ? ? ?
@@ -1339,78 +1885,6 @@ Section Correct.
         eapply Hcmap_eval_coherent;
           [exact Hlk0 | exact Hlk | exact Hdecl0 | exact Hbody0
           | exact Hdecl_k | exact Hbody_k | exact Heval_body].
-
-    - (* Rel *)
-      intros n rho_r v0 Hnth_rho
-             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      injection Hv as <-.
-      remember (EAst.tRel n) as e_r.
-      destruct Hcvt; try discriminate.
-      rename H into Hnth_src.
-      injection Heqe_r as <-.
-      split.
-      + (* Part 1: env_consistent *)
-        intros i Hnth_vn.
-        unfold env_consistent in Hcons.
-        rewrite (Hcons _ _ _ Hnth_vn Hnth_src). exact Hnth_rho.
-      + (* Part 2: cmap_consistent *)
-        intros k decl body_k Hlk Hdecl Hbody.
-        edestruct Hcmap as [v_i [f' [t' [Hnth_i Hev]]]];
-          [exact Hnth_src | exact Hlk | exact Hdecl | exact Hbody |].
-        rewrite Hnth_rho in Hnth_i. injection Hnth_i as <-.
-        exists f', t'. exact Hev.
-
-    - (* Lam *)
-      intros ? ? ?
-             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      injection Hv as <-.
-      remember (EAst.tLambda _ _) as e_lam.
-      destruct Hcvt; try discriminate.
-      injection Heqe_lam as <- <-.
-      split.
-      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
-        * eapply nth_error_In. exact Hnth_i.
-        * eapply Setminus_Included.
-          match goal with [ H : _ \in _ |- _ ] => exact H end.
-      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
-        * exists k_f. exact Hlk_f.
-        * eapply Setminus_Included.
-          match goal with [ H : _ \in _ |- _ ] => exact H end.
-
-    - (* Fix *)
-      intros ? ? ?
-             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      injection Hv as <-.
-      remember (EAst.tFix _ _) as e_fix.
-      destruct Hcvt; try discriminate.
-      injection Heqe_fix as <- <-.
-      split.
-      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
-        * eapply nth_error_In. exact Hnth_i.
-        * match goal with
-          | [ H : FromList _ \subset _ |- _ ] =>
-            eapply H; eapply nth_error_In; eassumption
-          end.
-      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
-        * exists k_f. exact Hlk_f.
-        * match goal with
-          | [ H : FromList _ \subset _ |- _ ] =>
-            eapply H; eapply nth_error_In; eassumption
-          end.
-
-    - (* Box *)
-      intros ?
-             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      injection Hv as <-.
-      remember EAst.tBox as e_box.
-      destruct Hcvt; try discriminate. clear Heqe_box.
-      split.
-      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
-        * eapply nth_error_In. exact Hnth_i.
-        * assumption.
-      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
-        * exists k_f. exact Hlk_f.
-        * assumption.
 
     - (* eval_step: delegate *)
       intros rho0 e0 r0 f0 t0 Hstep IH. exact IH.
@@ -3184,6 +3658,7 @@ Section Correct.
                     (e_k, M.set x v' rho) (C |[ e_k ]|, rho)) /\
         (* Source diverges *)
         (r = fuel_sem.OOT ->
+         src_not_stuck vs e ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
   (** P_step: Correctness for a computation step.
@@ -3213,6 +3688,7 @@ Section Correct.
                     (e_k, M.set x v' rho) (C |[ e_k ]|, rho)) /\
         (* Source diverges *)
         (r = fuel_sem.OOT ->
+         src_not_stuck vs e ->
          exists c, bstep_fuel cenv rho (C |[ e_k ]|) c eval.OOT tt).
 
   (** P_many: Correctness for argument lists.
@@ -3260,8 +3736,189 @@ Section Correct.
               (fun vs es vs1 f t => anf_cvt_correct_exps vs es vs1 f t)).
 
     (* ================================================================ *)
-    (* P cases: eval_env_step (13 cases)                                *)
+    (* P cases: eval_env_step                                           *)
     (* ================================================================ *)
+
+    (* eval_Rel_fuel *)
+    - intros n rho0 v Hnth.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
+      inv Hrel. split.
+      + intros v0 v' Heq Hvrel. injection Heq as <-.
+        change (Hole_c |[ e_k ]|) with e_k.
+        eapply (preord_exp_post_monotonic cenv _ eq_fuel).
+        { intros [[[? ?] ?] ?] [[[? ?] ?] ?] Heq.
+          unfold anf_bound, eq_fuel in *. cbn in *. lia. }
+        eapply preord_exp_refl. exact eq_fuel_compat.
+        intros y Hy.
+        destruct (Pos.eq_dec y x) as [-> | Hneq].
+        * unfold preord_var_env. intros w Hget.
+          rewrite M.gss in Hget. inv Hget.
+          match goal with
+          | [ Henv : anf_env_rel' _ _ _ |- _ ] =>
+            unfold anf_env_rel' in Henv;
+            eapply Forall2_nth_error_l in Henv; [| exact Hnth]
+          end.
+          destruct Henv as [x0 [Hnth_x [w' [Hget' Hvrel']]]].
+          change positive with var in Hnth_x.
+          rewrite H1 in Hnth_x. inv Hnth_x.
+          eexists. split. exact Hget'.
+          eapply (@anf_cvt_val_alpha_equiv
+                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                    eq_fuel_compat (fun _ _ H => H)
+                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                    Σ box_dc Hglob_term func_tag default_tag);
+            eassumption.
+        * unfold preord_var_env. intros w Hget.
+          rewrite M.gso in Hget; [| exact Hneq].
+          eexists. split. exact Hget.
+          eapply preord_val_refl. exact eq_fuel_compat.
+      + intros Habs _. discriminate.
+
+    (* eval_Lam_fuel *)
+    - intros body0 rho0 na0.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
+      inv Hrel.
+      split.
+      + intros v0 v' Heq Hvrel. injection Heq as <-.
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ intros m. eapply preord_exp_Efun_red. }
+            eapply preord_exp_refl. now eapply eq_fuel_compat.
+            intros y Hy.
+            destruct (Pos.eq_dec y x) as [Heq | Hneq].
+            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
+              eexists. split.
+              { cbn [def_funs]. rewrite M.gss. reflexivity. }
+              eapply (@anf_cvt_val_alpha_equiv
+                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                        eq_fuel_compat (fun _ _ H => H)
+                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc Hglob_term func_tag default_tag).
+              + eassumption.
+              + eapply anf_rel_Clos
+                  with (names := vnames) (S1 := S \\ [set x1] \\ [set x]);
+                  try eassumption.
+                * { eapply Union_Disjoint_l.
+                    - eapply Disjoint_Singleton_l.
+                      intros [[_ Habs] _]. apply Habs. constructor.
+                    - eapply Union_Disjoint_l.
+                      + eapply Disjoint_Singleton_l.
+                        intros [_ Habs]. apply Habs. constructor.
+                      + eapply Disjoint_Included_r.
+                        { eapply Included_trans; eapply Setminus_Included. }
+                        exact Hdis. }
+                * { eapply Disjoint_Included_r.
+                    - eapply Included_trans; eapply Setminus_Included.
+                    - exact Hdis_cmap. }
+                * { intro Hc. eapply Hdis_cmap. constructor; [exact Hc | exact H1]. }
+                * { intro Hc. destruct H3.
+                    eapply Hdis_cmap. constructor; [exact Hc | assumption]. }
+                * { intro Hc. inv Hc.
+                    - inv H. destruct H3 as [_ Habs]. apply Habs. constructor.
+                    - eapply Hdis. constructor; [exact H | exact H1]. }
+                * { intro Hc. destruct H3.
+                    eapply Hdis. constructor; [exact Hc | assumption]. }
+            - intros v1 Hget. rewrite M.gso in Hget; eauto.
+              eexists. split.
+              { cbn [def_funs]. rewrite M.gso; eauto. }
+              eapply preord_val_refl. tci. }
+        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
+        unfold_all. cbn in *. lia.
+      + intros Habs _. discriminate Habs.
+
+    (* eval_Fix_fuel *)
+    - intros mfix0 idx0 rho0.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
+      inv Hrel.
+      split.
+      + intros v0 v' Heq Hvrel. injection Heq as <-.
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ intros m. eapply preord_exp_Efun_red. }
+            eapply preord_exp_refl. now eapply eq_fuel_compat.
+            intros y Hy.
+            destruct (Pos.eq_dec y x) as [Heq | Hneq].
+            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
+              eexists. split.
+              { eapply def_funs_eq.
+                apply (proj2 (Same_set_all_fun_name _)).
+                erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
+                eapply nth_error_In. eassumption. }
+              eapply (@anf_cvt_val_alpha_equiv
+                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
+                        eq_fuel_compat (fun _ _ H => H)
+                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
+                        Σ box_dc Hglob_term func_tag default_tag).
+              + eassumption.
+              + eapply anf_rel_ClosFix
+                  with (names := vnames) (S1 := S \\ FromList fnames);
+                  try eassumption.
+                * { eapply Union_Disjoint_l.
+                    - eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis].
+                    - eapply Disjoint_Setminus_r. eapply Included_refl. }
+                * { eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap]. }
+                * { eapply Disjoint_Included_r; [exact H1 | exact Hdis_cmap]. }
+                * { eapply Disjoint_Included_r; [exact H1 | exact Hdis]. }
+                * { eapply anf_cvt_rel_mfix_to_fix_rel; [ eassumption | ].
+                    eapply Disjoint_sym. eapply Union_Disjoint_l.
+                    - eapply Disjoint_Setminus_r. eapply Included_refl.
+                    - eapply Disjoint_Included_r; [eapply Setminus_Included |].
+                      exact Hdis. }
+                * { eapply global_env_rel_mono; [exact Hglob |].
+                    intros k0 Hk0. eapply kn_deps_mfix_subset_fix. exact Hk0. }
+            - intros v1 Hget. rewrite M.gso in Hget; eauto.
+              eexists. split.
+              { rewrite def_funs_neq; eauto.
+                intros Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
+                erewrite anf_cvt_rel_mfix_all_fun_name in Hc by eassumption.
+                eapply Hdis_ek. constructor; [exact Hy |].
+                constructor.
+                - constructor; [eapply H1; exact Hc |].
+                  intros Hin_S'.
+                  assert (Hsub_mfix : S' \subset S \\ FromList fnames)
+                    by (eapply anf_cvt_mfix_subset; eassumption).
+                  apply Hsub_mfix in Hin_S'. destruct Hin_S' as [_ Habs].
+                  apply Habs. exact Hc.
+                - intro Habs. inv Habs. contradiction. }
+              eapply preord_val_refl. tci. }
+        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
+        unfold_all. cbn in *. lia.
+      + intros Habs _. discriminate Habs.
+
+    (* eval_Box_fuel *)
+    - intros rho0.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
+      inv Hrel.
+      split.
+      + intros v0 v' Heq Hvrel. injection Heq as <-.
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
+            2:{ intros m. eapply preord_exp_Econstr_red.
+                simpl. reflexivity. }
+            eapply preord_exp_refl. now eapply eq_fuel_compat.
+            intros y Hy.
+            destruct (Pos.eq_dec y x) as [Heq | Hneq].
+            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
+              eexists. split. rewrite M.gss. reflexivity.
+              inv Hvrel.
+              match goal with
+              | [ H : Forall2 _ [] ?vs |- _ ] => inv H
+              end.
+              rewrite preord_val_eq. simpl. split; [| constructor].
+              exact box_tag.
+            - intros v1 Hget. rewrite M.gso in Hget; eauto.
+              eexists. split. rewrite M.gso; eauto.
+              eapply preord_val_refl. tci. }
+        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
+        unfold_all. cbn in *. lia.
+      + intros Habs _. discriminate Habs.
 
     (* eval_App_step *)
     - intros e1 e2 body0 v2 r0 na0 rho0 rho' f1 f2 f3 t1 t2 t3
@@ -3422,6 +4079,7 @@ Section Correct.
                  (Ehalt r1, M.set r1 v'0 rho_bc)
                  (C0 |[ Ehalt r1 ]|, rho_bc)) /\
               (fuel_sem.Val v = fuel_sem.OOT ->
+               src_not_stuck (v2 :: rho') body0 ->
                exists c, bstep_fuel cenv rho_bc (C0 |[ Ehalt r1 ]|) c eval.OOT tt)).
             { eapply (IH3 rho_bc (x0 :: names) C0 r1 S1 S0 (i + 1)).
               - (* well_formed_env (v2 :: rho') *)
@@ -3977,21 +4635,21 @@ Section Correct.
           intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] [? ?]]].
           unfold_all. simpl in *. split; lia. }
       + (* Divergence *)
-        intros _. exists 0. eapply bstep_fuel_zero_OOT.
+        intros _ _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_App_step_OOT1 *)
     - intros e1 e2 rho0 f1 t1 Heval1 IH1.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_App_step_OOT2 *)
     - intros e1 e2 v rho0 f1 f2 t1 t2 Heval1 IH1 Heval2 IH2.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_FixApp_step *)
     - intros e1 e2 body0 rho0 rho' rho'' idx0 na0 mfix0 v2 r0
@@ -4139,6 +4797,7 @@ Section Correct.
                           (Ehalt r_bc, M.set r_bc v'0 rho_bc)
                           (C_bc |[ Ehalt r_bc ]|, rho_bc)) /\
               (fuel_sem.Val v = fuel_sem.OOT ->
+               src_not_stuck (v2 :: make_rec_env mfix0 rho') e_body ->
                exists c, bstep_fuel cenv rho_bc (C_bc |[ Ehalt r_bc ]|) c eval.OOT tt)).
             { eapply (IH3 rho_bc (x_pc :: List.rev fnames ++ names) C_bc r_bc
                           S_body1 S_body2 (i + 1)).
@@ -4642,7 +5301,7 @@ Section Correct.
           intros [[[? ?] ?] ?] [[[? ?] ?] ?].
           intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] [? ?]]].
           unfold_all. simpl in *. split; lia. }
-      + intros _. exists 0. eapply bstep_fuel_zero_OOT.
+      + intros _ _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_LetIn_step *)
     - intros na0 b0 t0 v1 r0 rho0 f1 f2 t1 t2
@@ -4861,14 +5520,14 @@ Section Correct.
         end.
         unfold_all. cbn in *. lia.
       + (* Divergence *)
-        intros _. exists 0. eapply bstep_fuel_zero_OOT.
+        intros _ _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_LetIn_step_OOT *)
     - intros na b t0 rho0 f1 t1 Heval1 IH1.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_Construct_step *)
     - intros ind c args vs0 rho0 dc fs ts
@@ -5115,7 +5774,7 @@ Section Correct.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?].
         intros [[[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]]].
         unfold_all. destruct p. destructAll. simpl in *. lia.
-      + intros Habs. congruence.
+      + intros _ _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_Construct_step_OOT *)
     - intros ind c args args_done args_rest e0 vs0 rho0 fs f0 t0 ts
@@ -5123,7 +5782,7 @@ Section Correct.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_Case_step *)
     - intros ind npars mch brs rho0 dc vs0 body0 c0 r0
@@ -5618,14 +6277,14 @@ Section Correct.
           unfold anf_bound in H_P1, H_ih1. unfold one_step in H_efun.
           destruct mid1' as [[[? ?] ?] ?]. destruct mid2' as [[[? ?] ?] ?].
           simpl in *. unfold_all. split; lia. }
-      + intros _. exists 0. eapply bstep_fuel_zero_OOT.
+      + intros _ _. exists 0. eapply bstep_fuel_zero_OOT.
 
     (* eval_Case_step_OOT *)
     - intros ind npars mch brs rho0 f1 t1 Heval1 IH1.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_Proj_step *)
     - intros p0 c0 rho0 vs0 v0 f1 t1
@@ -5819,14 +6478,14 @@ Section Correct.
           | [ p : _ * _ |- _ ] => destruct p
           end.
           unfold_all. cbn in *. lia. }
-      + intros Habs. congruence.
+      + intros Habs _. discriminate Habs.
 
     (* eval_Proj_step_OOT *)
     - intros p c rho0 f1 t1 Heval1 IH1.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
       split; [intros; congruence |
-              intros _; exists 0; eapply bstep_fuel_zero_OOT].
+              intros _ _; exists 0; eapply bstep_fuel_zero_OOT].
 
     (* eval_Const_step *)
     - intros k0 body0 v0 decl0 rho0 f0 t0
@@ -6262,216 +6921,6 @@ Section Correct.
     (* P1 cases: eval_env_fuel (6 cases)                                *)
     (* ================================================================ *)
 
-    (* eval_Rel_fuel *)
-    - intros n rho0 v Hnth.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
-      inv Hrel. split.
-      + (* Termination *)
-        intros v0 v' Heq Hvrel. injection Heq as <-.
-        change (Hole_c |[ e_k ]|) with e_k.
-        eapply (preord_exp_post_monotonic cenv _ eq_fuel).
-        { intros [[[? ?] ?] ?] [[[? ?] ?] ?] Heq.
-          unfold anf_bound, eq_fuel in *. cbn in *. lia. }
-        eapply preord_exp_refl. exact eq_fuel_compat.
-        (* preord_env_P eq_fuel (occurs_free e_k) i (M.set x v' rho) rho *)
-        intros y Hy.
-        destruct (Pos.eq_dec y x) as [-> | Hneq].
-        * (* y = x: v' and rho(x) both related to v *)
-          unfold preord_var_env. intros w Hget.
-          rewrite M.gss in Hget. inv Hget.
-          match goal with
-          | [ Henv : anf_env_rel' _ _ _ |- _ ] =>
-            unfold anf_env_rel' in Henv;
-            eapply Forall2_nth_error_l in Henv; [| exact Hnth]
-          end.
-          destruct Henv as [x0 [Hnth_x [w' [Hget' Hvrel']]]].
-          change positive with var in Hnth_x.
-          rewrite H1 in Hnth_x. inv Hnth_x.
-          eexists. split. exact Hget'.
-          eapply (@anf_cvt_val_alpha_equiv
-                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
-                    eq_fuel_compat (fun _ _ H => H)
-                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag);
-            eassumption.
-        * (* y ≠ x: M.gso, reflexivity *)
-          unfold preord_var_env. intros w Hget.
-          rewrite M.gso in Hget; [| exact Hneq].
-          eexists. split. exact Hget.
-          eapply preord_val_refl. exact eq_fuel_compat.
-      + (* Divergence: Val ≠ OOT *)
-        intros Heq. discriminate.
-    (* eval_Lam_fuel *)
-    - intros body0 rho0 na0.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
-      inv Hrel.
-      (* After inv (anf_Lam):
-         C = Efun1_c (Fcons f func_tag [x1] (C1 |[ Ehalt r1 ]|) Fnil) Hole_c
-         x = f, S' = S'0
-         H5 : x1 \in S, H7 : f \in S \\ [set x1]
-         H9 : anf_cvt_rel' (S \\ [set x1] \\ [set f]) body0 (x1::vnames) S'0 C1 r1 *)
-      split.
-      + (* Termination *)
-        intros v0 v' Heq Hvrel. injection Heq as <-.
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
-            2:{ intros m. eapply preord_exp_Efun_red. }
-            eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
-              eexists. split.
-              { cbn [def_funs]. rewrite M.gss. reflexivity. }
-              eapply (@anf_cvt_val_alpha_equiv
-                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
-                        eq_fuel_compat (fun _ _ H => H)
-                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag).
-              + eassumption.
-              + eapply anf_rel_Clos
-                  with (names := vnames) (S1 := S \\ [set x1] \\ [set x]);
-                  try eassumption.
-                (* Disjoint (x1 |: (x |: FromList vnames)) (S \\ {x1} \\ {x}) *)
-                * { eapply Union_Disjoint_l.
-                    - eapply Disjoint_Singleton_l.
-                      intros [[_ Habs] _]. apply Habs. constructor.
-                    - eapply Union_Disjoint_l.
-                      + eapply Disjoint_Singleton_l.
-                        intros [_ Habs]. apply Habs. constructor.
-                      + eapply Disjoint_Included_r.
-                        { eapply Included_trans; eapply Setminus_Included. }
-                        exact Hdis. }
-                (* Disjoint (cmap_vars cmap) (S \\ {x1} \\ {x}) *)
-                * { eapply Disjoint_Included_r.
-                    - eapply Included_trans; eapply Setminus_Included.
-                    - exact Hdis_cmap. }
-                (* ~ x1 ∈ cmap_vars cmap *)
-                * { intro Hc. eapply Hdis_cmap. constructor; [exact Hc | exact H1]. }
-                (* ~ x ∈ cmap_vars cmap *)
-                * { intro Hc. destruct H3.
-                    eapply Hdis_cmap. constructor; [exact Hc | assumption]. }
-                (* ~ x1 ∈ x |: FromList vnames *)
-                * { intro Hc. inv Hc.
-                    - (* x1 ∈ {x}, i.e. x1 = x *)
-                      inv H. destruct H3 as [_ Habs]. apply Habs. constructor.
-                    - (* x1 ∈ FromList vnames *)
-                      eapply Hdis. constructor; [exact H | exact H1]. }
-                (* ~ x ∈ FromList vnames *)
-                * { intro Hc. destruct H3.
-                    eapply Hdis. constructor; [exact Hc | assumption]. }
-                (* global_env_rel': kn_deps matches via try eassumption above *)
-            - intros v1 Hget. rewrite M.gso in Hget; eauto.
-              eexists. split.
-              { cbn [def_funs]. rewrite M.gso; eauto. }
-              eapply preord_val_refl. tci. }
-        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
-        unfold_all. cbn in *. lia.
-      + (* Divergence: Val ≠ OOT *)
-        intros Habs. congruence.
-    (* eval_Fix_fuel *)
-    - intros mfix0 idx0 rho0.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
-      inv Hrel.
-      (* anf_Fix: C = Efun1_c fdefs Hole_c, x = f *)
-      split.
-      + intros v0 v' Heq Hvrel. injection Heq as <-.
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
-            2:{ intros m. eapply preord_exp_Efun_red. }
-            eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
-              eexists. split.
-              { eapply def_funs_eq.
-                apply (proj2 (Same_set_all_fun_name _)).
-                erewrite anf_cvt_rel_mfix_all_fun_name by eassumption.
-                eapply nth_error_In. eassumption. }
-              eapply (@anf_cvt_val_alpha_equiv
-                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
-                        eq_fuel_compat (fun _ _ H => H)
-                        nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag).
-              + eassumption.
-              + eapply anf_rel_ClosFix
-                  with (names := vnames) (S1 := S \\ FromList fnames);
-                  try eassumption.
-                (* Disjoint (FromList vnames :|: FromList fnames) (S \\ FromList fnames) *)
-                * { eapply Union_Disjoint_l.
-                    - eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis].
-                    - eapply Disjoint_Setminus_r. eapply Included_refl. }
-                (* Disjoint (cmap_vars cmap) (S \\ FromList fnames) *)
-                * { eapply Disjoint_Included_r; [eapply Setminus_Included | exact Hdis_cmap]. }
-                (* Disjoint (cmap_vars cmap) (FromList fnames) *)
-                * { eapply Disjoint_Included_r; [exact H1 | exact Hdis_cmap]. }
-                (* Disjoint (FromList vnames) (FromList fnames) *)
-                * { eapply Disjoint_Included_r; [exact H1 | exact Hdis]. }
-                (* anf_fix_rel *)
-                * { eapply anf_cvt_rel_mfix_to_fix_rel; [ eassumption | ].
-                    eapply Disjoint_sym. eapply Union_Disjoint_l.
-                    - eapply Disjoint_Setminus_r. eapply Included_refl.
-                    - eapply Disjoint_Included_r; [eapply Setminus_Included |].
-                      exact Hdis. }
-                (* global_env_rel' for ClosFix *)
-                * { eapply global_env_rel_mono; [exact Hglob |].
-                    intros k0 Hk0. eapply kn_deps_mfix_subset_fix. exact Hk0. }
-            - intros v1 Hget. rewrite M.gso in Hget; eauto.
-              eexists. split.
-              { rewrite def_funs_neq; eauto.
-                intros Hc. apply (proj1 (Same_set_all_fun_name _)) in Hc.
-                erewrite anf_cvt_rel_mfix_all_fun_name in Hc by eassumption.
-                eapply Hdis_ek. constructor; [exact Hy |].
-                constructor.
-                - constructor; [eapply H1; exact Hc |].
-                  intros Hin_S'.
-                  assert (Hsub_mfix : S' \subset S \\ FromList fnames)
-                    by (eapply anf_cvt_mfix_subset; eassumption).
-                  apply Hsub_mfix in Hin_S'. destruct Hin_S' as [_ Habs].
-                  apply Habs. exact Hc.
-                - intro Habs. inv Habs. contradiction. }
-              eapply preord_val_refl. tci. }
-        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
-        unfold_all. cbn in *. lia.
-      + intros Habs. congruence.
-    (* eval_Box_fuel *)
-    - intros rho0.
-      unfold anf_cvt_correct_exp.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
-      inv Hrel.
-      (* anf_Box: C = Econstr_c x default_tag nil Hole_c *)
-      split.
-      + intros v0 v' Heq Hvrel. injection Heq as <-.
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
-            2:{ intros m. eapply preord_exp_Econstr_red.
-                simpl. reflexivity. }
-            eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
-              eexists. split. rewrite M.gss. reflexivity.
-              (* v' related to Con_v box_dc [], target is Vconstr default_tag [] *)
-              (* Design issue: needs dcon_to_tag default_tag box_dc tgm = default_tag.
-                 Requires either fixing box_dc in eval_Box_fuel or
-                 adding a well-formedness constraint. *)
-              inv Hvrel.
-              match goal with
-              | [ H : Forall2 _ [] ?vs |- _ ] => inv H
-              end.
-              rewrite preord_val_eq. simpl. split; [| constructor].
-              exact box_tag.
-            - intros v1 Hget. rewrite M.gso in Hget; eauto.
-              eexists. split. rewrite M.gso; eauto.
-              eapply preord_val_refl. tci. }
-        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
-        unfold_all. cbn in *. lia.
-      + intros Habs. congruence.
     (* eval_OOT *)
     - intros rho0 e0 f0 Hfuel_lt.
       unfold anf_cvt_correct_exp.
@@ -6480,7 +6929,7 @@ Section Correct.
       + (* Termination: vacuous — OOT ≠ Val *)
         intros v v' Heq. discriminate.
       + (* Divergence: target OOTs with fuel 0 *)
-        intros _.
+        intros _ _.
         exists 0. eapply bstep_fuel_zero_OOT.
     (* eval_step *)
     - intros rho0 e0 r0 f0 t0 Hstep IH_step.

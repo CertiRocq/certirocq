@@ -108,10 +108,35 @@ Section FUEL_SEM.
   Context (Σ : EAst.global_context).
   Context (box_dc : dcon).
 
-
   (** * Big-step resource semantics for EAst.term *)
 
   Inductive eval_env_step : env -> EAst.term -> result -> nat -> trace -> Prop :=
+
+  (** ** Immediate values *)
+  | eval_Rel_fuel :
+      forall (n : nat) (rho : env) (v : value),
+        nth_error rho n = Some v ->
+        eval_env_step rho (EAst.tRel n) (Val v)
+                      <0>
+                      <0>
+  | eval_Lam_fuel :
+      forall (body : EAst.term) (rho : env) (na : name),
+        eval_env_step rho (EAst.tLambda na body)
+                      (Val (Clos_v rho na body))
+                      <0>
+                      <0>
+  | eval_Fix_fuel :
+      forall (mfix : list (EAst.def EAst.term)) (idx : nat) (rho : env),
+        eval_env_step rho (EAst.tFix mfix idx)
+                      (Val (ClosFix_v rho mfix idx))
+                      <0>
+                      <0>
+  | eval_Box_fuel :
+      forall (rho : env),
+        eval_env_step rho EAst.tBox
+                      (Val (Con_v box_dc []))
+                      <0>
+                      <0>
 
   (** ** Application: function is a closure *)
   | eval_App_step :
@@ -222,31 +247,6 @@ Section FUEL_SEM.
 
   (** ** Top-level fuel-indexed evaluation *)
   with eval_env_fuel : env -> EAst.term -> result -> nat -> trace -> Prop :=
-  (* Values *)
-  | eval_Rel_fuel :
-      forall (n : nat) (rho : env) (v : value),
-        nth_error rho n = Some v ->
-        eval_env_fuel rho (EAst.tRel n) (Val v)
-                      <0>
-                      (one_i (EAst.tRel n))
-  | eval_Lam_fuel :
-      forall (body : EAst.term) (rho : env) (na : name),
-        eval_env_fuel rho (EAst.tLambda na body)
-                      (Val (Clos_v rho na body))
-                      <0>
-                      (one_i (EAst.tLambda na body))
-  | eval_Fix_fuel :
-      forall (mfix : list (EAst.def EAst.term)) (idx : nat) (rho : env),
-        eval_env_fuel rho (EAst.tFix mfix idx)
-                      (Val (ClosFix_v rho mfix idx))
-                      <0>
-                      (one_i (EAst.tFix mfix idx))
-  | eval_Box_fuel :
-      forall (rho : env),
-        eval_env_fuel rho EAst.tBox
-                      (Val (Con_v box_dc []))
-                      <0>
-                      (one_i EAst.tBox)
   (* OOT *)
   | eval_OOT :
       forall rho (e : EAst.term) f,
@@ -284,6 +284,42 @@ Section FUEL_SEM.
     enough (Haux : Pdet rho e (Val v1) f1 t1) by exact Haux.
     apply (eval_env_fuel_ind' Pdet Pmany Pdet); try exact Heval1;
     unfold Pdet, Pmany; try solve [intros; exact I].
+    (* eval_Rel_fuel *)
+    - intros n rho0 v Hnth v2 f2 t2 Heval2.
+      remember (EAst.tRel n) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tRel n) as ea in H.
+      remember (Val v2) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <-. injection Heqrv as <-. congruence.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na v2 f2 t2 Heval2.
+      remember (EAst.tLambda na body) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tLambda na body) as ea in H.
+      remember (Val v2) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 v2 f2 t2 Heval2.
+      remember (EAst.tFix mfix idx) as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tFix mfix idx) as ea in H.
+      remember (Val v2) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
+    (* eval_Box_fuel *)
+    - intros rho0 v2 f2 t2 Heval2.
+      remember EAst.tBox as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember EAst.tBox as ea in H.
+      remember (Val v2) as rv in H.
+      destruct H; try discriminate.
+      injection Heqrv as <-. reflexivity.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2' r na rho0 rho' f0 f2 f3 t0 t2 t3
              _ IH1 _ IH2 _ IH3.
@@ -404,40 +440,207 @@ Section FUEL_SEM.
       injection Heqees as <- <-. f_equal.
       + exact (IH_e _ _ _ H).
       + exact (IH_es _ _ _ Hmany2).
-    (* eval_Rel_fuel *)
+    (* eval_step *)
+    - intros rho0 e0 r f0 t0 _ IH. destruct r; [exact IH | exact I].
+  Qed.
+
+  Lemma eval_val_exact_det rho e v1 v2 f1 t1 f2 t2 :
+    eval_env_fuel rho e (Val v1) f1 t1 ->
+    eval_env_fuel rho e (Val v2) f2 t2 ->
+    v1 = v2 /\ f1 = f2 /\ t1 = t2.
+  Proof.
+    intros Heval1. revert v2 f2 t2.
+    set (Pstep := fun (rho : env) (e : EAst.term) (r : result) (f : nat) (t : trace) =>
+      match r with
+      | Val v1 => forall v2 f2 t2,
+          eval_env_step rho e (Val v2) f2 t2 ->
+          v1 = v2 /\ f = f2 /\ t = t2
+      | OOT => True
+      end).
+    set (Pmany := fun (rho : env) (es : list EAst.term) (vs : list value)
+                      (fs : nat) (ts : trace) =>
+      forall vs2 fs2 ts2,
+        eval_fuel_many rho es vs2 fs2 ts2 ->
+        vs = vs2 /\ fs = fs2 /\ ts = ts2).
+    set (Pfuel := fun (rho : env) (e : EAst.term) (r : result) (f : nat) (t : trace) =>
+      match r with
+      | Val v1 => forall v2 f2 t2,
+          eval_env_fuel rho e (Val v2) f2 t2 ->
+          v1 = v2 /\ f = f2 /\ t = t2
+      | OOT => True
+      end).
+    enough (Haux : Pfuel rho e (Val v1) f1 t1) by exact Haux.
+    apply (eval_env_fuel_ind' Pstep Pmany Pfuel); try exact Heval1;
+      unfold Pstep, Pmany, Pfuel; try solve [intros; exact I].
     - intros n rho0 v Hnth v2 f2 t2 Heval2.
       remember (EAst.tRel n) as ea in Heval2.
       remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate.
-      + injection Heqea as <-. injection Heqrv as <-. congruence.
-      + subst. exfalso. remember (EAst.tRel n) as ea in H.
-        destruct H; discriminate.
-    (* eval_Lam_fuel *)
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <-. subst.
+      split; [congruence | split; reflexivity].
     - intros body rho0 na v2 f2 t2 Heval2.
       remember (EAst.tLambda na body) as ea in Heval2.
       remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate.
-      + injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
-      + subst. exfalso. remember (EAst.tLambda na body) as ea in H.
-        destruct H; discriminate.
-    (* eval_Fix_fuel *)
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <- <-. subst.
+      split; [reflexivity | split; reflexivity].
     - intros mfix idx rho0 v2 f2 t2 Heval2.
       remember (EAst.tFix mfix idx) as ea in Heval2.
       remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate.
-      + injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
-      + subst. exfalso. remember (EAst.tFix mfix idx) as ea in H.
-        destruct H; discriminate.
-    (* eval_Box_fuel *)
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <- <-. subst.
+      split; [reflexivity | split; reflexivity].
     - intros rho0 v2 f2 t2 Heval2.
       remember EAst.tBox as ea in Heval2.
       remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate.
-      + injection Heqrv as <-. reflexivity.
-      + subst. exfalso. remember EAst.tBox as ea in H.
-        destruct H; discriminate.
-    (* eval_step *)
-    - intros rho0 e0 r f0 t0 _ IH. destruct r; [exact IH | exact I].
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      split; [reflexivity | split; reflexivity].
+    - intros e1 e2 body v2' r na rho0 rho' f0 f2 t0 t2 f3 t3
+             _ IH1 _ IH2 _ IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tApp e1 e2) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      + injection Heqea as <- <-. subst.
+        specialize (IH1 _ _ _ H). destruct IH1 as [Heq1 [-> ->]].
+        injection Heq1 as <- <- <-.
+        specialize (IH2 _ _ _ H0). destruct IH2 as [Heq2 [-> ->]].
+        subst. specialize (IH3 _ _ _ H1). destruct IH3 as [-> [-> ->]].
+        split; [reflexivity | split; reflexivity].
+      + injection Heqea as <- <-. subst.
+        specialize (IH1 _ _ _ H). destruct IH1 as [Heq1 _].
+        discriminate.
+    - intros e1 e2 body rho0 rho' rho'' idx na mfix v2' r
+             f0 f2 t0 t2 f3 t3 _ IH1 Hfb Hmre _ IH2 _ IH3.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tApp e1 e2) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      + injection Heqea as <- <-. subst.
+        specialize (IH1 _ _ _ H). destruct IH1 as [Heq1 _].
+        discriminate.
+      + injection Heqea as <- <-. subst.
+        lazymatch goal with
+        | [ He1_2 : eval_env_fuel _ _ (Val (ClosFix_v ?rho2 ?mfix2 ?idx2)) _ _,
+            Hfb2 : fix_body ?mfix3 ?idx3 = Some (EAst.tLambda ?na2 ?body2),
+            He2_2 : eval_env_fuel _ _ (Val ?v2_2) _ _,
+            Hbody2 : eval_env_fuel _ ?body2 (Val ?v_target2) _ _ |- _ ] =>
+          specialize (IH1 _ _ _ He1_2); destruct IH1 as [Heq1 [-> ->]];
+          injection Heq1 as <- <- <-;
+          rewrite Hfb in Hfb2; injection Hfb2 as <- <-;
+          specialize (IH2 _ _ _ He2_2); destruct IH2 as [-> [-> ->]];
+          specialize (IH3 _ _ _ Hbody2); destruct IH3 as [-> [-> ->]];
+          split; [reflexivity | split; reflexivity]
+        end.
+    - intros na b t0 v1' r rho0 f0 t2 f2 t3 _ IH1 _ IH2.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tLetIn na b t0) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <- <- <-. subst.
+      specialize (IH1 _ _ _ H). destruct IH1 as [Heq1 [-> ->]].
+      subst. specialize (IH2 _ _ _ H0). destruct IH2 as [-> [-> ->]].
+      split; [reflexivity | split; reflexivity].
+    - intros ind c args vs rho0 dc fs ts Hdc _ IHmany.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tConstruct ind c args) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      injection Heqea as <- <- <-. injection Heqrv as <-.
+      specialize (IHmany _ _ _ H0). destruct IHmany as [-> [-> ->]].
+      split; [congruence | split; reflexivity].
+    - intros ind npars mch brs rho0 dc vs body c r f0 f2 t0 t2
+             _ IH1 Hdc Hfind _ IH2.
+      destruct r as [v_r |]; [| exact I].
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tCase (ind, npars) mch brs) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      assert (ind0 = ind) by congruence.
+      assert (mch0 = mch) by congruence.
+      assert (brs0 = brs) by congruence.
+      subst. clear Heqea.
+      specialize (IH1 _ _ _ H). destruct IH1 as [Heq1 [-> ->]].
+      assert (vs0 = vs) by congruence. subst vs0.
+      assert (c0 = c).
+      { assert (Hde : dcon_of_con ind c = dcon_of_con ind c0) by congruence.
+        unfold dcon_of_con in Hde. injection Hde as HN.
+        now apply Nnat.Nat2N.inj. }
+      subst c0. rewrite Hfind in H1. injection H1 as <-.
+      specialize (IH2 _ _ _ H2). destruct IH2 as [-> [-> ->]].
+      split; [reflexivity | split; reflexivity].
+    - intros p c rho0 vs v f0 t0 _ IH Hnth.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tProj p c) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <- <-. subst.
+      specialize (IH _ _ _ H). destruct IH as [Heq1 [-> ->]].
+      injection Heq1 as <-.
+      rewrite Hnth in H0. injection H0 as <-.
+      split; [reflexivity | split; reflexivity].
+    - intros k body v decl rho0 f0 t0 Hdecl Hbody _ IH.
+      intros v_target f_t t_t Heval2.
+      remember (EAst.tConst k) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <-. subst.
+      assert (decl = decl0) by (unfold declared_constant in *; congruence).
+      subst decl0. rewrite Hbody in H0. injection H0 as <-.
+      specialize (IH _ _ _ H1). destruct IH as [-> [-> ->]].
+      split; [reflexivity | split; reflexivity].
+    - intros rho0 vs2 fs2 ts2 Hmany2.
+      remember (@nil EAst.term) as es in Hmany2.
+      destruct Hmany2; [split; [reflexivity | split; reflexivity] | discriminate].
+    - intros rho0 e0 es v vs f0 fs t0 ts _ IH_e _ IH_es.
+      intros vs2 fs2 ts2 Hmany2.
+      remember (e0 :: es) as ees in Hmany2.
+      destruct Hmany2; [discriminate |].
+      injection Heqees as <- <-.
+      specialize (IH_e _ _ _ H). destruct IH_e as [-> [-> ->]].
+      specialize (IH_es _ _ _ Hmany2). destruct IH_es as [-> [-> ->]].
+      split; [reflexivity | split; reflexivity].
+    - intros rho0 e0 r f0 t0 _ IH.
+      destruct r as [v_r |]; [| exact I].
+      intros v2 f2 t2 Heval2.
+      remember e0 as ea in Heval2.
+      remember (Val v2) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      specialize (IH _ _ _ H). destruct IH as [-> [-> ->]].
+      split; [reflexivity | split; reflexivity].
   Qed.
 
   Lemma eval_many_det rho es vs1 vs2 fs1 ts1 fs2 ts2 :
@@ -454,6 +657,47 @@ Section FUEL_SEM.
       + exact (IHeval_fuel_many _ _ _ H2).
   Qed.
 
+  Lemma eval_many_app_inv rho args_done e args_rest vs fs ts :
+    eval_fuel_many rho (args_done ++ e :: args_rest) vs fs ts ->
+    exists vs_done v vs_rest fs1 f fs2 ts1 t ts2,
+      vs = vs_done ++ v :: vs_rest /\
+      eval_fuel_many rho args_done vs_done fs1 ts1 /\
+      eval_env_fuel rho e (Val v) f t /\
+      eval_fuel_many rho args_rest vs_rest fs2 ts2 /\
+      fs = (fs1 <+> f <+> fs2) /\
+      ts = (ts1 <+> t <+> ts2).
+  Proof.
+    revert vs fs ts.
+    induction args_done as [| a args_done IH]; intros vs fs ts Hmany.
+    - simpl in Hmany.
+      inversion Hmany; subst.
+      exists [], v, vs0, <0>, f, fs0, <0>, t, ts0.
+      split; [reflexivity |].
+      split.
+      + constructor.
+      + split.
+        * exact H2.
+        * split.
+          -- exact H6.
+          -- split.
+             ++ rewrite plus_zero. reflexivity.
+             ++ rewrite plus_zero. reflexivity.
+    - simpl in Hmany.
+      inversion Hmany; subst.
+      specialize (IH _ _ _ H6) as
+        (vs_done & v_mid & vs_rest & fs1 & f' & fs2 & ts1 & t' & ts2 &
+         Hvs & Hdone & Heval & Hrest & Hfs & Hts).
+      exists (v :: vs_done), v_mid, vs_rest, (f <+> fs1), f', fs2,
+             (t <+> ts1), t', ts2.
+      repeat split.
+      + simpl. now rewrite Hvs.
+      + constructor; assumption.
+      + exact Heval.
+      + exact Hrest.
+      + rewrite Hfs. repeat rewrite plus_assoc. reflexivity.
+      + rewrite Hts. repeat rewrite plus_assoc. reflexivity.
+  Qed.
+
   (** All global constant bodies terminate. *)
   Definition globals_terminate :=
     forall k decl body,
@@ -461,5 +705,17 @@ Section FUEL_SEM.
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t,
         eval_env_fuel [] body (Val src_v) f t.
+
+  Definition diverge (rho : env) (e : EAst.term) : Prop :=
+    forall f, exists t, eval_env_fuel rho e OOT f t.
+
+  Definition not_stuck (rho : env) (e : EAst.term) : Prop :=
+    (exists src_v f t, eval_env_fuel rho e (Val src_v) f t) \/ diverge rho e.
+
+  Lemma diverge_not_stuck rho e :
+    diverge rho e -> not_stuck rho e.
+  Proof.
+    right. assumption.
+  Qed.
 
 End FUEL_SEM.
