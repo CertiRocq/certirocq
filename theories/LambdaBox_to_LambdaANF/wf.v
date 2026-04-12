@@ -239,6 +239,22 @@ Section WF_EVAL.
     enough (Haux : Pwf rho e (Val v) f t) by exact (Haux Hwf_env Hwf_e).
     apply (eval_env_fuel_ind' Σ box_dc Pwf Pmany Pwf); try exact Heval;
     unfold Pwf, Pmany; try solve [intros; exact I].
+    (* eval_Rel_fuel *)
+    - intros n rho0 v0 Hnth Hwfe Hwft.
+      apply wellformed_tRel in Hwft.
+      unfold well_formed_env in Hwfe.
+      eapply Forall_forall in Hwfe; [exact Hwfe |].
+      eapply nth_error_In. exact Hnth.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na Hwfe Hwft.
+      apply wellformed_tLambda in Hwft.
+      apply Wf_Clos; [exact Hwfe | exact Hwft].
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 Hwfe Hwft.
+      apply wellformed_tFix in Hwft as [Hidx Hwf_mfix].
+      apply Wf_ClosFix; assumption.
+    (* eval_Box_fuel *)
+    - intros rho0 _ _. constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -313,22 +329,6 @@ Section WF_EVAL.
       constructor.
       + exact (IH_e Hwfe Hwf_hd).
       + exact (IH_es Hwfe Hwf_tl).
-    (* eval_Rel_fuel *)
-    - intros n rho0 v0 Hnth Hwfe Hwft.
-      apply wellformed_tRel in Hwft.
-      unfold well_formed_env in Hwfe.
-      eapply Forall_forall in Hwfe; [exact Hwfe |].
-      eapply nth_error_In. exact Hnth.
-    (* eval_Lam_fuel *)
-    - intros body rho0 na Hwfe Hwft.
-      apply wellformed_tLambda in Hwft.
-      apply Wf_Clos; [exact Hwfe | exact Hwft].
-    (* eval_Fix_fuel *)
-    - intros mfix idx rho0 Hwfe Hwft.
-      apply wellformed_tFix in Hwft as [Hidx Hwf_mfix].
-      apply Wf_ClosFix; assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. constructor. constructor.
     (* eval_step *)
     - intros rho0 e0 r f0 t0 _ IH. exact IH.
   Qed.
@@ -395,6 +395,22 @@ Section WF_EVAL.
     enough (Haux : Pwf rho e (Val v) f t) by exact (Haux Hwf_env Hwf_e).
     apply (eval_env_fuel_ind' Σ box_dc Pwf Pmany Pwf); try exact Heval;
     unfold Pwf, Pmany; try solve [intros; exact I].
+    (* eval_Rel_fuel *)
+    - intros n rho0 v0 Hnth Hwfe Hwft.
+      apply (wellformed_tRel Σ_tail) in Hwft.
+      unfold well_formed_env in Hwfe.
+      eapply Forall_forall in Hwfe; [exact Hwfe |].
+      eapply nth_error_In. exact Hnth.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na Hwfe Hwft.
+      apply (wellformed_tLambda Σ_tail) in Hwft.
+      apply (Wf_Clos Σ_tail); [exact Hwfe | exact Hwft].
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 Hwfe Hwft.
+      apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
+      apply (Wf_ClosFix Σ_tail); assumption.
+    (* eval_Box_fuel *)
+    - intros rho0 _ _. constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -480,22 +496,6 @@ Section WF_EVAL.
       constructor.
       + exact (IH_e Hwfe Hwf_hd).
       + exact (IH_es Hwfe Hwf_tl).
-    (* eval_Rel_fuel *)
-    - intros n rho0 v0 Hnth Hwfe Hwft.
-      apply (wellformed_tRel Σ_tail) in Hwft.
-      unfold well_formed_env in Hwfe.
-      eapply Forall_forall in Hwfe; [exact Hwfe |].
-      eapply nth_error_In. exact Hnth.
-    (* eval_Lam_fuel *)
-    - intros body rho0 na Hwfe Hwft.
-      apply (wellformed_tLambda Σ_tail) in Hwft.
-      apply (Wf_Clos Σ_tail); [exact Hwfe | exact Hwft].
-    (* eval_Fix_fuel *)
-    - intros mfix idx rho0 Hwfe Hwft.
-      apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
-      apply (Wf_ClosFix Σ_tail); assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. constructor. constructor.
     (* eval_step *)
     - intros rho0 e0 r f0 t0 _ IH. exact IH.
   Qed.
@@ -551,6 +551,26 @@ Section EVAL_RESTRICT.
     apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ box_dc Pstep Pmany Pfuel);
       try exact Heval;
     unfold Pstep, Pmany, Pfuel; try solve [intros; exact I].
+    (* eval_Rel_fuel *)
+    - intros n rho0 v0 Hnth Hwfe Hwft. split.
+      + eapply fuel_sem.eval_Rel_fuel; eassumption.
+      + apply (wellformed_tRel Σ_tail) in Hwft.
+        eapply Forall_forall in Hwfe; [exact Hwfe |].
+        eapply nth_error_In. exact Hnth.
+    (* eval_Lam_fuel *)
+    - intros body rho0 na Hwfe Hwft. split.
+      + eapply fuel_sem.eval_Lam_fuel.
+      + apply (wellformed_tLambda Σ_tail) in Hwft.
+        apply (Wf_Clos Σ_tail); [exact Hwfe | exact Hwft].
+    (* eval_Fix_fuel *)
+    - intros mfix idx rho0 Hwfe Hwft. split.
+      + eapply fuel_sem.eval_Fix_fuel.
+      + apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
+        apply (Wf_ClosFix Σ_tail); assumption.
+    (* eval_Box_fuel *)
+    - intros rho0 _ _. split.
+      + eapply fuel_sem.eval_Box_fuel.
+      + constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r0 na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -693,26 +713,6 @@ Section EVAL_RESTRICT.
       split.
       + eapply fuel_sem.eval_many_cons; eassumption.
       + constructor; assumption.
-    (* eval_Rel_fuel *)
-    - intros n rho0 v0 Hnth Hwfe Hwft. split.
-      + eapply fuel_sem.eval_Rel_fuel; eassumption.
-      + apply (wellformed_tRel Σ_tail) in Hwft.
-        eapply Forall_forall in Hwfe; [exact Hwfe |].
-        eapply nth_error_In. exact Hnth.
-    (* eval_Lam_fuel *)
-    - intros body rho0 na Hwfe Hwft. split.
-      + eapply fuel_sem.eval_Lam_fuel.
-      + apply (wellformed_tLambda Σ_tail) in Hwft.
-        apply (Wf_Clos Σ_tail); [exact Hwfe | exact Hwft].
-    (* eval_Fix_fuel *)
-    - intros mfix idx rho0 Hwfe Hwft. split.
-      + eapply fuel_sem.eval_Fix_fuel.
-      + apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
-        apply (Wf_ClosFix Σ_tail); assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. split.
-      + eapply fuel_sem.eval_Box_fuel.
-      + constructor. constructor.
     (* eval_OOT *)
     - intros rho0 e0 f0 Hlt Hwfe Hwft. split.
       + eapply fuel_sem.eval_OOT. exact Hlt.
@@ -745,6 +745,10 @@ Section EVAL_RESTRICT.
     enough (Haux : Pfuel rho e r f t) by exact Haux.
     apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ_tail box_dc Pstep Pmany Pfuel);
       try exact Heval; unfold Pstep, Pmany, Pfuel; intros.
+    - eapply fuel_sem.eval_Rel_fuel; eassumption.
+    - eapply fuel_sem.eval_Lam_fuel.
+    - eapply fuel_sem.eval_Fix_fuel.
+    - eapply fuel_sem.eval_Box_fuel.
     - eapply fuel_sem.eval_App_step; eassumption.
     - eapply fuel_sem.eval_App_step_OOT1; eassumption.
     - eapply fuel_sem.eval_App_step_OOT2; eassumption.
@@ -762,11 +766,7 @@ Section EVAL_RESTRICT.
       unfold declared_constant in *. exact (Hext _ _ H).
     - constructor.
     - eapply fuel_sem.eval_many_cons; eassumption.
-    - eapply fuel_sem.eval_Rel_fuel; eassumption.
-    - eapply fuel_sem.eval_Lam_fuel.
-    - eapply fuel_sem.eval_Fix_fuel.
-    - eapply fuel_sem.eval_Box_fuel.
-    - eapply fuel_sem.eval_OOT. exact H.
+    - eapply fuel_sem.eval_OOT; eassumption.
     - eapply fuel_sem.eval_step. eassumption.
   Qed.
 
