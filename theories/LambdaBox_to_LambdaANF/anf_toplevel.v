@@ -15,7 +15,8 @@ From CertiRocq.LambdaANF Require Import
   tactics identifiers bounds cps_util rename set_util stemctx.
 From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import
-  common ANF fuel_sem wf anf_corresp anf_util anf_correct anf_global.
+  common ANF fuel_sem wf anf_corresp anf_util anf_correct anf_global
+  anf_divergence.
 
 Import ListNotations.
 Import Monad.MonadNotation.
@@ -53,8 +54,24 @@ Section Refinement.
     @global_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
 
   Let src_eval := @eval_env_fuel nat Hf_src Ht_src Σ box_dc.
+  Let src_diverge := @fuel_sem.diverge nat Hf_src Ht_src Σ box_dc.
+  Let src_diverge_not_stuck := @fuel_sem.diverge_not_stuck nat Hf_src Ht_src Σ box_dc.
   Let cmap_consistent' :=
     @cmap_consistent cmap nat Hf_src Ht_src Σ box_dc.
+
+  Lemma anf_bound_post_upper_bound f_src t_src :
+    post_upper_bound (anf_bound f_src t_src).
+  Proof.
+    intros e1 rho1 e2 rho2.
+    exists (fun cin => cin).
+    intros cin1 cin2 cout1 cout2 Hbound.
+    unfold anf_bound in Hbound. simpl in Hbound.
+    destruct Hbound as [Hlb _].
+    exists (cin2 - cin1).
+    symmetry.
+    apply Nat.sub_add.
+    lia.
+  Qed.
 
   Context (Hglob_term :
     forall k decl body,
@@ -348,6 +365,164 @@ Section Refinement.
     eapply anf_correct_top_explicit; eauto.
   Qed.
 
+  Theorem anf_divergence_top_explicit e Sg Sg' S' C_env C r :
+    wellformed Σ 0 e = true ->
+    anf_cvt_rel_global func_tag default_tag tgm
+      Sg (List.rev Σ) [] cmap C_env Sg' ->
+    anf_cvt_rel func_tag default_tag tgm cmap
+      Sg' e [] S' C r ->
+    src_diverge [] e ->
+    eval.diverge cenv (M.empty val) (C_env |[ C |[ Ehalt r ]| ]|).
+  Proof.
+    intros Hwf Hglob_cvt Hmain_cvt Hdiv_src.
+    pose proof (@anf_cvt_rel_global_complete_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_complete.
+    pose proof (@anf_cvt_rel_global_sound_top
+                  func_tag default_tag tgm efl Σ Hwf_glob
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_sound.
+    pose proof (@anf_cvt_rel_global_nodup_keys_top
+                  func_tag default_tag tgm efl Σ Hwf_glob HnoAxioms
+                  Sg cmap C_env Sg' Hglob_cvt)
+      as Hcmap_nodup_keys.
+    pose proof (@global_ctx_cmap_eval_coherent_top
+                  func_tag default_tag tgm cmap Σ efl HnoAxioms
+                  box_dc box_tag Hglob_term Hglob_fuel_zero Hwf_glob
+                  C_env Sg Sg' Hglob_cvt)
+      as Hcmap_eval_coherent.
+    pose (val_rel_exists :=
+      @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
+        _ Σ box_dc nat Hf_src Ht_src
+        Hglob_term Hwf_glob
+        HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
+    destruct (@global_ctx_correct_top
+                func_tag kon_tag default_tag default_itag
+                tgm cmap cenv Σ efl
+                HnoAxioms
+                dcon_to_tag_inj
+                box_dc box_tag
+                cenv_case_consistent
+                Hglob_term Hglob_fuel_zero Hglob_wf
+                prim_map prims Hwf_glob
+                HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                no_prims
+                C_env Sg Sg'
+                Hglob_cvt (M.empty val))
+      as [rho_g [F_glob [T_glob [Hglob_rho Hpre_glob]]]].
+
+    assert (Hwf_nil : well_formed_env Σ []) by constructor.
+    assert (Hcons_nil : env_consistent [] []).
+    { intros i j y Hi. destruct i; discriminate. }
+    assert (Hcmap_nil : cmap_consistent' [] []).
+    { intros i x k decl body Hi. destruct i; discriminate. }
+    assert (Hdis_nil : Disjoint _ (FromList []) Sg').
+    { rewrite FromList_nil. now apply Disjoint_Empty_set_l. }
+    assert (Hdis_main : Disjoint _ (cmap_vars cmap) Sg').
+    { eapply anf_cvt_global_disjoint_acc.
+      - exact Hglob_cvt.
+      - constructor. intros z Hc.
+        inversion Hc as [? Hz _]; subst; clear Hc.
+        destruct Hz as [k Hlk]. discriminate. }
+    assert (Henv_nil : anf_env_rel0 [] [] rho_g) by constructor.
+    assert (Hglob_main : global_env_rel' (kn_deps e) rho_g).
+    { intros k v Hdep Hlk.
+      eapply Hglob_rho.
+      - intro Hnone. rewrite Hlk in Hnone. discriminate.
+      - exact Hlk. }
+
+    assert (Hdis_ehalt :
+      Disjoint _ (occurs_free (Ehalt r)) ((Sg' \\ S') \\ [set r])).
+    { rewrite occurs_free_Ehalt.
+      eapply Disjoint_Singleton_l.
+      intro Hin.
+      inv Hin.
+      match goal with
+      | [ Hnot : ~ _ \in [set _] |- _ ] => now apply Hnot; constructor
+      end. }
+
+    assert (Hmain_div : eval.diverge cenv rho_g (C |[ Ehalt r ]|)).
+    { intros cin.
+      destruct (Hdiv_src cin) as [t Hoot].
+      pose proof (@anf_cvt_correct_oot_lower_bound
+                    func_tag default_tag default_itag
+                    tgm cmap cenv Σ efl
+                    dcon_to_tag_inj
+                    box_dc box_tag
+                    cenv_case_consistent Hcmap_eval_coherent
+                    Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
+                    [] e cin t Hoot)
+        as Hcorr_oot.
+      unfold anf_cvt_correct_oot_lower_bound_goal in Hcorr_oot.
+      specialize (Hcorr_oot rho_g [] C r Sg' S'
+                    Hwf_nil Hwf Hcons_nil Hcmap_nil
+                    Hdis_nil Hdis_main Henv_nil Hglob_main Hmain_cvt
+                    (Ehalt r) Hdis_ehalt).
+      specialize (Hcorr_oot (src_diverge_not_stuck [] e Hdiv_src)).
+      destruct Hcorr_oot as [c [Hle Hbsf]].
+      destruct (Nat.le_exists_sub _ _ Hle) as [d Hd].
+      assert (Hc_eq : c = d + cin) by lia.
+      rewrite Hc_eq in Hbsf.
+      eapply bstep_fuel_OOT_monotonic in Hbsf.
+      destruct Hbsf as [cout' [c' [Hbsf _]]].
+      exact (ex_intro _ cout' Hbsf). }
+
+    assert (Hctx_main0 :
+      occurs_free_ctx C \subset FromList [] :|: (Sg' \\ S') :|: cmap_vars cmap).
+    { exact (@anf_cvt_occurs_free_ctx_exp
+               func_tag default_tag tgm cmap Σ box_dc box_tag
+               Sg' e [] S' C r Hmain_cvt Hdis_nil Hdis_main). }
+    assert (Hctx_main :
+      occurs_free_ctx C \subset (Sg' \\ S') :|: cmap_vars cmap).
+    { rewrite FromList_nil, Union_Empty_set_neut_l in Hctx_main0.
+      exact Hctx_main0. }
+
+    assert (Hr_not_old_non_cmap : ~ r \in ((Sg \\ Sg') \\ cmap_vars cmap)).
+    { intro Hin_old.
+      destruct (@anf_cvt_result_in_consumed
+                  func_tag default_tag tgm cmap
+                  Sg' e [] S' C r Hmain_cvt)
+        as [Hin_vn | [Hin_s | Hin_cm]].
+      - rewrite FromList_nil in Hin_vn. contradiction.
+      - exact ((proj2 (proj1 Hin_old)) Hin_s).
+      - exact ((proj2 Hin_old) Hin_cm). }
+
+    assert (Hdis_cont :
+      Disjoint _ (occurs_free (C |[ Ehalt r ]|)) ((Sg \\ Sg') \\ cmap_vars cmap)).
+    { eapply Disjoint_Included_l.
+      - eapply occurs_free_ctx_app.
+      - eapply Union_Disjoint_l.
+        + eapply Disjoint_Included_l.
+          * exact Hctx_main.
+          * eapply Union_Disjoint_l.
+            -- constructor. intros z Hz.
+               inversion Hz as [? Hleft Hright]; subst; clear Hz.
+               exact ((proj2 (proj1 Hright)) (proj1 Hleft)).
+            -- constructor. intros z Hz.
+               inversion Hz as [? Hleft Hright]; subst; clear Hz.
+               exact ((proj2 Hright) Hleft).
+        + eapply Disjoint_Included_l.
+          * rewrite occurs_free_Ehalt. eapply Setminus_Included.
+          * eapply Disjoint_Singleton_l. exact Hr_not_old_non_cmap. }
+
+    eapply preord_exp_preserves_divergence.
+    - eapply anf_bound_post_upper_bound.
+    - intros i. exact (Hpre_glob (C |[ Ehalt r ]|) i Hdis_cont).
+    - exact Hmain_div.
+  Qed.
+
+  Theorem anf_divergence_top e Sg e_tgt :
+    wellformed Σ 0 e = true ->
+    anf_rel_top e Sg e_tgt ->
+    src_diverge [] e ->
+    eval.diverge cenv (M.empty val) e_tgt.
+  Proof.
+    intros Hwf [Sg' [S' [C_env [C [r [Hglob [Hmain ->]]]]]]] Hdiv.
+    eapply anf_divergence_top_explicit; eauto.
+  Qed.
+
 End Refinement.
 
 Section ComputationalCorrespondence.
@@ -557,6 +732,40 @@ Section ComputationalRefinement.
                  next_id ie e e_tgt comp_d' Hwf Hrun)
       as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
     eapply (@anf_correct_top_explicit
+              func_tag kon_tag default_tag default_itag
+              tgm cm (top_cenv ie) Σ efl
+              HnoAxioms
+              dcon_to_tag_inj
+              box_dc box_tag
+              cenv_case_consistent_top
+              Hglob_term Hglob_fuel_zero Hglob_wf
+              prim_map prims Hwf_glob
+              HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+              no_prims
+              e (fun x => (next_id <= x)%positive) Sg' S'
+              C_env C r); eauto.
+  Qed.
+
+  Theorem convert_top_anf_divergence_correct next_id e e_tgt comp_d' :
+    wellformed Σ 0 e = true ->
+    convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
+    @fuel_sem.diverge nat
+      (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
+      (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
+      Σ box_dc [] e ->
+    eval.diverge (top_cenv ie) (M.empty val) e_tgt.
+  Proof.
+    intros Hwf Hrun Hdiv.
+    edestruct (@convert_top_anf_corresp
+                 func_tag default_tag default_itag
+                 tgm Σ efl HnoAxioms
+                 prim_map prims Hwf_glob
+                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                 no_prims
+                 next_id ie e e_tgt comp_d' Hwf Hrun)
+      as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
+    eapply (@anf_divergence_top_explicit
               func_tag kon_tag default_tag default_itag
               tgm cm (top_cenv ie) Σ efl
               HnoAxioms
