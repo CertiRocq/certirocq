@@ -70,6 +70,14 @@ Section ANF.
 
     Definition def_name := nNamed "y"%bs.
 
+    Definition result_name := option (var * name).
+
+    Definition get_named_or_reserve (rname : result_name) (na : name) : anfM var :=
+      match rname with
+      | Some (x, hint_name) => reserve_named_var x hint_name
+      | None => get_named na
+      end.
+
     (** Bind projections for a match branch *)
     Definition proj_ctx (names : list name) (n : nat)
                (scrut : var) (vm : var_map) ct : anfM (exp_ctx * var_map) :=
@@ -80,27 +88,32 @@ Section ANF.
 
     (** Add names for mutually recursive functions *)
     Fixpoint add_fix_names (mfix : list (EAst.def EAst.term)) (vm : var_map)
+             (idx : nat) (rname : result_name)
       : anfM (list var * var_map) :=
       match mfix with
       | [] => ret ([], vm)
       | d :: mfix' =>
-        f_name <- get_named d.(EAst.dname) ;;
-        lvm <- add_fix_names mfix' (add_var_name vm f_name) ;;
+        f_name <- match idx, rname with
+                  | 0%nat, Some _ => get_named_or_reserve rname d.(EAst.dname)
+                  | _, _ => get_named d.(EAst.dname)
+                  end ;;
+        lvm <- add_fix_names mfix' (add_var_name vm f_name) (Nat.pred idx) rname ;;
         let '(fs, vm') := lvm in
         ret (f_name :: fs, vm')
       end.
 
     (** ANF conversion for primitive operations *)
     Fixpoint convert_prim_anf (n : nat) (prim : positive) (args : list var)
+             (rname : result_name)
       : anfM (var * exp_ctx) :=
       match n with
       | 0%nat =>
-        x <- get_named_str "prim"%bs ;;
+        x <- get_named_or_reserve rname (nNamed "prim"%bs) ;;
         ret (x, Eprim_c x prim (List.rev args) Hole_c)
       | S n =>
+        f <- get_named_or_reserve rname (nNamed "prim_wrapper"%bs) ;;
         arg <- get_named_str "p_arg"%bs ;;
-        f <- get_named_str "prim_wrapper"%bs ;;
-        '(x, C) <- convert_prim_anf n prim (arg :: args) ;;
+        '(x, C) <- convert_prim_anf n prim (arg :: args) None ;;
         ret (f, Efun1_c (Fcons f func_tag [arg] (C |[ Ehalt x ]|) Fnil) Hole_c)
       end.
 
@@ -162,7 +175,7 @@ Section ANF.
          end) brs n.
 
     (** Main ANF conversion *)
-    Fixpoint convert_anf (t : EAst.term) (vm : var_map)
+    Fixpoint convert_anf (t : EAst.term) (vm : var_map) (rname : result_name)
       {struct t} : anfM (var * exp_ctx) :=
       match t with
       | EAst.tRel n =>
@@ -172,31 +185,31 @@ Section ANF.
         end
 
       | EAst.tBox =>
-        x <- get_named_str "y"%bs ;;
+        x <- get_named_or_reserve rname (nNamed "y"%bs) ;;
         ret (x, Econstr_c x default_tag [] Hole_c)
 
       | EAst.tLambda na body =>
         x <- get_named na ;;
-        f <- get_named def_name ;;
-        '(r, C) <- convert_anf body (add_var_name vm x) ;;
+        f <- get_named_or_reserve rname def_name ;;
+        '(r, C) <- convert_anf body (add_var_name vm x) None ;;
         ret (f, Efun1_c (Fcons f func_tag [x] (C |[ Ehalt r ]|) Fnil) Hole_c)
 
       | EAst.tLetIn na b t =>
-        '(x, C1) <- convert_anf b vm ;;
-        '(r, C2) <- convert_anf t (add_var_name vm x) ;;
+        '(x, C1) <- convert_anf b vm None ;;
+        '(r, C2) <- convert_anf t (add_var_name vm x) rname ;;
         ret (r, comp_ctx_f C1 C2)
 
       | EAst.tApp u v =>
-        '(x1, C1) <- convert_anf u vm ;;
-        '(x2, C2) <- convert_anf v vm ;;
-        r <- get_named def_name ;;
+        r <- get_named_or_reserve rname def_name ;;
+        '(x1, C1) <- convert_anf u vm None ;;
+        '(x2, C2) <- convert_anf v vm None ;;
         ret (r, comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)))
 
       | EAst.tConst s =>
         match find_prim prims s with
         | Some p =>
           match M.get p prim_map with
-          | Some pr => convert_prim_anf pr.(prim_arity) p []
+          | Some pr => convert_prim_anf pr.(prim_arity) p [] rname
           | None => failwith "Internal error: identifier for primitive not found"
           end
         | None =>
@@ -208,35 +221,42 @@ Section ANF.
 
       | EAst.tConstruct ind c args =>
         let c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm in
-        x <- get_named def_name ;;
-        '(ys, C) <- convert_anf_args convert_anf args vm ;;
+        x <- get_named_or_reserve rname def_name ;;
+        '(ys, C) <- convert_anf_args (fun t vm => convert_anf t vm None) args vm ;;
         ret (x, comp_ctx_f C (Econstr_c x c_tag ys Hole_c))
 
       | EAst.tCase (ind, npars) mch brs =>
+        r <- get_named_or_reserve rname def_name ;;
         f <- get_named_str "f_case"%bs ;;
         y <- get_named_str "s"%bs ;;
-        '(x1, C1) <- convert_anf mch vm ;;
-        pats <- convert_anf_branches convert_anf ind brs 0%N y vm ;;
-        r <- get_named def_name ;;
+        '(x1, C1) <- convert_anf mch vm None ;;
+        pats <- convert_anf_branches (fun t vm => convert_anf t vm None) ind brs 0%N y vm ;;
         ret (r, Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil)
                         (comp_ctx_f C1 (Eletapp_c r f func_tag [x1] Hole_c)))
 
       | EAst.tFix mfix idx =>
-        lvm <- add_fix_names mfix vm ;;
+        lvm <- add_fix_names mfix vm idx rname ;;
         let (names, vm') := lvm in
-        '(x, defs) <- convert_anf_mfix convert_anf mfix names idx vm' ;;
+        '(x, defs) <- convert_anf_mfix (fun t vm => convert_anf t vm None) mfix names idx vm' ;;
         ret (x, Efun1_c defs Hole_c)
 
       | EAst.tProj p c =>
         let c_tag := dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm in
-        '(x, C) <- convert_anf c vm ;;
-        y <- get_named def_name ;;
-        ret (y, comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
+        match rname with
+        | Some _ =>
+          y <- get_named_or_reserve rname def_name ;;
+          '(x, C) <- convert_anf c vm None ;;
+          ret (y, comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
+        | None =>
+          '(x, C) <- convert_anf c vm None ;;
+          y <- get_named def_name ;;
+          ret (y, comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
+        end
 
       | EAst.tPrim p =>
         match trans_prim_val p with
         | Some pv =>
-          x <- get_named_str "y"%bs ;;
+          x <- get_named_or_reserve rname (nNamed "y"%bs) ;;
           ret (x, Eprim_val_c x pv Hole_c)
         | None => failwith "Unsupported primitive type (arrays)"
         end
@@ -252,7 +272,7 @@ Section ANF.
     (** ** Top-level conversion of a single expression *)
 
     Definition convert_anf_exp (e : EAst.term) : anfM cps.exp :=
-      '(x, C) <- convert_anf e new_var_map ;;
+      '(x, C) <- convert_anf e new_var_map None ;;
       ret (C |[ Ehalt x ]|).
 
   End Conversion.
@@ -274,32 +294,42 @@ Section ANF.
         the value in rho. The [const_map] is built incrementally so each
         constant can reference previously defined ones.
         Returns the final [const_map] and a composed binding context. *)
-    Fixpoint convert_global_decls (gd : EAst.global_declarations)
+    Definition global_result_name (preferred : kername -> option var) (k : kername)
+      : result_name :=
+      match preferred k with
+      | Some v => Some (v, nNamed (string_of_kername k))
+      | None => None
+      end.
+
+    Fixpoint convert_global_decls (preferred : kername -> option var)
+             (gd : EAst.global_declarations)
              (cm_acc : const_map) : (@compM' unit) (const_map * exp_ctx) :=
       match gd with
       | [] => ret (cm_acc, Hole_c)
       | (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: gd' =>
-        '(v, C) <- convert_anf prim_map tgm prims cm_acc body (M.empty var, 0%N) ;;
-        '(cm', C_rest) <- convert_global_decls gd' ((k, v) :: cm_acc) ;;
+        '(v, C) <- convert_anf prim_map tgm prims cm_acc body (M.empty var, 0%N)
+                                (global_result_name preferred k) ;;
+        '(cm', C_rest) <- convert_global_decls preferred gd' ((k, v) :: cm_acc) ;;
         ret (cm', comp_ctx_f C C_rest)
       | (_, EAst.ConstantDecl {| EAst.cst_body := None |}) :: gd' =>
-        convert_global_decls gd' cm_acc
+        convert_global_decls preferred gd' cm_acc
       | (_, EAst.InductiveDecl _) :: gd' =>
-        convert_global_decls gd' cm_acc
+        convert_global_decls preferred gd' cm_acc
       end.
 
     (** Convert a full program: global environment + main expression.
         Global constant bindings are composed around the main expression,
         producing a single [cps.exp] where all globals are in rho. *)
-    Definition convert_top_anf (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
+    Definition convert_top_anf (preferred : kername -> option var)
+               (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
       : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, _dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (1%N, (0%N::nil)) (M.empty _) in
       let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
       let prog :=
-        '(cm, C_env) <- convert_global_decls gd [] ;;
-        '(x, C_main) <- convert_anf prim_map tgm prims cm e (M.empty var, 0%N) ;;
+        '(cm, C_env) <- convert_global_decls preferred gd [] ;;
+        '(x, C_main) <- convert_anf prim_map tgm prims cm e (M.empty var, 0%N) None ;;
         ret (C_env |[ C_main |[ Ehalt x ]| ]|)
       in
       let '(res_err, (comp_d', _)) := run_compM prog comp_d tt in
