@@ -94,6 +94,12 @@ Section CompM.
     compM.put (mkCompData n' c i f e fenv names' imap log, st) ;;
     ret x.
 
+  Definition set_var_name (x : var) (s : name) : compM' unit :=
+    p <- compM.get ;;
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
+    let names' := M.set x s names in
+    compM.put (mkCompData n c i f e fenv names' imap log, st).
+
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
 
 
