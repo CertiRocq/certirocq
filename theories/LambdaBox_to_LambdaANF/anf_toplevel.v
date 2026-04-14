@@ -549,8 +549,8 @@ Section ComputationalCorrespondence.
     wellformed Σ 0 e = true ->
     compM.triple
       (fun _ s => fresh Sg (state.next_var (fst s)))
-      ('(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (List.rev Σ) [] ;;
-       '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map ;;
+      ('(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None) (List.rev Σ) [] ;;
+       '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map None ;;
        ret (C_env |[ C |[ Ehalt r ]| ]|))
       (fun _ _ e_tgt _ =>
          exists cm Sg' S' C_env C r,
@@ -601,6 +601,7 @@ Section ComputationalCorrespondence.
   Lemma convert_top_anf_corresp next_id ie e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
     convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     exists cm Sg' S' C_env C r,
       anf_cvt_rel_global func_tag default_tag tgm
@@ -619,8 +620,8 @@ Section ComputationalCorrespondence.
     set (comp_d := state.pack_data next_id ctag itag ftag cenv0 fenv (M.empty _) (M.empty nat) []).
     set (Sg := fun x => (next_id <= x)%positive).
     set (prog :=
-      '(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (List.rev Σ) [] ;;
-      '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map ;;
+      '(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None) (List.rev Σ) [] ;;
+      '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map None ;;
       ret (C_env |[ C |[ Ehalt r ]| ]|)).
     assert (Hprog_corresp :
       compM.triple
@@ -719,6 +720,7 @@ Section ComputationalRefinement.
   Theorem convert_top_anf_correct next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
     convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     exists M, refines_top ie M e e_tgt.
   Proof.
@@ -749,6 +751,7 @@ Section ComputationalRefinement.
   Theorem convert_top_anf_divergence_correct next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
     convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     @fuel_sem.diverge nat
       (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
