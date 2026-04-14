@@ -131,6 +131,21 @@ Section Corresp.
     intros Hc. inv Hc. zify; lia.
   Qed.
 
+  Lemma set_var_name_spec :
+    forall (A : Type) (S0 : Ensemble var) (x : var) (na : name),
+      {{ fun (_ : unit) (s : comp_data * A) => fresh S0 (next_var (fst s)) }}
+        set_var_name x na
+      {{ fun _ _ _ s' => fresh S0 (next_var (fst s')) }}.
+  Proof.
+    Transparent bind ret.
+    unfold triple, set_var_name.
+    intros A S0 x na r w Hfr.
+    destruct w as [[n c i f e fenv names imap log] st].
+    simpl in *.
+    Opaque bind ret.
+    exact Hfr.
+  Qed.
+
   Lemma names_lst_length ns m :
     List.length (names_lst_len ns m) = m.
   Proof.
@@ -209,10 +224,10 @@ Section Corresp.
   (** * Spec for add_fix_names *)
 
   Lemma add_fix_names_spec :
-    forall mfix S0 vm vn
+    forall mfix idx S0 vm vn
       (Hvm : var_map_correct vm vn),
     {{ fun _ (s : comp_data * unit) => fresh S0 (next_var (fst s)) }}
-      add_fix_names mfix vm
+      add_fix_names mfix vm idx None
     {{ fun _ s (p : list var * var_map) s' =>
          let (names, vm') := p in
          NoDup names /\
@@ -221,7 +236,7 @@ Section Corresp.
          var_map_correct vm' (List.rev names ++ vn) /\
          fresh (S0 \\ FromList names) (next_var (fst s')) }}.
   Proof.
-    induction mfix; intros S0 vm vn Hvm.
+    induction mfix; intros idx S0 vm vn Hvm.
     - (* nil *)
       simpl. eapply return_triple.
       intros _ w Hf. repeat normalize_sets.
@@ -231,35 +246,55 @@ Section Corresp.
       split; [exact Hvm | assumption].
     - (* cons *)
       simpl.
-      (* Step 1: get_named allocates f *)
-      eapply bind_triple. eapply get_named_fresh.
-      intros f w.
-      eapply pre_curry_l; intros Hf_in.
-      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
-      (* Step 2: recursive call with updated vm *)
-      eapply bind_triple.
-      eapply IHmfix. eapply var_map_correct_cons. exact Hvm.
-      (* Step 3: destructure result and return *)
-      intros [names vm'] w'.
-      eapply pre_curry_l; intros Hnd.
-      eapply pre_curry_l; intros Hlen.
-      eapply pre_curry_l; intros Hsub.
-      eapply pre_curry_l; intros Hvm'.
-      eapply return_triple. intros _ w'' Hfr.
-      repeat normalize_sets.
-      split; [| split; [| split; [| split]]].
-      + (* NoDup (f :: names) *)
-        constructor; [| exact Hnd].
-        intros Hc. eapply Hsub in Hc. inv Hc. now eauto.
-      + (* length *)
-        simpl. congruence.
-      + (* FromList (f :: names) ⊆ S0 *)
-        eapply Union_Included. now sets.
-        eapply Included_trans; [exact Hsub | sets].
-      + (* var_map_correct *)
-        simpl rev. rewrite <- app_assoc. simpl. exact Hvm'.
-      + (* fresh *)
-        rewrite <- Setminus_Union. exact Hfr.
+      destruct idx; simpl.
+      + (* Step 1: get_named allocates f *)
+        eapply bind_triple. eapply get_named_fresh.
+        intros f w.
+        eapply pre_curry_l; intros Hf_in.
+        eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+        (* Step 2: recursive call with updated vm *)
+        eapply bind_triple.
+        eapply IHmfix. eapply var_map_correct_cons. exact Hvm.
+        (* Step 3: destructure result and return *)
+        intros [names vm'] w'.
+        eapply pre_curry_l; intros Hnd.
+        eapply pre_curry_l; intros Hlen.
+        eapply pre_curry_l; intros Hsub.
+        eapply pre_curry_l; intros Hvm'.
+        eapply return_triple. intros _ w'' Hfr.
+        repeat normalize_sets.
+        split; [| split; [| split; [| split]]].
+        * constructor; [| exact Hnd].
+          intros Hc. eapply Hsub in Hc. inv Hc. now eauto.
+        * simpl. congruence.
+        * eapply Union_Included. now sets.
+          eapply Included_trans; [exact Hsub | sets].
+        * simpl rev. rewrite <- app_assoc. simpl. exact Hvm'.
+        * rewrite <- Setminus_Union. exact Hfr.
+      + (* Step 1: get_named allocates f *)
+        eapply bind_triple. eapply get_named_fresh.
+        intros f w.
+        eapply pre_curry_l; intros Hf_in.
+        eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+        (* Step 2: recursive call with updated vm *)
+        eapply bind_triple.
+        eapply IHmfix. eapply var_map_correct_cons. exact Hvm.
+        (* Step 3: destructure result and return *)
+        intros [names vm'] w'.
+        eapply pre_curry_l; intros Hnd.
+        eapply pre_curry_l; intros Hlen.
+        eapply pre_curry_l; intros Hsub.
+        eapply pre_curry_l; intros Hvm'.
+        eapply return_triple. intros _ w'' Hfr.
+        repeat normalize_sets.
+        split; [| split; [| split; [| split]]].
+        * constructor; [| exact Hnd].
+          intros Hc. eapply Hsub in Hc. inv Hc. now eauto.
+        * simpl. congruence.
+        * eapply Union_Included. now sets.
+          eapply Included_trans; [exact Hsub | sets].
+        * simpl rev. rewrite <- app_assoc. simpl. exact Hvm'.
+        * rewrite <- Setminus_Union. exact Hfr.
   Qed.
 
   (** * Correspondence statements *)
@@ -276,7 +311,8 @@ Section Corresp.
           (Hblocks : cstr_as_blocks = true)
           (HnoArray : has_primarray = false).
 
-  Let convert_anf' := convert_anf func_tag default_tag prim_map tgm prims cmap.
+  Let convert_anf' (t : EAst.term) (vm : var_map) :=
+    convert_anf func_tag default_tag prim_map tgm prims cmap t vm None.
 
   (* For tConst: assume no primitive constants (find_prim always fails).
      Also assume every constant in Σ is in cmap. *)
@@ -483,14 +519,25 @@ Section Corresp.
       eexists. split; [econstructor; exact Hx_in | exact Hfr].
 
     - (* tRel n *)
-      simpl. rewrite (Hvm n).
+      simpl.
+      unfold var_map_correct in Hvm.
+      destruct vm as [vm p]. simpl in *.
       assert (Hn : (n < List.length vn)%nat).
       { apply Bool.andb_true_iff in Hwf as [_ Hlt].
         apply Nat.ltb_lt in Hlt. exact Hlt. }
-      destruct (nth_error vn n) eqn:Hnth.
-      2:{ apply nth_error_None in Hnth. lia. }
-      eapply return_triple. intros _ s Hfr.
-      eexists. split; [econstructor; exact Hnth | exact Hfr].
+      remember
+        match (p - N.of_nat n)%N with
+        | 0%N => None
+        | N.pos pos => vm ! pos
+        end as vopt eqn:Hvopt.
+      specialize (Hvm n). rewrite <- Hvopt in Hvm.
+      destruct vopt as [v |] eqn:Hv.
+      + unfold convert_anf'. simpl. rewrite <- Hvopt. simpl.
+        eapply return_triple. intros _ s Hfr.
+        eexists. split.
+        * econstructor. symmetry. exact Hvm.
+        * exact Hfr.
+      + symmetry in Hvm. apply nth_error_None in Hvm. lia.
 
     - (* tVar *) rewrite HnoVar in Hwf. discriminate.
     - (* tEvar *) rewrite HnoEvar in Hwf. discriminate.
@@ -542,7 +589,7 @@ Section Corresp.
       eexists. split; [econstructor; eassumption | exact Hfr].
 
     - (* tConst s *)
-      simpl. rewrite no_prims.
+      unfold convert_anf'. simpl. rewrite no_prims.
       apply Bool.andb_true_iff in Hwf as [_ Hwf_const].
       destruct (lookup_constant Σ s) as [d |] eqn:Hd; [| discriminate].
       specialize (cmap_complete s d Hd).
@@ -659,7 +706,7 @@ Section Corresp.
     - (* tCoFix *) rewrite HnoCoFix in Hwf. discriminate.
 
     - (* tPrim p *)
-      simpl.
+      unfold convert_anf'. simpl.
       destruct (trans_prim_val p) as [pv |] eqn:Hpv.
       + eapply bind_triple. eapply get_named_str_fresh.
         intros x w. eapply return_triple.
@@ -845,7 +892,7 @@ Section GlobalCorresp.
   Context (no_prims : forall s, find_prim prims s = None).
 
   Let convert_global_decls' :=
-    convert_global_decls func_tag default_tag prim_map tgm prims.
+    convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None).
 
   Local Open Scope list_scope.
 
@@ -924,6 +971,9 @@ Section GlobalCorresp.
           intros [v C] w.
           eapply pre_existential; intros S1.
           eapply pre_curry_l; intros Hcvt_body.
+          eapply bind_triple.
+          { eapply set_var_name_spec. }
+          intros u w_name.
           assert (Hcm_complete_proc1 :
             forall s d,
               lookup_constant

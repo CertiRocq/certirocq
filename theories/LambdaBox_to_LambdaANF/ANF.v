@@ -70,11 +70,11 @@ Section ANF.
 
     Definition def_name := nNamed "y"%bs.
 
-    Definition result_name := option (var * name).
+    Definition result_name := option var.
 
     Definition get_named_or_reserve (rname : result_name) (na : name) : anfM var :=
       match rname with
-      | Some (x, hint_name) => reserve_named_var x hint_name
+      | Some x => reserve_named_var x na
       | None => get_named na
       end.
 
@@ -111,9 +111,9 @@ Section ANF.
         x <- get_named_or_reserve rname (nNamed "prim"%bs) ;;
         ret (x, Eprim_c x prim (List.rev args) Hole_c)
       | S n =>
-        f <- get_named_or_reserve rname (nNamed "prim_wrapper"%bs) ;;
         arg <- get_named_str "p_arg"%bs ;;
         '(x, C) <- convert_prim_anf n prim (arg :: args) None ;;
+        f <- get_named_or_reserve rname (nNamed "prim_wrapper"%bs) ;;
         ret (f, Efun1_c (Fcons f func_tag [arg] (C |[ Ehalt x ]|) Fnil) Hole_c)
       end.
 
@@ -200,9 +200,9 @@ Section ANF.
         ret (r, comp_ctx_f C1 C2)
 
       | EAst.tApp u v =>
-        r <- get_named_or_reserve rname def_name ;;
         '(x1, C1) <- convert_anf u vm None ;;
         '(x2, C2) <- convert_anf v vm None ;;
+        r <- get_named_or_reserve rname def_name ;;
         ret (r, comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)))
 
       | EAst.tConst s =>
@@ -226,11 +226,11 @@ Section ANF.
         ret (x, comp_ctx_f C (Econstr_c x c_tag ys Hole_c))
 
       | EAst.tCase (ind, npars) mch brs =>
-        r <- get_named_or_reserve rname def_name ;;
         f <- get_named_str "f_case"%bs ;;
         y <- get_named_str "s"%bs ;;
         '(x1, C1) <- convert_anf mch vm None ;;
         pats <- convert_anf_branches (fun t vm => convert_anf t vm None) ind brs 0%N y vm ;;
+        r <- get_named_or_reserve rname def_name ;;
         ret (r, Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil)
                         (comp_ctx_f C1 (Eletapp_c r f func_tag [x1] Hole_c)))
 
@@ -294,13 +294,6 @@ Section ANF.
         the value in rho. The [const_map] is built incrementally so each
         constant can reference previously defined ones.
         Returns the final [const_map] and a composed binding context. *)
-    Definition global_result_name (preferred : kername -> option var) (k : kername)
-      : result_name :=
-      match preferred k with
-      | Some v => Some (v, nNamed (string_of_kername k))
-      | None => None
-      end.
-
     Fixpoint convert_global_decls (preferred : kername -> option var)
              (gd : EAst.global_declarations)
              (cm_acc : const_map) : (@compM' unit) (const_map * exp_ctx) :=
@@ -308,7 +301,8 @@ Section ANF.
       | [] => ret (cm_acc, Hole_c)
       | (k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: gd' =>
         '(v, C) <- convert_anf prim_map tgm prims cm_acc body (M.empty var, 0%N)
-                                (global_result_name preferred k) ;;
+                                (preferred k) ;;
+        _ <- set_var_name v (nNamed (string_of_kername k)) ;;
         '(cm', C_rest) <- convert_global_decls preferred gd' ((k, v) :: cm_acc) ;;
         ret (cm', comp_ctx_f C C_rest)
       | (_, EAst.ConstantDecl {| EAst.cst_body := None |}) :: gd' =>
