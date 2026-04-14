@@ -86,6 +86,14 @@ Section CompM.
     compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
+  Definition reserve_named_var (x : var) (s : name) : compM' var :=
+    p <- compM.get ;;
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
+    let names' := M.set x s names in
+    let n' := Pos.succ (Pos.max n x) in
+    compM.put (mkCompData n' c i f e fenv names' imap log, st) ;;
+    ret x.
+
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
 
 
