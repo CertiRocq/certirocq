@@ -896,34 +896,6 @@ Section GlobalCorresp.
 
   Local Open Scope list_scope.
 
-  Lemma suffix_wf (prefix Σ0 : global_context) :
-    wf_glob (List.app prefix Σ0) ->
-    wf_glob Σ0.
-  Proof.
-    intros Hwf.
-    eapply EExtends.extends_wf_glob.
-    - exists prefix. reflexivity.
-    - exact Hwf.
-  Qed.
-
-  Lemma wf_glob_head_const_some_wf Σ0 k body :
-    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
-    wellformed Σ0 0 body = true.
-  Proof.
-    intros Hwf0.
-    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
-    simpl in Hwd. exact Hwd.
-  Qed.
-
-  Lemma wf_glob_head_const_none_absurd Σ0 k :
-    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
-    False.
-  Proof.
-    intros Hwf0.
-    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
-    simpl in Hwd. rewrite HnoAxioms in Hwd. discriminate.
-  Qed.
-
   Lemma anf_cvt_global_corresp :
     forall (gd : global_context) (cm_acc : const_map)
            (Σ_proc : global_context) (S0 : Ensemble var),
@@ -1004,7 +976,9 @@ Section GlobalCorresp.
             wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
           { eapply suffix_wf with (prefix := List.rev gd').
             rewrite <- HΣ_eq. exact Hwf_glob. }
-          exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+          exfalso.
+          eapply (@wf_glob_head_const_none_absurd efl HnoAxioms Σ_proc k).
+          exact Hwf_proc1.
       + simpl in HΣ_eq.
         rewrite <- app_assoc in HΣ_eq.
         simpl in HΣ_eq.
