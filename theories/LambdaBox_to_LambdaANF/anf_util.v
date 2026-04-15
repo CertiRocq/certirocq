@@ -584,6 +584,15 @@ Section GlobalCMapFacts.
     - exact Hwf.
   Qed.
 
+  Lemma wf_glob_head_const_some_wf Σ0 k body :
+    wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
+    wellformed Σ0 0 body = true.
+  Proof.
+    intros Hwf0.
+    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
+    simpl in Hwd. exact Hwd.
+  Qed.
+
   Lemma wf_glob_head_const_none_absurd Σ0 k :
     wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
     False.
@@ -621,6 +630,20 @@ Section GlobalCMapFacts.
     intros Hwf0 Hdecl.
     pose proof (EExtends.lookup_env_In efl (k, EAst.ConstantDecl decl) Σ0 Hwf0) as Hiff.
     exact (in_map fst _ _ ((proj1 Hiff) Hdecl)).
+  Qed.
+
+  Lemma key_not_in_prefix (prefix : global_context) (k : kername)
+      (decl : EAst.global_decl) (suffix : global_context) :
+    wf_glob (List.app prefix ((k, decl) :: suffix)) ->
+    ~ List.In k (map fst prefix).
+  Proof.
+    intros Hwf Hin.
+    pose proof (EProgram.wf_glob_fresh _ Hwf) as Hfg.
+    apply EnvMap.EnvMap.fresh_globals_iff_NoDup in Hfg.
+    rewrite map_app in Hfg. simpl in Hfg.
+    assert (Hnotin : ~ List.In k (map fst prefix ++ map fst suffix)).
+    { eapply NoDup_remove_2. exact Hfg. }
+    apply Hnotin. apply in_or_app. left. exact Hin.
   Qed.
 
   Lemma key_not_in_suffix (prefix : global_context) (k : kername)

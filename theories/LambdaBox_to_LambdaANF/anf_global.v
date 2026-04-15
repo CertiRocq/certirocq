@@ -872,16 +872,6 @@ Section GlobalBindingsCorrect.
         exists d. right. exact Hin_d.
   Qed.
 
-  Lemma suffix_wf prefix Σ0 :
-    EWellformed.wf_glob (prefix ++ Σ0) ->
-    EWellformed.wf_glob Σ0.
-  Proof.
-    intros Hwf.
-    eapply EExtends.extends_wf_glob.
-    - exists prefix. reflexivity.
-    - exact Hwf.
-  Qed.
-
   Lemma suffix_extends prefix Σ0 :
     EWellformed.wf_glob (prefix ++ Σ0) ->
     EGlobalEnv.extends Σ0 (prefix ++ Σ0).
@@ -890,32 +880,6 @@ Section GlobalBindingsCorrect.
     eapply EExtends.extends_prefix_extends.
     - exists prefix. reflexivity.
     - exact Hwf.
-  Qed.
-
-  Lemma key_not_in_prefix prefix k decl suffix :
-    EWellformed.wf_glob (prefix ++ (k, decl) :: suffix) ->
-    ~ List.In k (map fst prefix).
-  Proof.
-    intros Hwf Hin.
-    pose proof (EProgram.wf_glob_fresh _ Hwf) as Hfg.
-    apply EnvMap.EnvMap.fresh_globals_iff_NoDup in Hfg.
-    rewrite map_app in Hfg. simpl in Hfg.
-    assert (Hnotin : ~ List.In k (map fst prefix ++ map fst suffix)).
-    { eapply NoDup_remove_2. exact Hfg. }
-    apply Hnotin. apply in_or_app. left. exact Hin.
-  Qed.
-
-  Lemma key_not_in_suffix prefix k decl suffix :
-    EWellformed.wf_glob (prefix ++ (k, decl) :: suffix) ->
-    ~ List.In k (map fst suffix).
-  Proof.
-    intros Hwf Hin.
-    pose proof (EProgram.wf_glob_fresh _ Hwf) as Hfg.
-    apply EnvMap.EnvMap.fresh_globals_iff_NoDup in Hfg.
-    rewrite map_app in Hfg. simpl in Hfg.
-    assert (Hnotin : ~ List.In k (map fst prefix ++ map fst suffix)).
-    { eapply NoDup_remove_2. exact Hfg. }
-    apply Hnotin. apply in_or_app. right. exact Hin.
   Qed.
 
   Lemma wf_glob_declared_constant_has_body Σ0 :
@@ -1335,24 +1299,6 @@ Section GlobalBindingsCorrect.
     simpl in Hdecl. rewrite eq_kername_bool_neq in Hdecl; eauto.
   Qed.
 
-  Lemma wf_glob_head_const_some_wf Σ0 k body :
-    EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ0) ->
-    wellformed Σ0 0 body = true.
-  Proof.
-    intros Hwf0.
-    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
-    simpl in Hwd. exact Hwd.
-  Qed.
-
-  Lemma wf_glob_head_const_none_absurd Σ0 k :
-    EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ0) ->
-    False.
-  Proof.
-    intros Hwf0.
-    inversion Hwf0 as [| ? ? ? Hwf_tail Hwd Hfresh]; subst.
-    simpl in Hwd. rewrite HnoAxioms in Hwd. discriminate.
-  Qed.
-
   Lemma anf_cvt_rel_global_lookup_preserved :
     forall S gd cm_acc cm C_env S' k v,
       anf_cvt_rel_global func_tag default_tag tgm S gd cm_acc cm C_env S' ->
@@ -1657,7 +1603,9 @@ Section GlobalBindingsCorrect.
       assert (Hwf_proc1 : EWellformed.wf_glob
           ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
       { eapply suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
-      exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+      exfalso.
+      eapply (@wf_glob_head_const_none_absurd efl HnoAxioms Σ_proc k).
+      exact Hwf_proc1.
     - simpl in HΣ_eq.
       assert (Hwf_split : EWellformed.wf_glob
           (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)).
@@ -2237,7 +2185,9 @@ Section GlobalBindingsCorrect.
         rewrite <- HΣ_eq. exact Hwf_glob. }
       assert (Hwf_proc1 : EWellformed.wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
       { eapply suffix_wf with (prefix := List.rev gd'). exact Hwf_split. }
-      exfalso. eapply wf_glob_head_const_none_absurd. exact Hwf_proc1.
+      exfalso.
+      eapply (@wf_glob_head_const_none_absurd efl HnoAxioms Σ_proc k).
+      exact Hwf_proc1.
     - simpl in HΣ_eq.
       assert (Hwf_split : EWellformed.wf_glob (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)).
       { replace (List.rev gd' ++ (k, EAst.InductiveDecl ind) :: Σ_proc)
