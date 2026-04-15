@@ -1046,9 +1046,8 @@ Section GlobalBindingsCorrect.
     unfold anf_cvt_correct_exp in Hcorrect.
     exists anf_v. split; [exact Hrel_v |].
     intros e_k i Hdis_ek.
-    destruct (Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob_body Hcvt_full e_k Hdis_ek)
-      as [Hterm _].
-    exact (Hterm src_v anf_v eq_refl Hrel_v).
+    exact ((Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob_body Hcvt_full e_k Hdis_ek)
+             src_v anf_v eq_refl Hrel_v).
   Qed.
 
   Lemma global_body_correct_acc :
@@ -1183,9 +1182,8 @@ Section GlobalBindingsCorrect.
     unfold anf_cvt_correct_exp in Hcorrect.
     exists anf_v. split; [exact Hrel_v |].
     intros e_k i Hdis_ek.
-    destruct (Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob Hcvt e_k Hdis_ek)
-      as [Hterm _].
-    exact (Hterm src_v anf_v eq_refl Hrel_v_acc).
+    exact ((Hcorrect rho [] C v S S' i Hwfe Hwf Hcons Hcmap_c Hdis_fn Hdis Henv Hglob Hcvt e_k Hdis_ek)
+             src_v anf_v eq_refl Hrel_v_acc).
   Qed.
 
 

@@ -552,8 +552,7 @@ Section Divergence.
               * constructor; [exact HS | exact HnS'].
               * simpl. intros [Heq | Hin]; [subst; apply Hneq_x1; constructor | exact (Hnxs Hin)]. }
           specialize (Hcorr_head Hdis_ctx).
-          destruct Hcorr_head as [Hval_head _].
-          eapply Hval_head; eauto. }
+          eapply Hcorr_head; eauto. }
         eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
         2:{
           intros m.
@@ -1002,8 +1001,7 @@ Section Divergence.
     specialize (Hcorr rho vnames C x S S' i
                       Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel
                       e_k Hdis_ek).
-    destruct Hcorr as [Hval _].
-    eapply Hval; eauto.
+    eapply Hcorr; eauto.
   Qed.
 
   (* Wrapping a source value prefix around a target OOT continuation contributes

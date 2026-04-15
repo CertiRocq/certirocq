@@ -280,12 +280,11 @@ Section Refinement.
       end. }
 
     specialize (Hcorr (Ehalt r) Hdis_ehalt).
-    destruct Hcorr as [Hterm _].
 
     assert (Hwf_src_v : well_formed_val Σ src_v).
     { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf_nil | exact Hwf | exact Heval]. }
     destruct (val_rel_exists src_v Hwf_src_v) as [v_anf Hrel_anf].
-    specialize (Hterm src_v v_anf eq_refl Hrel_anf).
+    specialize (Hcorr src_v v_anf eq_refl Hrel_anf).
 
     assert (Hctx_main0 :
       occurs_free_ctx C \subset FromList [] :|: (Sg' \\ S') :|: cmap_vars cmap).
@@ -331,7 +330,7 @@ Section Refinement.
 	        (Ehalt r, M.set r v_anf rho_g)
 	        (C_env |[ C |[ Ehalt r ]| ]|, M.empty val)).
 	    { eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
-	      - exact Hterm.
+	      - exact Hcorr.
 	      - intros m. exact (Hpre_glob (C |[ Ehalt r ]|) m Hdis_cont). }
 
 	    assert (Hehalt :
