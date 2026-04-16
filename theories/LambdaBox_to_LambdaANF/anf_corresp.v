@@ -403,7 +403,7 @@ Section Corresp.
       (* Step 3: convert branch body with extended vm *)
       eapply bind_triple.
       { eapply (IH_hd (List.app vars vn)); [| exact Hvm'].
-        rewrite app_length, Hlen. exact Hwf_hd. }
+        rewrite length_app, Hlen. exact Hwf_hd. }
       intros [r1 C1] w3. eapply pre_existential; intros S3.
       eapply pre_curry_l; intros Hcvt_body.
       eapply return_triple. intros _ s Hfr.
@@ -685,7 +685,7 @@ Section Corresp.
         (* Extract forallb test_def from Hwf_fix *)
         unfold wf_fix, wf_fix_gen in Hwf_fix.
         apply Bool.andb_true_iff in Hwf_fix as [_ Hwf_bodies].
-        rewrite app_length, rev_length, Hlen. exact Hwf_bodies. }
+        rewrite length_app, length_rev, Hlen. exact Hwf_bodies. }
       intros [fi defs] w'.
       eapply pre_existential; intros S2.
       eapply pre_curry_l; intros Hcvt_mfix.

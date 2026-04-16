@@ -3933,7 +3933,6 @@ Section Correct.
               { unfold anf_bound in Hpost_bc, Hpost2_bc |- *.
                 unfold eq_fuel in Heq_cont, Hpost2_bc. simpl in Heq_cont, Hpost_bc, Hpost2_bc.
                 destruct Hpost_bc as [Hlb_bc Hub_bc].
-                destruct Hpost2_bc as [Hlb2_bc Hub2_bc].
                 unfold_all. simpl in *. split; lia. }
               { exact Hres_cont. } }
             (* x1 ≠ x2: standard case *)
@@ -5512,7 +5511,7 @@ Section Correct.
             assert (Hset_proj : exists rho_proj,
               set_lists (rev br_vars) vs_anf rho_match = Some rho_proj).
             { apply (set_lists_length3 rho_match).
-              rewrite rev_length, Hbr_len.
+              rewrite length_rev, Hbr_len.
               exact (Forall2_length HF2_vs). }
             destruct Hset_proj as [rho_proj Hset_proj].
             (* Build body preord_exp via IH_body *)
@@ -5547,7 +5546,7 @@ Section Correct.
                 + unfold well_formed_env in Hwf.
                   rewrite Forall_forall in Hwf. exact (Hwf _ Hv0).
               - (* wellformed Σ (length (br_vars ++ vnames)) body0 *)
-                rewrite app_length.
+                rewrite length_app.
                 replace (Datatypes.length br_vars + Datatypes.length vnames)
                   with (Datatypes.length vnames + Datatypes.length vs0)
                   by (rewrite Hbr_len; lia).
@@ -5562,7 +5561,7 @@ Section Correct.
                   eapply Included_trans;
                     [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
                   eapply Included_trans; apply Setminus_Included.
-                + rewrite Hbr_len. rewrite rev_length. reflexivity.
+                + rewrite Hbr_len. rewrite length_rev. reflexivity.
               - (* cmap_consistent (br_vars ++ vnames) (rev vs0 ++ rho0) *)
                 eapply cmap_consistent_app.
                 + exact Hcmap.
@@ -5572,7 +5571,7 @@ Section Correct.
                   eapply Included_trans;
                     [eapply anf_cvt_exp_subset; exact Hcvt_mch |].
                   eapply Included_trans; apply Setminus_Included.
-                + rewrite Hbr_len. rewrite rev_length. reflexivity.
+                + rewrite Hbr_len. rewrite length_rev. reflexivity.
               - (* Disjoint (FromList (br_vars ++ vnames)) (S_br \\ FromList br_vars) *)
                 rewrite FromList_app. eapply Union_Disjoint_l.
                 + eapply Disjoint_Setminus_r. eapply Included_refl.
