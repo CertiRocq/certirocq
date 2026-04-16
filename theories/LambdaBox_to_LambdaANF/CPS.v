@@ -260,14 +260,48 @@ Section Translate.
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
              (cps.Eapp f kon_tag (k::nil))).
 
-    Definition convert_top_cps (ie : ienv) (prims : list (primitive * positive))
-               (cmap : const_map) (e : EAst.term) : error cps.exp * comp_data :=
+    Definition result_name := option var.
+
+    Definition get_named_or_reserve (rname : result_name) (na : name) : cpsM var :=
+      match rname with
+      | Some x => reserve_named_var x na
+      | None => get_named na
+      end.
+
+    Fixpoint convert_global_decls (dcm : conId_map)
+             (prims : list (primitive * positive))
+             (preferred : kername -> option var)
+             (gd : EAst.global_declarations)
+             (cm_acc : const_map) : cpsM (const_map * (exp -> exp)) :=
+      match gd with
+      | [] => ret (cm_acc, fun e => e)
+      | (kn, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: gd' =>
+        v <- get_named_or_reserve (preferred kn) (nNamed (string_of_kername kn)) ;;
+        k <- get_named_str "gk" ;;
+        body' <- cps_cvt dcm prims cm_acc body [] k ;;
+        '(cm', wrap_rest) <- convert_global_decls dcm prims preferred gd' ((kn, v) :: cm_acc) ;;
+        ret (cm', fun e => Efun (Fcons k kon_tag [v] (wrap_rest e) Fnil) body')
+      | (_, EAst.ConstantDecl {| EAst.cst_body := None |}) :: gd' =>
+        convert_global_decls dcm prims preferred gd' cm_acc
+      | (_, EAst.InductiveDecl _) :: gd' =>
+        convert_global_decls dcm prims preferred gd' cm_acc
+      end.
+
+    Definition convert_top_cps (prims : list (primitive * positive))
+               (preferred : kername -> option var)
+               (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
+      : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil))
                                   (M.set kon_tag (1%N, (0%N::nil)) (M.empty _)) in
       let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
-      let '(res_err, (comp_d', _)) := run_compM (convert_cps_exp dcm prims cmap e) comp_d tt in
+      let prog :=
+        '(cm, wrap_globals) <- convert_global_decls dcm prims preferred gd [] ;;
+        main <- convert_cps_exp dcm prims cm e ;;
+        ret (wrap_globals main)
+      in
+      let '(res_err, (comp_d', _)) := run_compM prog comp_d tt in
       (res_err, comp_d').
 
   End CPS.

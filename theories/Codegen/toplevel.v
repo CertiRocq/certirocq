@@ -34,7 +34,7 @@ Definition prevFld:positive := 89.
 
 Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
-Definition add_prim_names (prims : list (primitive * positive)) (nenv : LambdaBoxLocal_to_LambdaANF.name_env) : LambdaBoxLocal_to_LambdaANF.name_env :=
+Definition add_prim_names (prims : list (primitive * positive)) (nenv : cps_util.name_env) : cps_util.name_env :=
   List.fold_left (fun map '(prim, p) => cps.M.set p (nNamed prim.(prim_target)) map) prims nenv.
 
 Definition Clight_trans (bodyName : string) prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
