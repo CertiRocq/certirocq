@@ -1,10 +1,10 @@
 From Stdlib Require Import ZArith.
 Require Import Common.
 From CertiRocq Require Import
-     LambdaANF.cps LambdaANF.cps_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps LambdaANF.LambdaBoxLocal_to_LambdaANF
+     LambdaANF.cps LambdaANF.cps_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
-From CertiRocq Require Import LambdaBoxLocal.toplevel.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import ANF CPS common.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
 
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -21,6 +21,7 @@ Definition LambdaANFenv : Type := eval.prims * prim_env * ctor_env * ctor_tag * 
 Definition LambdaANFterm : Type := cps.exp.
 Definition LambdaANFval : Type := cps.val.
 Definition LambdaANF_FullTerm : Type := LambdaANFenv * LambdaANFterm.
+Definition LambdaBoxEAstTerm : Type := EAst.global_declarations * EAst.term.
 
 Section IDENT.
 
@@ -53,26 +54,44 @@ Section IDENT.
   Definition make_prim_env (prims : list (primitive * positive)) : prim_env :=
     List.fold_left (fun map '(p, pos) => M.set pos p map) prims (M.empty _).
 
-  Definition compile_LambdaANF_CPS prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition inductive_entry_aux_east (x : kername * EAst.global_decl) acc : common.ienv :=
+    match x with
+    | (s, EAst.ConstantDecl _) => acc
+    | (s, EAst.InductiveDecl m) =>
+      (s, ibodies_itypPack m.(ind_bodies)) :: acc
+    end.
+
+  Definition inductive_env_east (e : EAst.global_declarations) : common.ienv :=
+    fold_right inductive_entry_aux_east [] e.
+
+  Definition compile_LambdaANF_CPS prims : CertiRocqTrans LambdaBoxEAstTerm LambdaANF_FullTerm :=
     fun src =>
-      debug_msg "Translating from LambdaBoxLocal to LambdaANF (CPS)" ;;
+      debug_msg "Translating from LambdaBox (EAst) to LambdaANF (CPS)" ;;
       LiftErrorCertiRocqTrans "LambdaANF CPS"
-                             (fun (p : toplevel.LambdaBoxLocalTerm) =>
+                             (fun (p : LambdaBoxEAstTerm) =>
                                 let prim_env := make_prim_env prims in
-                                match convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let ie := inductive_env_east (fst p) in
+                                match convert_top_cps prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var
+                                                      prims (fun _ => None) ie (fst p) (snd p) with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
                                   Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
                                 | (compM.Err s, _) => Err s
                                 end) src.
 
-  Definition compile_LambdaANF_ANF prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_ANF prims : CertiRocqTrans LambdaBoxEAstTerm LambdaANF_FullTerm :=
     fun src =>
-      debug_msg "Translating from LambdaBoxLocal to LambdaANF (ANF)" ;;
+      debug_msg "Translating from LambdaBox (EAst) to LambdaANF (ANF)" ;;
       LiftErrorCertiRocqTrans "LambdaANF ANF"
-                             (fun (p : toplevel.LambdaBoxLocalTerm) =>
+                             (fun (p : LambdaBoxEAstTerm) =>
                                 let prim_env := make_prim_env prims in
-                                match convert_top_anf prim_env fun_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let ie := inductive_env_east (fst p) in
+                                let '(_, _, _, _, dcm) :=
+                                  CertiRocq.LambdaBox_to_LambdaANF.common.convert_env default_ctor_tag default_ind_tag ie in
+                                match CertiRocq.LambdaBox_to_LambdaANF.ANF.convert_top_anf
+                                        fun_fun_tag default_ctor_tag prim_env
+                                        default_ind_tag next_var dcm
+                                        prims (fun _ => None) ie (fst p) (snd p) with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
                                   Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)

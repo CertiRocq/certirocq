@@ -1,6 +1,6 @@
 From Wasm Require Import binary_format_printer.
 
-Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel CodegenWasm.toplevel.
+Require Export LambdaANF.toplevel Codegen.toplevel CodegenWasm.toplevel.
 Require Import compcert.lib.Maps.
 From Stdlib Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -10,6 +10,8 @@ Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
+From MetaRocq.Erasure Require Import EAst Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 From MetaRocq.Utils Require Import MRString.
 
 Import Monads.
@@ -42,36 +44,57 @@ Definition register_prims (id : positive) (env : Ast.Env.global_declarations) : 
 
 Section Pipeline.
 
+  Axiom assume_wellformed_inductives_mapping :
+    forall Σ (ip : EProgram.inductives_mapping),
+      is_true (wf_template_inductives_mapping Σ ip).
+
   Context (next_id : positive)
           (prims : list (primitive * positive))
           (debug : bool).
 
-  Fixpoint find_axioms {T} acc (env : environ T) :=
+  Fixpoint find_axioms acc (env : EAst.global_declarations) :=
     match env with
     | [] => acc
-    | (kn, d) :: decls =>
-      match d with
-      | ecTrm _ => find_axioms acc decls
-      | ecTyp 0 [] =>
+    | (kn, EAst.ConstantDecl {| EAst.cst_body := None |}) :: decls =>
         if List.find (fun prim => ReflectEq.eqb kn (fst prim).(prim_name)) prims then find_axioms acc decls
         else find_axioms (kn :: acc) decls
-      | ecTyp _ _ => find_axioms acc decls
-      end
-    end.
+    | _ :: decls => find_axioms acc decls
+      end.
 
-  Definition check_axioms (p : Program (compile.Term)) : pipelineM Datatypes.unit :=
-    match find_axioms [] p.(env) with
+  Definition check_axioms (p : toplevel.LambdaBoxEAstTerm) : pipelineM Datatypes.unit :=
+    match find_axioms [] (fst p) with
     | [] => ret tt
     | l => failwith ("Axioms found, use Extract Constant to realize them in C: " ++ newline ++
       print_list string_of_kername ", " l)%bs
     end.
 
+  Program Definition erase_program (econf : Erasure.erasure_configuration) imap
+          (p : Ast.Env.program) : EAst.global_declarations * EAst.term :=
+    run_erase_program econf (imap, p) _.
+  Next Obligation.
+    split.
+    now eapply assume_wellformed_inductives_mapping.
+    split.
+    now eapply assume_that_we_only_erase_on_welltyped_programs.
+    cbv [PCUICWeakeningEnvSN.normalizationInAdjustUniversesIn].
+    pose proof @PCUICSN.normalization.
+    split; typeclasses eauto.
+  Qed.
+
+  Definition compile_LambdaBoxEAst (econf : Erasure.erasure_configuration) imap
+    : CertiRocqTrans (Ast.Env.program) toplevel.LambdaBoxEAstTerm :=
+    fun src =>
+      debug_msg "Erasing to LambdaBox (EAst)" ;;
+      LiftCertiRocqTrans "LambdaBoxEAst" (erase_program econf imap) src.
+
   Definition CertiRocq_pipeline (p : Ast.Env.program) :=
     o <- get_options ;;
-    p <- compile_LambdaBoxMut o.(erasure_config) o.(inductives_mapping) p ;;
+    p <- compile_LambdaBoxEAst o.(erasure_config) o.(inductives_mapping) p ;;
     check_axioms p ;;
-    p <- compile_LambdaBoxLocal prims p ;;
-    p <- (if direct o then compile_LambdaANF_ANF next_id prims p else compile_LambdaANF_CPS next_id prims p) ;;
+    p <- match direct o with
+         | true => compile_LambdaANF_ANF next_id prims p
+         | false => compile_LambdaANF_CPS next_id prims p
+         end ;;
     if debug then compile_LambdaANF_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_LambdaANF next_id p.
 
