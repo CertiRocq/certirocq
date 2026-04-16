@@ -1083,23 +1083,6 @@ Section Correct.
     apply (wf.eval_preserves_wf _ _ Hglob_wf).
   Qed.
 
-  (** Weakening: env_consistent over an extended list implies
-      env_consistent over the original list with the first and last entries. *)
-  Lemma env_consistent_weaken x x1 vn v v_b rho :
-    env_consistent (x :: x1 :: vn) (v :: v_b :: rho) ->
-    env_consistent vn rho ->
-    env_consistent (x :: vn) (v :: rho).
-  Proof.
-    intros Hext Horig i j y Hi Hj.
-    destruct i as [|i'], j as [|j']; simpl in *.
-    - reflexivity.
-    - (* i=0, j=S j': x = vn[j'], need v = rho[j'].
-         Use Hext with i=0 and j=j'+2. *)
-      apply (Hext 0 (S (S j')) y Hi Hj).
-    - apply (Hext (S (S i')) 0 y Hi Hj).
-    - exact (Horig i' j' y Hi Hj).
-  Qed.
-
   (** Combined: eval preserves env_consistent when extending.
       Proved by eval induction. The LetIn case uses IH(b) to extend,
       then IH(body), then weakening to project out the intermediate binding. *)
@@ -2360,27 +2343,6 @@ Section Correct.
         intros [Hz_S3 _]. exact (Hz_nS2 (HS3_S2 _ Hz_S3)).
   Qed.
 
-  (* ANF expression contexts are built only from the administrative forms that
-     [interpret_ctx] knows how to execute. This is the key bridge from the
-     separate lower-bound OOT theorem back to arbitrary ANF continuations. *)
-  Lemma anf_cvt_rel_interprable S e vn S' C x :
-    anf_cvt_rel' S e vn S' C x ->
-    interprable C = true.
-  Proof.
-    intros Hcvt.
-    revert S e vn S' C x Hcvt.
-    apply (anf_cvt_rel_ind'
-             func_tag default_tag tgm cmap
-             (fun S e vn S' C x => interprable C = true)
-             (fun S es vn S' C xs => interprable C = true)
-             (fun _ _ _ _ _ _ => True)
-             (fun _ _ _ _ _ _ _ _ => True));
-      simpl; intros; try reflexivity; try exact I;
-      try (eapply interprable_comp_f_l; eauto; reflexivity).
-    eapply interprable_comp_f_l; [exact H0 |].
-    eapply interprable_comp_f_l; [exact H2 | reflexivity].
-  Qed.
-
   (** If the ANF conversion result is a cmap variable not in [FromList vn],
       the associated constant appears in [term_global_deps e]. *)
   Lemma anf_cvt_cmap_result_in_deps S e vn S' C x :
@@ -2659,12 +2621,6 @@ Section Correct.
     simpl. induction n as [| n' IH]; simpl; lia.
   Qed.
 
-  Lemma make_rec_env_length mfix rho :
-    Datatypes.length (make_rec_env mfix rho) =
-    (Datatypes.length mfix + Datatypes.length rho)%nat.
-  Proof.
-    unfold make_rec_env. apply make_rec_env_aux_length.
-  Qed.
 
   (* nth_error into make_rec_env: closure part *)
   Lemma make_rec_env_aux_nth_closure mfix rho n i :
@@ -2680,13 +2636,6 @@ Section Correct.
       + replace (n' - 0 - 0)%nat with n' by lia. reflexivity.
       + replace (n' - 0 - S i')%nat with (n' - 1 - i')%nat by lia.
         apply IH. lia.
-  Qed.
-
-  Lemma make_rec_env_nth_closure mfix rho i :
-    (i < Datatypes.length mfix)%nat ->
-    nth_error (make_rec_env mfix rho) i = Some (ClosFix_v rho mfix (Datatypes.length mfix - 1 - i)).
-  Proof.
-    unfold make_rec_env. apply make_rec_env_aux_nth_closure.
   Qed.
 
   (* nth_error into make_rec_env: original env part *)
@@ -2847,17 +2796,6 @@ Section Correct.
       eapply Hcons; eassumption.
   Qed.
 
-  (* NoDup implies env_consistent (any rho) *)
-  Lemma NoDup_env_consistent' vn rho :
-    NoDup vn -> env_consistent vn rho.
-  Proof.
-    intros Hnd i j x Hi Hj.
-    assert (Hib : (i < Datatypes.length vn)%nat)
-      by (apply nth_error_Some; congruence).
-    assert (i = j).
-    { apply (proj1 (NoDup_nth_error vn) Hnd i j Hib). rewrite Hi, Hj. reflexivity. }
-    subst j. reflexivity.
-  Qed.
 
   (* cmap_consistent extends to l1 ++ l2 when l1 ∩ cmap_vars = ∅ *)
   Lemma cmap_consistent_app l1 l2 v1 v2 :
@@ -6057,7 +5995,7 @@ Section Correct.
           | [ p : _ * _ |- _ ] => destruct p
           end.
           unfold_all. cbn in *. lia. }
-      
+
 
     (* eval_Proj_step_OOT *)
     - intros p c rho0 f1 t1 Heval1 IH1.
@@ -6116,7 +6054,7 @@ Section Correct.
           rewrite M.gso in Hget; [| exact Hneq_zx].
           eexists. split. { exact Hget. }
           eapply preord_val_refl. tci.
-      
+
 
     (* ================================================================ *)
     (* P0 cases: eval_fuel_many (2 cases)                               *)

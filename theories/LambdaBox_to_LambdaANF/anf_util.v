@@ -110,22 +110,6 @@ Section ANF_Val.
       exists f' t',
         @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body2 (fuel_sem.Val src_v) f' t'.
 
-  Lemma cmap_inj_implies_eval_coherent :
-    (forall k1 k2 v,
-      lookup_const cmap k1 = Some v ->
-      lookup_const cmap k2 = Some v ->
-      k1 = k2) ->
-    cmap_eval_coherent.
-  Proof.
-    intros Hinj k1 k2 x decl1 body1 decl2 body2 src_v f t
-           Hlk1 Hlk2 Hdecl1 Hbody1 Hdecl2 Hbody2 Heval1.
-    assert (Heqk : k1 = k2) by (eapply Hinj; eassumption). subst k2.
-    unfold declared_constant in Hdecl1, Hdecl2.
-    rewrite Hdecl1 in Hdecl2. injection Hdecl2 as <-.
-    rewrite Hbody1 in Hbody2. injection Hbody2 as <-.
-    exists f, t. exact Heval1.
-  Qed.
-
   Inductive anf_val_rel : fuel_sem.value -> val -> Prop :=
   | anf_rel_Con :
       forall vs vs' dc c_tag,
@@ -185,42 +169,6 @@ Section ANF_Val.
   Proof.
     intros H. induction H; simpl; congruence.
   Qed.
-
-  Lemma anf_fix_rel_find_def :
-    forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f d na e_body,
-      anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
-      nth_error fnames_list idx = Some f ->
-      nth_error mfix idx = Some d ->
-      d.(EAst.dbody) = EAst.tLambda na e_body ->
-      NoDup fnames_list ->
-      exists x_pc C_body r_body S_body1 S_body2,
-        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
-        anf_cvt_rel' S_body1 e_body
-                     (x_pc :: List.rev fnames0 ++ names0) S_body2 C_body r_body.
-  Proof.
-    intros fnames0 names0 S1 fnames_list mfix Bs S2 idx f d na e_body
-           Hrel Hnth_f Hnth_d Hbody Hnd.
-    revert idx f d na e_body Hnth_f Hnth_d Hbody Hnd.
-    induction Hrel; intros idx0 f0 d0 na0 e_body0 Hnth_f Hnth_d Hbody0 Hnd.
-    - destruct idx0; discriminate.
-    - destruct idx0 as [| idx'].
-      + simpl in Hnth_f, Hnth_d. inv Hnth_f. inv Hnth_d.
-        rewrite Hbody0 in H. inv H.
-        do 5 eexists. split.
-        * simpl. destruct (M.elt_eq f0 f0); [reflexivity | congruence].
-        * eassumption.
-      + simpl in Hnth_f, Hnth_d.
-        match goal with H : NoDup (_ :: _) |- _ =>
-          inversion H as [| ? ? Hnotin Hnd_tl]; subst end.
-        edestruct IHHrel as (xp & Cb & rb & Sb1 & Sb2 & Hfind & Hcvt);
-          [exact Hnth_f | exact Hnth_d | exact Hbody0 | exact Hnd_tl |].
-        do 5 eexists. split.
-        * simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
-          -- exfalso. subst. apply Hnotin. eapply nth_error_In. exact Hnth_f.
-          -- exact Hfind.
-        * exact Hcvt.
-  Qed.
-
 
   (* Build Forall2 from pointwise proof + length equality *)
   Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
@@ -420,9 +368,6 @@ Section ANF_Val.
           eapply Setminus_Included.
   Qed.
 
-  (* Like [anf_fix_rel_find_def] but derives the [nth_error mfix] and
-     [dbody] facts from the [anf_fix_rel] induction. Also gives
-     disjointness, freshness, and membership for the lambda parameter. *)
   Lemma anf_fix_rel_exists :
     forall fnames0 names0 S1 fnames_list mfix Bs S2 idx f,
       anf_fix_rel fnames0 names0 S1 fnames_list mfix Bs S2 ->
@@ -516,41 +461,6 @@ End ANF_Val.
 (* ================================================================= *)
 (** * Global const_map construction facts                             *)
 (* ================================================================= *)
-
-Lemma lookup_const_nodup_snd_inj (cm : const_map) :
-  NoDup (map snd cm) ->
-  forall k1 k2 v,
-    lookup_const cm k1 = Some v ->
-    lookup_const cm k2 = Some v ->
-    k1 = k2.
-Proof.
-  intros Hnd.
-  induction cm as [| [k v0] cm' IH]; intros k1 k2 v Hlk1 Hlk2.
-  - discriminate.
-  - simpl in Hnd. apply NoDup_cons_iff in Hnd as [Hv_notin Hnd'].
-    simpl in Hlk1, Hlk2.
-    destruct (eq_kername k1 k) eqn:Hk1, (eq_kername k2 k) eqn:Hk2.
-    + now apply eq_kername_bool_eq in Hk1; apply eq_kername_bool_eq in Hk2; subst.
-    + injection Hlk1 as <-.
-      exfalso. apply Hv_notin.
-      clear -Hlk2.
-      induction cm' as [| [k' v'] cm'' IHcm].
-      * discriminate.
-      * simpl in Hlk2.
-        destruct (eq_kername k2 k') eqn:Hkk'.
-        -- injection Hlk2 as <-. now left.
-        -- right. eapply IHcm. exact Hlk2.
-    + injection Hlk2 as <-.
-      exfalso. apply Hv_notin.
-      clear -Hlk1.
-      induction cm' as [| [k' v'] cm'' IHcm].
-      * discriminate.
-      * simpl in Hlk1.
-        destruct (eq_kername k1 k') eqn:Hkk'.
-        -- injection Hlk1 as <-. now left.
-        -- right. eapply IHcm. exact Hlk1.
-    + eapply IH; eauto.
-Qed.
 
 Lemma lookup_const_in_map_fst (cm : const_map) k v :
   lookup_const cm k = Some v ->
@@ -2285,10 +2195,6 @@ Section AlphaEquiv.
     (* tLazy — impossible *) 1: inv Hrel1.
     (* tForce — impossible *) 1: inv Hrel1.
   Qed.
-
-  Corollary anf_cvt_exp_alpha_equiv_holds :
-    forall k, anf_cvt_exp_alpha_equiv k.
-  Proof. intros k e. exact (anf_cvt_alpha_equiv k e). Qed.
 
   Corollary anf_cvt_args_alpha_equiv k :
     forall args, anf_cvt_args_alpha_equiv_for args k.
