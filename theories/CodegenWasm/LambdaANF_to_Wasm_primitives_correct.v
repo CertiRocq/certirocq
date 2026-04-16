@@ -416,8 +416,8 @@ Qed.
 Lemma addc_reduce (x y : localidx) :
   forall state sr fr m gmp addrx addry bsx bsy n1 n2 c0_tag c1_tag it_carry v,
     INV fenv nenv sr fr ->
-    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0") (Common.BasicAst.nNamed "carry") it_carry 1%N C0_ord) ->
-    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1") (Common.BasicAst.nNamed "carry") it_carry 1%N C1_ord) ->
+    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C0_ord) ->
+    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C1_ord) ->
     LambdaANF_primInt_carry_fun c0_tag c1_tag addc n1 n2 = v ->
     (* ((~ (to_Z (n1 + n2) < to_Z n1)%Z /\ v = Vconstr c0_tag [Vprim (AstCommon.primInt ; (n1 + n2)%uint63)]) \/ ((to_Z (n1 + n2) < to_Z n1)%Z /\ v = Vconstr c1_tag [Vprim (AstCommon.primInt ; (n1 + n2)%uint63)])) -> *)
     smem sr (f_inst fr) = Some m ->
@@ -582,8 +582,8 @@ Qed.
 Lemma addcarryc_reduce (x y : localidx) :
   forall state sr fr m gmp addrx addry bsx bsy n1 n2 c0_tag c1_tag it_carry v,
     INV fenv nenv sr fr ->
-    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0") (Common.BasicAst.nNamed "carry") it_carry 1%N C0_ord) ->
-    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1") (Common.BasicAst.nNamed "carry") it_carry 1%N C1_ord) ->
+    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C0_ord) ->
+    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C1_ord) ->
     LambdaANF_primInt_carry_fun c0_tag c1_tag addcarryc n1 n2 = v ->
     smem sr (f_inst fr) = Some m ->
     (* Local x holds address to 1st i64 *)
@@ -746,8 +746,8 @@ Qed.
 Lemma subc_reduce (x y : localidx) :
   forall state sr fr m gmp addrx addry bsx bsy n1 n2 c0_tag c1_tag it_carry v,
     INV fenv nenv sr fr ->
-    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0") (Common.BasicAst.nNamed "carry") it_carry 1%N C0_ord) ->
-    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1") (Common.BasicAst.nNamed "carry") it_carry 1%N C1_ord) ->
+    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C0_ord) ->
+    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C1_ord) ->
     LambdaANF_primInt_carry_fun c0_tag c1_tag subc n1 n2 = v ->
     smem sr (f_inst fr) = Some m ->
     local_holds_address_to_i64 sr fr x addrx (Int64.repr (to_Z n1)) m bsx ->
@@ -898,8 +898,8 @@ Qed.
 Lemma subcarryc_reduce (x y : localidx) :
   forall state sr fr m gmp addrx addry bsx bsy n1 n2 c0_tag c1_tag it_carry v,
     INV fenv nenv sr fr ->
-    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0") (Common.BasicAst.nNamed "carry") it_carry 1%N C0_ord) ->
-    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1") (Common.BasicAst.nNamed "carry") it_carry 1%N C1_ord) ->
+    M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C0_ord) ->
+    M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C1_ord) ->
     LambdaANF_primInt_carry_fun c0_tag c1_tag subcarryc n1 n2 = v ->
     smem sr (f_inst fr) = Some m ->
     local_holds_address_to_i64 sr fr x addrx (Int64.repr (to_Z n1)) m bsx ->
@@ -1234,14 +1234,14 @@ Definition prim_funs_env_wellformed (cenv : ctor_env) (penv : prim_env) (prim_fu
       (* This links operational semantics to primitive operators in penv *)
       apply_LambdaANF_primInt_operator true_tag false_tag eq_tag lt_tag gt_tag c0_tag c1_tag pair_tag op vs = Some v
       (* Constructor tags (bools, comparison, carry and prod) used by prim ops *)
-      /\ M.get true_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "true") (Common.BasicAst.nNamed "bool") it_bool 0%N true_ord)
-      /\ M.get false_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "false") (Common.BasicAst.nNamed "bool") it_bool 0%N false_ord)
-      /\ M.get eq_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Eq") (Common.BasicAst.nNamed "comparison") it_comparison 0%N Eq_ord)
-      /\ M.get lt_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Lt") (Common.BasicAst.nNamed "comparison") it_comparison 0%N Lt_ord)
-      /\ M.get gt_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Gt") (Common.BasicAst.nNamed "comparison") it_comparison 0%N Gt_ord)
-      /\ M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0") (Common.BasicAst.nNamed "carry") it_carry 1%N C0_ord)
-      /\ M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1") (Common.BasicAst.nNamed "carry") it_carry 1%N C1_ord)
-      /\ M.get pair_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "pair") (Common.BasicAst.nNamed "prod") it_prod 2%N pair_ord).
+      /\ M.get true_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "true"%bs) (Common.BasicAst.nNamed "bool"%bs) it_bool 0%N true_ord)
+      /\ M.get false_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "false"%bs) (Common.BasicAst.nNamed "bool"%bs) it_bool 0%N false_ord)
+      /\ M.get eq_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Eq"%bs) (Common.BasicAst.nNamed "comparison"%bs) it_comparison 0%N Eq_ord)
+      /\ M.get lt_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Lt"%bs) (Common.BasicAst.nNamed "comparison"%bs) it_comparison 0%N Lt_ord)
+      /\ M.get gt_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "Gt"%bs) (Common.BasicAst.nNamed "comparison"%bs) it_comparison 0%N Gt_ord)
+      /\ M.get c0_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C0"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C0_ord)
+      /\ M.get c1_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "C1"%bs) (Common.BasicAst.nNamed "carry"%bs) it_carry 1%N C1_ord)
+      /\ M.get pair_tag cenv = Some (Build_ctor_ty_info (Common.BasicAst.nNamed "pair"%bs) (Common.BasicAst.nNamed "prod"%bs) it_prod 2%N pair_ord).
 
 (* Application of primitive operators can never evaluate to a function value *)
 Lemma primop_value_not_funval :
