@@ -1002,41 +1002,6 @@ Section GlobalCorresp.
         * split; [exact Hfr | exact Hcm_complete].
   Qed.
 
-  Lemma anf_cvt_rel_global_exists m :
-    exists cm C_env S',
-      anf_cvt_rel_global func_tag default_tag tgm
-        (fun x => (m <= x)%positive) (List.rev Σ) [] cm C_env S' /\
-      (forall k decl, lookup_constant Σ k = Some decl ->
-                      lookup_const cm k <> None).
-  Proof.
-    set (S0 := fun x => (m <= x)%positive).
-    set (comp_d := pack_data m 1%positive 1%positive 1%positive
-                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
-
-    destruct (runState (convert_global_decls' (List.rev Σ) []) tt (comp_d, tt))
-      as [cvt_res cvt_st] eqn:Hrun.
-
-    assert (HΣ_top : Σ = List.rev (List.rev Σ) ++ ([] : global_context)).
-    { rewrite rev_involutive. rewrite app_nil_r. reflexivity. }
-    assert (Hcm_empty :
-      forall s d, lookup_constant ([] : EAst.global_context) s = Some d ->
-                  lookup_const ([] : const_map) s <> None).
-    { intros s d Hlk. discriminate. }
-    assert (Hf : fresh S0 m).
-    { unfold S0, fresh, Ensembles.In. lia. }
-
-    pose proof (anf_cvt_global_corresp (List.rev Σ) [] [] S0 HΣ_top Hcm_empty)
-      as Hcorresp.
-    unfold triple in Hcorresp.
-    specialize (Hcorresp tt (comp_d, tt) Hf).
-    rewrite Hrun in Hcorresp.
-    destruct cvt_res as [msg | [cm C_env]].
-    - contradiction.
-    - simpl in Hcorresp.
-      destruct Hcorresp as [S' [Hrel [_ Hcm_complete]]].
-      exists cm, C_env, S'. split; [exact Hrel | exact Hcm_complete].
-  Qed.
-
 End GlobalCorresp.
 
 Section TopLevelCorresp.
@@ -1324,13 +1289,6 @@ Section ValRelExists.
       + injection Hdecl as Heq. subst d0. simpl in Hwd. rewrite Hbody in Hwd. exact Hwd.
       + exact (IH _ _ _ Hdecl Hbody).
   Qed.
-
-  Lemma wf_glob_globals_wellformed :
-    forall k decl body,
-      declared_constant Σ k decl ->
-      decl.(EAst.cst_body) = Some body ->
-      wellformed Σ 0 body = true.
-  Proof. exact (wf_glob_globals_wellformed_gen Σ Hwf_glob). Qed.
 
   (* ================================================================= *)
   (** * Construction helpers for anf_val_rel_exists                      *)

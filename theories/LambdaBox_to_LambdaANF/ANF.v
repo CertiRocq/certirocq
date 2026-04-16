@@ -268,16 +268,10 @@ Section ANF.
       | EAst.tForce _ => failwith "Force"
       end.
 
-    (** ** Top-level conversion of a single expression *)
-
-    Definition convert_anf_exp (e : EAst.term) : anfM cps.exp :=
-      '(x, C) <- convert_anf e new_var_map None ;;
-      ret (C |[ Ehalt x ]|).
-
   End Conversion.
 
 
-  (** * Environment conversion and top-level *)
+  (** * Environment and top-level conversion *)
 
   Section TopLevel.
 

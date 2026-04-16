@@ -60,8 +60,6 @@ Section TagLookup.
 
 End TagLookup.
 
-Definition constr_env : Type := conId_map.
-
 (** * Global constant environment *)
 
 (** Map from global constant names to LambdaANF variables.

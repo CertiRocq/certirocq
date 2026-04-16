@@ -817,19 +817,6 @@ Section FUEL_SEM.
       discriminate.
   Qed.
 
-  Lemma src_eval_app_val_of_body
-        rho e1 e2 rho' na body v2 v_app f1 t1 f2 t2 f3 t3 :
-    eval_env_fuel rho e1 (Val (Clos_v rho' na body)) f1 t1 ->
-    eval_env_fuel rho e2 (Val v2) f2 t2 ->
-    eval_env_fuel (v2 :: rho') body (Val v_app) f3 t3 ->
-    eval_env_fuel rho (EAst.tApp e1 e2) (Val v_app)
-                  (f1 <+> f2 <+> f3 <+> one_i (EAst.tApp e1 e2))
-                  (t1 <+> t2 <+> t3 <+> one_i (EAst.tApp e1 e2)).
-  Proof.
-    intros He1 He2 Hbody.
-    econstructor. econstructor; eauto.
-  Qed.
-
   Lemma src_eval_fixapp_val_body rho e1 e2 rho' idx na mfix body v2 v_app
         f1 t1 f2 t2 f t :
     eval_env_fuel rho e1 (Val (ClosFix_v rho' mfix idx)) f1 t1 ->
@@ -873,78 +860,6 @@ Section FUEL_SEM.
             as [-> [-> ->]];
           exists fb, tb; exact Hbody
       end.
-  Qed.
-
-  Lemma src_eval_fixapp_val_of_body
-        rho e1 e2 rho' idx na mfix body v2 v_app f1 t1 f2 t2 f3 t3 :
-    eval_env_fuel rho e1 (Val (ClosFix_v rho' mfix idx)) f1 t1 ->
-    fix_body mfix idx = Some (EAst.tLambda na body) ->
-    eval_env_fuel rho e2 (Val v2) f2 t2 ->
-    eval_env_fuel (v2 :: make_rec_env mfix rho') body (Val v_app) f3 t3 ->
-    eval_env_fuel rho (EAst.tApp e1 e2) (Val v_app)
-                  (f1 <+> f2 <+> f3 <+> one_i (EAst.tApp e1 e2))
-                  (t1 <+> t2 <+> t3 <+> one_i (EAst.tApp e1 e2)).
-  Proof.
-    intros He1 Hfix He2 Hbody.
-    econstructor.
-    eapply eval_FixApp_step with (rho'' := make_rec_env mfix rho'); eauto.
-  Qed.
-
-  (** Successful let-evaluations project to successful evaluations of both the
-      bound term and, after fixing that result, the body. *)
-  Lemma src_eval_let_val_bind rho na b t v_let f tr :
-    eval_env_fuel rho (EAst.tLetIn na b t) (Val v_let) f tr ->
-    exists v1 f1 t1,
-      eval_env_fuel rho b (Val v1) f1 t1.
-  Proof.
-    intros Hlet.
-    inversion Hlet; subst; try discriminate.
-    remember (EAst.tLetIn na b t) as e_let in H.
-    remember (Val v_let) as r_let in H.
-    inversion H; subst; try discriminate.
-    lazymatch goal with
-    | [ Heq : EAst.tLetIn _ _ _ = EAst.tLetIn _ _ _ |- _ ] =>
-        injection Heq as <- <- <-; subst
-    end.
-    lazymatch goal with
-    | [ Hb : eval_env_fuel rho _ (Val ?v1) ?f1 ?t1 |- _ ] =>
-        exists v1, f1, t1; exact Hb
-    end.
-  Qed.
-
-  Lemma src_eval_let_val_body rho na b t v1 v_let f1 t1 f tr :
-    eval_env_fuel rho b (Val v1) f1 t1 ->
-    eval_env_fuel rho (EAst.tLetIn na b t) (Val v_let) f tr ->
-    exists f2 t2,
-      eval_env_fuel (v1 :: rho) t (Val v_let) f2 t2.
-  Proof.
-    intros Hb Hlet.
-    inversion Hlet; subst; try discriminate.
-    remember (EAst.tLetIn na b t) as e_let in H.
-    remember (Val v_let) as r_let in H.
-    inversion H; subst; try discriminate.
-    lazymatch goal with
-    | [ Heq : EAst.tLetIn _ _ _ = EAst.tLetIn _ _ _ |- _ ] =>
-        injection Heq as <- <- <-; subst
-    end.
-    lazymatch goal with
-    | [ Hb2 : eval_env_fuel rho _ (Val _) _ _,
-        Hbody : eval_env_fuel (_ :: rho) _ (Val _) ?f2 ?t2 |- _ ] =>
-        pose proof (eval_val_exact_det _ _ _ _ _ _ _ _ Hb Hb2)
-          as [-> [-> ->]];
-        exists f2, t2; exact Hbody
-    end.
-  Qed.
-
-  Lemma src_eval_let_val_of_body rho na b t v1 v_let f1 t1 f2 t2 :
-    eval_env_fuel rho b (Val v1) f1 t1 ->
-    eval_env_fuel (v1 :: rho) t (Val v_let) f2 t2 ->
-    eval_env_fuel rho (EAst.tLetIn na b t) (Val v_let)
-                  (f1 <+> f2 <+> one_i (EAst.tLetIn na b t))
-                  (t1 <+> t2 <+> one_i (EAst.tLetIn na b t)).
-  Proof.
-    intros Hbind Hbody.
-    econstructor. econstructor; eauto.
   Qed.
 
   (** Successful case/projection evaluations project to successful evaluation of
@@ -1000,20 +915,6 @@ Section FUEL_SEM.
     end.
   Qed.
 
-  Lemma src_eval_case_val_of_body
-        rho ind npars mch brs dc vs body c v_case f1 t1 f2 t2 :
-    eval_env_fuel rho mch (Val (Con_v dc vs)) f1 t1 ->
-    dc = dcon_of_con ind c ->
-    find_branch ind c (List.length vs) brs = Some body ->
-    eval_env_fuel ((List.rev vs) ++ rho) body (Val v_case) f2 t2 ->
-    eval_env_fuel rho (EAst.tCase (ind, npars) mch brs) (Val v_case)
-                  (f1 <+> f2 <+> one_i (EAst.tCase (ind, npars) mch brs))
-                  (t1 <+> t2 <+> one_i (EAst.tCase (ind, npars) mch brs)).
-  Proof.
-    intros Hmch Hdc Hfind Hbody.
-    econstructor. econstructor; eauto.
-  Qed.
-
   Lemma src_eval_proj_val_scrut rho p c v f tr :
     eval_env_fuel rho (EAst.tProj p c) (Val v) f tr ->
     exists vs f1 t1,
@@ -1033,17 +934,6 @@ Section FUEL_SEM.
       | [ Hc : eval_env_fuel rho _ (Val (Con_v _ ?vs)) ?f1 ?t1 |- _ ] =>
           exists vs, f1, t1; exact Hc
       end.
-  Qed.
-
-  Lemma src_eval_proj_val_of_scrut rho p c vs v f1 t1 :
-    eval_env_fuel rho c (Val (Con_v (dcon_of_con p.(proj_ind) 0) vs)) f1 t1 ->
-    nth_error vs p.(proj_arg) = Some v ->
-    eval_env_fuel rho (EAst.tProj p c) (Val v)
-                  (f1 <+> one_i (EAst.tProj p c))
-                  (t1 <+> one_i (EAst.tProj p c)).
-  Proof.
-    intros Hscrut Hnth.
-    econstructor. econstructor; eauto.
   Qed.
 
   Lemma src_eval_construct_val_arg rho ind c args_done e args_rest v_con f t :
