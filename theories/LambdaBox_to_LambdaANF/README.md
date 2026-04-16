@@ -44,9 +44,9 @@ The CPS conversion is not yet proved correct.
 
 ## Design Notes
 
-- Global constants (`tConst`) are translated through a `const_map`
-  (`kername -> var`) mapping global constant names to ANF variables. Global
-  declarations are converted into ANF binding contexts wrapped around the
+- Global constants (`tConst`) are translated through a `const_map` (`kername ->
+  var`) mapping global constant names to ANF variables, passed as an input.
+  Global declarations are converted into ANF binding contexts wrapped around the
   translated main expression, so translated globals are available in the
   LambdaANF environment during evaluation.
 
