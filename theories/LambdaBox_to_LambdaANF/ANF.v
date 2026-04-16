@@ -30,10 +30,9 @@ Open Scope bs_scope.
 
     Global constants (tConst) are translated to variable references via a
     [kername -> var] map. The global environment bodies are converted separately
-    into the initial LambdaANF environment. *)
+    and are defined at the beginning of the converted program. *)
 
 
-(** Outer section: parameters shared by both conversion and spec *)
 Section ANF.
 
   Context (func_tag default_tag : positive).
