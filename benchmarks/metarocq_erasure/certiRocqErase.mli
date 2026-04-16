@@ -1,1 +1,0 @@
-val erase : bypass:bool -> Environ.env -> Evd.evar_map -> EConstr.t -> unit

@@ -1005,9 +1005,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
-      "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"] in
+      "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"; "rocq-certirocq-vanilla.plugin"] in
     let pkgs = String.concat "," packages in
-    let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp" in
+    let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp,rocq-certirocq-vanilla.plugin" in
     let () = ignore (execute cmd) in
     let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
     let linkcmd =

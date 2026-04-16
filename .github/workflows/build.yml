@@ -1,4 +1,4 @@
-name: Compile and bench
+name: Compile and test
 
 on:
   push:
@@ -46,16 +46,16 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
-            startGroup "Copy repo (for later benchmarking)"
+            startGroup "Copy repo (for later testing)"
               cp -r `pwd` ~/repo
             endGroup
           after_script: |
             startGroup "List installed packages"
               opam list
             endGroup
-            startGroup "Run benchmarks"
+            startGroup "Run tests"
               ulimit -s unlimited
-              make -C ~/repo/benchmarks all
+              make -C ~/repo plugin && make -C ~/repo/tests all
             endGroup
             startGroup "Test bootstrapped plugins"
               cd ~/repo && ./configure.sh global

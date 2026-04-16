@@ -1,0 +1,3 @@
+-R ./ CertiRocq.Tests.programs
+-R ../lib CertiRocq.Tests.lib
+-arg -w -arg -deprecated

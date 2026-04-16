@@ -842,16 +842,16 @@ Defined.
 Definition float64_to_model (f : PrimFloat.float) : float64_model :=
   exist (FloatOps.Prim2SF f) (FloatAxioms.Prim2SF_valid f).
 
-Definition model_to_ff (f : float64_model) : Binary.full_float :=
-  Binary.SF2FF (proj1_sig f).
+Definition model_to_binary (f : float64_model) : Floats.float :=
+  match proj1_sig f as x return is_true (SpecFloat.valid_binary FloatOps.prec FloatOps.emax x) -> Floats.float with
+  | SpecFloat.S754_zero s => fun _ => Binary.B754_zero _ _ s
+  | SpecFloat.S754_infinity s => fun _ => Binary.B754_infinity _ _ s
+  | SpecFloat.S754_nan => fun _ => Binary.B754_nan FloatOps.prec FloatOps.emax false xH eq_refl
+  | SpecFloat.S754_finite s m e => fun h => Binary.B754_finite _ _ s m e h
+  end (proj2_sig f).
 
-Program Definition to_float (f : PrimFloat.float) : Floats.float :=
-  Binary.FF2B _ _ (model_to_ff (float64_to_model f)) _.
-Next Obligation.
-  unfold model_to_ff.
-  pose proof (FloatAxioms.Prim2SF_valid f).
-  rewrite Binary.valid_binary_SF2FF; auto.
-  Admitted.
+Definition to_float (f : PrimFloat.float) : Floats.float :=
+  model_to_binary (float64_to_model f).
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
   (x : positive) (f : Floats.float) :=
@@ -885,7 +885,6 @@ Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_en
 Section Translation.
 
   Context (args_opt : bool).
-
 
   Section Body.
     Context

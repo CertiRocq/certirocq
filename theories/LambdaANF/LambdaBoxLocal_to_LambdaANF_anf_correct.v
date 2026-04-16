@@ -4167,7 +4167,7 @@ Section Correct.
         (* Assert projection bindings succeed *)
         assert (Hset_proj : exists rho_proj,
           set_lists (rev vars) vs_anf rho_match = Some rho_proj).
-        { eapply set_lists_length3. rewrite rev_length.
+        { eapply set_lists_length3. rewrite length_rev.
           rewrite Hvars_len. rewrite Nnat.Nat2N.id.
           eapply Forall2_length. exact Hvs_rel. }
         destruct Hset_proj as [rho_proj Hset_proj].
@@ -4251,7 +4251,7 @@ Section Correct.
                   eapply Disjoint_Included_r; [ | exact Hdis ].
                   intros z Hz. apply Hvars_sub in Hz. apply HS_mid_sub in Hz.
                   apply HS2 in Hz. inv Hz. inv H. exact H1.
-                + rewrite rev_length. rewrite Hvars_len. rewrite Nnat.Nat2N.id. reflexivity.
+                + rewrite length_rev. rewrite Hvars_len. rewrite Nnat.Nat2N.id. reflexivity.
               - (* Disjoint (FromList (vars ++ vnames)) (S_mid \\ FromList vars) *)
                 rewrite FromList_app. apply Union_Disjoint_l.
                 + apply Disjoint_Setminus_r. apply Included_refl.
