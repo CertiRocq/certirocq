@@ -1,25 +1,64 @@
 # LambdaBox to LambdaANF
 
-Transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF (`cps.exp`).
+Transformation from MetaRocq's erased terms (`EAst.term`) to LambdaANF
+(`cps.exp`). The transformation can be done as an A-normal form (ANF)
+conversion or as a continuation-passing style (CPS) conversion.
 
-## Files
+The CPS conversion is not yet proved correct.
 
-- **common.v** — Shared definitions: constructor discriminants (`dcon`), constructor tag mapping (`conId_map`, `dcon_to_tag`), global constant map (`const_map`), primitive lookup, inductive environment processing (`convert_env`), primitive value translation (`trans_prim_val`).
+## File Guide
 
-- **ANF.v** — ANF conversion. Contains:
-  - *Section Conversion*: Monadic ANF translation (`convert_anf`) and global environment conversion (`convert_global_decls`, `convert_top_anf`).
-  - *Section Spec*: Declarative relational specification (`anf_cvt_rel`) used in correctness proofs.
+- **ANF.v** — The ANF translation, including both the executable converter and
+  the relational specification.
 
-- **CPS.v** — CPS conversion (`cps_cvt`, `convert_top_cps`).
+- **CPS.v** — The CPS conversion, between the same intermediate languages.
 
-- **anf_util.v** — Source value type (`value`: `Con_v`, `Clos_v`, `ClosFix_v`) and value relations (`anf_val_rel`, `anf_env_rel`, `anf_fix_rel`) connecting source evaluation results to LambdaANF values.
+- **common.v** — Shared definitions:
+  constructor discriminants (`dcon`), constructor tag maps, `const_map`,
+  primitive lookup, and environment conversion helpers.
 
-- **fuel_sem.v** — Environment-based big-step resource semantics for `EAst.term` (`eval_env_fuel`, `eval_env_step`). Uses the same resource algebra framework as LambdaANF (`LambdaANF.algebra`).
+- **fuel_sem.v** — Source fuel-based semantics for source terms and semantic
+  facts used by the correctness proofs.
 
-## Design
+- **wf.v** — Source-side well-formedness infrastructure used by the ANF proofs.
 
-- Global constants (`tConst`) are translated to variable references via a `const_map` (`kername -> var`). Global environment bodies are converted to ANF binding contexts composed around the main expression, so all globals end up in the LambdaANF environment (`rho`) during evaluation.
+- **anf_util.v** — Shared ANF proof utilities:
+  value relations, alpha-equivalence lemmas, environment facts, and shared
+  global-context lemmas.
 
-- `tLazy`, `tForce`, `tCoFix` are assumed absent (can be enforced via preconditions). `tProj` is handled as `Eproj` (record field extraction). `tPrim` is translated via `trans_prim_val` (int, float, string; arrays unsupported).
+- **anf_corresp.v** — Correspondence between the executable conversion and the
+  relational specification.
 
-- Global constant bodies are assumed to be values (lambdas, constructors, etc.), so their ANF conversion directly produces binding contexts without thunking.
+- **anf_correct.v** — Main termination correctness proof for ANF conversion.
+  This file proves that terminating source evaluations are preserved by the ANF
+  conversion.
+
+- **anf_divergence.v** — Divergence preservation for ANF conversion.
+
+- **anf_global.v** — Global-environment correctness lemmas and coherence facts
+  used to lift expression-level correctness to programs with translated global
+  declarations.
+
+- **anf_toplevel.v** — End-to-end theorems for the top-level executable
+  ANF conversion.
+
+## Design Notes
+
+- Global constants (`tConst`) are translated through a `const_map`
+  (`kername -> var`) mapping global constant names to ANF variables. Global
+  declarations are converted into ANF binding contexts wrapped around the
+  translated main expression, so translated globals are available in the
+  LambdaANF environment during evaluation.
+
+- The names of global constants are preserved in the generated ANF binding
+  contexts, so the resulting program can be pretty-printed using the original
+  global names.
+
+- `tLazy`, `tForce`, and `tCoFix` are assumed absent. `tProj` is translated to
+  `Eproj`, and `tPrim` is translated through `trans_prim_val` (primitive arrays
+  remain unsupported).
+
+- Divergence is proved separately from termination. `anf_correct.v` handles
+  terminating source evaluations, while `anf_divergence.v` handles source
+  OOT/divergence with the additional lower-bound structure needed by the target
+  semantics.
