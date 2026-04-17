@@ -5170,7 +5170,6 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     intros; apply occurs_free_included_ctx_mut.
   Qed.
 
-
   Theorem Decidable_occurs_free_ctx :
     (forall c,
        Decidable (occurs_free_ctx c)).
