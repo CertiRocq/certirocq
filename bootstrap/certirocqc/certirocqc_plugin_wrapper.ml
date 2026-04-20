@@ -3,7 +3,7 @@ open Pp
 open Universes0
 open BasicAst
 open Ast0
-open Toplevel2
+open Toplevel0
 open Pipeline_utils
 
 external certirocq_pipeline : coq_Options -> Ast0.Env.program -> coq_Cprogram CompM.error * Bytestring.String.t = "certirocq_pipeline_wrapper"

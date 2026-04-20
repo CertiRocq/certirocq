@@ -3,7 +3,7 @@ open Pp
 open Universes0
 open BasicAst
 open Ast0
-open Toplevel2
+open Toplevel0
 open Pipeline_utils
 
 external certirocqchk_wrapper : Ast0.Env.program -> bool = "certirocqchk_wrapper"
