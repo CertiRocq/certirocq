@@ -5,7 +5,7 @@
 
 From Stdlib Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles micromega.Lia Sorting.Permutation.
-From CertiRocq.LambdaANF Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
+From CertiRocq.LambdaANF Require Import List_util term ctx identifiers Ensembles_util set_util term_util map_util.
 
 Require Import compcert.lib.Maps.
 

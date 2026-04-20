@@ -18,7 +18,7 @@ Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
 Require Import LambdaANF.Ensembles_util.
 
-Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.cps_util LambdaANF.List_util
+Require Import LambdaANF.term LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.term_util LambdaANF.List_util
         LambdaANF.shrink_cps LambdaANF.eval LambdaANF.set_util LambdaANF.identifiers LambdaANF.stemctx LambdaANF.alpha_conv
         LambdaANF.functions LambdaANF.relations LambdaANF.rename LambdaANF.inline_letapp LambdaANF.algebra.
 
@@ -747,7 +747,7 @@ Section Shrink_correct.
       intros vs1 vs2 j t1 xs1 e' rho1' Hlen Hf Hs.
       edestruct find_def_def_funs_ctx' as [H1 | [c [H1 H2]]]; eauto.
 
-      + edestruct (@set_lists_length cps.val) as [rho2' Hs']; eauto.
+      + edestruct (@set_lists_length term.val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto. split; eauto.
         intros Hleq Hall.
         eapply preord_exp_refl; eauto.
@@ -760,7 +760,7 @@ Section Shrink_correct.
         eapply occurs_free_in_fun in Hfv; eauto.
         inv Hfv. exfalso. eauto. eapply Union_assoc. right. eapply Ensembles_util.Union_commut. eauto.
       + destruct H2. inv H0. inv H2.
-        edestruct (@set_lists_length cps.val) as [rho2' Hs']; eauto.
+        edestruct (@set_lists_length term.val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto.
         split; eauto.
         intros Hleq Hall.
@@ -1335,9 +1335,9 @@ Section Shrink_correct.
     simpl. rewrite IHl; auto.
     destruct (var_dec x a).
     + subst. erewrite apply_r_some by apply M.gss.
-      destruct (cps_util.var_dec a y). exfalso; auto. auto.
+      destruct (term_util.var_dec a y). exfalso; auto. auto.
     + rewrite apply_r_none.
-      destruct (cps_util.var_dec x a). exfalso; auto. auto.
+      destruct (term_util.var_dec x a). exfalso; auto. auto.
       rewrite M.gso by auto. apply M.gempty.
   Qed.
 
@@ -3107,15 +3107,15 @@ Section Shrink_Rewrites.
   Proof.
     induction l; auto.
     simpl.
-    destruct (cps_util.var_dec f a).
+    destruct (term_util.var_dec f a).
     unfold apply_r.
     subst.
     destruct (M.get a sigma) eqn:gas.
     exfalso.
     apply H. exists v; auto.
-    destruct (cps_util.var_dec a a). lia.
+    destruct (term_util.var_dec a a). lia.
     exfalso; apply n. auto.
-    destruct (cps_util.var_dec f (apply_r sigma a)); lia.
+    destruct (term_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
   Lemma num_occur_list_not_range: forall f sigma,
@@ -3126,10 +3126,10 @@ Section Shrink_Rewrites.
     induction l.
     - simpl. reflexivity.
     - simpl.
-      destruct (cps_util.var_dec f a).
+      destruct (term_util.var_dec f a).
       + subst.
-        destruct (cps_util.var_dec a (apply_r sigma a)); lia.
-      + destruct (cps_util.var_dec f (apply_r sigma a)).
+        destruct (term_util.var_dec a (apply_r sigma a)); lia.
+      + destruct (term_util.var_dec f (apply_r sigma a)).
         * exfalso. apply H.
           exists a.
           unfold apply_r in e.
@@ -3421,11 +3421,11 @@ substitution to a term cannot increase the occurence count for that variable. *)
     destruct (var_dec x a).
     - subst.
       rewrite apply_r_set1.
-      destruct (cps_util.var_dec f y).
+      destruct (term_util.var_dec f y).
       exfalso; auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
+      destruct (term_util.var_dec f (apply_r sigma a)); lia.
     - rewrite apply_r_set2  by auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
+      destruct (term_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
 
@@ -3441,16 +3441,16 @@ substitution to a term cannot increase the occurence count for that variable. *)
     destruct (var_dec x a).
     - subst.
       rewrite apply_r_set1.
-      destruct (cps_util.var_dec f y). subst.
-      destruct (cps_util.var_dec y (apply_r sigma a)); lia.
-      destruct (cps_util.var_dec f (apply_r sigma a)).
+      destruct (term_util.var_dec f y). subst.
+      destruct (term_util.var_dec y (apply_r sigma a)); lia.
+      destruct (term_util.var_dec f (apply_r sigma a)).
       exfalso. unfold apply_r  in e.
       destruct (Maps.PTree.get a sigma) eqn:gas.
       apply H. exists v; auto.
       auto.
       auto.
     - rewrite apply_r_set2; auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
+      destruct (term_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
   Lemma num_occur_sig_unaffected:
@@ -3638,15 +3638,15 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Proof.
     intros x y Hxy. induction l.
     auto.
-    simpl. destruct (cps_util.var_dec x a).
+    simpl. destruct (term_util.var_dec x a).
     - subst. rewrite apply_r_set1.
-      destruct (cps_util.var_dec y a).
+      destruct (term_util.var_dec y a).
       exfalso; auto.
-      destruct (cps_util.var_dec y y). 2: exfalso; auto.
+      destruct (term_util.var_dec y y). 2: exfalso; auto.
       lia.
     - rewrite apply_r_set2 by auto.
       rewrite apply_r_empty.
-      destruct (cps_util.var_dec y a); lia.
+      destruct (term_util.var_dec y a); lia.
   Qed.
 
   Lemma num_occur_arl_kill:
@@ -3658,7 +3658,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Proof.
     induction l.
     auto.
-    simpl. destruct (cps_util.var_dec x (apply_r sig a)).
+    simpl. destruct (term_util.var_dec x (apply_r sig a)).
     - exfalso. unfold apply_r in e.
       destruct (@M.get var a sig) eqn:gas.
       subst.
@@ -3686,7 +3686,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       simpl in Hn. simpl. lia.
     - eapply num_occur_n. constructor. constructor. eauto.
       inv H0; pi0; eauto. simpl.
-      inv H0; pi0. destruct (cps_util.var_dec x (apply_r sig v)); subst; pi0; auto.
+      inv H0; pi0. destruct (term_util.var_dec x (apply_r sig v)); subst; pi0; auto.
     - eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx [v0]).
       simpl in *; lia.
@@ -3870,7 +3870,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       eapply (proj1 (num_occur_rename_all_not_dom_mut _)); eauto.
   Qed.
 
-  (* move to cps_util *)
+  (* move to term_util *)
   Lemma e_num_occur_ec:
     forall c v, exists n, num_occur_ec c v n.
   Proof.
@@ -3907,11 +3907,11 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - intro.
       simpl in H.
       inv H0.
-      destruct (cps_util.var_dec v v). inv H. apply n; auto.
-      destruct (cps_util.var_dec v a). inv H. apply IHl in H.
+      destruct (term_util.var_dec v v). inv H. apply n; auto.
+      destruct (term_util.var_dec v a). inv H. apply IHl in H.
       auto.
     - simpl.
-      destruct (cps_util.var_dec v a).
+      destruct (term_util.var_dec v a).
       exfalso; apply H.
       constructor. auto.
       apply IHl.
@@ -3964,7 +3964,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       apply num_occur_app_ctx in H5.
       destructAll.
       inv H2. simpl in H3.
-      destruct (cps_util.var_dec f f).
+      destruct (term_util.var_dec f f).
       2: (exfalso; apply n; auto).
       assert (x = 0 /\ num_occur_list vs f = 0 /\ m = 0).
       lia.

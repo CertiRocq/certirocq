@@ -1,7 +1,7 @@
 
 From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.MSetRBT
         Lists.List micromega.Lia Sets.Ensembles.
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.tactics LambdaANF.relations LambdaANF.algebra.
 Require Export LambdaANF.logical_relations LambdaANF.logical_relations_cc LambdaANF.alpha_conv LambdaANF.inline_letapp.
 Require Import compcert.lib.Coqlib.

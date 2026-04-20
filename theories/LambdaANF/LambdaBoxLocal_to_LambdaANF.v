@@ -1,4 +1,4 @@
-(* Conversion from LambdaBoxLocal.expression to LambdaANF.cps using ANF or CPS tranformation *)
+(* Conversion from LambdaBoxLocal.expression to LambdaANF.term using ANF or CPS tranformation *)
 
 From Stdlib Require Import ZArith.ZArith Lists.List
         Sorting.Sorted Arith.Arith Sets.Ensembles.
@@ -6,7 +6,7 @@ Require Import ExtLib.Data.String.
 From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
 
 Require Import LambdaBoxLocal.expression.
-Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
+Require Import LambdaANF.term LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
 Require Import compcert.lib.Coqlib compcert.lib.Maps.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -211,7 +211,7 @@ Section Translate.
       mapM get_named_str s.
 
     Fixpoint convert_prim (n : nat) (* arity *)
-             (prim : positive) (args : list var) (kont : var) : cpsM cps.exp :=
+             (prim : positive) (args : list var) (kont : var) : cpsM term.exp :=
       match n with
       | 0%nat =>
         pr <- get_named_str "prim"%bs ;;
@@ -244,11 +244,11 @@ Section Translate.
 
     (** ** Main CPS conversion program *)
 
-    Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (tgm : constr_env) : cpsM cps.exp :=
+    Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (tgm : constr_env) : cpsM term.exp :=
       match e with
       | Var_e x =>
         match nth_error vn (N.to_nat x) with
-        | Some v => ret (cps.Eapp k kon_tag (v::nil))
+        | Some v => ret (term.Eapp k kon_tag (v::nil))
         | None => failwith  "Unknown DeBruijn index"
         end
       | App_e e1 e2 =>
@@ -260,9 +260,9 @@ Section Translate.
         e2' <- cps_cvt e2 vn k2 tgm;;
         ret (Efun
                (Fcons k1 kon_tag (x1::nil)
-                      (cps.Efun
+                      (term.Efun
                          (Fcons k2 kon_tag (x2::nil)
-                                (cps.Eapp x1 func_tag (k::x2::nil)) Fnil)
+                                (term.Eapp x1 func_tag (k::x2::nil)) Fnil)
                          e2') Fnil)
                e1')
       | Lam_e n e1 =>
@@ -272,7 +272,7 @@ Section Translate.
         e1' <- cps_cvt e1 (x1::vn) k1 tgm ;;
         ret (Efun
                (Fcons f func_tag (k1::x1::nil) e1' Fnil)
-               (cps.Eapp k kon_tag (f::nil)))
+               (term.Eapp k kon_tag (f::nil)))
 
       | Let_e n e1 e2 =>
         x <- get_named_str (string_of_name n);;
@@ -314,7 +314,7 @@ Section Translate.
       (* f <- get_named_str "f"%bs ;; *)
       (* x <- get_named_str "x"%bs ;; *)
       (* let c := consume_fun f x in *)
-      (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|) *)
+      (* ret (c |[ term.Eapp k kon_tag (f::nil) ]|) *)
 
       | Prim_val_e p =>
         x <- get_named_str "prim"%bs ;;
@@ -328,7 +328,7 @@ Section Translate.
       end
 
     with cps_cvt_exps (es : expression.exps) (vn : list var) (e_app : exp) (xs ks : list var) (tgm : constr_env)
-         : cpsM cps.exp :=
+         : cpsM term.exp :=
            match es with
            | enil => ret e_app
            | econs e es' =>
@@ -385,10 +385,10 @@ Section Translate.
       ret (Efun
              (Fcons f kon_tag (k::nil) e'
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
-             (cps.Eapp f kon_tag (k::nil))).
+             (term.Eapp f kon_tag (k::nil))).
 
 
-    Definition convert_top (ee:ienv * expression.exp) : error cps.exp * comp_data :=
+    Definition convert_top (ee:ienv * expression.exp) : error term.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
 
       let ftag := (func_tag + 1)%positive in
@@ -410,12 +410,12 @@ Section Translate.
                           var -> (* Continuation variable *)
                           constr_env ->
                           Ensemble var -> (* Output fresh identifiers *)
-                          cps.exp -> (* CPS converted exp *)
+                          term.exp -> (* CPS converted exp *)
                           Prop :=
   | e_Var :
       forall S v vn x k tgm,
         nth_error vn (N.to_nat x) = Some v ->
-        cps_cvt_rel S (Var_e x) vn k tgm S (cps.Eapp k kon_tag (v::nil))
+        cps_cvt_rel S (Var_e x) vn k tgm S (term.Eapp k kon_tag (v::nil))
   | e_Lam :
       forall S S' na e1 e1' x1 vn k k1 f tgm,
         x1 \in S ->
@@ -428,8 +428,8 @@ Section Translate.
                     k
                     tgm
                     S'
-                    (cps.Efun (Fcons f func_tag (k1::x1::nil) e1' Fnil)
-                              (cps.Eapp k kon_tag (f::nil)))
+                    (term.Efun (Fcons f func_tag (k1::x1::nil) e1' Fnil)
+                              (term.Eapp k kon_tag (f::nil)))
   | e_App :
       forall S1 S2 S3 e1 e1' e2 e2' k k1 k2 x1 x2 vn tgm,
         x1 \in S1 ->
@@ -444,9 +444,9 @@ Section Translate.
                     k
                     tgm
                     S3
-                    (cps.Efun (Fcons k1 kon_tag (x1::nil)
-                                     (cps.Efun (Fcons k2 kon_tag (x2::nil)
-                                                      (cps.Eapp x1 func_tag
+                    (term.Efun (Fcons k1 kon_tag (x1::nil)
+                                     (term.Efun (Fcons k2 kon_tag (x2::nil)
+                                                      (term.Eapp x1 func_tag
                                                                 (k::x2::nil))
                                                       Fnil)
                                                e2') Fnil)
@@ -482,7 +482,7 @@ Section Translate.
                     k
                     tgm
                     S3
-                    (cps.Efun (Fcons k1 kon_tag (x1::nil) e2' Fnil) e1')
+                    (term.Efun (Fcons k1 kon_tag (x1::nil) e2' Fnil) e1')
   | e_Match :
       forall S1 S2 S3 e1 e1' bs bs' vn k x1 k1 n tgm,
         x1 \in S1 ->
@@ -509,7 +509,7 @@ Section Translate.
                     k
                     tgm
                     S2
-                    (cps.Efun fdefs (cps.Eapp k kon_tag (f::nil)))
+                    (term.Efun fdefs (term.Eapp k kon_tag (f::nil)))
   | e_Prf :
       forall S vn k tgm x,
         x \in S ->
@@ -628,7 +628,7 @@ Section Translate.
     | Anf_App (f x : var)
     | Constr (c : ctor_tag) (xs : list var)
     | Proj (c : ctor_tag) (n : N) (y : var)
-    | Fun (ft : cps.fun_tag) (x : var) (e : cps.exp)
+    | Fun (ft : term.fun_tag) (x : var) (e : term.exp)
     | Prim_val (p : primitive)
     | Prim (pr : positive) (xs : list var).
 
@@ -768,13 +768,13 @@ Section Translate.
     End Convert.
 
 
-    Definition convert_anf_exp dcm e : anfM cps.exp :=
+    Definition convert_anf_exp dcm e : anfM term.exp :=
       '(x, C) <- convert_anf dcm e new_var_map ;;
       ret (C |[ Ehalt x ]|).
 
     (** * Top-level convert function *)
 
-    Definition convert_top_anf (ee: ienv * expression.exp) : error cps.exp * comp_data :=
+    Definition convert_top_anf (ee: ienv * expression.exp) : error term.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (1%N, (0%N::nil)) (M.empty _) in

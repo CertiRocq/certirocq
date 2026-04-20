@@ -1,4 +1,4 @@
-(* ANF conversion from MetaRocq Erasure (EAst.term) to LambdaANF.cps *)
+(* ANF conversion from MetaRocq Erasure (EAst.term) to LambdaANF.term *)
 
 (** Stdlib *)
 From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Sets.Ensembles.
@@ -17,7 +17,7 @@ From compcert Require Import lib.Coqlib lib.Maps.
 From CertiRocq.Common Require Import AstCommon compM.
 From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
-  cps cps_show eval ctx List_util Ensembles_util state.
+  term cps_show eval ctx List_util Ensembles_util state.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
 
 Import ListNotations.
@@ -26,7 +26,7 @@ Open Scope monad_scope.
 Open Scope bs_scope.
 
 (** This file defines ANF conversion from MetaRocq's erased terms
-    (EAst.term) to LambdaANF (cps.exp).
+    (EAst.term) to LambdaANF (term.exp).
 
     Global constants (tConst) are translated to variable references via a
     [kername -> var] map. The global environment bodies are converted separately
@@ -214,7 +214,7 @@ Section ANF.
         | None =>
           match lookup_const cmap s with
           | Some v => ret (v, Hole_c)
-          | None => failwith "Unknown constant"
+          | None => failwith ("Unknown constant: " ++ string_of_kername s)
           end
         end
 
@@ -306,10 +306,10 @@ Section ANF.
 
     (** Convert a full program: global environment + main expression.
         Global constant bindings are composed around the main expression,
-        producing a single [cps.exp] where all globals are in rho. *)
+        producing a single [term.exp] where all globals are in rho. *)
     Definition convert_top_anf (preferred : kername -> option var)
                (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
-      : error cps.exp * comp_data :=
+      : error term.exp * comp_data :=
       let '(_, cenv, ctag, itag, _dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (1%N, (0%N::nil)) (M.empty _) in

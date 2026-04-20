@@ -15,7 +15,7 @@ From compcert Require Import lib.Maps.
 (** CertiRocq *)
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq Require Import Pipeline_utils.
-From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util.
+From CertiRocq.LambdaANF Require Import term ctx Ensembles_util.
 
 Import ListNotations.
 Open Scope bs_scope.

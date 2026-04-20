@@ -10,9 +10,9 @@ Require Import ExtLib.Data.Bool.
 Import Nnat.
 Require Import ExtLib.Data.String ExtLib.Data.List.
 Require Import Libraries.maps_util.
-Require Import LambdaANF.cps.
+Require Import LambdaANF.term.
 Require Import LambdaANF.ctx LambdaANF.rename LambdaANF.state.
-Require Import LambdaANF.cps_util LambdaANF.List_util LambdaANF.identifiers LambdaANF.inline_letapp.
+Require Import LambdaANF.term_util LambdaANF.List_util LambdaANF.identifiers LambdaANF.inline_letapp.
 Require Import Common.exceptionMonad.
 
 (* Shallow val for constr and function *)

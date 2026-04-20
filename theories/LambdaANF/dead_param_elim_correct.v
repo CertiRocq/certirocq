@@ -1,5 +1,5 @@
-Require Import LambdaANF.cps LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state LambdaANF.alpha_conv
-        LambdaANF.dead_param_elim LambdaANF.Ensembles_util LambdaANF.tactics LambdaANF.map_util LambdaANF.cps_util
+Require Import LambdaANF.term LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state LambdaANF.alpha_conv
+        LambdaANF.dead_param_elim LambdaANF.Ensembles_util LambdaANF.tactics LambdaANF.map_util LambdaANF.term_util
         LambdaANF.hoisting LambdaANF.dead_param_elim_util LambdaANF.eval LambdaANF.algebra LambdaANF.logical_relations.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -8,7 +8,7 @@ Require Import maps_util.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
 
-Require Import LambdaANF.alpha_conv LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.state LambdaANF.set_util LambdaANF.identifiers LambdaANF.List_util
+Require Import LambdaANF.alpha_conv LambdaANF.term LambdaANF.term_util LambdaANF.ctx LambdaANF.state LambdaANF.set_util LambdaANF.identifiers LambdaANF.List_util
         LambdaANF.functions LambdaANF.Ensembles_util LambdaANF.uncurry LambdaANF.tactics.
 From Stdlib Require Import ZArith.Znumtheory Strings.String.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums

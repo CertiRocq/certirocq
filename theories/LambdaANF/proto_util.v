@@ -1,6 +1,6 @@
 From Stdlib Require Import Strings.String Classes.Morphisms Relations.Relations.
 From Stdlib Require Import PArith.BinPos Sets.Ensembles Lia.
-Require Import LambdaANF.identifiers LambdaANF.Prototype LambdaANF.cps_proto_univ LambdaANF.cps_proto LambdaANF.cps LambdaANF.cps_util.
+Require Import LambdaANF.identifiers LambdaANF.Prototype LambdaANF.cps_proto_univ LambdaANF.cps_proto LambdaANF.term LambdaANF.term_util.
 Require Import LambdaANF.Ensembles_util LambdaANF.rename LambdaANF.shrink_cps LambdaANF.map_util.
 
 From Stdlib Require Import Lists.List.
@@ -268,26 +268,26 @@ Extraction Inline Preserves_S_dn_S_uniq Preserves_S_up_S_uniq.
 
 (* Additional facts about variables *)
 
-Fixpoint bound_var_ces (ces : list (cps.ctor_tag * cps.exp)) :=
+Fixpoint bound_var_ces (ces : list (term.ctor_tag * term.exp)) :=
   match ces with
   | [] => Empty_set _
   | (c, e) :: ces => bound_var e :|: bound_var_ces ces
   end.
 
-Lemma bound_var_Ecase x ces : bound_var (cps.Ecase x ces) <--> bound_var_ces ces.
+Lemma bound_var_Ecase x ces : bound_var (term.Ecase x ces) <--> bound_var_ces ces.
 Proof.
   induction ces as [|[c e] ces IHces].
   - rewrite bound_var_Ecase_nil; now cbn.
   - rewrite bound_var_Ecase_cons; cbn; rewrite IHces; eauto with Ensembles_DB.
 Qed.
 
-Fixpoint used_vars_ces (ces : list (cps.ctor_tag * cps.exp)) :=
+Fixpoint used_vars_ces (ces : list (term.ctor_tag * term.exp)) :=
   match ces with
   | [] => Empty_set _
   | (c, e) :: ces => used_vars e :|: used_vars_ces ces
   end.
 
-Lemma used_vars_Ecase x ces : used_vars (cps.Ecase x ces) <--> x |: used_vars_ces ces.
+Lemma used_vars_Ecase x ces : used_vars (term.Ecase x ces) <--> x |: used_vars_ces ces.
 Proof.
   induction ces as [|[c e] ces IHces].
   - rewrite used_vars_Ecase_nil; cbn; now normalize_sets.
@@ -307,7 +307,7 @@ Definition image'' σ : Ensemble var := fun y => exists x, M.get x σ = Some y.
 Lemma apply_r_vars σ x : [set apply_r σ x] \subset x |: image'' σ.
 Proof.
   unfold apply_r.
-  destruct (cps.M.get x σ) as [y|] eqn:Hget; [|eauto with Ensembles_DB].
+  destruct (term.M.get x σ) as [y|] eqn:Hget; [|eauto with Ensembles_DB].
   intros arb Harb; inv Harb; right; unfold image'', Ensembles.In; now exists x.
 Qed.
 

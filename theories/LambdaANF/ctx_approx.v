@@ -4,7 +4,7 @@
 
 From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia
         Relations.Relations Classes.RelationClasses.
-From CertiRocq.LambdaANF Require Import cps ctx eval logical_relations identifiers tactics.
+From CertiRocq.LambdaANF Require Import term ctx eval logical_relations identifiers tactics.
 
 Import ListNotations.
 

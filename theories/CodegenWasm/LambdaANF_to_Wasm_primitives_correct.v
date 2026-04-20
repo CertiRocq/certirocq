@@ -6,8 +6,8 @@ From Stdlib Require Import
   List Nnat Uint63.
 
 From CertiRocq Require Import
-  LambdaANF.cps
-  LambdaANF.cps_util
+  LambdaANF.term
+  LambdaANF.term_util
   LambdaANF.eval
   LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm
@@ -26,7 +26,7 @@ From Wasm Require Import
   type_preservation properties common numerics.
 
 Import ssreflect eqtype ssrbool eqtype.
-Import LambdaANF.toplevel LambdaANF.cps compM.
+Import LambdaANF.toplevel LambdaANF.term compM.
 Import bytestring.
 Import ExtLib.Structures.Monad MonadNotation.
 Import bytestring.
@@ -100,7 +100,7 @@ Definition LambdaANF_primInt_addmuldiv p x y := Vprim (primInt (addmuldiv p x y)
    match the type of the Coq operator.
    E.g 'add' has the type 'uint63 -> uint63 -> uint63' so the arguments must be
    2 primitive integer values and the return value is a primitive integer. *)
-Definition apply_LambdaANF_primInt_operator op (vs : list cps.val) : option cps.val :=
+Definition apply_LambdaANF_primInt_operator op (vs : list term.val) : option term.val :=
   match vs with
   | [ Vprim (primInt x) ] =>
       match op with
@@ -149,7 +149,7 @@ Notation i32_glob gidx := (In gidx [ glob_result ; glob_out_of_mem ; glob_mem_pt
 Notation i64_glob gidx := (In gidx [ glob_tmp1 ; glob_tmp2 ; glob_tmp3 ; glob_tmp4 ]).
 
 
-Variable cenv:LambdaANF.cps.ctor_env.
+Variable cenv:LambdaANF.term.ctor_env.
 Variable funenv : fun_env.
 Variable fenv   : fname_env.
 Variable nenv : LambdaANF.cps_show.name_env.
@@ -441,7 +441,7 @@ Lemma addc_reduce (x y : localidx) :
       /\ mem_length m = mem_length m'
       /\ repr_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr) (Val_ptr (gmp + 8)%N)
       (* Values are preserved *)
-      /\ (forall (wal : wasm_value) (val : cps.val),
+      /\ (forall (wal : wasm_value) (val : term.val),
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr (f_inst fr) wal ->
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr' (f_inst fr) wal).
 Proof with eassumption.
@@ -606,7 +606,7 @@ Lemma addcarryc_reduce (x y : localidx) :
       /\ mem_length m = mem_length m'
       /\ repr_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr) (Val_ptr (gmp + 8)%N)
       (* Values are preserved *)
-      /\ (forall (wal : wasm_value) (val : cps.val),
+      /\ (forall (wal : wasm_value) (val : term.val),
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr (f_inst fr) wal ->
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr' (f_inst fr) wal).
 Proof with eassumption.
@@ -765,7 +765,7 @@ Lemma subc_reduce (x y : localidx) :
       /\ s_funcs sr = s_funcs sr'
       /\ mem_length m = mem_length m'
       /\ repr_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr) (Val_ptr (gmp + 8)%N)
-      /\ (forall (wal : wasm_value) (val : cps.val),
+      /\ (forall (wal : wasm_value) (val : term.val),
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr (f_inst fr) wal ->
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr' (f_inst fr) wal).
 Proof with eassumption.
@@ -917,7 +917,7 @@ Lemma subcarryc_reduce (x y : localidx) :
       /\ s_funcs sr = s_funcs sr'
       /\ mem_length m = mem_length m'
       /\ repr_val_LambdaANF_Wasm cenv fenv nenv penv v sr' (f_inst fr) (Val_ptr (gmp + 8)%N)
-      /\ (forall (wal : wasm_value) (val : cps.val),
+      /\ (forall (wal : wasm_value) (val : term.val),
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr (f_inst fr) wal ->
              repr_val_LambdaANF_Wasm cenv fenv nenv penv val sr' (f_inst fr) wal).
 Proof with eassumption.
@@ -1224,7 +1224,7 @@ Qed.
    and the constructor environment contains all constructors that may be returned,
    and the constructors have the expected ordinals (i.e. the ones used in the translation section).
  *)
-Definition prim_funs_env_wellformed (cenv : ctor_env) (penv : prim_env) (prim_funs : M.t (list cps.val -> option cps.val)) : Prop :=
+Definition prim_funs_env_wellformed (cenv : ctor_env) (penv : prim_env) (prim_funs : M.t (list term.val -> option term.val)) : Prop :=
   forall p op_name s b n op f vs v,
     M.get p penv = Some (Pipeline_utils.mk_primitive op_name s b n) ->       (* penv = primitive function environment obtained from previous pipeline stage *)
     KernameMap.find op_name primop_map = Some op -> (* primop_map = environment of supported primitive operations *)

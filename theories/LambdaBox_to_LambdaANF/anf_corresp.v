@@ -12,10 +12,10 @@ From ExtLib Require Import Structures.Monads Data.Monads.OptionMonad.
 From CertiRocq.Common Require Import AstCommon compM.
 From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
-  cps cps_util ctx List_util Ensembles_util
+  term term_util ctx List_util Ensembles_util
   identifiers state set_util tactics
   closure_conversion_corresp.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem wf anf_util.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf fuel_sem wf anf_util.
 
 Import ListNotations.
 Import Monad.MonadNotation.

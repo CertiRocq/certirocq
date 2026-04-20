@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-Require Import LambdaANF.set_util LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.ctx LambdaANF.identifiers.
+Require Import LambdaANF.set_util LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.ctx LambdaANF.identifiers.
 From Stdlib Require Import MSets.MSetRBT Lists.List.
 Require Import compcert.lib.Coqlib.
 

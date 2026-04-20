@@ -11,9 +11,9 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 (* From Stdlib Require Import Classes.Morphisms. *)
 (* From Stdlib Require Import Classes.RelationClasses. *)
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import term cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
-        LambdaBoxLocal_to_LambdaANF LambdaANF.tactics identifiers cps_util rename.
+        LambdaBoxLocal_to_LambdaANF LambdaANF.tactics identifiers term_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 

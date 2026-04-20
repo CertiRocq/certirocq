@@ -10,11 +10,11 @@ From compcert Require Import lib.Maps lib.Coqlib.
 From CertiRocq.Common Require Import AstCommon.
 From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
-  cps cps_show eval ctx logical_relations
+  term cps_show eval ctx logical_relations
   List_util algebra alpha_conv functions Ensembles_util
-  tactics identifiers bounds cps_util rename set_util.
+  tactics identifiers bounds term_util rename set_util.
 From MetaRocq.Utils Require Import All_Forall.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common ANF fuel_sem.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf fuel_sem.
 
 Import ListNotations.
 

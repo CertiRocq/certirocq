@@ -1,6 +1,6 @@
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
-From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util identifiers cps_util stemctx
+From CertiRocq.LambdaANF Require Import term ctx Ensembles_util List_util functions map_util identifiers term_util stemctx
      rename logical_relations alpha_conv eval functions.
 From Stdlib Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
@@ -288,7 +288,7 @@ Proof.
   - inv Hin. inv Hnum.
     Transparent num_occur_list.
     simpl in *.
-    destruct (cps_util.var_dec g x'); subst; try congruence. split; eauto. econstructor.
+    destruct (term_util.var_dec g x'); subst; try congruence. split; eauto. econstructor.
 Qed.
 
 Lemma num_occur_inline_letapp_leq e f C x x' m :
@@ -774,7 +774,7 @@ Section Inline_correct.
 
 
   Lemma eq_env_P_def_funs_not_in_P_r' (B B' : fundefs) (P : Ensemble M.elt)
-        (rho : cps.M.t val) (rho1 rho2 : M.t val) :
+        (rho : term.M.t val) (rho1 rho2 : M.t val) :
     eq_env_P P rho1 (def_funs B' B rho rho2) ->
     Disjoint M.elt P (name_in_fundefs B) ->
     eq_env_P P rho1 rho2.

@@ -4,7 +4,7 @@
 
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
-From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util.
+From CertiRocq.LambdaANF Require Import term ctx Ensembles_util List_util functions map_util.
 From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
 From MetaRocq.Utils Require Import bytestring. (* For identifier names *)
@@ -1087,14 +1087,14 @@ Proof.
   - auto.
   - intro. inversion H0.
     + subst. simpl in H.
-      unfold cps_util.var_dec in *.
+      unfold term_util.var_dec in *.
       destruct (M.elt_eq v v).
       inversion H. apply n; auto.
     + inversion H.
-      apply IHl. destruct (cps_util.var_dec v a).
+      apply IHl. destruct (term_util.var_dec v a).
       inversion H3. auto. auto.
   - simpl.
-    destruct (cps_util.var_dec v a).
+    destruct (term_util.var_dec v a).
     exfalso. apply H. constructor. auto.
     apply IHl. intro. apply H. constructor 2. auto.
 Qed.

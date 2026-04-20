@@ -10,12 +10,12 @@ From ExtLib Require Import Structures.Monads.
 From CertiRocq.Common Require Import AstCommon compM.
 From CertiRocq Require Import Pipeline_utils.
 From CertiRocq.LambdaANF Require Import
-  cps cps_show eval ctx logical_relations
+  term cps_show eval ctx logical_relations
   List_util algebra alpha_conv functions Ensembles_util
-  tactics identifiers bounds cps_util rename set_util stemctx.
+  tactics identifiers bounds term_util rename set_util stemctx.
 From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import
-  common ANF fuel_sem wf anf_corresp anf_util anf_correct anf_global
+  common anf fuel_sem wf anf_corresp anf_util anf_correct anf_global
   anf_divergence.
 
 Import ListNotations.

@@ -3,7 +3,7 @@ From compcert Require Import
   lib.Integers common.Memory.
 
 From CertiRocq Require Import
-  LambdaANF.cps LambdaANF.eval LambdaANF.cps_util
+  LambdaANF.term LambdaANF.eval LambdaANF.term_util
   LambdaANF.List_util LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_restrictions
@@ -335,13 +335,13 @@ End General.
 
 Section Vars.
 
-Fixpoint fds_collect_local_variables (fds : fundefs) : list cps.var :=
+Fixpoint fds_collect_local_variables (fds : fundefs) : list term.var :=
   match fds with
   | Fnil => []
   | Fcons _ _ ys e fds' => (ys ++ collect_local_variables e) ++ (fds_collect_local_variables fds')
   end.
 
-Definition collect_all_local_variables (e : cps.exp) : list cps.var :=
+Definition collect_all_local_variables (e : term.exp) : list term.var :=
   match e with
   | Efun fds e' => collect_local_variables e' ++ fds_collect_local_variables fds
   | _ => collect_local_variables e
@@ -615,7 +615,7 @@ Section LambdaANF.
 
 (* some of the following taken from C backend *)
 
-Inductive dsubval_v: LambdaANF.cps.val -> LambdaANF.cps.val -> Prop :=
+Inductive dsubval_v: LambdaANF.term.val -> LambdaANF.term.val -> Prop :=
 | dsubval_constr: forall v vs c,
   List.In v vs ->
   dsubval_v v (Vconstr c vs)

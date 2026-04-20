@@ -15,7 +15,7 @@ Done: change LambdaANF_to_Clight's reserve into reserve', todo update proof with
 Done: update proof to 64 bits (parametric over Archi.ptr64)
  *)
 
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.identifiers LambdaANF.tactics LambdaANF.shrink_cps_corresp.
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.identifiers LambdaANF.tactics LambdaANF.shrink_cps_corresp.
 
 
 
@@ -223,7 +223,7 @@ Qed.
 
 
  (* TODO: move to identifiers *)
-Inductive bound_var_val: LambdaANF.cps.val -> Ensemble var :=
+Inductive bound_var_val: LambdaANF.term.val -> Ensemble var :=
 | Bound_Vconstr :
     forall c vs v x,
     bound_var_val v x ->
@@ -235,7 +235,7 @@ Inductive bound_var_val: LambdaANF.cps.val -> Ensemble var :=
     bound_var_val (Vfun rho fds f) x.
 
 
-Inductive occurs_free_val: LambdaANF.cps.val -> Ensemble var :=
+Inductive occurs_free_val: LambdaANF.term.val -> Ensemble var :=
 | OF_Vconstr :
     forall c vs v x,
     occurs_free_val v x ->
@@ -248,18 +248,18 @@ Inductive occurs_free_val: LambdaANF.cps.val -> Ensemble var :=
       occurs_free_val (Vfun rho fds f) x.
 
 
-Definition closed_val (v : LambdaANF.cps.val) : Prop :=
+Definition closed_val (v : LambdaANF.term.val) : Prop :=
   Same_set var (occurs_free_val v) (Empty_set var).
 
 
 Theorem closed_val_fun:
   forall fl f t vs e,
-    closed_val (Vfun (M.empty cps.val) fl f) ->
+    closed_val (Vfun (M.empty term.val) fl f) ->
     find_def f fl = Some (t, vs, e) ->
     (Included _ (occurs_free e) (Ensembles.Union _  (FromList vs) (name_in_fundefs fl)) ).
 Proof.
   intros. inv H. intro. intros.
-  assert (~  occurs_free_val (Vfun (M.empty cps.val) fl f) x). intro. apply H1 in H3. inv H3.
+  assert (~  occurs_free_val (Vfun (M.empty term.val) fl f) x). intro. apply H1 in H3. inv H3.
   clear H1. clear H2.
   assert (decidable (List.In x vs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
   assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
@@ -271,7 +271,7 @@ Qed.
 
 
 
-Inductive dsubval_v: LambdaANF.cps.val -> LambdaANF.cps.val -> Prop :=
+Inductive dsubval_v: LambdaANF.term.val -> LambdaANF.term.val -> Prop :=
 | dsubval_constr: forall v vs c,
   List.In v vs ->
   dsubval_v v (Vconstr c vs)
@@ -414,21 +414,21 @@ Qed.
 
 
 (* bound_var_val - name_in_fds *)
-Inductive bound_subvar_val : cps.val -> Ensemble var :=
-    Bound_SVconstr : forall (c : ctor_tag) (vs : list cps.val) (v : cps.val) (x : var),
+Inductive bound_subvar_val : term.val -> Ensemble var :=
+    Bound_SVconstr : forall (c : ctor_tag) (vs : list term.val) (v : term.val) (x : var),
                     bound_var_val (Vconstr c vs) x -> bound_subvar_val (Vconstr c vs) x
-  | Bound_SVfun : forall (fds : fundefs) (rho : cps.M.t cps.val) (x f : var),
+  | Bound_SVfun : forall (fds : fundefs) (rho : term.M.t term.val) (x f : var),
       bound_var_val (Vfun rho fds f) x -> ~name_in_fundefs fds x -> bound_subvar_val (Vfun rho fds f) x.
 
 
 
 (* deep version of bound_subvar_val, likely what is needed for functions_not_bound inv *)
-Inductive bound_notfun_val: cps.val -> Ensemble var :=
-  Bound_FVconstr : forall (c : ctor_tag) (vs : list cps.val)
-                         (v : cps.val) (x : var),
+Inductive bound_notfun_val: term.val -> Ensemble var :=
+  Bound_FVconstr : forall (c : ctor_tag) (vs : list term.val)
+                         (v : term.val) (x : var),
                     bound_notfun_val v x ->
                     List.In v vs -> bound_notfun_val (Vconstr c vs) x
-| Bound_FVfun : forall (e:exp) (fds : fundefs) (rho : cps.M.t cps.val) ys (x f f' : var) t,
+| Bound_FVfun : forall (e:exp) (fds : fundefs) (rho : term.M.t term.val) ys (x f f' : var) t,
     In _ (Ensembles.Union _ (FromList ys) (bound_var e)) x ->  find_def f' fds = Some (t, ys, e) ->  bound_notfun_val (Vfun rho fds f) x.
 
 
@@ -437,7 +437,7 @@ Theorem find_dsubterm:
 find_def x fl = Some (t, ys, e) -> dsubterm_fds_e e fl.
 Proof.
   induction fl; intros.
-  - simpl in H. destruct (cps.M.elt_eq x v) eqn:Heq_xv. inv H. constructor.
+  - simpl in H. destruct (term.M.elt_eq x v) eqn:Heq_xv. inv H. constructor.
     constructor 2. eapply IHfl; eauto.
   - inv H.
 Qed.
@@ -454,7 +454,7 @@ Proof.
   intros. induction H.
   - econstructor; eauto.
   -  constructor. induction fds. simpl in H0.
-     destruct  (cps.M.elt_eq f' v). inv H0. inv H. constructor; auto.
+     destruct  (term.M.elt_eq f' v). inv H0. inv H. constructor; auto.
      constructor 3; auto.
      constructor 2. auto.
      inv H0.
@@ -519,8 +519,8 @@ Section RELATION.
 
 
 
-  Variable cenv:LambdaANF.cps.ctor_env.
-  Variable fenv:LambdaANF.cps.fun_env.
+  Variable cenv:LambdaANF.term.ctor_env.
+  Variable fenv:LambdaANF.term.fun_env.
   Variable finfo_env: LambdaANF_to_Clight.fun_info_env. (* map from a function name to its type info *)
   Variable p:program.
 
@@ -1876,7 +1876,7 @@ TODO: maybe this should be related to a state instead?
  *)
 
 (* CHANGE THIS (relational version from translate body) *)
-Inductive repr_expr_LambdaANF_Codegen: LambdaANF.cps.exp -> statement -> Prop :=
+Inductive repr_expr_LambdaANF_Codegen: LambdaANF.term.exp -> statement -> Prop :=
 | Rconstr_e:
     forall x t vs  s s' e,
     repr_asgn_constr x t vs s ->
@@ -2085,11 +2085,11 @@ Qed.
 
 Theorem in_rho_entry:
   forall xs vs fl rho x v,
-  set_lists xs vs (def_funs fl fl (M.empty cps.val) (M.empty cps.val)) = Some rho ->
+  set_lists xs vs (def_funs fl fl (M.empty term.val) (M.empty term.val)) = Some rho ->
   NoDup xs ->
   M.get x rho = Some v ->
   (exists n, nthN xs n = Some x /\ nthN vs n = Some v) \/
-  (exists t ys b, ~List.In x xs /\  find_def x fl = Some (t, ys, b) /\ v = Vfun (M.empty cps.val) fl x).
+  (exists t ys b, ~List.In x xs /\  find_def x fl = Some (t, ys, b) /\ v = Vfun (M.empty term.val) fl x).
 Proof.
   intros.
   assert (decidable (List.In x xs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
@@ -2121,15 +2121,15 @@ Qed.
 
 
 
-Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val -> Prop :=
+Inductive repr_val_LambdaANF_Codegen:  LambdaANF.term.val -> mem -> Values.val -> Prop :=
 | Rint_v: forall  z r m,
     repr_unboxed_Codegen (Z.to_N z) r ->
-    repr_val_LambdaANF_Codegen (LambdaANF.cps.Vint z) m (make_vint r)
+    repr_val_LambdaANF_Codegen (LambdaANF.term.Vint z) m (make_vint r)
 | Rconstr_unboxed_v:
     forall t arr n m,
       M.get t rep_env = Some (enum arr) ->
       repr_unboxed_Codegen arr n ->
-      repr_val_LambdaANF_Codegen (LambdaANF.cps.Vconstr t nil) m  (make_vint n)
+      repr_val_LambdaANF_Codegen (LambdaANF.term.Vconstr t nil) m  (make_vint n)
 | Rconstr_boxed_v: forall  t vs n a b i m h,
     (* t is a boxed constructor, n ends with 0 and represents
       a pointer to repr_val_ptr of (t, vs)  *)
@@ -2140,7 +2140,7 @@ Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val ->
     boxed_header n a h ->
     (* 2) all the fields are also well-represented *)
     repr_val_ptr_list_LambdaANF_Codegen vs m b i ->
-    repr_val_LambdaANF_Codegen (LambdaANF.cps.Vconstr t vs) m  (Vptr b i)
+    repr_val_LambdaANF_Codegen (LambdaANF.term.Vconstr t vs) m  (Vptr b i)
 | Rfunction_v:
     forall vars avars fds f m b t t' vs pvs avs alocs e asgn body l locs finfo gccall,
       let F := mkfunction (Tvoid)
@@ -2178,8 +2178,8 @@ Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val ->
       avars = skipn nParam vars ->
       right_param_asgn avs alocs asgn ->
       repr_expr_LambdaANF_Codegen e body ->
-      repr_val_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m (Vptr b Ptrofs.zero)
-with repr_val_ptr_list_LambdaANF_Codegen: (list LambdaANF.cps.val) -> mem -> block -> ptrofs -> Prop :=
+      repr_val_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m (Vptr b Ptrofs.zero)
+with repr_val_ptr_list_LambdaANF_Codegen: (list LambdaANF.term.val) -> mem -> block -> ptrofs -> Prop :=
      | Rnil_l:
          forall m b i,
            repr_val_ptr_list_LambdaANF_Codegen nil m b i
@@ -2203,15 +2203,15 @@ Definition sub_locProp: locProp -> locProp -> Prop :=
 
 
 (* CHANGE THIS *)
-Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> Values.val -> Prop :=
+Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.term.val -> mem -> locProp -> Values.val -> Prop :=
 | RSint_v: forall L z r m,
     repr_unboxed_Codegen (Z.to_N z) r ->
-    repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vint z) m L (make_vint r)
+    repr_val_L_LambdaANF_Codegen (LambdaANF.term.Vint z) m L (make_vint r)
 | RSconstr_unboxed_v:
     forall t arr n m L,
       M.get t rep_env = Some (enum arr) ->
       repr_unboxed_Codegen arr n ->
-      repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vconstr t nil) m L (make_vint n)
+      repr_val_L_LambdaANF_Codegen (LambdaANF.term.Vconstr t nil) m L (make_vint n)
 | RSconstr_boxed_v: forall (L:block -> Z -> Prop) t vs n a b i m h,
     (* t is a boxed constructor, n ends with 0 and represents
       a pointer to repr_val_ptr of (t, vs)  *)
@@ -2224,7 +2224,7 @@ Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> 
     boxed_header n a h ->
     (* 2) all the fields are also well-represented *)
     repr_val_ptr_list_L_LambdaANF_Codegen vs m L b i ->
-    repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vconstr t vs) m L (Vptr b i)
+    repr_val_L_LambdaANF_Codegen (LambdaANF.term.Vconstr t vs) m L (Vptr b i)
 | RSfunction_v:
     forall (L:block -> Z -> Prop)  vars avars fds f m b t t' vs pvs avs e asgn body l locs alocs finfo gccall,
       let F := mkfunction (Tvoid)
@@ -2262,8 +2262,8 @@ Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> 
       avars = skipn nParam vars ->
       right_param_asgn avs alocs asgn ->
       repr_expr_LambdaANF_Codegen e body ->
-      repr_val_L_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m L (Vptr b Ptrofs.zero)
-with repr_val_ptr_list_L_LambdaANF_Codegen: (list LambdaANF.cps.val) -> mem -> locProp -> block -> ptrofs -> Prop :=
+      repr_val_L_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m L (Vptr b Ptrofs.zero)
+with repr_val_ptr_list_L_LambdaANF_Codegen: (list LambdaANF.term.val) -> mem -> locProp -> block -> ptrofs -> Prop :=
      | RSnil_l:
          forall m L b i,
            repr_val_ptr_list_L_LambdaANF_Codegen nil m L b i
@@ -2280,7 +2280,7 @@ Scheme repr_val_L_LambdaANF_Codegen_rec := Induction for repr_val_L_LambdaANF_Co
 
 
 
-Inductive  repr_val_ptr_list_L_LambdaANF_Codegen_Z: (list LambdaANF.cps.val) -> mem -> locProp -> block -> Z -> Prop :=
+Inductive  repr_val_ptr_list_L_LambdaANF_Codegen_Z: (list LambdaANF.term.val) -> mem -> locProp -> block -> Z -> Prop :=
      | RSnil_l_Z:
          forall m L b i,
            repr_val_ptr_list_L_LambdaANF_Codegen_Z nil m L b i
@@ -2300,7 +2300,7 @@ Inductive  repr_val_ptr_list_L_LambdaANF_Codegen_Z: (list LambdaANF.cps.val) -> 
 (*
 Theorem repr_val_forall_L_fun:
   forall L fds f m b,
-  repr_val_ptr_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m (b,Int.zero) <-> repr_val_L_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m L (Vptr b Int.zero).
+  repr_val_ptr_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m (b,Int.zero) <-> repr_val_L_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m L (Vptr b Int.zero).
 Proof.
   intros. split; intro H; inv H; econstructor; eauto.
 Qed.   *)
@@ -2367,12 +2367,12 @@ Qed.
 
 
 (* this is the sum of get_var_or_funvar and repr_val_L_LambdaANF_Codegen (-> and <-\-) *)
-Inductive repr_val_id_L_LambdaANF_Codegen: LambdaANF.cps.val -> mem -> locProp -> temp_env -> positive -> Prop :=
+Inductive repr_val_id_L_LambdaANF_Codegen: LambdaANF.term.val -> mem -> locProp -> temp_env -> positive -> Prop :=
 | RVid_F:
    forall b f lenv fds L m,
      Genv.find_symbol (Genv.globalenv p) f = Some b ->
-     repr_val_L_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m L (Vptr b (Ptrofs.zero)) ->
-     repr_val_id_L_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m L lenv f
+     repr_val_L_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m L (Vptr b (Ptrofs.zero)) ->
+     repr_val_id_L_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m L lenv f
 | RVid_V:
     forall x m lenv L v6 v7,
       Genv.find_symbol (Genv.globalenv p) x = None ->
@@ -2689,10 +2689,10 @@ Qed.
 Returns True if the pointer Vptr q_b q_ofs is reachable by crawling v7
 Assumes correct memory layout (i.e. repr_val_LambdaANF_Codegen v6 m v7)
  *)
-Fixpoint reachable_val_Codegen (v6:LambdaANF.cps.val) (m:mem) (v7:Values.val) (q_b:block) (q_ofs:ptrofs): Prop :=
+Fixpoint reachable_val_Codegen (v6:LambdaANF.term.val) (m:mem) (v7:Values.val) (q_b:block) (q_ofs:ptrofs): Prop :=
   match v6, v7 with
-  | LambdaANF.cps.Vint z, Vint r => False
-  | LambdaANF.cps.Vconstr t vs, Vptr b i =>
+  | LambdaANF.term.Vint z, Vint r => False
+  | LambdaANF.term.Vconstr t vs, Vptr b i =>
     (fst (List.fold_left (fun curr v =>
                             let '(p, (p_b, p_ofs)) := curr in
                             (match Val.cmpu_bool (Mem.valid_pointer m) Ceq (Vptr p_b p_ofs) (Vptr q_b q_ofs) with
@@ -2705,7 +2705,7 @@ Fixpoint reachable_val_Codegen (v6:LambdaANF.cps.val) (m:mem) (v7:Values.val) (q
                                 end)
                              end))
                         vs (False, (b,i))))
-  | (LambdaANF.cps.Vfun rho fds f), Vptr b i => False
+  | (LambdaANF.term.Vfun rho fds f), Vptr b i => False
   | _, _ => False
   end.
 
@@ -2979,9 +2979,9 @@ Genv.find_var_info (globalenv p) b = Some finfo_init /\
 (*     Forall2 (fun a i => exists i', i = Init_int32 i' /\ (Z.of_N a) = Int.unsigned i')  l fi_rest. *)
 
 (* P is true of every fundefs in a bundle *)
-(* TODO: move this to cps_util *)
-Inductive Forall_fundefs: (LambdaANF.cps.var -> fun_tag -> list LambdaANF.cps.var -> exp -> Prop) -> fundefs -> Prop :=
-| Ff_cons : forall (P:(LambdaANF.cps.var -> fun_tag -> list LambdaANF.cps.var -> exp -> Prop)) f t vs e fds,
+(* TODO: move this to term_util *)
+Inductive Forall_fundefs: (LambdaANF.term.var -> fun_tag -> list LambdaANF.term.var -> exp -> Prop) -> fundefs -> Prop :=
+| Ff_cons : forall (P:(LambdaANF.term.var -> fun_tag -> list LambdaANF.term.var -> exp -> Prop)) f t vs e fds,
          P f t vs e ->
          Forall_fundefs P fds ->
          Forall_fundefs P (Fcons f t vs e fds)
@@ -3007,8 +3007,8 @@ Qed.
    2) fenv is consistent with the info
    3) global env holds a correct Codegen representation of the function *)
 Definition correct_environments_for_function:
-  genv -> fun_env -> M.t positive -> mem -> fundefs ->  LambdaANF.cps.var ->
-  fun_tag -> list LambdaANF.cps.var -> exp ->  Prop
+  genv -> fun_env -> M.t positive -> mem -> fundefs ->  LambdaANF.term.var ->
+  fun_tag -> list LambdaANF.term.var -> exp ->  Prop
   := fun ge fenv finfo_env m fds f t vs e =>
        exists l locs finfo b,
          (*1*)
@@ -3021,7 +3021,7 @@ Definition correct_environments_for_function:
          (*3*)
          Genv.find_symbol (globalenv p) f = Some b /\
          (* TODO: change this to repr_val_LambdaANF_Codegen *)
-         repr_val_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m (Vptr b Ptrofs.zero).
+         repr_val_LambdaANF_Codegen (term.Vfun (M.empty term.val) fds f) m (Vptr b Ptrofs.zero).
 
 
 Definition correct_environments_for_functions: fundefs -> genv -> fun_env -> M.t positive -> mem ->  Prop := fun fds ge fenv finfo_env m =>
@@ -3055,7 +3055,7 @@ Definition functions_not_bound (rho:LambdaANF.eval.env) (e:exp): Prop :=
 
 
 
-Inductive unique_bindings_val: LambdaANF.cps.val -> Prop :=
+Inductive unique_bindings_val: LambdaANF.term.val -> Prop :=
 | UB_Vfun: forall rho fds f,
     unique_bindings_fundefs fds ->
     unique_bindings_val (Vfun rho fds f)
@@ -3063,7 +3063,7 @@ Inductive unique_bindings_val: LambdaANF.cps.val -> Prop :=
     Forall unique_bindings_val vs ->
     unique_bindings_val (Vconstr c vs)
 |UB_VInt: forall z,
-    unique_bindings_val (cps.Vint z)
+    unique_bindings_val (term.Vint z)
 .
 
 
@@ -3148,7 +3148,7 @@ Theorem find_def_bound_in_bundle:
   bound_var_fundefs fds y.
 Proof.
   induction fds; intros.
-  simpl in H0. destruct (cps.M.elt_eq f v). inv H0. constructor 3; auto.
+  simpl in H0. destruct (term.M.elt_eq f v). inv H0. constructor 3; auto.
   constructor 2. apply IHfds; auto.
   inv H0.
 Qed.
@@ -3174,7 +3174,7 @@ Qed.
 Theorem protected_id_closure:
   forall rho rho' f t0 ys fl f' t xs e' vs,
     protected_id_not_bound rho (Eapp f t0 ys) ->
-    cps.M.get f rho = Some (Vfun (M.empty _) fl f') ->
+    term.M.get f rho = Some (Vfun (M.empty _) fl f') ->
     get_list ys rho = Some vs ->
     find_def f' fl = Some (t, xs, e') ->
     set_lists xs vs (def_funs fl fl (M.empty _) (M.empty _)) = Some rho' ->
@@ -3451,8 +3451,8 @@ Proof.
 Qed. *)
 
 
-Definition Vint_or_Vconstr (v:cps.val): Prop :=
-  (exists i, v = cps.Vint i) \/ (exists c vs, v = cps.Vconstr c vs).
+Definition Vint_or_Vconstr (v:term.val): Prop :=
+  (exists i, v = term.Vint i) \/ (exists c vs, v = term.Vconstr c vs).
 
 Definition correct_fundef_id_info (m:mem) (fds:fundefs) (f:positive) :=
             exists finfo t t' vs e, (find_def f fds = Some (t, vs, e) /\
@@ -4030,8 +4030,8 @@ Proof.
 Qed.
 
 (*
-    Variable cenv:LambdaANF.cps.ctor_env.
-  Variable fenv:LambdaANF.cps.fun_env.
+    Variable cenv:LambdaANF.term.ctor_env.
+  Variable fenv:LambdaANF.term.fun_env.
   Variable finfo_env: M.t positive. (* map from a function name to its type info *)
   Variable p:program.
 
@@ -4041,7 +4041,7 @@ Qed.
 *)
 
 
-  (* TODO: move this to cps_util *)
+  (* TODO: move this to term_util *)
   Definition Forall_constructors_in_e (P: var -> ctor_tag -> list var -> Prop) (e:exp) :=
     forall x t  ys e',
       subterm_or_eq (Econstr x t ys e') e -> P x t ys.
@@ -4092,7 +4092,7 @@ Qed.
 
   (* all constructors in the exp exists in cenv and are applied to the right number of arguments
     May want to have "exists in cenv" also true for constructors in rho *)
-  Definition correct_cenv_of_exp: LambdaANF.cps.ctor_env -> exp -> Prop :=
+  Definition correct_cenv_of_exp: LambdaANF.term.ctor_env -> exp -> Prop :=
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
@@ -4101,7 +4101,7 @@ Qed.
                                   | None => False
                                   end) e.
 
-  Definition correct_cenv_of_caselist: LambdaANF.cps.ctor_env -> list (ctor_tag * exp) -> Prop :=
+  Definition correct_cenv_of_caselist: LambdaANF.term.ctor_env -> list (ctor_tag * exp) -> Prop :=
     fun cenv cl =>
       Forall_exp_in_caselist (correct_cenv_of_exp cenv) cl.
 
@@ -4145,7 +4145,7 @@ Qed.
 
 
 
-Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> Prop :=
+Inductive correct_cenv_of_val: LambdaANF.term.ctor_env -> (LambdaANF.term.val) -> Prop :=
 | CCV_constr:forall cenv c vs inf,
     Forall (correct_cenv_of_val cenv) vs ->
     M.get c cenv = Some inf ->
@@ -4155,19 +4155,19 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
     Forall_fundefs (fun v t xs e => correct_cenv_of_exp cenv e) fds ->
     correct_cenv_of_val cenv (Vfun rho fds f)
 | CCV_int: forall cenv z,
-    correct_cenv_of_val cenv (cps.Vint z).
+    correct_cenv_of_val cenv (term.Vint z).
 
 
 
 (* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
-  Definition correct_ienv_of_cenv: LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+  Definition correct_ienv_of_cenv: LambdaANF.term.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name name', M.get x cenv = Some (Build_ctor_ty_info name name' i a ord) ->
                                    exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
   (* all constructors found in ienv are in cenv *)
-  Definition domain_ienv_cenv:  LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+  Definition domain_ienv_cenv:  LambdaANF.term.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
                          forall name x a ord, List.In (name, x, a, ord) cl ->
@@ -4176,7 +4176,7 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
 
 
 (* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
-    Definition correct_ienv_of_cenv_strong: LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+    Definition correct_ienv_of_cenv_strong: LambdaANF.term.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name namei, M.get x cenv = Some (Build_ctor_ty_info name namei i a ord) ->
                                    exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
@@ -4202,7 +4202,7 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
       correct_crep cenv c (boxed n (Npos a)).
 
   (* crep <-> make_ctor_rep cenv *)
-  Definition correct_crep_of_env: LambdaANF.cps.ctor_env -> M.t ctor_rep -> Prop :=
+  Definition correct_crep_of_env: LambdaANF.term.ctor_env -> M.t ctor_rep -> Prop :=
     fun cenv crep_env =>
       (forall c name namei it a n,
         M.get c cenv = Some (Build_ctor_ty_info name namei it a n) ->
@@ -4212,13 +4212,13 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
                      correct_crep cenv c crep).
 
 
-  Definition correct_cenv_of_env: ctor_env -> cps.M.t cps.val -> Prop :=
+  Definition correct_cenv_of_env: ctor_env -> term.M.t term.val -> Prop :=
     fun cenv rho =>
       forall x v,
         M.get x rho = Some v ->
         correct_cenv_of_val cenv v.
 
-  Definition correct_envs: ctor_env -> n_ind_env -> M.t ctor_rep ->  cps.M.t cps.val ->  exp -> Prop :=
+  Definition correct_envs: ctor_env -> n_ind_env -> M.t ctor_rep ->  term.M.t term.val ->  exp -> Prop :=
     fun cenv ienv crep_env rho e =>
       correct_ienv_of_cenv cenv ienv /\
       correct_cenv_of_env cenv rho /\
@@ -4738,7 +4738,7 @@ Proof.
     + constructor. auto.
     +
 *)
-Definition arg_val_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep): LambdaANF.cps.val -> mem -> temp_env -> Prop :=
+Definition arg_val_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep): LambdaANF.term.val -> mem -> temp_env -> Prop :=
   fun v m lenv =>
     exists args_b args_ofs Codegenv L,
 (*       M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
@@ -4779,13 +4779,13 @@ Theorem get_list_cons :
   forall A rho v ys vs,
     @get_list A ys rho = Some (v :: vs) ->
   exists y ys', ys = y::ys' /\
-                cps.M.get y rho = Some v /\
+                term.M.get y rho = Some v /\
                 get_list ys' rho = Some vs.
 Proof.
   intros. destruct ys as [ | y ys'].
   inv H. exists y, ys'.
   split; auto.  simpl in H.
-  destruct  (cps.M.get y rho).
+  destruct  (term.M.get y rho).
   destruct (get_list ys' rho). inv H. auto.
   inv H. inv H.
 Qed.
@@ -4795,7 +4795,7 @@ Theorem exists_getvar_or_funvar_list:
   forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
          m xs vs,
             ( forall x, List.In x xs ->
-                        exists v6 : cps.val,
+                        exists v6 : term.val,
          M.get x rho = Some v6 /\
          repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env
                              p rep_env v6 m L lenv x)
@@ -4806,13 +4806,13 @@ Proof.
   induction xs; intros.
   - exists nil. auto.
   - simpl in H0.
-    destruct (cps.M.get a rho) eqn:Hgar.
+    destruct (term.M.get a rho) eqn:Hgar.
     destruct (get_list xs rho) eqn:Hgxsr.
     inv H0.
     specialize (IHxs l).
     assert ((forall x : positive,
           List.In x xs ->
-          exists v6 : cps.val,
+          exists v6 : term.val,
             M.get x rho = Some v6 /\
             repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0
                                 fenv finfo_env p rep_env v6 m L lenv x)).
@@ -4821,7 +4821,7 @@ Proof.
     }
     apply IHxs in H0. destruct H0.
     assert
-      (exists v6 : cps.val,
+      (exists v6 : term.val,
         M.get a rho = Some v6 /\
         repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0 fenv
                             finfo_env p rep_env v6 m L lenv a).
@@ -5662,7 +5662,7 @@ Definition program_gc_inv (p:program) :=
    correct_tinfo p (Int.unsigned finfo_maxalloc) lenv' m'). *)
 
 (* deep version of mem_after_asgn  *)
- Inductive rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L: list LambdaANF.cps.val -> list N -> list Values.val -> Prop :=
+ Inductive rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L: list LambdaANF.term.val -> list N -> list Values.val -> Prop :=
   | rma_cons: forall  i v6 v7  vs6 inf vs7,
     rel_mem_asgn args_b args_ofs  m L vs6 inf vs7 ->
     Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v7 ->
@@ -5917,7 +5917,7 @@ Theorem find_symbol_map:
     var_or_funvar id m fenv finfo_env p v (makeVar id m v fenv finfo_env).
 Proof.
   intros. specialize (H v). inv H.
-  destruct (cps.M.get v finfo_env) eqn:Hgvm.
+  destruct (term.M.get v finfo_env) eqn:Hgvm.
   - destruct (H0 (ex_intro _ p0 (eq_refl _))). econstructor. apply H.
   - unfold makeVar. rewrite Hgvm. econstructor.
     destruct (Genv.find_symbol (Genv.globalenv p) v) eqn:Hgpv; auto.
@@ -6097,7 +6097,7 @@ forall cenv rep_env,
     make_ctor_rep cenv c =  M.get c rep_env.
 Proof.
   intros. unfold make_ctor_rep.
-  destruct (cps.M.get c cenv) eqn:Hgc.
+  destruct (term.M.get c cenv) eqn:Hgc.
   - destruct c0.
     simpl.
     destruct (ctor_arity =? 0)%N eqn:Hn0.
@@ -6201,7 +6201,7 @@ Theorem make_crep_none:
 Proof.
   intros.
   unfold make_ctor_rep in *.
-  destruct (cps.M.get c cenv); auto.
+  destruct (term.M.get c cenv); auto.
   exfalso. destruct c0. inv H.
   destruct (ctor_arity =? 0)%N; inv H1.
 Qed.
@@ -6214,7 +6214,7 @@ Proof.
   intros.
   unfold makeTagZ in *.
   unfold make_ctor_rep in *.
-  destruct (cps.M.get c cenv). destruct c0. simpl in H.
+  destruct (term.M.get c cenv). destruct c0. simpl in H.
   destruct  (ctor_arity =? 0)%N; inv H. auto.
 Qed.
 
@@ -6310,9 +6310,9 @@ Proof.
     inv H.
   - (* Eapp *)
     unfold translate_body in H.
-    destruct (cps.M.get t fenv) eqn:Hffenv. 2:inv H.
+    destruct (term.M.get t fenv) eqn:Hffenv. 2:inv H.
     destruct f as [n locs].
-    unfold var , cps.M.elt in l.
+    unfold var , term.M.elt in l.
     set (avs := skipn nParam l).
     set (aind := skipn nParam locs).
     set (bvs := firstn nParam l).
@@ -6440,7 +6440,7 @@ Proof.
     assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_ind_env a k v)).
     {
       intro; intros. destruct v. simpl in H5.
-      destruct ( cps.M.get ctor_ind_tag a) eqn:Hgi0a.
+      destruct ( term.M.get ctor_ind_tag a) eqn:Hgi0a.
       + destruct n.
         destruct (var_dec i ctor_ind_tag).
         * subst. rewrite M.gss in H5. inv H5. inv H6.
@@ -6463,7 +6463,7 @@ Proof.
     intro. intros.
     assert (H6' := H6).
     apply H2 in H6'. destruct H6' as [H6b H6'].
-    destruct (cps_util.var_dec x k).
+    destruct (term_util.var_dec x k).
     + (* x = k  -> can update i and it still be proper *)
       subst. rewrite M.gss in H6. inv H6.
       simpl.  destruct (M.get i a) eqn:Hgia.
@@ -6492,7 +6492,7 @@ Proof.
       apply H4 in H6. destructAll.
       {
         unfold update_ind_env. destruct v.
-        destruct  (cps.M.get ctor_ind_tag a) eqn:Hi0a.
+        destruct  (term.M.get ctor_ind_tag a) eqn:Hi0a.
         - destruct n0.
           destruct (var_dec i ctor_ind_tag).
           + subst.
@@ -6548,7 +6548,7 @@ Qed.
 
 
 Definition correct_fenv_for_function (fenv:fun_env):=
-  fun f (t:fun_tag) (ys:list LambdaANF.cps.var) (e:exp) =>
+  fun f (t:fun_tag) (ys:list LambdaANF.term.var) (e:exp) =>
     exists n l, M.get f fenv = Some (n, l) /\
                 n = N.of_nat (length l) /\
                 length l = length ys /\
@@ -6787,7 +6787,7 @@ Theorem repr_bs_LambdaANF_Codegen_related:
     program_inv p -> (* isPtr function is defined/correct /\ thread info is correct /\ gc invariant *)
     find_symbol_domain p finfo_env -> (* finfo_env [LambdaANF] contains precisely the same things as global env [Clight] *)
     finfo_env_correct fenv finfo_env -> (* everything in finfo_env is in the function environment *)
-    forall (rho : eval.env) (v : cps.val) (e : exp) (n : nat), (* rho is environment containing outer fundefs. e is body of LambdaANF program *)
+    forall (rho : eval.env) (v : term.val) (e : exp) (n : nat), (* rho is environment containing outer fundefs. e is body of LambdaANF program *)
       bstep_e (M.empty _) cenv rho e v n ->  (* e n-steps to v *) (* for linking: environment won't be empty *)
       correct_envs cenv ienv rep_env rho e -> (* inductive type/constructor environments are correct/pertain to e*)
       protected_id_not_bound_id rho e ->
@@ -7677,7 +7677,7 @@ Proof.
 
                   } *)
                   assert (forall y, List.In y ys ->
-                                    exists v6 : cps.val,
+                                    exists v6 : term.val,
               M.get y rho = Some v6 /\
               repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
                                   finfo_env p rep_env v6 m L lenv y).
@@ -8317,7 +8317,7 @@ Forall2
     }  destruct H0 as [lenv' [m' [Hstep [Hrel_m' [Htinfo_e Hsame_args]]]]].
 
     (* set up the with the recursive call *)
-    assert (Hc_env_e: correct_envs cenv ienv rep_env (cps.M.set x (Vconstr t vs) rho) e). {
+    assert (Hc_env_e: correct_envs cenv ienv rep_env (term.M.set x (Vconstr t vs) rho) e). {
       eapply correct_envs_subterm.
       eapply correct_envs_set.
       eauto.
@@ -8332,7 +8332,7 @@ Forall2
         eapply H1. eauto.
       -  constructor. constructor.
     }
-    assert (Hp_id_e: protected_id_not_bound_id (cps.M.set x (Vconstr t vs) rho) e).
+    assert (Hp_id_e: protected_id_not_bound_id (term.M.set x (Vconstr t vs) rho) e).
     { split; intros.
       - inv Hp_id.
         destruct (var_dec x0 x).
@@ -8347,7 +8347,7 @@ Forall2
       - inv Hp_id.
         intro. eapply H2; eauto.
     }
-    assert (Hf_id_e:  functions_not_bound p (cps.M.set x (Vconstr t vs) rho) e). {
+    assert (Hf_id_e:  functions_not_bound p (term.M.set x (Vconstr t vs) rho) e). {
       eapply functions_not_bound_subterm.
       eapply functions_not_bound_set;
         eauto.
@@ -8360,7 +8360,7 @@ Forall2
         eapply H1; eauto.
       - constructor. constructor.
     }
-    assert (H_rho_e:  unique_bindings_env (cps.M.set x (Vconstr t vs) rho) e ).
+    assert (H_rho_e:  unique_bindings_env (term.M.set x (Vconstr t vs) rho) e ).
     {  destruct Hrho_id as [Hub Hrho_id].
       split.
       inv Hub; auto.
@@ -8444,7 +8444,7 @@ Forall2
     }
 
     simpl in Hc_alloc.
-    assert (Hc_env_e: correct_envs cenv ienv rep_env (cps.M.set x v rho) e). {
+    assert (Hc_env_e: correct_envs cenv ienv rep_env (term.M.set x v rho) e). {
       eapply correct_envs_subterm.
       eapply correct_envs_set.
       eauto.
@@ -8456,7 +8456,7 @@ Forall2
       - constructor. constructor.
     }
     specialize (IHHev Hc_env_e).
-    assert (Hp_id_e: protected_id_not_bound_id (cps.M.set x v rho) e).
+    assert (Hp_id_e: protected_id_not_bound_id (term.M.set x v rho) e).
     { split; intros.
       - inv Hp_id.
         destruct (var_dec x0 x).
@@ -8472,7 +8472,7 @@ Forall2
         constructor; auto.
     }
     specialize (IHHev Hp_id_e).
-    assert (Hf_id_e: functions_not_bound p (cps.M.set x v rho) e). {
+    assert (Hf_id_e: functions_not_bound p (term.M.set x v rho) e). {
       eapply functions_not_bound_subterm.
       eapply functions_not_bound_set; eauto.
       - intros.
@@ -8482,7 +8482,7 @@ Forall2
       - constructor. constructor.
     }
 
-    assert (Hrho_id_e: unique_bindings_env (cps.M.set x v rho) e). {
+    assert (Hrho_id_e: unique_bindings_env (term.M.set x v rho) e). {
       destruct Hrho_id as [Hub Hrho_id].
       split.
       inv Hub; auto.
@@ -8499,7 +8499,7 @@ Forall2
     assert (Hx_not:  ~ is_protected_id_thm x). {
       intro. inv Hp_id. eapply H9; eauto.
     }
-    assert (rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e (cps.M.set x v rho) m (Maps.PTree.set x v7' lenv)).
+    assert (rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e (term.M.set x v rho) m (Maps.PTree.set x v7' lenv)).
     { exists L.
 
       split.
@@ -9122,7 +9122,7 @@ Forall2
     }
 
     assert (exists b,
-               (repr_val_LambdaANF_Codegen_thm fenv finfo_env p rep_env (cps.Vfun (M.empty cps.val) fl f') m4 (Vptr b Ptrofs.zero)) /\
+               (repr_val_LambdaANF_Codegen_thm fenv finfo_env p rep_env (term.Vfun (M.empty term.val) fl f') m4 (Vptr b Ptrofs.zero)) /\
 (*               Genv.find_symbol (globalenv p) f' = Some b /\ *)
                eval_expr (globalenv p) empty_env lenv m4
                          (Ecast (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
@@ -9196,7 +9196,7 @@ Forall2
     assert (bys_bvsm4_length : length bys = length bvsm4).
     {
       rewrite bvsm4Eq. Set Printing All.
-      simpl. unfold var , cps.M.elt.
+      simpl. unfold var , term.M.elt.
       rewrite <- (HFirstnLength _ _ nParam _ _ Hlvs).
       rewrite <- bindEq.
       Unset Printing All. simpl.
@@ -9441,8 +9441,8 @@ Forall2
                                       [Evar finfo0 (Tarray LambdaANF_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr); Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft)
                  Sskip)).
     { unfold gc_test'. unfold reserve'. Set Printing All. simpl.
-      unfold var , cps.M.elt in Heqbef.
-      unfold var , cps.M.elt in Heqaft.
+      unfold var , term.M.elt in Heqbef.
+      unfold var , term.M.elt in Heqaft.
       rewrite Heqbef. rewrite Heqaft.
       Unset Printing All. simpl.
       reflexivity.
@@ -10005,7 +10005,7 @@ Forall2
             inv Hx_in. exfalso; auto.
             eapply set_lists_not_In in H2. 2: eauto.
             rewrite def_funs_eq in H2; auto. eexists. split; eauto.
-            assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H17 _ _ _ _  H H15). destruct H17. inv H17.
+            assert (subval_or_eq  (Vfun (M.empty term.val) fl x) (Vfun (M.empty term.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H17 _ _ _ _  H H15). destruct H17. inv H17.
 
             econstructor. apply H21. inv H26.
             econstructor; eauto.
@@ -10043,9 +10043,9 @@ Forall2
             + (* x is from fl *)
               destructAll.
               specialize (Hrel_rho_m4 f). destruct Hrel_rho_m4 as [Hrel_m41 Hrel_m42].
-              assert (    exists l,  (Vfun rho'0 fds f0) = Vfun  (M.empty cps.val) fl l /\ name_in_fundefs fl l).
+              assert (    exists l,  (Vfun rho'0 fds f0) = Vfun  (M.empty term.val) fl l /\ name_in_fundefs fl l).
               eapply subval_fun.                     eapply find_def_name_in_fundefs; eauto. auto. destruct H16. destruct H16. inv H16.
-              assert (subval_or_eq (Vfun (M.empty cps.val) fl x3) (Vfun (M.empty cps.val) fl f')).
+              assert (subval_or_eq (Vfun (M.empty term.val) fl x3) (Vfun (M.empty term.val) fl f')).
               constructor. constructor. auto.
               specialize (Hrel_m42 _ _ _ _ H H16). destruct Hrel_m42 as [Hrel_m421 [Hrel_closed_m42 Hrel_m422]].
 
@@ -10160,7 +10160,7 @@ Forall2
                     inv Hx_in. exfalso; auto.
                     eapply set_lists_not_In in H2. 2: eauto.
                     rewrite def_funs_eq in H2; auto. eexists. split; eauto.
-                    assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H15 _ _ _ _  H H7). destruct H15. inv H15. econstructor; eauto.
+                    assert (subval_or_eq  (Vfun (M.empty term.val) fl x) (Vfun (M.empty term.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H15 _ _ _ _  H H7). destruct H15. inv H15. econstructor; eauto.
                     (* impossible, functions not bound *)
                     inv H19. rewrite H24 in H17. inv H17.
                 -  intros.
@@ -10184,9 +10184,9 @@ Forall2
                   + (* x is from fl *)
                     destructAll.
                     specialize (Hrel_rho_m4 f). destruct Hrel_rho_m4 as [Hrel_m41 Hrel_m42].
-                    assert (    exists l,  (Vfun rho'0 fds f0) = Vfun  (M.empty cps.val) fl l /\ name_in_fundefs fl l).
+                    assert (    exists l,  (Vfun rho'0 fds f0) = Vfun  (M.empty term.val) fl l /\ name_in_fundefs fl l).
                     eapply subval_fun.                     eapply find_def_name_in_fundefs; eauto. auto. destruct H12. destruct H12. inv H12.
-                    assert (subval_or_eq (Vfun (M.empty cps.val) fl x3) (Vfun (M.empty cps.val) fl f')).
+                    assert (subval_or_eq (Vfun (M.empty term.val) fl x3) (Vfun (M.empty term.val) fl f')).
                     constructor. constructor. auto.
                     specialize (Hrel_m42 _ _ _ _ H H12). destruct Hrel_m42 as [Hrel_m421 Hrel_m422]. split; auto.
                     inv Hrel_m421; subst. econstructor; eauto.

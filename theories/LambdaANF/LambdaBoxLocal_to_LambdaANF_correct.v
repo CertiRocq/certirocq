@@ -14,10 +14,10 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 (* From Stdlib Require Import Classes.Morphisms. *)
 (* From Stdlib Require Import Classes.RelationClasses. *)
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import term cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util LambdaBoxLocal_to_LambdaANF_corresp
-        LambdaANF.tactics identifiers bounds cps_util rename.
+        LambdaANF.tactics identifiers bounds term_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -542,7 +542,7 @@ Section Correct.
     Qed.
 
     Lemma preord_var_env_extend_neq_l PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
-          (v1 : cps.val) :
+          (v1 : term.val) :
         preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
         y1 <> x1 ->
         preord_var_env cenv PostG k (M.set x1 v1 rho1) rho2 y1 y2.
@@ -552,7 +552,7 @@ Section Correct.
     Qed.
 
     Lemma preord_var_env_extend_neq_r PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
-          (v1 : cps.val) :
+          (v1 : term.val) :
       preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
       y2 <> x1 ->
       preord_var_env cenv PostG k rho1 (M.set x1 v1 rho2) y1 y2.
@@ -562,7 +562,7 @@ Section Correct.
     Qed.
 
     Lemma preord_var_env_get :
-      forall PostG (rho1 rho2 : eval.env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
+      forall PostG (rho1 rho2 : eval.env) (k : nat) (x1 x2 : var) (v1 v2 : term.val),
         preord_val cenv PostG k v1 v2 ->
         M.get x1 rho1 = Some v1 ->
         M.get x2 rho2 = Some v2 ->
@@ -573,7 +573,7 @@ Section Correct.
     Qed.
 
     Lemma preord_var_env_get_list :
-      forall PostG (rho1 rho2 : eval.env) (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list cps.val),
+      forall PostG (rho1 rho2 : eval.env) (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list term.val),
         Forall2 (preord_val cenv PostG k) vs1 vs2 ->
         get_list xs1 rho1 = Some vs1 ->
         get_list xs2 rho2 = Some vs2 ->
@@ -1115,7 +1115,7 @@ Section Correct.
       (* Source terminates *)
       (forall v v', r = (Val v) -> cps_val_rel v v' ->
        preord_exp cenv (cps_bound f t) eq_fuel i
-                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
+                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty term.val))))
                   (e', rho)) /\
       (* SOurce diverges *)
       (r = fuel_sem.OOT ->
@@ -1144,7 +1144,7 @@ Section Correct.
                                (cps_bound (f <+> @one_i _ _ fuel_resource_LambdaBoxLocal e)
                                           (t <+> @one_i _ _ trace_resource_LambdaBoxLocal e))
                                eq_fuel i
-                               ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
+                               ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty term.val))))
                                (e', rho)) /\
       (* Source diverges *)
       (r = fuel_sem.OOT ->

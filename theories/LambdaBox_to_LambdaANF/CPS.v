@@ -1,4 +1,4 @@
-(* CPS conversion from MetaRocq Erasure (EAst.term) to LambdaANF.cps *)
+(* CPS conversion from MetaRocq Erasure (EAst.term) to LambdaANF.term *)
 
 (** Stdlib *)
 From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Sets.Ensembles.
@@ -16,7 +16,7 @@ From compcert Require Import lib.Maps.
 (** CertiRocq *)
 From CertiRocq.Common Require Import AstCommon compM.
 From CertiRocq Require Import Pipeline_utils.
-From CertiRocq.LambdaANF Require Import cps ctx state.
+From CertiRocq.LambdaANF Require Import term ctx state.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
 
 Import ListNotations.
@@ -25,7 +25,7 @@ Open Scope monad_scope.
 Open Scope bs_scope.
 
 (** This file defines CPS conversion from MetaRocq's erased terms
-    (EAst.term) to LambdaANF (cps.exp).
+    (EAst.term) to LambdaANF (term.exp).
 
     Global constants (tConst) are translated to variable references via a
     [kername -> var] map. The global environment bodies are converted separately
@@ -49,7 +49,7 @@ Section Translate.
 
     (** CPS conversion for primitive operations *)
     Fixpoint convert_prim (n : nat) (prim : positive) (args : list var) (kont : var)
-      : cpsM cps.exp :=
+      : cpsM term.exp :=
       match n with
       | 0%nat =>
         pr <- get_named_str "prim" ;;
@@ -71,9 +71,9 @@ Section Translate.
 
       (** ** Helper: CPS convert constructor arguments *)
       Definition cps_cvt_args
-                 (cvt : EAst.term -> list var -> var -> cpsM cps.exp)
+                 (cvt : EAst.term -> list var -> var -> cpsM term.exp)
                  (args : list EAst.term) (vn : list var) (e_app : exp)
-                 (xs ks : list var) : cpsM cps.exp :=
+                 (xs ks : list var) : cpsM term.exp :=
         (fix go args xs ks :=
            match args with
            | [] => ret e_app
@@ -90,7 +90,7 @@ Section Translate.
 
       (** Helper: CPS convert mutually recursive fixpoint bodies *)
       Definition cps_cvt_mfix
-                 (cvt : EAst.term -> list var -> var -> cpsM cps.exp)
+                 (cvt : EAst.term -> list var -> var -> cpsM term.exp)
                  (mfix : list (EAst.def EAst.term)) (vn : list var)
                  (nlst : list var) : cpsM fundefs :=
         (fix go mfix nlst :=
@@ -111,7 +111,7 @@ Section Translate.
 
       (** Helper: CPS convert case branches *)
       Definition cps_cvt_branches
-                 (cvt : EAst.term -> list var -> var -> cpsM cps.exp)
+                 (cvt : EAst.term -> list var -> var -> cpsM term.exp)
                  (ind : inductive) (brs : list (list name * EAst.term))
                  (n : N) (vn : list var) (k : var) (r : var)
         : cpsM (list (ctor_tag * exp)) :=
@@ -133,11 +133,11 @@ Section Translate.
       (** ** Main CPS conversion from EAst.term *)
 
       Fixpoint cps_cvt (t : EAst.term) (vn : list var) (k : var)
-        {struct t} : cpsM cps.exp :=
+        {struct t} : cpsM term.exp :=
         match t with
         | EAst.tRel n =>
           match nth_error vn n with
-          | Some v => ret (cps.Eapp k kon_tag (v::nil))
+          | Some v => ret (term.Eapp k kon_tag (v::nil))
           | None => failwith "Unknown de Bruijn index"
           end
 
@@ -152,7 +152,7 @@ Section Translate.
           e1' <- cps_cvt e1 (x1::vn) k1 ;;
           ret (Efun
                  (Fcons f func_tag (k1::x1::nil) e1' Fnil)
-                 (cps.Eapp k kon_tag (f::nil)))
+                 (term.Eapp k kon_tag (f::nil)))
 
         | EAst.tLetIn na b t =>
           x <- get_named_str (string_of_name na) ;;
@@ -172,9 +172,9 @@ Section Translate.
           v' <- cps_cvt v vn k2 ;;
           ret (Efun
                  (Fcons k1 kon_tag (x1::nil)
-                        (cps.Efun
+                        (term.Efun
                            (Fcons k2 kon_tag (x2::nil)
-                                  (cps.Eapp x1 func_tag (k::x2::nil)) Fnil)
+                                  (term.Eapp x1 func_tag (k::x2::nil)) Fnil)
                            v') Fnil)
                  u')
 
@@ -187,8 +187,8 @@ Section Translate.
             end
           | None =>
             match lookup_const cmap s with
-            | Some v => ret (cps.Eapp k kon_tag (v::nil))
-            | None => failwith "Unknown constant"
+            | Some v => ret (term.Eapp k kon_tag (v::nil))
+            | None => failwith ("Unknown constant: " ++ string_of_kername s)
             end
           end
 
@@ -258,7 +258,7 @@ Section Translate.
       ret (Efun
              (Fcons f kon_tag (k::nil) e'
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
-             (cps.Eapp f kon_tag (k::nil))).
+             (term.Eapp f kon_tag (k::nil))).
 
     Definition result_name := option var.
 
@@ -290,7 +290,7 @@ Section Translate.
     Definition convert_top_cps (prims : list (primitive * positive))
                (preferred : kername -> option var)
                (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
-      : error cps.exp * comp_data :=
+      : error term.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil))

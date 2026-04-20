@@ -17,7 +17,7 @@ From compcert Require Import
 From MetaRocq Require Import EWcbvEvalNamed. (* for string_of_nat_inj *)
 
 From CertiRocq Require Import
-  LambdaANF.cps_util
+  LambdaANF.term_util
   LambdaANF.List_util
   LambdaANF.Ensembles_util LambdaANF.identifiers
   LambdaANF.shrink_cps_corresp
@@ -37,7 +37,7 @@ From Wasm Require Import
 From Stdlib Require Import List.
 
 Import ssreflect eqtype ssrbool.
-Import LambdaANF.toplevel LambdaANF.cps compM.
+Import LambdaANF.toplevel LambdaANF.term compM.
 Import ExtLib.Structures.Monad MonadNotation.
 Import bytestring MRString.
 Import ListNotations.
@@ -1131,8 +1131,8 @@ Import host instantiation_spec.
 Import Lia.
 Import Relations.Relation_Operators.
 
-Variable cenv:LambdaANF.cps.ctor_env.
-Variable funenv:LambdaANF.cps.fun_env.
+Variable cenv:LambdaANF.term.ctor_env.
+Variable funenv:LambdaANF.term.fun_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
 

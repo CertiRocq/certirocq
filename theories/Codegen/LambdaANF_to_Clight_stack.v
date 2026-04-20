@@ -85,7 +85,7 @@ From compcert Require Import
 
 Require Import
   LambdaANF.set_util
-  LambdaANF.cps
+  LambdaANF.term
   LambdaANF.identifiers
   LambdaANF.cps_show
   LambdaANF.state
@@ -292,7 +292,7 @@ with max_args_fundefs (fnd : fundefs) :=
 
 
 (* named ienv *)
-(* TODO: move this to cps and replace the current definition of ind_ty_info *)
+(* TODO: move this to term and replace the current definition of ind_ty_info *)
 (* 1) name of inductive type
    2) list containing
       2.1 name of the constructor

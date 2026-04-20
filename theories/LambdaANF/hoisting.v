@@ -3,7 +3,7 @@
  *)
 
 Require Import Common.AstCommon Common.compM.
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.identifiers LambdaANF.eval LambdaANF.env LambdaANF.ctx LambdaANF.size_cps
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.identifiers LambdaANF.eval LambdaANF.env LambdaANF.ctx LambdaANF.size_cps
         LambdaANF.logical_relations LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.map_util LambdaANF.tactics
         LambdaANF.algebra LambdaANF.closure_conversion LambdaANF.closure_conversion_util LambdaANF.state.
 Require Import compcert.lib.Coqlib.

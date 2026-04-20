@@ -7,7 +7,7 @@
       the eta expansion (thereby undoing the uncurrying.)
  *)
 Require Import Libraries.CpdtTactics Common.compM.
-Require Import LambdaANF.cps.
+Require Import LambdaANF.term.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -18,7 +18,7 @@ Require Import ExtLib.Data.Positive.
 From Stdlib Require Import Bool.Bool.
 Require Import identifiers.  (* for max_var *)
 From Stdlib Require Import AltBinNotations.
-Require Import LambdaANF.List_util LambdaANF.cps_util LambdaANF.state.
+Require Import LambdaANF.List_util LambdaANF.term_util LambdaANF.state.
 Require Import MetaRocq.Utils.bytestring.
 
 Open Scope monad_scope.

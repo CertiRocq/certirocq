@@ -5,7 +5,7 @@
 From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia.
 Require Import LambdaANF.tactics.
 From CertiRocq.Common Require Import AstCommon.
-From CertiRocq.LambdaANF Require Import cps set_util.
+From CertiRocq.LambdaANF Require Import term set_util.
 Require Import ExtLib.Structures.Monad.
 
 Import MonadNotation.

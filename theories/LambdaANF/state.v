@@ -1,5 +1,5 @@
 Require Import Common.compM Common.Pipeline_utils.
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.List_util LambdaANF.functions LambdaANF.cps_show LambdaANF.Ensembles_util LambdaANF.tactics.
 From Stdlib Require Import ZArith.ZArith.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
