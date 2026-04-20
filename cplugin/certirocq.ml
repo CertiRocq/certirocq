@@ -542,9 +542,9 @@ let fix_opts opts =
     { opts.erasure_config with Erasure0.inlined_constants = Obj.magic (FixRepr.fix_set opts.erasure_config.Erasure0.inlined_constants) } }
 
 module MLCompiler : CompilerInterface with
-  type name_env = BasicAst.name Cps.M.t
+  type name_env = BasicAst.name Term0.M.t
   = struct
-  type name_env = BasicAst.name Cps.M.t
+  type name_env = BasicAst.name Term0.M.t
   let compile opts prg =
     let opts = fix_opts opts in
     Pipeline.compile opts (FixRepr.fix_quoted_program prg)
@@ -554,7 +554,7 @@ module MLCompiler : CompilerInterface with
       | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
-    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
+    PrintClight.print_dest_names_imports prog (Term0.M.elements names) dest imports'
 
   let generate_glue opts decls =
     let opts = fix_opts opts in
