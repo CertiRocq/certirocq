@@ -1,5 +1,5 @@
 Require Import Corelib.Init.Nat.
-From Stdlib Require Import Arith List String.
+From Stdlib Require Import Arith ZArith List String.
 Require Import CertiRocq.Tests.lib.vs.
 Require Import CertiRocq.Tests.lib.Binom.
 Require Import CertiRocq.Tests.lib.Color.
@@ -119,7 +119,6 @@ Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
 Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
 (* Lazy factorial. Needs coinductive types *)
-From Stdlib Require Import ZArith.
 
 Definition lazy_factorial := string_of_Z (coind.lfact 150).
 
@@ -213,7 +212,10 @@ CertiRocq Compile -config 5 -O 1 -ext "_opt5" color.
 CertiRocq Generate Glue -file "glue_color" [ nat, list, prod, Z ].
 
 
-Eval compute in "Compiling lazy factorial (using unsafe passes)".
+
+(* Zoe: Removing lazy factorial for the time being, as it requires enabling the MetaRocq pass *)
+
+(* Eval compute in "Compiling lazy factorial (using unsafe passes)".
 
 CertiRocq Compile -unsafe-erasure -O 1 -ext "_opt" lazy_factorial.
 CertiRocq Compile -unsafe-erasure -config 1 -O 1 -ext "_opt1" lazy_factorial.
@@ -222,7 +224,7 @@ CertiRocq Compile -unsafe-erasure -config 3 -O 1 -ext "_opt3" lazy_factorial.
 CertiRocq Compile -unsafe-erasure -config 4 -O 1 -ext "_opt4" lazy_factorial.
 CertiRocq Compile -unsafe-erasure -config 5 -O 1 -ext "_opt5" lazy_factorial.
 
-CertiRocq Generate Glue -file "glue_lazy_factorial" [ bool, list ].
+CertiRocq Generate Glue -file "glue_lazy_factorial" [ bool, list ]. *)
 
 
 Eval compute in "Compiling clos".
