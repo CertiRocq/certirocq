@@ -92,8 +92,6 @@ extraction/clight.ml
 extraction/clight.mli
 extraction/closure_conversion.ml
 extraction/closure_conversion.mli
-extraction/compile0.ml
-extraction/compile0.mli
 extraction/compM.ml
 extraction/compM.mli
 extraction/config0.ml
@@ -212,8 +210,6 @@ extraction/exAst.ml
 extraction/exAst.mli
 extraction/exceptionMonad.ml
 extraction/exceptionMonad.mli
-extraction/expression.ml
-extraction/expression.mli
 extraction/extractionCorrectness.ml
 extraction/extractionCorrectness.mli
 extraction/extract.ml
@@ -258,8 +254,6 @@ extraction/inline.ml
 extraction/inline.mli
 extraction/int0.ml
 extraction/int0.mli
-extraction/uint0.ml
-extraction/uint0.mli
 extraction/intDef.ml
 extraction/intDef.mli
 extraction/integers.ml
@@ -494,7 +488,5 @@ extraction/zbits.ml
 extraction/zbits.mli
 extraction/zpower.ml
 extraction/zpower.mli
-extraction/zbool.ml
-extraction/zbool.mli
 
 # end of `ls`

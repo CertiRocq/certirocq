@@ -26,7 +26,6 @@ BinPos
 BinNat
 BinInt
 PrimInt63
-Uint0
 PrimString
 Uint63Axioms
 PrimStringAxioms
@@ -78,7 +77,6 @@ Caml_bytestring
 Caml_ascii_string
 MRString
 Zpower
-Zbool
 SpecFloat
 PrimFloat
 FloatOps
@@ -206,7 +204,6 @@ ZArith_dec
 Coqlib0
 
 ExceptionMonad
-Expression
 RandyPrelude
 Classes2
 
@@ -221,8 +218,6 @@ MSetRBT
 Maps
 Maps_util
 Map_util
-Compile0
-Compile1
 CompM
 Term0
 Common0
