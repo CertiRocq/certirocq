@@ -7,7 +7,7 @@
 ##         #     GNU Lesser General Public License Version 2.1          ##
 ##         #     (see LICENSE file for the text of the license)         ##
 ##########################################################################
-## GNUMakefile for Rocq 9.1.0
+## GNUMakefile for Rocq 9.1.1
 
 # For debugging purposes (must stay here, don't move below)
 INITIAL_VARS := $(.VARIABLES)
@@ -274,7 +274,7 @@ COQDOCLIBS?=$(COQLIBS_NOML)
 # generated this makefile
 # NB --print-version is not in the rocq shim
 COQ_VERSION:=$(shell $(ROCQ) c --print-version | cut -d " " -f 1)
-COQMAKEFILE_VERSION:=9.1.0
+COQMAKEFILE_VERSION:=9.1.1
 
 # COQ_SRC_SUBDIRS is for user-overriding, usually to add
 # `user-contrib/Foo` to the includes, we keep COQCORE_SRC_SUBDIRS for
