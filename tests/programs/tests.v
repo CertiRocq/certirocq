@@ -9,6 +9,7 @@ From MetaRocq.Utils Require Import bytestring MRString.
 From CertiRocq.Plugin Require Import CertiRocq.
 
 Open Scope string.
+Open Scope nat.
 
 Import ListNotations.
 Import VeriStar.
@@ -61,7 +62,7 @@ Definition color := Color.main.
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   match n with
-  | 0%nat => f tt
+  | 0 => f tt
   | S n => f tt + loop_add n f
   end.
 
