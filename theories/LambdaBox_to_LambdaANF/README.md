@@ -8,10 +8,10 @@ The CPS conversion is not yet proved correct.
 
 ## File Guide
 
-- **ANF.v** — The ANF translation, including both the executable converter and
+- **anf.v** — The ANF translation, including both the executable converter and
   the relational specification.
 
-- **CPS.v** — The CPS conversion, between the same intermediate languages.
+- **cps.v** — The CPS conversion, between the same intermediate languages.
 
 - **common.v** — Shared definitions:
   constructor discriminants (`dcon`), constructor tag maps, `const_map`,
