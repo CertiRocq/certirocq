@@ -1,14 +1,12 @@
 -R Compiler             CertiRocq.Compiler
 -R common               CertiRocq.Common
--R LambdaBoxMut         CertiRocq.LambdaBoxMut
--R LambdaBoxLocal       CertiRocq.LambdaBoxLocal
 -R LambdaANF            CertiRocq.LambdaANF
+-R LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF
 -R ../libraries         CertiRocq.Libraries
 -R Codegen              CertiRocq.Codegen
 -R CodegenWasm          CertiRocq.CodegenWasm
 -R Glue                 CertiRocq.Glue
 -R Extraction           CertiRocq.extraction
-# -R Runtime              CertiRocq.runtime
 -R ExtractionVanilla    CertiRocq.extraction_vanilla
 
 
@@ -21,23 +19,18 @@ common/compM.v
 common/Pipeline_utils.v
 common/classes.v
 
-# Mutual-inductive lambda box
-LambdaBoxMut/compile.v
-LambdaBoxMut/term.v
-LambdaBoxMut/program.v
-LambdaBoxMut/wcbvEval.v
-LambdaBoxMut/wNorm.v
-LambdaBoxMut/stripEvalCommute.v
-LambdaBoxMut/LambdaBoxMut.v
-LambdaBoxMut/toplevel.v
-
-
-# Lamboda box without global definition envs
-LambdaBoxLocal/expression.v
-LambdaBoxLocal/fuel_sem.v
-LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal.v
-LambdaBoxLocal/LambdaBoxMut_to_LambdaBoxLocal_correct.v
-LambdaBoxLocal/toplevel.v
+# LambdaBox to LambdaANF
+LambdaBox_to_LambdaANF/common.v
+LambdaBox_to_LambdaANF/anf.v
+LambdaBox_to_LambdaANF/cps.v
+LambdaBox_to_LambdaANF/fuel_sem.v
+LambdaBox_to_LambdaANF/anf_corresp.v
+LambdaBox_to_LambdaANF/anf_util.v
+LambdaBox_to_LambdaANF/wf.v
+LambdaBox_to_LambdaANF/anf_correct.v
+LambdaBox_to_LambdaANF/anf_divergence.v
+LambdaBox_to_LambdaANF/anf_global.v
+LambdaBox_to_LambdaANF/anf_toplevel.v
 
 # LambdaANF
 LambdaANF/Frame.v
@@ -52,9 +45,9 @@ LambdaANF/List_util.v
 LambdaANF/functions.v
 LambdaANF/set_util.v
 LambdaANF/map_util.v
-LambdaANF/cps.v
+LambdaANF/term.v
 LambdaANF/ctx.v
-LambdaANF/cps_util.v
+LambdaANF/term_util.v
 LambdaANF/identifiers.v
 LambdaANF/cps_proto_univ.v
 LambdaANF/cps_proto.v
@@ -65,14 +58,6 @@ LambdaANF/eval.v
 LambdaANF/cps_show.v
 LambdaANF/state.v
 LambdaANF/rel_comp.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_util.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_corresp.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_correct.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_util.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_corresp.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_correct.v
-LambdaANF/LambdaBoxLocal_to_LambdaANF_anf_toplevel.v
 LambdaANF/stemctx.v
 LambdaANF/env.v
 LambdaANF/relations.v

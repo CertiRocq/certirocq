@@ -5,9 +5,9 @@ From Stdlib Require Import NArith.BinNat PArith.BinPos Sets.Ensembles Lia.
 Require Import Common.
 Require Import LambdaANF.Prototype.
 Require Import LambdaANF.proto_util.
-Require Import LambdaANF.cps LambdaANF.cps_proto_univ LambdaANF.cps_proto.
+Require Import LambdaANF.term LambdaANF.cps_proto_univ LambdaANF.cps_proto.
 Require Import identifiers.  (* for max_var, occurs_in_exp, .. *)
-Require Import LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.cps_util LambdaANF.state.
+Require Import LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.term_util LambdaANF.state.
 
 From Stdlib Require Import Lists.List.
 Import ListNotations.
@@ -42,12 +42,12 @@ Definition I_R : forall {A}, frames_t A exp_univ_exp -> bool -> Prop := (I_R_pla
 (* pair of
    1 - max number of arguments
    2 - encoding of inlining decision for beta-contraction phase *)
-Definition St : Set := (nat * (cps.M.tree nat))%type.
+Definition St : Set := (nat * (term.M.tree nat))%type.
 (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
 
 (* Maps (arity+1) to the right fun_tag *)
-Definition arity_map : Set := cps.M.tree fun_tag.
-Definition local_map : Set := cps.M.tree bool.
+Definition arity_map : Set := term.M.tree fun_tag.
+Definition local_map : Set := term.M.tree bool.
 
 (* The state for this includes
    1 - a boolean for tracking whether or not a reduction happens

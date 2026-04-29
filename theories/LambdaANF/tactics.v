@@ -37,8 +37,8 @@ Ltac pi0 :=
            apply Nat.eq_add_0 in H; destruct H; subst
          | [ H: 0 = _ + _ |- _ ] =>
            symmetry in H; pi0
-         (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
-         (*   destruct (cps_util.var_dec X Y); try inversion H; pi0 *)
+         (* | [ H: (if term_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
+         (*   destruct (term_util.var_dec X Y); try inversion H; pi0 *)
          | [ H: ?X <> ?X |- _] =>
            exfalso; apply H; auto
          end.

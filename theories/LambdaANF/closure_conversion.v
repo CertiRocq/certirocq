@@ -3,7 +3,7 @@
  *)
 Require Import Common.AstCommon Common.compM.
 
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.functions LambdaANF.cps_show LambdaANF.state.
 From Stdlib Require Import ZArith.Znumtheory.
 Require Import compcert.lib.Maps.

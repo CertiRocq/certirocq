@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.tactics
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.tactics
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.functions LambdaANF.lambda_lifting LambdaANF.lambda_lifting_util LambdaANF.eval
         LambdaANF.logical_relations LambdaANF.alpha_conv LambdaANF.algebra LambdaANF.state LambdaANF.lambda_lifting_corresp .
 Require Import compcert.lib.Coqlib.

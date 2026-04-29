@@ -9,10 +9,10 @@ From ExtLib Require Import Structures.Monad.
 
 From CertiRocq Require Import
   LambdaANF.toplevel
-  LambdaANF.cps_util
+  LambdaANF.term_util
   Common.Pipeline_utils
   Common.Common
-  LambdaANF.cps
+  LambdaANF.term
   LambdaANF.cps_show
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives.
@@ -98,20 +98,20 @@ Definition Z_to_value (z : Z) :=
 Definition N_to_value (n : N) :=
   Z_to_value (Z.of_N n).
 
-Definition translate_var (nenv : name_env) (lenv : localvar_env) (v : cps.var) (err : string)
+Definition translate_var (nenv : name_env) (lenv : localvar_env) (v : term.var) (err : string)
   : error u32 :=
   match M.get v lenv with
   | Some n => Ret n
   | None => Err ("expected to find id for variable " ++ (show_tree (show_var nenv v)) ++ " in var/fvar mapping: " ++ err)
   end.
 
-Definition is_function_var (fenv : fname_env) (v : cps.var) : bool :=
+Definition is_function_var (fenv : fname_env) (v : term.var) : bool :=
   match M.get v fenv with
   | Some _ => true
   | None => false
   end.
 
-Definition instr_local_var_read (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (v : cps.var)
+Definition instr_local_var_read (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (v : term.var)
   : error basic_instruction :=
   if is_function_var fenv v then
     fidx <- translate_var nenv fenv v "translate local var read: obtaining function idx" ;;
@@ -134,7 +134,7 @@ Definition get_ctor_size (cenv : ctor_env) (t : ctor_tag) : error N :=
 
 (* every function has type: T_i32^{#args} -> [] *)
 
-Fixpoint pass_function_args (nenv : name_env) (lenv: localvar_env) (fenv : fname_env) (args : list cps.var) : error (list basic_instruction) :=
+Fixpoint pass_function_args (nenv : name_env) (lenv: localvar_env) (fenv : fname_env) (args : list term.var) : error (list basic_instruction) :=
   match args with
   | [] => Ret []
   | a0 :: args' =>
@@ -143,7 +143,7 @@ Fixpoint pass_function_args (nenv : name_env) (lenv: localvar_env) (fenv : fname
       Ret (a0' :: args'')
   end.
 
-Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (f : cps.var) (args : list cps.var) (tailcall : bool)
+Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (f : term.var) (args : list term.var) (tailcall : bool)
   : error (list basic_instruction) :=
   instr_pass_params <- pass_function_args nenv lenv fenv args;;
   instr_fidx <- instr_local_var_read nenv lenv fenv f;;
@@ -168,7 +168,7 @@ Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_
 *)
 
 (* store argument pointers in memory *)
-Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (args : list cps.var) (current : nat) : error (list basic_instruction) :=
+Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (args : list term.var) (current : nat) : error (list basic_instruction) :=
   match args with
   | [] => Ret []
   | y :: ys =>
@@ -191,7 +191,7 @@ Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : 
   end.
 
 
-Definition store_constructor (nenv : name_env) (cenv : ctor_env) (lenv : localvar_env) (fenv : fname_env) (c : ctor_tag) (ys : list cps.var) : error (list basic_instruction) :=
+Definition store_constructor (nenv : name_env) (cenv : ctor_env) (lenv : localvar_env) (fenv : fname_env) (c : ctor_tag) (ys : list term.var) : error (list basic_instruction) :=
   ord <- get_ctor_ord cenv c ;;
   store_constr_args <- store_constructor_args nenv lenv fenv ys 0;;
   Ret ([ BI_global_get glob_mem_ptr
@@ -425,7 +425,7 @@ Fixpoint translate_body (nenv : name_env) (cenv : ctor_env) (lenv: localvar_env)
 (* ***** FUNCTIONS ****** *)
 
 (* unique, vars are only assigned once *)
-Fixpoint collect_local_variables (e : exp) : list cps.var :=
+Fixpoint collect_local_variables (e : exp) : list term.var :=
   match e with
   | Efun _ e' => collect_local_variables e'
   | Econstr x _ _ e' => x :: collect_local_variables e'
@@ -439,18 +439,18 @@ Fixpoint collect_local_variables (e : exp) : list cps.var :=
   end.
 
 (* create mapping from vars to nats counting up from start_id, used for both fns and vars *)
-Fixpoint create_var_mapping (start_id : u32) (vars : list cps.var) (env : M.tree u32) : M.tree u32 :=
+Fixpoint create_var_mapping (start_id : u32) (vars : list term.var) (env : M.tree u32) : M.tree u32 :=
    match vars with
    | [] => env
    | v :: l' => let mapping := create_var_mapping (N.succ start_id) l' env in
                 M.set v start_id mapping
    end.
 
-Definition create_local_variable_mapping (vars : list cps.var) : localvar_env :=
+Definition create_local_variable_mapping (vars : list term.var) : localvar_env :=
   create_var_mapping 0%N vars (M.empty _).
 
 Definition translate_function (nenv : name_env) (cenv : ctor_env) (fenv : fname_env) (penv : prim_env)
-                              (f : cps.var) (args : list cps.var) (body : exp) : error wasm_function :=
+                              (f : term.var) (args : list term.var) (body : exp) : error wasm_function :=
   let locals := collect_local_variables body in
   let lenv := create_local_variable_mapping (args ++ locals) in
 
@@ -492,10 +492,10 @@ Definition unique_export_names (fns : list wasm_function) :=
 
 (* ***** MAIN: GENERATE COMPLETE WASM_MODULE FROM lambdaANF EXP ****** *)
 
-Definition collect_function_vars (e : cps.exp) : list cps.var :=
+Definition collect_function_vars (e : term.exp) : list term.var :=
     match e with
     | Efun fds exp => (* fundefs only allowed here (uppermost level) *)
-      (fix iter (fds : fundefs) : list cps.var :=
+      (fix iter (fds : fundefs) : list term.var :=
           match fds with
           | Fnil => []
           | Fcons x _ _ e' fds' => x :: (iter fds')

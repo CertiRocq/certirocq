@@ -6,10 +6,10 @@ Import ListNotations.
 
 Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import term cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util LambdaANF.tactics identifiers
-        cps_util rename state.
+        term_util rename state.
 Require Import closure_conversion_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.

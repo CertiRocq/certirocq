@@ -32,10 +32,10 @@ Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
 
-Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
+Definition Cprogram := (term_util.name_env * Clight.program * Clight.program)%type.
 
-Definition add_prim_names (prims : list (primitive * positive)) (nenv : LambdaBoxLocal_to_LambdaANF.name_env) : LambdaBoxLocal_to_LambdaANF.name_env :=
-  List.fold_left (fun map '(prim, p) => cps.M.set p (nNamed prim.(prim_target)) map) prims nenv.
+Definition add_prim_names (prims : list (primitive * positive)) (nenv : term_util.name_env) : term_util.name_env :=
+  List.fold_left (fun map '(prim, p) => term.M.set p (nNamed prim.(prim_target)) map) prims nenv.
 
 Definition Clight_trans (bodyName : string) prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
   let '(_, p_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in

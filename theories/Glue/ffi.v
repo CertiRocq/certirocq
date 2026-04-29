@@ -34,7 +34,7 @@ Require Import compcert.common.AST
                compcert.common.Values
                compcert.export.Clightdefs.
 
-Require Import LambdaANF.cps
+Require Import LambdaANF.term
                LambdaANF.identifiers
                LambdaANF.cps_show
                LambdaANF_to_Clight

@@ -2,7 +2,7 @@ Require Import Common.compM Common.Pipeline_utils.
 From Stdlib Require Import ZArith.ZArith Lists.List micromega.Lia.
 Import ListNotations.
 Require Import identifiers.
-Require Import LambdaANF.state LambdaANF.cps_util LambdaANF.cps_show LambdaANF.ctx LambdaANF.uncurry LambdaANF.shrink_cps LambdaANF.rename LambdaANF.inline_letapp LambdaANF.cps.
+Require Import LambdaANF.state LambdaANF.term_util LambdaANF.cps_show LambdaANF.ctx LambdaANF.uncurry LambdaANF.shrink_cps LambdaANF.rename LambdaANF.inline_letapp LambdaANF.term.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.

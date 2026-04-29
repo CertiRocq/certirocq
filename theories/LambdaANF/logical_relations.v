@@ -7,7 +7,7 @@ From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.M
         Lists.List micromega.Lia Sets.Ensembles.
 From Stdlib Require Import Logic.Classical_Prop Logic.Classical_Pred_Type.
 
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.map_util
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.map_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.tactics LambdaANF.set_util LambdaANF.algebra.
 
 Import ListNotations.
@@ -15,7 +15,7 @@ Import ListNotations.
 Close Scope Z_scope.
 
 
-  (** step-indexed preorder on cps terms *)
+  (** step-indexed preorder on LambdaANF terms *)
   (* Expression relation :
    * ---------------------
    *  (e1, ρ1) ~_k (e2, ρ2) iff
@@ -210,7 +210,7 @@ Section Log_rel.
 
   (** Lemmas about extending the environment *)
   Lemma preord_var_env_extend_eq :
-    forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : term.val),
       preord_val PostG k v1 v2 ->
       preord_var_env PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) x1 x2.
   Proof.
@@ -220,7 +220,7 @@ Section Log_rel.
 
 
   Lemma preord_var_env_extend_neq :
-    forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : cps.val),
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : term.val),
       preord_var_env PostG k rho1 rho2 y1 y2 ->
       y1 <> x1 ->
       y2 <> x2 ->
@@ -449,8 +449,8 @@ Section Log_rel.
   Qed.
 
   Lemma preord_val_constr k t vl x :
-    preord_val PostG k (cps.Vconstr t vl) x  ->
-    exists vl', x = cps.Vconstr t vl' /\ Forall2 (preord_val PostG k) vl vl'.
+    preord_val PostG k (term.Vconstr t vl) x  ->
+    exists vl', x = term.Vconstr t vl' /\ Forall2 (preord_val PostG k) vl vl'.
   Proof.
     intros H. eapply preord_val_eq in H.
     destruct x; try contradiction. destruct H as [Heq Hall]; eauto. subst.

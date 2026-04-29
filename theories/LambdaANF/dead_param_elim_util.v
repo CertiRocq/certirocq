@@ -1,4 +1,4 @@
-Require Import LambdaANF.cps LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state
+Require Import LambdaANF.term LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state
         LambdaANF.dead_param_elim LambdaANF.Ensembles_util LambdaANF.tactics LambdaANF.map_util
         LambdaANF.hoisting.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
@@ -685,7 +685,7 @@ Proof.
   unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
 
   unfold max_map_size.
-  edestruct cps.M.elements_remove. eassumption.
+  edestruct term.M.elements_remove. eassumption.
   destructAll. rewrite H, H0.
   rewrite !fold_left_app. simpl.
 

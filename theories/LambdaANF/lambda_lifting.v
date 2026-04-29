@@ -3,7 +3,7 @@
  *)
 
 Require Import Common.compM.
-Require Import LambdaANF.alpha_conv LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.state LambdaANF.set_util LambdaANF.identifiers LambdaANF.List_util
+Require Import LambdaANF.alpha_conv LambdaANF.term LambdaANF.term_util LambdaANF.ctx LambdaANF.state LambdaANF.set_util LambdaANF.identifiers LambdaANF.List_util
         LambdaANF.functions LambdaANF.Ensembles_util LambdaANF.uncurry LambdaANF.tactics.
 From Stdlib Require Import ZArith.Znumtheory.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums

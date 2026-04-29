@@ -15,10 +15,10 @@ Open Scope list_scope.
 
 Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import term cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
-        LambdaANF.tactics identifiers bounds cps_util rename.
+        LambdaANF.tactics identifiers bounds term_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 

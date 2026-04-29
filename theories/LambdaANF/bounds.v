@@ -1,7 +1,7 @@
 From Stdlib Require Import NArith.BinNat Arith Relations.Relations MSets.MSets MSets.MSetRBT
      Lists.List micromega.Lia Sets.Ensembles.
 
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.tactics LambdaANF.set_util LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.tactics LambdaANF.set_util LambdaANF.ctx
         LambdaANF.logical_relations LambdaANF.logical_relations_cc LambdaANF.algebra LambdaANF.inline_letapp LambdaANF.lambda_lifting_correct.
 Require Import LambdaANF.closure_conversion_correct ctx.
 
@@ -201,7 +201,7 @@ Section Bounds.
 
     Lemma inline_bound_Ecase :
       forall x cl t e n rho1 rho2 cin1 cout1 cin2 cout2,
-        cps_util.find_tag_nth cl t e n ->
+        term_util.find_tag_nth cl t e n ->
         inline_bound 0 1 (e, rho1, cin1, cout1) (e, rho2, cin2, cout2) ->
         inline_bound 1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2).
     Proof.

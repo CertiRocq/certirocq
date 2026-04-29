@@ -11,10 +11,11 @@ ifeq '$(CERTIROCQ_CONFIG)' 'local'
   export OCAMLPATH
 
   COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRocq.Libraries \
-	-Q ../../theories/LambdaANF CertiRocq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiRocq.LambdaBoxLocal \
+	-Q ../../theories/LambdaANF CertiRocq.LambdaANF \
+	-Q ../../theories/LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF \
+	-Q ../../theories/CodegenWasm CertiRocq.CodegenWasm \
 	-Q ../../theories/Compiler CertiRocq.Compiler -Q ../../theories/common CertiRocq.Common \
 	-Q ../../theories/Glue CertiRocq.Glue \
-	-Q ../../theories/LambdaBoxMut CertiRocq.LambdaBoxMut \
 	-Q ../../plugin CertiRocq.Plugin \
 	-I ../../plugin \
 	-Q ../../cplugin CertiRocq.VanillaPlugin \

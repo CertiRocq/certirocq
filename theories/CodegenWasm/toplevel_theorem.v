@@ -4,8 +4,8 @@ From Stdlib Require Import
 
 From CertiRocq Require Import
   LambdaANF.Ensembles_util
-  LambdaANF.cps
-  LambdaANF.cps_util
+  LambdaANF.term
+  LambdaANF.term_util
   LambdaANF.eval
   LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm
@@ -21,14 +21,14 @@ From Wasm Require Import
 Import Lia.
 Import Relations.Relation_Operators.
 Import ssreflect eqtype.
-Import LambdaANF.cps compM.
+Import LambdaANF.term compM.
 Import ListNotations.
 Import seq.
 
 Section TOPLEVEL.
 
-Variable cenv:LambdaANF.cps.ctor_env.
-Variable funenv:LambdaANF.cps.fun_env.
+Variable cenv:LambdaANF.term.ctor_env.
+Variable funenv:LambdaANF.term.fun_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
 
@@ -36,7 +36,7 @@ Context `{ho : host}.
 
 (* TOPLEVEL CORRECTNESS THEOREM *)
 Theorem LambdaANF_Wasm_related :
-  forall (v : cps.val) (e : exp) (n : nat)
+  forall (v : term.val) (e : exp) (n : nat)
          (hs : host_state) module fenv lenv (pfs : M.t (list val -> option val)),
   (* primitive env well-formed *)
   prim_funs_env_returns_no_funvalues pfs ->
@@ -174,7 +174,7 @@ Proof.
       now apply notNone_Some.
   }
 
-  assert (HfenvRho: (forall (a : positive) (v0 : cps.val),
+  assert (HfenvRho: (forall (a : positive) (v0 : term.val),
        (def_funs fds fds (M.empty _) (M.empty _)) ! a = Some v0 ->
        find_def a fds <> None -> v0 = Vfun (M.empty _) fds a)). {
     intros ? ? H H1. eapply def_funs_find_def in H1; eauto. now erewrite H in H1. }

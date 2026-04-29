@@ -3,7 +3,7 @@
  *)
 
 From Stdlib Require Import Relations.Relations Classes.RelationClasses.
-From CertiRocq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
+From CertiRocq Require Import LambdaANF.term LambdaANF.ctx LambdaANF.tactics.
 
 Section Relations.
 

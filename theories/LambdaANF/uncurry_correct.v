@@ -1,4 +1,4 @@
-Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.size_cps LambdaANF.term_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.uncurry LambdaANF.uncurry_rel
         LambdaANF.shrink_cps_correct LambdaANF.algebra.
 From Stdlib Require Import FunInd.

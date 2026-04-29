@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-From CertiRocq Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+From CertiRocq Require Import LambdaANF.term LambdaANF.size_cps LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
      LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.functions LambdaANF.closure_conversion LambdaANF.closure_conversion
      LambdaANF.eval LambdaANF.tactics.
 Require Import compcert.lib.Coqlib.

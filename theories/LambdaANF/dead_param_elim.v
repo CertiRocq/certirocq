@@ -2,7 +2,7 @@
  * Author: Katja Vassilev, 2018
  *)
 
-Require Import LambdaANF.cps LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state.
+Require Import LambdaANF.term LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
         NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.

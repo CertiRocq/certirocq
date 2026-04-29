@@ -2,7 +2,7 @@
 From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.MSetRBT
         Lists.List micromega.Lia Sets.Ensembles.
 
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.tactics LambdaANF.relations LambdaANF.rel_comp
         LambdaANF.uncurry LambdaANF.uncurry_proto LambdaANF.bounds LambdaANF.shrink_cps LambdaANF.shrink_cps_toplevel
         LambdaANF.closure_conversion LambdaANF.closure_conversion_util LambdaANF.hoisting

@@ -75,7 +75,7 @@ From compcert Require Import
   common.Values
   Clightdefs.
 
-Require Import LambdaANF.cps
+Require Import LambdaANF.term
                LambdaANF.identifiers
                LambdaANF.cps_show.
 Require LambdaANF.toplevel.
@@ -264,7 +264,7 @@ with max_args_fundefs (fnd : fundefs) :=
                                (max_allocs_fundefs fnd')
   end.
 
-(* Maybe move this to cps and replace the current definition of ind_ty_info? *)
+(* Maybe move this to term and replace the current definition of ind_ty_info? *)
 (* 1) name of inductive type
    2) list containing the constructor info *)
 Definition n_ind_ty_info : Type := BasicAst.name * list ctor_ty_info.

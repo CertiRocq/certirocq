@@ -1,17 +1,17 @@
 (* The stack-of-frames one-hole contexts, with the right indices, are isomorphic to
-   [cps.exp_ctx] and [cps.fundefs_ctx] *)
+   [term.exp_ctx] and [term.fundefs_ctx] *)
 
 From Stdlib Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
 From Stdlib Require Import Lia.
 Import ListNotations.
 From CertiRocq.Common Require AstCommon.
 From CertiRocq.LambdaANF Require Import
-     Prototype cps cps_util ctx
+     Prototype term term_util ctx
      identifiers Ensembles_util.
 
 From MetaRocq Require Import Template.All.
 
-From CertiRocq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
+From CertiRocq.LambdaANF Require Import PrototypeGenFrame term cps_proto_univ.
 
 (* Print exp_univ. *)
 (* Print exp_univD. *)
@@ -28,9 +28,9 @@ Open Scope list_scope.
 (* The type of one-hole contexts *)
 Definition exp_c : exp_univ -> exp_univ -> Set := frames_t.
 
-(* cps.exp_ctx -> exp_c _ _ *)
+(* term.exp_ctx -> exp_c _ _ *)
 
-Definition c_of_ces (ces : list (cps.ctor_tag * cps.exp)) :
+Definition c_of_ces (ces : list (term.ctor_tag * term.exp)) :
   exp_c exp_univ_list_prod_ctor_tag_exp exp_univ_list_prod_ctor_tag_exp :=
   fold_right
     (fun '(c, e) frames =>
@@ -38,8 +38,8 @@ Definition c_of_ces (ces : list (cps.ctor_tag * cps.exp)) :
     <[]>
     ces.
 
-Definition c_of_ces_ctx' c_of_exp_ctx (ces1 : list (cps.ctor_tag * cps.exp)) (c : cps.ctor_tag)
-           (C : exp_ctx) (ces2 : list (cps.ctor_tag * cps.exp))
+Definition c_of_ces_ctx' c_of_exp_ctx (ces1 : list (term.ctor_tag * term.exp)) (c : term.ctor_tag)
+           (C : exp_ctx) (ces2 : list (term.ctor_tag * term.exp))
   : exp_c exp_univ_exp exp_univ_list_prod_ctor_tag_exp :=
   c_of_ces ces1
     >++ <[cons_prod_ctor_tag_exp0 ces2; pair_ctor_tag_exp1 c]>
@@ -69,16 +69,16 @@ Defined.
 
 Definition c_of_ces_ctx := c_of_ces_ctx' c_of_exp_ctx.
 
-(* exp_c _ _ -> cps.exp_ctx: directly writing a recursive function on exp_c is annoying because
+(* exp_c _ _ -> term.exp_ctx: directly writing a recursive function on exp_c is annoying because
    of the indices. Instead map each frame to a "slice" of an exp_ctx represented as a function
    ctx |-> slice + ctx. Then all the functions can be composed together and initialized with
    the empty context. *)
 
 Definition univ_rep (A : exp_univ) : Set :=
   match A with
-  | exp_univ_prod_ctor_tag_exp => cps.ctor_tag * exp_ctx
+  | exp_univ_prod_ctor_tag_exp => term.ctor_tag * exp_ctx
   | exp_univ_list_prod_ctor_tag_exp =>
-    list (cps.ctor_tag * cps.exp) * cps.ctor_tag * exp_ctx * list (cps.ctor_tag * cps.exp)
+    list (term.ctor_tag * term.exp) * term.ctor_tag * exp_ctx * list (term.ctor_tag * term.exp)
   | exp_univ_fundefs => fundefs_ctx
   | exp_univ_exp => exp_ctx
   | exp_univ_var => False
@@ -352,13 +352,13 @@ Proof. revert D; iso C; intros D; iso D; mk_corollary comp_fundefs_ctx_eq. Qed.
 
 (* ---------- Facts about used variables ---------- *)
 
-Fixpoint used_ces (ces : list (ctor_tag * exp)) : Ensemble cps.var :=
+Fixpoint used_ces (ces : list (ctor_tag * exp)) : Ensemble term.var :=
   match ces with
   | [] => Empty_set _
   | (_, e) :: ces => used_vars e :|: used_ces ces
   end.
 
-Definition used {A} : univD A -> Ensemble cps.var :=
+Definition used {A} : univD A -> Ensemble term.var :=
   match A with
   | exp_univ_prod_ctor_tag_exp => fun '(_, e) => used_vars e
   | exp_univ_list_prod_ctor_tag_exp => used_ces
@@ -377,7 +377,7 @@ Definition used {A} : univD A -> Ensemble cps.var :=
 (* TODO: use a prettier definition in terms of greatest lower bound of all [frameD f x]s.
    Then show that for every hole type can find x1, x2 such that
      glb_x (frameD f x) = frameD f x1 ∩ frameD f x2 *)
-Definition used_c {A B} (C : exp_c A B) : Ensemble cps.var :=
+Definition used_c {A B} (C : exp_c A B) : Ensemble term.var :=
   fun x => forall e, In _ (used (C ⟦+ e +⟧)) x.
 
 Local Ltac clearpose H x e :=
@@ -405,7 +405,7 @@ Proof.
   - specialize (Hx []); inversion Hx.
 Qed. *)
 
-Definition used_frame {A B} (f : exp_frame_t A B) : Ensemble cps.var. refine (
+Definition used_frame {A B} (f : exp_frame_t A B) : Ensemble term.var. refine (
   match f with
   | pair_ctor_tag_exp0 e => used_vars e
   | pair_ctor_tag_exp1 c => Empty_set _
@@ -462,7 +462,7 @@ Proof.
     rewrite IHces; eauto with Ensembles_DB.
 Qed.
 
-Fixpoint used_c {A B} (C : exp_c A B) : Ensemble cps.var :=
+Fixpoint used_c {A B} (C : exp_c A B) : Ensemble term.var :=
   match C with
   | <[]> => Empty_set _
   | C >:: f => used_c C :|: used_frame f

@@ -21,7 +21,7 @@ From compcert Require Import
   lib.Integers common.Memory.
 
 From CertiRocq Require Import
-  LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_util
+  LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.List_util
   LambdaANF.Ensembles_util LambdaANF.identifiers
   LambdaANF.shrink_cps_corresp
   Libraries.maps_util
@@ -44,7 +44,7 @@ From Wasm Require Import
   type_preservation properties common numerics.
 
 Import ssreflect eqtype ssrbool eqtype.
-Import LambdaANF.toplevel LambdaANF.cps compM.
+Import LambdaANF.toplevel LambdaANF.term compM.
 Import bytestring.
 Import ExtLib.Structures.Monad MonadNotation.
 Import bytestring.
@@ -59,8 +59,8 @@ Opaque Uint63.to_Z.
 (* Codegen relation *)
 Section CODEGEN.
 
-Variable cenv : LambdaANF.cps.ctor_env.
-Variable funenv : LambdaANF.cps.fun_env.
+Variable cenv : LambdaANF.term.ctor_env.
+Variable funenv : LambdaANF.term.fun_env.
 Variable fenv : CodegenWasm.LambdaANF_to_Wasm.fname_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
@@ -162,7 +162,7 @@ Inductive store_nth_constr_arg {lenv} : nat -> var -> list basic_instruction -> 
       ].
 
 (* args are pushed on the stack before calling a function *)
-Inductive repr_fun_args_Wasm {lenv} : list LambdaANF.cps.var ->
+Inductive repr_fun_args_Wasm {lenv} : list LambdaANF.term.var ->
                                       list basic_instruction -> Prop :=
 (* base case: no args *)
 | FA_nil :
@@ -368,7 +368,7 @@ Inductive repr_call_grow_mem_if_necessary : N (* at least mem available, known s
 
 
 (* CODEGEN RELATION: relatates LambdaANF expression and result of translate_body *)
-Inductive repr_expr_LambdaANF_Wasm {lenv} : LambdaANF.cps.exp -> N -> list basic_instruction -> Prop :=
+Inductive repr_expr_LambdaANF_Wasm {lenv} : LambdaANF.term.exp -> N -> list basic_instruction -> Prop :=
 | R_halt_e: forall x x' mem,
     repr_var (lenv:=lenv) x x' ->
     repr_expr_LambdaANF_Wasm (Ehalt x) mem
@@ -746,8 +746,8 @@ End CODEGEN.
 
 Section MAIN.
 
-Variable cenv : LambdaANF.cps.ctor_env.
-Variable funenv : LambdaANF.cps.fun_env.
+Variable cenv : LambdaANF.term.ctor_env.
+Variable funenv : LambdaANF.term.fun_env.
 Variable fenv : CodegenWasm.LambdaANF_to_Wasm.fname_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
@@ -759,7 +759,7 @@ Context `{ho : host}.
 
 (* VALUE RELATION *)
 (* immediate is pointer to linear memory or function id *)
-Inductive repr_val_LambdaANF_Wasm : LambdaANF.cps.val -> store_record -> moduleinst -> wasm_value -> Prop :=
+Inductive repr_val_LambdaANF_Wasm : LambdaANF.term.val -> store_record -> moduleinst -> wasm_value -> Prop :=
 | Rconstr_unboxed_v : forall v (t : ctor_tag) (sr : store_record) inst ord,
     get_ctor_ord cenv t = Ret ord ->
     (ord * 2 + 1 = v)%N ->
@@ -809,7 +809,7 @@ Inductive repr_val_LambdaANF_Wasm : LambdaANF.cps.val -> store_record -> modulei
     load_i64 m addr = Some (VAL_int64 (Z_to_i64 (Uint63.to_Z n))) ->
     repr_val_LambdaANF_Wasm (Vprim (primInt n)) sr inst (Val_ptr addr)
 
-with repr_val_constr_args_LambdaANF_Wasm : list LambdaANF.cps.val -> store_record -> moduleinst -> u32 -> Prop :=
+with repr_val_constr_args_LambdaANF_Wasm : list LambdaANF.term.val -> store_record -> moduleinst -> u32 -> Prop :=
      | Rnil_l: forall sr fr addr,
         repr_val_constr_args_LambdaANF_Wasm nil sr fr addr
 
@@ -899,7 +899,7 @@ Proof.
   (* Non-nullary constructor value *)
   {
   have indPrinciple := repr_val_constr_args_LambdaANF_Wasm_mut
-  (fun (v : cps.val) (s : store_record) (inst : moduleinst) (w : wasm_value)
+  (fun (v : term.val) (s : store_record) (inst : moduleinst) (w : wasm_value)
        (H: repr_val_LambdaANF_Wasm v s inst w) =>
        (forall a s' m m',
           s_funcs s = s_funcs s' ->
@@ -915,7 +915,7 @@ Proof.
           (forall a, (a + 8<= gmp)%N -> load_i64 m a = load_i64 m' a) ->
               repr_val_LambdaANF_Wasm v s' inst w)
     )
-  (fun (l : seq cps.val) (s : store_record) (inst : moduleinst) (addr : u32)
+  (fun (l : seq term.val) (s : store_record) (inst : moduleinst) (addr : u32)
        (H: repr_val_constr_args_LambdaANF_Wasm l s inst addr) =>
        (forall a s' m m',
           s_funcs s = s_funcs s' ->
@@ -962,7 +962,7 @@ Qed.
 
 
 (* RESULT RELATION *)
-Definition result_val_LambdaANF_Wasm (val : LambdaANF.cps.val) (sr : store_record) (inst : moduleinst) : Prop :=
+Definition result_val_LambdaANF_Wasm (val : LambdaANF.term.val) (sr : store_record) (inst : moduleinst) : Prop :=
      (exists res_i32 wasmval,
        (* global var *glob_result* contains correct return value *)
        sglob_val sr inst glob_result = Some (VAL_num (VAL_int32 res_i32))
@@ -974,7 +974,7 @@ Definition result_val_LambdaANF_Wasm (val : LambdaANF.cps.val) (sr : store_recor
 
 (* ENVIRONMENT RELATION (also named memory relation in C-backend) *)
 
-Definition stored_in_locals {lenv} (x : cps.var) (v : wasm_value) (f : frame ) :=
+Definition stored_in_locals {lenv} (x : term.var) (v : wasm_value) (f : frame ) :=
   exists i,
   @repr_var nenv lenv x i /\
   lookup_N f.(f_locs) i = Some (VAL_num (VAL_int32 (wasm_value_to_i32 v))).
@@ -2215,7 +2215,7 @@ Lemma store_constr_args_reduce {lenv} : forall ys offset vs sargs state rho fds 
             /\ repr_val_constr_args_LambdaANF_Wasm vs s' (f_inst f) (4 + (4*(N.of_nat offset)) + v_cap)%N
             /\ sglob_val s' (f_inst f) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 ((4 + (4*(N.of_nat offset)) + v_cap) + 4 * N.of_nat (length ys)))))
             /\ s_funcs s = s_funcs s'
-            /\ (forall (wal : wasm_value) (val : cps.val),
+            /\ (forall (wal : wasm_value) (val : term.val),
                     repr_val_LambdaANF_Wasm val s (f_inst f) wal ->
                     repr_val_LambdaANF_Wasm val s' (f_inst f) wal)
             (* previous mem including tag unchanged *)
@@ -2395,7 +2395,7 @@ Proof.
       assert (HrelE_before_IH: (forall y : var,
         In y ys ->
         find_def y fds = None ->
-        exists (v6 : cps.val) (val : wasm_value),
+        exists (v6 : term.val) (val : wasm_value),
           rho ! y = Some v6 /\
           @stored_in_locals lenv y val f /\
           repr_val_LambdaANF_Wasm v6 s_before_IH (f_inst f) val)). {
@@ -2465,7 +2465,7 @@ Proof.
         rewrite Hgmp in H1. apply N_to_i32_eq_modulus in H1; try lia.
       }
 
-     assert (HfVal_before_IH: (forall (y : positive) (y' : funcidx) (v : cps.val),
+     assert (HfVal_before_IH: (forall (y : positive) (y' : funcidx) (v : term.val),
        rho ! y = Some v -> repr_funvar y y' ->
        repr_val_LambdaANF_Wasm v s_before_IH (f_inst f) (Val_funidx y'))).
      { intros. have H' := HfVal _ _ _ H7 H8.
@@ -2649,7 +2649,7 @@ Proof.
 Qed.
 
 
-Lemma store_constr_reduce {lenv} : forall state s f rho fds ys (vs : list cps.val) t n sargs m gmp_v ord constr_size mem',
+Lemma store_constr_reduce {lenv} : forall state s f rho fds ys (vs : list term.val) t n sargs m gmp_v ord constr_size mem',
   get_ctor_size cenv t = Ret constr_size ->
   get_ctor_ord cenv t = Ret ord ->
   get_ctor_arity cenv t = Ret n ->
@@ -2666,7 +2666,7 @@ Lemma store_constr_reduce {lenv} : forall state s f rho fds ys (vs : list cps.va
   (forall y : var,
          In y ys ->
          find_def y fds = None ->
-         exists (v6 : cps.val) (val : wasm_value),
+         exists (v6 : term.val) (val : wasm_value),
            rho ! y = Some v6 /\
            @stored_in_locals lenv y val f /\
            repr_val_LambdaANF_Wasm v6 s (f_inst f) val) ->
@@ -2675,7 +2675,7 @@ Lemma store_constr_reduce {lenv} : forall state s f rho fds ys (vs : list cps.va
   get_list ys rho = Some vs ->
 
   (* function indices: value relation *)
-  (forall (y : positive) (y' : funcidx) (v : cps.val),
+  (forall (y : positive) (y' : funcidx) (v : term.val),
          rho ! y = Some v ->
          repr_funvar y y' ->
          repr_val_LambdaANF_Wasm v s (f_inst f) (Val_funidx y')) ->
@@ -2695,7 +2695,7 @@ Lemma store_constr_reduce {lenv} : forall state s f rho fds ys (vs : list cps.va
     INV s' f /\
     s_funcs s = s_funcs s' /\
     (forall m', smem s' (f_inst f) = Some m' -> mem_length m = mem_length m') /\
-    (forall (wal : wasm_value) (val : cps.val),
+    (forall (wal : wasm_value) (val : term.val),
       repr_val_LambdaANF_Wasm val s (f_inst f) wal ->
       repr_val_LambdaANF_Wasm val s' (f_inst f) wal) /\
       (* cap points to value *)
@@ -2821,7 +2821,7 @@ Proof.
   assert (HrelE': forall y : var,
     In y ys ->
     find_def y fds = None ->
-    exists (v6 : cps.val) (val : wasm_value),
+    exists (v6 : term.val) (val : wasm_value),
       rho ! y = Some v6 /\
       @stored_in_locals lenv y val f /\
       repr_val_LambdaANF_Wasm v6 s_before_args (f_inst f) val). {
@@ -2870,7 +2870,7 @@ Proof.
         Some (VAL_num (VAL_int32 (N_to_i32 (4 + gmp_v)%N)))).
   { apply update_global_get_same in H0. rewrite H0. do 4! f_equal. lia. }
 
-  assert (HfVal_before_args: (forall (y : positive) (y' : funcidx) (v : cps.val),
+  assert (HfVal_before_args: (forall (y : positive) (y' : funcidx) (v : term.val),
          rho ! y = Some v ->
          repr_funvar y y' ->
          repr_val_LambdaANF_Wasm v s_before_args (f_inst f) (Val_funidx y'))).
@@ -2967,7 +2967,7 @@ Proof.
 Qed.
 
 
-Inductive const_val_list : list cps.val -> store_record -> frame -> list u32 -> Prop :=
+Inductive const_val_list : list term.val -> store_record -> frame -> list u32 -> Prop :=
   | CV_nil  : forall s f, const_val_list [] s f []
   | CV_cons : forall s f v vs n w ns,
        repr_val_LambdaANF_Wasm v s (f_inst f) w ->
@@ -3016,12 +3016,12 @@ Proof.
   now destruct (Hvar _ Hocc' Hfd) as [v' [w [Hrho [Hloc Hval]]]].
 Qed.
 
-Lemma fun_args_reduce {lenv} : forall state fr sr fds (ys : seq cps.var) rho vs f t args_instr,
+Lemma fun_args_reduce {lenv} : forall state fr sr fds (ys : seq term.var) rho vs f t args_instr,
   INV sr fr ->
   get_list ys rho = Some vs ->
   domains_disjoint lenv fenv ->
   (forall f, (exists res, find_def f fds = Some res) <-> (exists i, fenv ! f = Some i)) ->
-  (forall a v, rho ! a = Some v -> find_def a fds <> None -> v = Vfun (M.empty cps.val) fds a) ->
+  (forall a v, rho ! a = Some v -> find_def a fds <> None -> v = Vfun (M.empty term.val) fds a) ->
   @rel_env_LambdaANF_Wasm lenv (Eapp f t ys) rho sr fr fds ->
   @repr_fun_args_Wasm fenv nenv lenv ys args_instr ->
   exists args,
@@ -3689,7 +3689,7 @@ Qed.
 Definition fds_translated_correctly fds sr finst := forall a t ys e,
   find_def a fds = Some (t, ys, e) ->
   exists fidx, repr_funvar a fidx /\
-               repr_val_LambdaANF_Wasm (Vfun (M.empty cps.val) fds a) sr finst (Val_funidx fidx).
+               repr_val_LambdaANF_Wasm (Vfun (M.empty term.val) fds a) sr finst (Val_funidx fidx).
 
 Definition fds_restricted fds := forall a t ys e,
   find_def a fds = Some (t, ys, e) ->
@@ -3722,7 +3722,7 @@ Definition primitive_operation_reduces pfs : Prop :=
       s_funcs s = s_funcs s' /\
       min_available_memory s' (f_inst f) mem /\
       @rel_env_LambdaANF_Wasm lenv e (M.set x v rho) s' f' fds /\
-      (forall (wal : wasm_value) (val : cps.val),
+      (forall (wal : wasm_value) (val : term.val),
          repr_val_LambdaANF_Wasm val s (f_inst f) wal ->
          repr_val_LambdaANF_Wasm val s' (f_inst f') wal) /\
       (exists wal,
@@ -3735,7 +3735,7 @@ Definition primitive_operation_reduces pfs : Prop :=
 (* GENERALIZED CORRECTNESS THEOREM *)
 Theorem repr_bs_LambdaANF_Wasm_related :
   (* rho is environment containing outer fundefs. e is body of LambdaANF program *)
-  forall lenv pfs (rho : eval.env) (v : cps.val) (e : exp) (memAvail : N) (n : nat) (vars : list cps.var) (fds : fundefs)
+  forall lenv pfs (rho : eval.env) (v : term.val) (e : exp) (memAvail : N) (n : nat) (vars : list term.var) (fds : fundefs)
                                fAny k (lh : lholed k),
     primitive_operation_reduces pfs ->
     cenv_restricted cenv ->
@@ -3750,8 +3750,8 @@ Theorem repr_bs_LambdaANF_Wasm_related :
     (* fenv maps f vars to the index of the corresponding wasm function *)
     (forall f, (exists res, find_def f fds = Some res) <-> (exists i, fenv ! f = Some i)) ->
     (* find_def a fds <> None, rho ! a imply fn value *)
-    (forall (a : positive) (v : cps.val), rho ! a = Some v -> find_def a fds <> None ->
-             v = Vfun (M.empty cps.val) fds a) ->
+    (forall (a : positive) (v : term.val), rho ! a = Some v -> find_def a fds <> None ->
+             v = Vfun (M.empty term.val) fds a) ->
 
     (* restricts size of e so all vars fit in i32s *)
     expression_restricted cenv e ->
@@ -3830,7 +3830,7 @@ Proof with eauto.
         assert (HrelE' : (forall y : var,
              In y ys ->
              find_def y fds = None ->
-             exists (v6 : cps.val) (val : wasm_value),
+             exists (v6 : term.val) (val : wasm_value),
                rho ! y = Some v6 /\
                @stored_in_locals lenv y val fr /\
                repr_val_LambdaANF_Wasm v6 s' (f_inst fr) val)). {
@@ -3840,7 +3840,7 @@ Proof with eauto.
           exists val, wal. by repeat split; auto.
         }
 
-        assert (HfVal' : (forall (y : positive) (y' : funcidx) (v : cps.val),
+        assert (HfVal' : (forall (y : positive) (y' : funcidx) (v : term.val),
              rho ! y = Some v ->
              repr_funvar y y' ->
              repr_val_LambdaANF_Wasm v s' (f_inst fr) (Val_funidx y'))). {
@@ -3854,7 +3854,7 @@ Proof with eauto.
            apply notNone_Some in Hfd. destruct Hfd as [[[f' ys''] e''] ?H].
 
            assert (Hsubval: subval_or_eq (Vfun (M.empty _) fds y)
-            (Vfun (M.empty cps.val) fds y)) by constructor.
+            (Vfun (M.empty term.val) fds y)) by constructor.
 
            have H' := Hfun1 _ _ _ _ _ H1 Hsubval. destruct H' as [_ [_ H']].
            apply Hfun2 in H'.
@@ -3984,8 +3984,8 @@ Proof with eauto.
        cbn in Hnodup. apply NoDup_cons_iff in Hnodup.
        now destruct Hnodup. }
 
-       assert (HfenvRho' : forall (a : positive) (v : cps.val),
-          rho' ! a = Some v -> find_def a fds <> None -> v = Vfun (M.empty cps.val) fds a). {
+       assert (HfenvRho' : forall (a : positive) (v : term.val),
+          rho' ! a = Some v -> find_def a fds <> None -> v = Vfun (M.empty term.val) fds a). {
           intros ?? Hrho Hfd. apply HfenvRho; auto. subst rho'.
           rewrite M.gso in Hrho; auto. intro Hcontra. subst a.
           apply notNone_Some in Hfd. apply HfenvWf in Hfd. destruct Hfd.
@@ -4311,10 +4311,10 @@ Proof with eauto.
        cbn in Hnodup. apply NoDup_cons_iff in Hnodup.
        now destruct Hnodup. }
 
-     assert (HfenvRho' : forall (a : positive) (v0 : cps.val),
+     assert (HfenvRho' : forall (a : positive) (v0 : term.val),
               (map_util.M.set x v rho) ! a = Some v0 ->
               find_def a fds <> None ->
-              v0 = Vfun (M.empty cps.val) fds a). {
+              v0 = Vfun (M.empty term.val) fds a). {
        intros. apply HfenvRho; auto.
        rewrite M.gso in H11; auto. intro Hcontra. subst a.
        apply notNone_Some in H13. apply HfenvWf in H13. destruct H13.
@@ -4576,8 +4576,8 @@ Proof with eauto.
         assert (Htemp: f' = f). { apply HfenvRho in H. now inv H. now destruct Hf'. }
         inv Htemp.
         destruct HrelE as [Hfun1 [Hfun2 _]].
-        assert (Hsubval: subval_or_eq (Vfun (M.empty cps.val) fds f)
-                                      (Vfun (M.empty cps.val) fds f)) by constructor.
+        assert (Hsubval: subval_or_eq (Vfun (M.empty term.val) fds f)
+                                      (Vfun (M.empty term.val) fds f)) by constructor.
         have H' := Hfun1 _ _ _ _ _ H Hsubval. destruct H' as [_ [_ H']].
         apply Hfun2 in H'.
         destruct H' as [idx [HtransF Hval]].
@@ -4743,7 +4743,7 @@ Proof with eauto.
       apply NoDup_app_remove_l in HnodupE.
       assumption. }
 
-    assert (HfenvRho': forall (a : positive) (v : cps.val),
+    assert (HfenvRho': forall (a : positive) (v : term.val),
       rho'' ! a = Some v ->
       find_def a fds <> None -> v = Vfun (M.empty _) fds a). {
       intros.
@@ -4851,8 +4851,8 @@ Proof with eauto.
         apply HfenvWf in Hf'.
         assert (Htemp: f' = f). { apply HfenvRho in H. now inv H. now destruct Hf'. } inv Htemp.
         destruct HrelE as [Hfun1 [Hfun2 _]].
-        assert (Hsubval: subval_or_eq (Vfun (M.empty cps.val) fds f)
-                                      (Vfun (M.empty cps.val) fds f)) by constructor.
+        assert (Hsubval: subval_or_eq (Vfun (M.empty term.val) fds f)
+                                      (Vfun (M.empty term.val) fds f)) by constructor.
         have H' := Hfun1 _ _ _ _ _ H Hsubval. destruct H' as [_ [_ H']].
         apply Hfun2 in H'.
         destruct H' as [idx [HtransF Hval]].
@@ -5013,7 +5013,7 @@ Proof with eauto.
       apply NoDup_app_remove_l in HnodupE.
       assumption. }
 
-    assert (HfenvRho': forall (a : positive) (v : cps.val),
+    assert (HfenvRho': forall (a : positive) (v : term.val),
       rho'' ! a = Some v ->
       find_def a fds <> None -> v = Vfun (M.empty _) fds a). {
       intros.
@@ -5677,7 +5677,7 @@ Proof with eauto.
         assert (Hlocals : (forall y : var,
                               In y ys ->
                               find_def y fds = None ->
-                              exists (v6 : cps.val) (val : wasm_value),
+                              exists (v6 : term.val) (val : wasm_value),
                                 rho ! y = Some v6 /\
                                   @stored_in_locals lenv y val fr /\
                                   repr_val_LambdaANF_Wasm v6 s' (f_inst fr) val)). {
@@ -5744,7 +5744,7 @@ Proof with eauto.
           unfold not. unfold not in Hx. intros Heq. subst x.
           apply Hx in H2. contradiction. }
 
-        assert (HfVal' : forall (y : positive) (y' : funcidx) (v : cps.val),
+        assert (HfVal' : forall (y : positive) (y' : funcidx) (v : term.val),
                   rho ! y = Some v ->
                   repr_funvar y y' ->
                   repr_val_LambdaANF_Wasm v sr_before_IH (f_inst fr_before_IH) (Val_funidx y')).
@@ -5757,7 +5757,7 @@ Proof with eauto.
           apply notNone_Some in Hfd. destruct Hfd as [[[f'' ys''] e''] ?H].
 
           assert (Hsubval: subval_or_eq (Vfun (M.empty _) fds y)
-                             (Vfun (M.empty cps.val) fds y)) by constructor.
+                             (Vfun (M.empty term.val) fds y)) by constructor.
 
           have H' := Hfun1 _ _ _ _ _ H2 Hsubval. destruct H' as [_ [_ H']].
           apply Hfun2 in H'.

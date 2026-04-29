@@ -1,0 +1,1917 @@
+(* Correspondence between monadic convert_anf and relational anf_cvt_rel *)
+
+From Stdlib Require Import ZArith.ZArith NArith.NArith Lists.List micromega.Lia Arith
+     Ensembles Relations.Relation_Definitions Sets.Constructive_sets.
+From MetaRocq.Erasure Require Import EAst EGlobalEnv EWellformed EInduction EPrimitive
+     ErasureFunction.
+From MetaRocq.Utils Require Import All_Forall.
+From MetaRocq.Common Require Import BasicAst Kernames.
+From MetaRocq.Utils Require Import bytestring.
+From compcert Require Import lib.Maps lib.Coqlib.
+From ExtLib Require Import Structures.Monads Data.Monads.OptionMonad.
+From CertiRocq.Common Require Import AstCommon compM.
+From CertiRocq Require Import Pipeline_utils.
+From CertiRocq.LambdaANF Require Import
+  term term_util ctx List_util Ensembles_util
+  identifiers state set_util tactics
+  closure_conversion_corresp.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf fuel_sem wf anf_util.
+
+Import ListNotations.
+Import Monad.MonadNotation.
+Open Scope monad_scope.
+Open Scope bs_scope.
+
+
+(* [term_ind_fix_body] is now in common.v *)
+
+Section Corresp.
+
+  Context (func_tag default_tag : positive)
+          (prim_map : M.t primitive)
+          (tgm : conId_map)
+          (prims : list (primitive * positive))
+          (cmap : const_map).
+
+
+  (** * var_map correctness *)
+
+  Definition var_map_correct (vm : var_map) (vn : list var) : Prop :=
+    forall i, get_var_name vm (N.of_nat i) = nth_error vn i.
+
+  Lemma var_map_correct_nil :
+    var_map_correct new_var_map [].
+  Proof.
+    unfold var_map_correct, new_var_map, get_var_name.
+    intros []; reflexivity.
+  Qed.
+
+  (* Helper: looking up index 0 in an extended var_map yields the new variable *)
+  Lemma get_var_name_add_0 vm x :
+    get_var_name (add_var_name vm x) 0%N = Some x.
+  Proof.
+    unfold add_var_name, get_var_name.
+    destruct vm as [m p]. simpl.
+    destruct p; simpl; rewrite M.gss; reflexivity.
+  Qed.
+
+  (* Helper: looking up a successor index in an extended var_map
+     gives the same result as the original map at the predecessor index.
+     Key idea: add_var_name increments the internal counter by 1,
+     so shifting the lookup index by 1 cancels out. *)
+  Lemma get_var_name_add_succ vm x n :
+    get_var_name (add_var_name vm x) (N.succ n) = get_var_name vm n.
+  Proof.
+    unfold add_var_name, get_var_name.
+    destruct vm as [m p].
+    (* LHS: match (Npos (N.succ_pos p) - N.succ n) with ... end
+       RHS: match (p - n) with ... end
+       Key fact: Npos (N.succ_pos p) - N.succ n = p - n *)
+    replace (Npos (N.succ_pos p) - N.succ n)%N with (p - n)%N.
+    2:{ rewrite N.succ_pos_spec. lia. }
+    destruct (p - n)%N as [| q] eqn:Hdiff; [reflexivity |].
+    rewrite M.gso; [reflexivity |].
+    (* q <> N.succ_pos p: if q = N.succ_pos p then (p-n) = N.succ p,
+       but (p-n) <= p < N.succ p, contradiction. *)
+    intros Heq. subst q. rewrite N.succ_pos_spec in Hdiff. lia.
+  Qed.
+
+  Lemma var_map_correct_cons vm vn x :
+    var_map_correct vm vn ->
+    var_map_correct (add_var_name vm x) (x :: vn).
+  Proof.
+    intros Hvm i. destruct i as [| i'].
+    - (* i = 0 *)
+      simpl. exact (get_var_name_add_0 vm x).
+    - (* i = S i' *)
+      change (nth_error (x :: vn) (S i')) with (nth_error vn i').
+      rewrite <- (Hvm i').
+      rewrite Nat2N.inj_succ.
+      exact (get_var_name_add_succ vm x (N.of_nat i')).
+  Qed.
+
+  Lemma var_map_correct_fold_right vm vn vars :
+    var_map_correct vm vn ->
+    var_map_correct
+      (List.fold_right (fun v vm' => add_var_name vm' v) vm vars)
+      (vars ++ vn).
+  Proof.
+    induction vars; simpl; intros Hvm.
+    - exact Hvm.
+    - apply var_map_correct_cons, IHvars, Hvm.
+  Qed.
+
+  (** * Fresh name specs *)
+
+  (* get_named_str_fresh is imported from closure_conversion_corresp.
+     We prove the analogous spec for get_named. Both functions have
+     the same monadic structure: get state, increment next_var, put, ret old next_var. *)
+
+  Lemma get_named_fresh :
+    forall (A : Type) (S0 : Ensemble var) (na : name),
+      {{ fun (_ : unit) (s : comp_data * A) => fresh S0 (next_var (fst s)) }}
+        get_named na
+      {{ fun (_ : unit) (s : comp_data * A) (x : var) (s' : comp_data * A) =>
+           x \in S0 /\
+           (next_var (fst s) < next_var (fst s'))%positive /\
+           fresh (S0 \\ [set x]) (next_var (fst s')) }}.
+  Proof.
+    intros.
+    eapply pre_post_mp_l.
+    eapply bind_triple. now eapply get_triple.
+    intros [[] w1] [[] w2].
+    eapply pre_post_mp_l.
+    eapply bind_triple. now eapply put_triple.
+    intros x [r3 w3].
+    eapply return_triple.
+    intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros Hfresh.
+    split. eapply Hfresh. reflexivity.
+    simpl. split. zify; lia.
+    intros z Hin. constructor. eapply Hfresh; eauto. simpl. zify. lia.
+    intros Hc. inv Hc. zify; lia.
+  Qed.
+
+  Lemma set_var_name_spec :
+    forall (A : Type) (S0 : Ensemble var) (x : var) (na : name),
+      {{ fun (_ : unit) (s : comp_data * A) => fresh S0 (next_var (fst s)) }}
+        set_var_name x na
+      {{ fun _ _ _ s' => fresh S0 (next_var (fst s')) }}.
+  Proof.
+    Transparent bind ret.
+    unfold triple, set_var_name.
+    intros A S0 x na r w Hfr.
+    destruct w as [[n c i f e fenv names imap log] st].
+    simpl in *.
+    Opaque bind ret.
+    exact Hfr.
+  Qed.
+
+  Lemma names_lst_length ns m :
+    List.length (names_lst_len ns m) = m.
+  Proof.
+    revert m; induction ns; intros []; simpl; try reflexivity.
+    - rewrite repeat_length. reflexivity.
+    - f_equal. apply IHns.
+  Qed.
+
+  (* Spec for get_named_lst: produces a NoDup list of fresh names from S0. *)
+  Lemma get_named_lst_spec :
+    forall (S0 : Ensemble var) (strs : list name),
+      {{ fun _ (s : comp_data * unit) => fresh S0 (next_var (fst s)) }}
+        get_named_lst strs
+      {{ fun _ s xs s' =>
+           NoDup xs /\
+           List.length xs = List.length strs /\
+           FromList xs \subset S0 /\
+           fresh (S0 \\ FromList xs) (next_var (fst s')) }}.
+  Proof.
+    intros S0 strs. revert S0.
+    induction strs as [| a strs' IH]; intros S0; simpl.
+    - unfold get_named_lst. simpl.
+      eapply return_triple. intros _ w Hf.
+      repeat normalize_sets.
+      split; [constructor | split; [reflexivity | split; [sets | assumption]]].
+    - unfold get_named_lst. simpl. unfold mapM. simpl.
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w.
+      eapply pre_curry_l. intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hf]. exact Hf. }
+      eapply bind_triple.
+      change (mapM get_named strs') with (get_named_lst strs').
+      eapply IH.
+      intros xs w'. eapply return_triple.
+      intros _ s [Hnd [Hlen [Hsub Hfresh]]].
+      repeat normalize_sets.
+      split; [| split; [| split]].
+      + constructor; eauto. intros Hc.
+        eapply Hsub in Hc. inv Hc. now eauto.
+      + simpl. congruence.
+      + eapply Union_Included. now sets.
+        eapply Included_trans; [eapply Hsub | sets].
+      + rewrite <- Setminus_Union. assumption.
+  Qed.
+
+  (** * Spec for proj_ctx *)
+
+  Lemma proj_ctx_spec names n scrut vm ct S0 vn
+    (Hvm : var_map_correct vm vn) :
+    {{ fun _ (s : comp_data * unit) => fresh S0 (next_var (fst s)) }}
+      proj_ctx names n scrut vm ct
+    {{ fun _ s (p : exp_ctx * var_map) s' =>
+         let (ctx_p, vm') := p in
+         exists vars,
+           NoDup vars /\
+           List.length vars = n /\
+           FromList vars \subset S0 /\
+           ctx_p = ctx_bind_proj ct scrut vars (List.length vars) /\
+           var_map_correct vm' (vars ++ vn) /\
+           fresh (S0 \\ FromList vars) (next_var (fst s')) }}.
+  Proof.
+    unfold proj_ctx.
+    eapply bind_triple. eapply get_named_lst_spec.
+    intros vars w'. eapply return_triple.
+    intros _ w [Hnd [Hlen [Hsub Hfr]]].
+    exists vars.
+    split; [exact Hnd |].
+    split; [rewrite Hlen; apply names_lst_length |].
+    split; [exact Hsub |].
+    split; [reflexivity |].
+    split; [apply var_map_correct_fold_right, Hvm |].
+    exact Hfr.
+  Qed.
+
+
+  (** * Spec for add_fix_names *)
+
+  Lemma add_fix_names_spec :
+    forall mfix idx S0 vm vn
+      (Hvm : var_map_correct vm vn),
+    {{ fun _ (s : comp_data * unit) => fresh S0 (next_var (fst s)) }}
+      add_fix_names mfix vm idx None
+    {{ fun _ s (p : list var * var_map) s' =>
+         let (names, vm') := p in
+         NoDup names /\
+         List.length names = List.length mfix /\
+         FromList names \subset S0 /\
+         var_map_correct vm' (List.rev names ++ vn) /\
+         fresh (S0 \\ FromList names) (next_var (fst s')) }}.
+  Proof.
+    induction mfix; intros idx S0 vm vn Hvm.
+    - (* nil *)
+      simpl. eapply return_triple.
+      intros _ w Hf. repeat normalize_sets.
+      split; [constructor |].
+      split; [reflexivity |].
+      split; [sets |].
+      split; [exact Hvm | assumption].
+    - (* cons *)
+      simpl.
+      destruct idx; simpl.
+      + (* Step 1: get_named allocates f *)
+        eapply bind_triple. eapply get_named_fresh.
+        intros f w.
+        eapply pre_curry_l; intros Hf_in.
+        eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+        (* Step 2: recursive call with updated vm *)
+        eapply bind_triple.
+        eapply IHmfix. eapply var_map_correct_cons. exact Hvm.
+        (* Step 3: destructure result and return *)
+        intros [names vm'] w'.
+        eapply pre_curry_l; intros Hnd.
+        eapply pre_curry_l; intros Hlen.
+        eapply pre_curry_l; intros Hsub.
+        eapply pre_curry_l; intros Hvm'.
+        eapply return_triple. intros _ w'' Hfr.
+        repeat normalize_sets.
+        split; [| split; [| split; [| split]]].
+        * constructor; [| exact Hnd].
+          intros Hc. eapply Hsub in Hc. inv Hc. now eauto.
+        * simpl. congruence.
+        * eapply Union_Included. now sets.
+          eapply Included_trans; [exact Hsub | sets].
+        * simpl rev. rewrite <- app_assoc. simpl. exact Hvm'.
+        * rewrite <- Setminus_Union. exact Hfr.
+      + (* Step 1: get_named allocates f *)
+        eapply bind_triple. eapply get_named_fresh.
+        intros f w.
+        eapply pre_curry_l; intros Hf_in.
+        eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+        (* Step 2: recursive call with updated vm *)
+        eapply bind_triple.
+        eapply IHmfix. eapply var_map_correct_cons. exact Hvm.
+        (* Step 3: destructure result and return *)
+        intros [names vm'] w'.
+        eapply pre_curry_l; intros Hnd.
+        eapply pre_curry_l; intros Hlen.
+        eapply pre_curry_l; intros Hsub.
+        eapply pre_curry_l; intros Hvm'.
+        eapply return_triple. intros _ w'' Hfr.
+        repeat normalize_sets.
+        split; [| split; [| split; [| split]]].
+        * constructor; [| exact Hnd].
+          intros Hc. eapply Hsub in Hc. inv Hc. now eauto.
+        * simpl. congruence.
+        * eapply Union_Included. now sets.
+          eapply Included_trans; [exact Hsub | sets].
+        * simpl rev. rewrite <- app_assoc. simpl. exact Hvm'.
+        * rewrite <- Setminus_Union. exact Hfr.
+  Qed.
+
+  (** * Correspondence statements *)
+
+  Context {efl : EEnvFlags}.
+  Context (Σ : global_context).
+
+  (* Flags: our pipeline excludes tVar, tEvar, tCoFix, tLazy, tForce
+     and uses block constructors *)
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+
+  Let convert_anf' (t : EAst.term) (vm : var_map) :=
+    convert_anf func_tag default_tag prim_map tgm prims cmap t vm None.
+
+  (* For tConst: assume no primitive constants (find_prim always fails).
+     Also assume every constant in Σ is in cmap. *)
+  Context (no_prims : forall s, find_prim prims s = None).
+  Context (cmap_complete : forall s d,
+    lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
+
+  (* Helper: args correspondence from per-term IH.
+     Given All (per-term correspondence) args, prove the args triple. *)
+  Lemma anf_cvt_args_corresp :
+    forall args vn vm
+      (Hall : All (fun t => forall vn vm S0
+        (Hwf : wellformed Σ (List.length vn) t = true)
+        (Hvm : var_map_correct vm vn),
+        {{ fun _ s => fresh S0 (next_var (fst s)) }}
+          convert_anf' t vm
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 t vn S' C r /\
+           fresh S' (next_var (fst s')) }}) args)
+      (Hwf : forallb (wellformed Σ (List.length vn)) args = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_args convert_anf' args vm
+    {{ fun _ s p s' => let '(xs, C) := p in
+       exists S', anf_cvt_rel_args func_tag default_tag tgm cmap S0 args vn S' C xs /\
+       fresh S' (next_var (fst s')) }}.
+  Proof.
+    induction args as [| t args' IHargs]; intros vn vm Hall Hwf Hvm S0.
+    - simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor | exact Hfr].
+    - simpl in Hwf. apply Bool.andb_true_iff in Hwf as [Hwf_hd Hwf_tl].
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      simpl.
+      eapply bind_triple. { eapply IH_hd; eassumption. }
+      intros [y C1] w. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt1.
+      eapply bind_triple. { eapply IHargs; eassumption. }
+      intros [ys C2] w'. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt2.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; eassumption | exact Hfr].
+  Qed.
+
+  (* Helper: branches correspondence from per-branch IH *)
+  Lemma anf_cvt_branches_corresp :
+    forall ind brs n scrut vn vm
+      (Hall : All (fun br : list name * EAst.term => forall vn vm S0
+        (Hwf : wellformed Σ (List.length vn) (snd br) = true)
+        (Hvm : var_map_correct vm vn),
+        {{ fun _ s => fresh S0 (next_var (fst s)) }}
+          convert_anf' (snd br) vm
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 (snd br) vn S' C r /\
+           fresh S' (next_var (fst s')) }}) brs)
+      (Hwf : forallb (fun br : list name * EAst.term =>
+               wellformed Σ (List.length (fst br) + List.length vn) (snd br)) brs = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_branches default_tag tgm convert_anf' ind brs n scrut vm
+    {{ fun _ s pats s' =>
+       exists S', anf_cvt_rel_branches func_tag default_tag tgm cmap S0 ind brs n vn scrut S' pats /\
+       fresh S' (next_var (fst s')) }}.
+  Proof.
+    induction brs as [| [lnames e_br] brs' IHbrs];
+    intros n scrut vn vm Hall Hwf_brs Hvm S0.
+    - (* nil *)
+      simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor | exact Hfr].
+    - (* cons *)
+      simpl in Hwf_brs. apply Bool.andb_true_iff in Hwf_brs as [Hwf_hd Hwf_tl].
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      simpl.
+      (* Step 1: recurse on remaining branches *)
+      eapply bind_triple. { eapply IHbrs; eassumption. }
+      intros pats' w1. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_rest.
+      (* Step 2: proj_ctx for this branch *)
+      eapply bind_triple. { eapply proj_ctx_spec. exact Hvm. }
+      intros [Cproj vm'] w2.
+      eapply pre_existential; intros vars.
+      eapply pre_curry_l; intros Hnd.
+      eapply pre_curry_l; intros Hlen.
+      eapply pre_curry_l; intros Hsub.
+      eapply pre_curry_l; intros Hctx.
+      eapply pre_curry_l; intros Hvm'.
+      (* Step 3: convert branch body with extended vm *)
+      eapply bind_triple.
+      { eapply (IH_hd (List.app vars vn)); [| exact Hvm'].
+        rewrite length_app, Hlen. exact Hwf_hd. }
+      intros [r1 C1] w3. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_body.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [| exact Hfr].
+      eapply anf_Branches_cons;
+        [reflexivity | exact Hcvt_rest | exact Hsub | exact Hnd
+         | exact Hlen | subst; reflexivity | exact Hcvt_body].
+  Qed.
+
+  (* Helper: mfix correspondence from per-body IH.
+     Hall gives P on the lambda BODY (not the whole lambda),
+     matching term_ind_fix_body's tFix case. *)
+  Lemma anf_cvt_mfix_corresp :
+    forall mfix fnames idx vn vm
+      (Hall : All (fun d : EAst.def EAst.term =>
+        match EAst.dbody d with
+        | EAst.tLambda _ e1 =>
+          forall vn vm S0
+            (Hwf : wellformed Σ (List.length vn) e1 = true)
+            (Hvm : var_map_correct vm vn),
+          {{ fun _ s => fresh S0 (next_var (fst s)) }}
+            convert_anf' e1 vm
+          {{ fun _ s p s' => let '(r, C) := p in
+             exists S', anf_cvt_rel func_tag default_tag tgm cmap S0 e1 vn S' C r /\
+             fresh S' (next_var (fst s')) }}
+        | _ => True
+        end) mfix)
+      (Hlen : List.length fnames = List.length mfix)
+      (Hwf_mfix : forallb (fun d => isLambda (EAst.dbody d)) mfix = true)
+      (Hwf_bodies : forallb (test_def (wellformed Σ (List.length vn))) mfix = true)
+      (Hvm : var_map_correct vm vn)
+      S0,
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf_mfix func_tag convert_anf' mfix fnames idx vm
+    {{ fun _ s (p : var * fundefs) s' =>
+         let '(fi, B) := p in
+         exists S',
+           anf_cvt_rel_mfix func_tag default_tag tgm cmap S0 mfix vn fnames S' B /\
+           (forall f, nth_error fnames idx = Some f -> fi = f) /\
+           fresh S' (next_var (fst s')) }}.
+  Proof.
+    induction mfix as [| d mfix' IHmfix];
+    intros fnames idx vn vm Hall Hlen Hwf_mfix Hwf_bodies Hvm S0.
+    - (* nil *)
+      destruct fnames; [| simpl in Hlen; congruence].
+      simpl. eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor |].
+      split; [intros f Hf; destruct idx; discriminate | exact Hfr].
+    - (* cons *)
+      destruct fnames as [| f_name rest]; [simpl in Hlen; congruence |].
+      simpl in Hlen.
+      simpl in Hwf_mfix. apply Bool.andb_true_iff in Hwf_mfix as [Hislam Hwf_mfix'].
+      simpl in Hwf_bodies.
+      apply Bool.andb_true_iff in Hwf_bodies as [Hwf_d Hwf_bodies'].
+      (* d.(dbody) must be a tLambda *)
+      destruct (EAst.dbody d) eqn:Hbody; simpl in Hislam; try discriminate.
+      (* Extract wellformed for body t *)
+      unfold test_def in Hwf_d. rewrite Hbody in Hwf_d. simpl in Hwf_d.
+      apply Bool.andb_true_iff in Hwf_d as [_ Hwf_t].
+      (* Extract IH for body from All *)
+      inversion Hall as [| ? ? IH_hd IH_tl]; subst.
+      rewrite Hbody in IH_hd.
+      simpl. rewrite Hbody.
+      (* Step 1: allocate argument variable x *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w. eapply pre_curry_l; intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      (* Step 2: convert body t with extended vm *)
+      eapply bind_triple.
+      { eapply (IH_hd (x :: vn)).
+        - exact Hwf_t.
+        - eapply var_map_correct_cons. exact Hvm. }
+      intros [r1 C1] w'. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_body.
+      (* Step 3: recurse on remaining mfix *)
+      eapply bind_triple.
+      { eapply (IHmfix rest); try eassumption. lia. }
+      intros [fi defs'] w''.
+      eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_rest.
+      eapply pre_curry_l; intros Hfi_eq.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [| split].
+      + eapply anf_Mfix_cons; [exact Hbody | exact Hx | exact Hcvt_body |].
+        exact Hcvt_rest.
+      + intros f Hf. destruct idx.
+        * simpl in Hf. congruence.
+        * eapply Hfi_eq. exact Hf.
+      + exact Hfr.
+  Qed.
+
+  (* Main correspondence *)
+  Lemma anf_cvt_exp_corresp :
+    forall e vn vm S0
+      (Hwf : wellformed Σ (List.length vn) e = true)
+      (Hvm : var_map_correct vm vn),
+    {{ fun _ s => fresh S0 (next_var (fst s)) }}
+      convert_anf' e vm
+    {{ fun _ s (p : var * exp_ctx) s' =>
+         let '(r, C) := p in
+         exists S',
+           anf_cvt_rel func_tag default_tag tgm cmap S0 e vn S' C r /\
+           fresh S' (next_var (fst s')) }}.
+  Proof.
+    intros e. induction e using term_ind_fix_body;
+    intros vn vm S0 Hwf Hvm; simpl in Hwf.
+
+    - (* tBox *)
+      simpl.
+      eapply bind_triple. eapply get_named_str_fresh.
+      intros x w. eapply return_triple.
+      intros _ s [Hx_in [_ [_ Hfr]]].
+      eexists. split; [econstructor; exact Hx_in | exact Hfr].
+
+    - (* tRel n *)
+      simpl.
+      unfold var_map_correct in Hvm.
+      destruct vm as [vm p]. simpl in *.
+      assert (Hn : (n < List.length vn)%nat).
+      { apply Bool.andb_true_iff in Hwf as [_ Hlt].
+        apply Nat.ltb_lt in Hlt. exact Hlt. }
+      remember
+        match (p - N.of_nat n)%N with
+        | 0%N => None
+        | N.pos pos => vm ! pos
+        end as vopt eqn:Hvopt.
+      specialize (Hvm n). rewrite <- Hvopt in Hvm.
+      destruct vopt as [v |] eqn:Hv.
+      + unfold convert_anf'. simpl. rewrite <- Hvopt. simpl.
+        eapply return_triple. intros _ s Hfr.
+        eexists. split.
+        * econstructor. symmetry. exact Hvm.
+        * exact Hfr.
+      + symmetry in Hvm. apply nth_error_None in Hvm. lia.
+
+    - (* tVar *) rewrite HnoVar in Hwf. discriminate.
+    - (* tEvar *) rewrite HnoEvar in Hwf. discriminate.
+
+    - (* tLambda na body *)
+      simpl. apply Bool.andb_true_iff in Hwf as [_ Hwf_body].
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w. eapply pre_curry_l; intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple. eapply get_named_fresh.
+      intros f w'. eapply pre_curry_l; intros Hf.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple.
+      { eapply (IHe (x :: vn)); [exact Hwf_body | eapply var_map_correct_cons; exact Hvm]. }
+      intros [r C] w''.
+      eapply pre_existential; intros S'.
+      eapply pre_curry_l; intros Hcvt.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; eassumption | exact Hfr].
+
+    - (* tLetIn na b t *)
+      apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_t].
+      apply Bool.andb_true_iff in Hwf_rest as [_ Hwf_b].
+      simpl.
+      eapply bind_triple. { eapply IHe1; eassumption. }
+      intros [x1 C1] w. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt1.
+      eapply bind_triple.
+      { eapply (IHe2 (x1 :: vn));
+        [exact Hwf_t | eapply var_map_correct_cons; exact Hvm]. }
+      intros [r C2] w'. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt2.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; eassumption | exact Hfr].
+
+    - (* tApp u v *)
+      apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_v].
+      apply Bool.andb_true_iff in Hwf_rest as [_ Hwf_u].
+      simpl.
+      eapply bind_triple. { eapply IHe1; eassumption. }
+      intros [x1 C1] w. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt1.
+      eapply bind_triple. { eapply IHe2; eassumption. }
+      intros [x2 C2] w'. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt2.
+      eapply bind_triple. eapply get_named_fresh.
+      intros r w''. eapply return_triple.
+      intros _ s [Hr [_ Hfr]].
+      eexists. split; [econstructor; eassumption | exact Hfr].
+
+    - (* tConst s *)
+      unfold convert_anf'. simpl. rewrite no_prims.
+      apply Bool.andb_true_iff in Hwf as [_ Hwf_const].
+      destruct (lookup_constant Σ s) as [d |] eqn:Hd; [| discriminate].
+      specialize (cmap_complete s d Hd).
+      destruct (lookup_const cmap s) eqn:Hlookup; [| contradiction].
+      eapply return_triple. intros _ s0 Hfr.
+      eexists. split; [econstructor; exact Hlookup | exact Hfr].
+
+    - (* tConstruct ind c args *)
+      simpl.
+      eapply bind_triple. eapply get_named_fresh.
+      intros x w. eapply pre_curry_l; intros Hx.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple.
+      { eapply anf_cvt_args_corresp; [exact X | | exact Hvm].
+        (* Extract forallb (wellformed ...) args from Hwf *)
+        rewrite Hblocks in Hwf.
+        apply Bool.andb_true_iff in Hwf as [_ Hwf_args].
+        apply Bool.andb_true_iff in Hwf_args as [_ Hwf_args].
+        exact Hwf_args. }
+      intros [ys C] w'.
+      eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_args.
+      eapply return_triple. intros _ s Hfr.
+      eexists. split; [econstructor; [reflexivity | exact Hx | exact Hcvt_args] | exact Hfr].
+
+    - (* tCase (ind, npars) mch brs *)
+      destruct p as [ind npars]. simpl.
+      (* Decompose wellformed:
+         has_tCase && ((wf_brs && wellformed mch) && forallb brs) = true *)
+      apply Bool.andb_true_iff in Hwf as [_ Hwf].
+      apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_brs].
+      apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_mch].
+      simpl.
+      (* Step 1-2: allocate f and y *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros f w. eapply pre_curry_l; intros Hf.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      eapply bind_triple. eapply get_named_fresh.
+      intros yv w'. eapply pre_curry_l; intros Hyv.
+      eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
+      (* Step 3: convert scrutinee *)
+      eapply bind_triple. { eapply IHe. apply Hwf_mch. apply Hvm. }
+      intros [x1 C1] w''. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_mch.
+      (* Step 4: convert branches *)
+      eapply bind_triple.
+      { eapply anf_cvt_branches_corresp; [exact X | exact Hwf_brs | exact Hvm]. }
+      intros pats w'''. eapply pre_existential; intros S3.
+      eapply pre_curry_l; intros Hcvt_brs.
+      (* Step 5: allocate result variable *)
+      eapply bind_triple. eapply get_named_fresh.
+      intros r w4. eapply return_triple.
+      intros _ s [Hr [_ Hfr]].
+      eexists. split; [| exact Hfr].
+      eapply anf_Case.
+      + exact Hf.
+      + exact Hyv.
+      + exact Hcvt_mch.
+      + exact Hcvt_brs.
+      + exact Hr.
+
+    - (* tProj p c *)
+      apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_c].
+      apply Bool.andb_true_iff in Hwf_rest as [_ _].
+      simpl.
+      eapply bind_triple. { eapply IHe; eassumption. }
+      intros [x C] w. eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt.
+      eapply bind_triple. eapply get_named_fresh.
+      intros y w'. eapply return_triple.
+      intros _ s0 [Hy [_ Hfr]].
+      eexists. split; [econstructor; [reflexivity | exact Hcvt | exact Hy] | exact Hfr].
+
+    - (* tFix mfix idx *)
+      simpl.
+      (* Decompose wellformed: has_tFix && forallb isLambda && wf_fix_gen *)
+      apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_fix].
+      apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_lam].
+      (* wf_fix_gen gives: idx < length mfix && forallb test_def mfix *)
+      (* We need to extract these from Hwf_fix *)
+      (* Step 1: add_fix_names *)
+      eapply bind_triple. { eapply add_fix_names_spec. exact Hvm. }
+      intros [names vm'] w.
+      eapply pre_curry_l; intros Hnd.
+      eapply pre_curry_l; intros Hlen.
+      eapply pre_curry_l; intros Hsub.
+      eapply pre_curry_l; intros Hvm'.
+      (* Step 2: convert_anf_mfix *)
+      eapply bind_triple.
+      { eapply (anf_cvt_mfix_corresp _ _ _ (List.app (List.rev names) vn));
+          [exact X | exact Hlen | exact Hwf_lam | |exact Hvm'].
+        (* wellformed bodies: need forallb (test_def (wellformed Σ (length (rev names ++ vn)))) mfix *)
+        (* Extract forallb test_def from Hwf_fix *)
+        unfold wf_fix, wf_fix_gen in Hwf_fix.
+        apply Bool.andb_true_iff in Hwf_fix as [_ Hwf_bodies].
+        rewrite length_app, length_rev, Hlen. exact Hwf_bodies. }
+      intros [fi defs] w'.
+      eapply pre_existential; intros S2.
+      eapply pre_curry_l; intros Hcvt_mfix.
+      eapply pre_curry_l; intros Hfi_eq.
+      eapply return_triple. intros _ s Hfr.
+      (* Determine fi from Hfi_eq *)
+      destruct (nth_error names idx) as [f_res |] eqn:Hnth.
+      2:{ exfalso. apply nth_error_None in Hnth.
+          (* idx < length names follows from wf_fix *)
+          unfold wf_fix, wf_fix_gen in Hwf_fix.
+          apply Bool.andb_true_iff in Hwf_fix as [Hidx _].
+          apply Nat.ltb_lt in Hidx. lia. }
+      assert (fi = f_res) as -> by (apply Hfi_eq; reflexivity).
+      eexists. split; [| exact Hfr].
+      eapply anf_Fix; [exact Hsub | exact Hnd | exact Hlen | exact Hcvt_mfix |].
+      exact Hnth.
+
+    - (* tCoFix *) rewrite HnoCoFix in Hwf. discriminate.
+
+    - (* tPrim p *)
+      unfold convert_anf'. simpl.
+      destruct (trans_prim_val p) as [pv |] eqn:Hpv.
+      + eapply bind_triple. eapply get_named_str_fresh.
+        intros x w. eapply return_triple.
+        intros _ s0 [Hx [_ [_ Hfr]]].
+        eexists. split; [econstructor; [exact Hpv | exact Hx] | exact Hfr].
+      + (* Arrays: trans_prim_val = None only for primArrayModel.
+           wellformed requires has_prim p = true, but has_primarray = false. *)
+        exfalso.
+        (* p is a prim_val with primArrayModel *)
+        destruct p as [tag model].
+        destruct model; simpl in Hpv; try discriminate.
+        (* model = primArrayModel, so has_prim = has_primarray = false *)
+        unfold has_prim in Hwf. simpl in Hwf. rewrite HnoArray in Hwf. discriminate.
+
+    - (* tLazy *) rewrite HnoLazy in Hwf. discriminate.
+    - (* tForce *) rewrite HnoLazy in Hwf. discriminate.
+  Qed.
+
+  (** * Auxiliary definitions *)
+
+  Fixpoint pos_seq (start : var) (n : nat) : list positive :=
+    match n with
+    | 0%nat => []
+    | S n => start :: (pos_seq (start + 1)%positive n)
+    end.
+
+  Lemma pos_seq_len start n :
+    List.length (pos_seq start n) = n.
+  Proof.
+    revert start. induction n; intros start; simpl; [reflexivity | rewrite IHn; reflexivity].
+  Qed.
+
+  Lemma pos_seq_In start n x :
+    List.In x (pos_seq start n) ->
+    (start <= x <= Pos.of_nat (Pos.to_nat start + n)%nat)%positive.
+  Proof.
+    revert start. induction n; intros start Hin.
+    - inv Hin.
+    - inv Hin; [lia |]. eapply IHn in H. lia.
+  Qed.
+
+  Lemma pos_seq_NoDup start n :
+    NoDup (pos_seq start n).
+  Proof.
+    revert start; induction n; intros start; simpl.
+    - constructor.
+    - constructor; [| eauto].
+      intros Hc. eapply pos_seq_In in Hc. lia.
+  Qed.
+
+  Lemma set_lists_Forall2 {A} xs (vs : list A) rho rho' :
+    set_lists xs vs rho = Some rho' ->
+    NoDup xs ->
+    Forall2 (fun x v => M.get x rho' = Some v) xs vs.
+  Proof.
+    revert vs rho rho'; induction xs; intros ys rho rho' Hset Hnd;
+      destruct ys; simpl in *; try congruence.
+    - constructor.
+    - destruct (set_lists xs ys rho) eqn:Hset'; try congruence.
+      inv Hset. constructor.
+      + rewrite M.gss. reflexivity.
+      + eapply Forall2_monotonic_strong.
+        2:{ eapply IHxs; eauto. inv Hnd. eassumption. }
+        intros. rewrite M.gso. eassumption.
+        intros Heq; subst. inv Hnd; eauto.
+  Qed.
+
+  (** * Existence of relational derivation *)
+
+  (* Given a well-formed term, there exists a relational derivation.
+     Proved by running convert_anf and applying correspondence. *)
+  Lemma anf_rel_exists e xs m :
+    wellformed Σ (List.length xs) e = true ->
+    exists C r S',
+      anf_cvt_rel func_tag default_tag tgm cmap
+        (fun x => (m <= x)%positive) e xs S' C r.
+  Proof.
+    intros Hwf.
+    set (S0 := fun x => (m <= x)%positive).
+    set (vm := List.fold_right (fun v vm' => add_var_name vm' v) new_var_map xs).
+
+    assert (Hvm : var_map_correct vm xs).
+    { unfold vm. rewrite <- (List.app_nil_r xs) at 2.
+      apply var_map_correct_fold_right. apply var_map_correct_nil. }
+
+    set (comp_d := pack_data m 1%positive 1%positive 1%positive
+                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
+
+    destruct (runState (convert_anf' e vm) tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hrun.
+
+    assert (Hf : fresh S0 m).
+    { unfold S0, fresh, Ensembles.In. lia. }
+
+    pose proof (anf_cvt_exp_corresp e xs vm S0 Hwf Hvm) as Hcorresp.
+    unfold triple in Hcorresp.
+    specialize (Hcorresp tt (comp_d, tt) Hf).
+    rewrite Hrun in Hcorresp.
+    destruct cvt_res as [msg | [r0 C0]].
+    - contradiction.
+    - simpl in Hcorresp. destruct Hcorresp as [S' [Hrel Hfr]].
+      exists C0, r0, S'. exact Hrel.
+  Qed.
+
+  (** Existence of [anf_cvt_rel_mfix] for well-formed fixpoint bodies.
+      Proved by running the monadic [convert_anf_mfix] and applying
+      [anf_cvt_mfix_corresp]. *)
+  Lemma anf_cvt_rel_mfix_exists mfix fnames vn m :
+    List.length fnames = List.length mfix ->
+    forallb (fun d => EAst.isLambda (EAst.dbody d)) mfix = true ->
+    forallb (test_def (wellformed Σ (List.length vn))) mfix = true ->
+    exists fdefs S',
+      anf_cvt_rel_mfix func_tag default_tag tgm cmap
+        (fun z => (m <= z)%positive) mfix vn fnames S' fdefs.
+  Proof.
+    intros Hlen Hlam Hwf_bodies.
+    set (S0 := fun z => (m <= z)%positive).
+    set (vm := List.fold_right (fun v vm' => add_var_name vm' v) new_var_map vn).
+    assert (Hvm : var_map_correct vm vn).
+    { unfold vm. rewrite <- (List.app_nil_r vn) at 2.
+      apply var_map_correct_fold_right. apply var_map_correct_nil. }
+    (* Build All hypothesis from anf_cvt_exp_corresp *)
+    assert (Hall : All (fun d : EAst.def EAst.term =>
+      match EAst.dbody d with
+      | EAst.tLambda _ e1 =>
+        forall vn0 vm0 S1
+          (Hwf : wellformed Σ (List.length vn0) e1 = true)
+          (Hvm0 : var_map_correct vm0 vn0),
+        {{ fun _ s => fresh S1 (next_var (fst s)) }}
+          convert_anf' e1 vm0
+        {{ fun _ s p s' => let '(r, C) := p in
+           exists S', anf_cvt_rel func_tag default_tag tgm cmap S1 e1 vn0 S' C r /\
+                      fresh S' (next_var (fst s')) }}
+      | _ => True
+      end) mfix).
+    { clear Hlen Hvm Hwf_bodies vm S0.
+      induction mfix as [| d mfix' IHm]; [constructor |].
+      simpl in Hlam. apply Bool.andb_true_iff in Hlam as [Hlam_d Hlam_rest].
+      constructor.
+      - destruct (EAst.dbody d) eqn:Hbd; try exact I.
+        intros vn0 vm0 S1 Hwf0 Hvm0.
+        exact (anf_cvt_exp_corresp t vn0 vm0 S1 Hwf0 Hvm0).
+      - exact (IHm Hlam_rest). }
+    (* Run the monadic computation *)
+    set (comp_d := pack_data m 1%positive 1%positive 1%positive
+                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
+    destruct (runState (convert_anf_mfix func_tag convert_anf' mfix fnames 0 vm)
+                tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hrun.
+    assert (Hf : fresh S0 m).
+    { unfold S0, fresh, Ensembles.In. lia. }
+    pose proof (anf_cvt_mfix_corresp mfix fnames 0 vn vm Hall Hlen Hlam Hwf_bodies Hvm S0)
+      as Hspec.
+    unfold triple in Hspec.
+    specialize (Hspec tt (comp_d, tt) Hf).
+    rewrite Hrun in Hspec.
+    destruct cvt_res as [msg | [fi fdefs]].
+    - contradiction.
+    - simpl in Hspec. destruct Hspec as [S' [Hrel [_ Hfr]]].
+      exists fdefs, S'. exact Hrel.
+  Qed.
+
+End Corresp.
+
+
+Section GlobalCorresp.
+
+  Context (func_tag default_tag : positive)
+          (prim_map : M.t primitive)
+          (tgm : conId_map)
+          (prims : list (primitive * positive)).
+
+  Context {efl : EEnvFlags}.
+  Context (Σ : global_context).
+  Context (Hwf_glob : wf_glob Σ).
+  Context (HnoAxioms : has_axioms = false).
+
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+
+  Context (no_prims : forall s, find_prim prims s = None).
+
+  Let convert_global_decls' :=
+    convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None).
+
+  Local Open Scope list_scope.
+
+  Lemma anf_cvt_global_corresp :
+    forall (gd : global_context) (cm_acc : const_map)
+           (Σ_proc : global_context) (S0 : Ensemble var),
+      Σ = List.rev gd ++ Σ_proc ->
+      (forall s d, lookup_constant Σ_proc s = Some d ->
+                   lookup_const cm_acc s <> None) ->
+      {{ fun _ s => fresh S0 (next_var (fst s)) }}
+        convert_global_decls' gd cm_acc
+      {{ fun _ s p s' =>
+           let '(cm, C_env) := p in
+           exists S',
+             anf_cvt_rel_global func_tag default_tag tgm S0 gd cm_acc cm C_env S' /\
+             fresh S' (next_var (fst s')) /\
+             (forall k decl, lookup_constant Σ k = Some decl ->
+                             lookup_const cm k <> None) }}.
+  Proof.
+    induction gd as [| [k decl] gd' IH];
+      intros cm_acc Σ_proc S0 HΣ_eq Hcm_complete_proc.
+    - simpl in HΣ_eq.
+      eapply return_triple. intros _ s Hfr.
+      exists S0. split.
+      + constructor.
+      + split; [exact Hfr |].
+        intros k decl Hlk.
+        rewrite HΣ_eq in Hlk.
+        exact (Hcm_complete_proc _ _ Hlk).
+    - destruct decl as [[body_opt] | ind].
+      + destruct body_opt as [body |].
+        * simpl in HΣ_eq.
+          rewrite <- app_assoc in HΣ_eq.
+          simpl in HΣ_eq.
+          assert (Hwf_proc1 :
+            wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)).
+          { eapply suffix_wf with (prefix := List.rev gd').
+            rewrite <- HΣ_eq. exact Hwf_glob. }
+          assert (Hwf_body : wellformed Σ_proc 0 body = true).
+          { eapply wf_glob_head_const_some_wf. exact Hwf_proc1. }
+          eapply bind_triple.
+          { eapply (@anf_cvt_exp_corresp
+                      func_tag default_tag prim_map tgm prims cm_acc
+                      efl Σ_proc
+                      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                      no_prims Hcm_complete_proc
+                      body [] new_var_map S0 Hwf_body var_map_correct_nil). }
+          intros [v C] w.
+          eapply pre_existential; intros S1.
+          eapply pre_curry_l; intros Hcvt_body.
+          eapply bind_triple.
+          { eapply set_var_name_spec. }
+          intros u w_name.
+          assert (Hcm_complete_proc1 :
+            forall s d,
+              lookup_constant
+                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc) s = Some d ->
+              lookup_const ((k, v) :: cm_acc) s <> None).
+          { intros s d Hlk.
+            unfold lookup_constant in Hlk.
+            simpl in Hlk. simpl.
+            destruct (eq_kername s k) eqn:Hsk.
+            - discriminate.
+            - exact (Hcm_complete_proc _ _ Hlk). }
+          eapply bind_triple.
+          { eapply (IH ((k, v) :: cm_acc)
+                       ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
+                       S1);
+              eauto. }
+          intros [cm C_rest] w'.
+          eapply pre_existential; intros S2.
+          eapply pre_curry_l; intros Hcvt_rest.
+          eapply return_triple. intros _ s [Hfr Hcm_complete].
+          exists S2. split.
+          { econstructor; eauto. }
+          split; [exact Hfr | exact Hcm_complete].
+        * simpl in HΣ_eq.
+          rewrite <- app_assoc in HΣ_eq.
+          simpl in HΣ_eq.
+          assert (Hwf_proc1 :
+            wf_glob ((k, EAst.ConstantDecl {| EAst.cst_body := None |}) :: Σ_proc)).
+          { eapply suffix_wf with (prefix := List.rev gd').
+            rewrite <- HΣ_eq. exact Hwf_glob. }
+          exfalso.
+          eapply (@wf_glob_head_const_none_absurd efl HnoAxioms Σ_proc k).
+          exact Hwf_proc1.
+      + simpl in HΣ_eq.
+        rewrite <- app_assoc in HΣ_eq.
+        simpl in HΣ_eq.
+        simpl.
+        assert (Hcm_complete_proc1 :
+          forall s d,
+            lookup_constant ((k, EAst.InductiveDecl ind) :: Σ_proc) s = Some d ->
+            lookup_const cm_acc s <> None).
+        { intros s d Hlk.
+          unfold lookup_constant in Hlk.
+          simpl in Hlk.
+          destruct (eq_kername s k) eqn:Hsk.
+          - discriminate.
+          - exact (Hcm_complete_proc _ _ Hlk). }
+        eapply post_weakening.
+        2:{ eapply (IH cm_acc ((k, EAst.InductiveDecl ind) :: Σ_proc) S0);
+              eauto. }
+        intros r0 w0 [cm C_rest] w1 HP [S' [Hcvt [Hfr Hcm_complete]]].
+        exists S'. split.
+        * econstructor. exact Hcvt.
+        * split; [exact Hfr | exact Hcm_complete].
+  Qed.
+
+End GlobalCorresp.
+
+Section TopLevelCorresp.
+
+  Context (func_tag default_tag default_itag : positive)
+          (tgm : conId_map)
+          (Σ : EAst.global_context).
+
+  Context {efl : EEnvFlags}.
+  Context (HnoAxioms : has_axioms = false).
+
+  Context (prim_map : M.t primitive)
+          (prims : list (primitive * positive)).
+  Context (Hwf_glob : wf_glob Σ).
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+  Context (no_prims : forall s, find_prim prims s = None).
+
+  Lemma convert_top_anf_prog_corresp e Sg :
+    wellformed Σ 0 e = true ->
+    compM.triple
+      (fun _ s => fresh Sg (state.next_var (fst s)))
+      ('(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None) (List.rev Σ) [] ;;
+       '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map None ;;
+       ret (C_env |[ C |[ Ehalt r ]| ]|))
+      (fun _ _ e_tgt _ =>
+         exists cm Sg' S' C_env C r,
+           anf_cvt_rel_global func_tag default_tag tgm
+             Sg (List.rev Σ) [] cm C_env Sg' /\
+           anf_cvt_rel func_tag default_tag tgm cm
+             Sg' e [] S' C r /\
+           e_tgt = C_env |[ C |[ Ehalt r ]| ]|).
+  Proof.
+    intros Hwf.
+    assert (HΣ_top : Σ = List.app (List.rev (List.rev Σ)) ([] : global_context)).
+    { rewrite rev_involutive. rewrite app_nil_r. reflexivity. }
+    assert (Hcm_empty :
+      forall s d, lookup_constant ([] : EAst.global_context) s = Some d ->
+                  lookup_const ([] : const_map) s <> None).
+    { intros s d Hlk. discriminate. }
+    eapply bind_triple.
+    { eapply (@anf_cvt_global_corresp
+                func_tag default_tag prim_map tgm prims
+                efl Σ Hwf_glob HnoAxioms
+                HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                no_prims
+                (List.rev Σ) [] [] Sg
+                HΣ_top Hcm_empty). }
+    intros [cm C_env] w.
+    eapply pre_existential; intros Sg'.
+    eapply pre_curry_l; intros Hglob_cvt.
+    eapply pre_strenghtening.
+    { intros ? ? [Hcm_complete Hfresh_main].
+      exact (conj Hfresh_main Hcm_complete). }
+    eapply pre_curry_l; intros Hcm_complete.
+    eapply bind_triple.
+    { eapply (@anf_cvt_exp_corresp
+                func_tag default_tag prim_map tgm prims cm
+                efl Σ
+                HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
+                no_prims Hcm_complete
+                e [] new_var_map Sg'
+                Hwf var_map_correct_nil). }
+    intros [r C] w'.
+    eapply pre_existential; intros S'.
+    eapply pre_curry_l; intros Hmain_cvt.
+    eapply return_triple. intros _ s _.
+    exists cm, Sg', S', C_env, C, r.
+    repeat split; assumption.
+  Qed.
+
+  Lemma convert_top_anf_corresp next_id ie e e_tgt comp_d' :
+    wellformed Σ 0 e = true ->
+    convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      (fun _ => None)
+      ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
+    exists cm Sg' S' C_env C r,
+      anf_cvt_rel_global func_tag default_tag tgm
+        (fun x => (next_id <= x)%positive) (List.rev Σ) [] cm C_env Sg' /\
+      anf_cvt_rel func_tag default_tag tgm cm
+        Sg' e [] S' C r /\
+      e_tgt = C_env |[ C |[ Ehalt r ]| ]|.
+  Proof.
+    intros Hwf Hrun.
+    unfold convert_top_anf in Hrun.
+    destruct (convert_env default_tag default_itag ie)
+      as [[[[ienv0 cenv0] ctag] itag] dcm].
+    simpl in Hrun.
+    set (ftag := (func_tag + 1)%positive).
+    pose (fenv := M.set func_tag (1%N, (0%N :: nil)) (M.empty _) : fun_env).
+    set (comp_d := state.pack_data next_id ctag itag ftag cenv0 fenv (M.empty _) (M.empty nat) []).
+    set (Sg := fun x => (next_id <= x)%positive).
+    set (prog :=
+      '(cm, C_env) <- convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None) (List.rev Σ) [] ;;
+      '(r, C) <- convert_anf func_tag default_tag prim_map tgm prims cm e new_var_map None ;;
+      ret (C_env |[ C |[ Ehalt r ]| ]|)).
+    assert (Hprog_corresp :
+      compM.triple
+        (fun _ s => fresh Sg (state.next_var (fst s)))
+        prog
+        (fun _ _ e_out _ =>
+           exists cm Sg' S' C_env C r,
+             anf_cvt_rel_global func_tag default_tag tgm
+               Sg (List.rev Σ) [] cm C_env Sg' /\
+             anf_cvt_rel func_tag default_tag tgm cm
+               Sg' e [] S' C r /\
+             e_out = C_env |[ C |[ Ehalt r ]| ]|)).
+    { unfold prog. eapply convert_top_anf_prog_corresp. exact Hwf. }
+    pose proof Hprog_corresp as Hprog.
+    unfold triple in Hprog.
+    assert (Hfresh : fresh Sg (state.next_var comp_d)).
+    { unfold Sg, comp_d, fresh, Ensembles.In. simpl. lia. }
+    specialize (Hprog tt (comp_d, tt) Hfresh).
+    unfold state.run_compM in Hrun.
+    change
+      ((let '(res_err, (comp_d'', _)) := compM.runState prog tt (comp_d, tt)
+        in (res_err, comp_d'')) = (compM.Ret e_tgt, comp_d')) in Hrun.
+    remember (compM.runState prog tt (comp_d, tt)) as top_run eqn:Htop_run.
+    destruct top_run as [res [comp_d_fin u]].
+    simpl in Hrun, Hprog.
+    destruct res; try discriminate.
+    inversion Hrun; subst; clear Hrun.
+    exact Hprog.
+  Qed.
+
+End TopLevelCorresp.
+
+
+(* ================================================================= *)
+(** * Helpers for ValRelExists                                        *)
+(* ================================================================= *)
+
+(** Upper bound on cmap variable values (for freshness arguments). *)
+Fixpoint max_cmap_var (cm : const_map) : positive :=
+  match cm with
+  | [] => 1%positive
+  | (_, v) :: cm' => Pos.max v (max_cmap_var cm')
+  end.
+
+Lemma pos_seq_lt start n x :
+  List.In x (pos_seq start n) ->
+  (x < start + Pos.of_succ_nat n)%positive.
+Proof.
+  revert start. induction n; intros start Hin.
+  - inv Hin.
+  - simpl in Hin. destruct Hin as [<- | Hin].
+    + lia.
+    + specialize (IHn (start + 1)%positive Hin). lia.
+Qed.
+
+Lemma max_cmap_var_bound cm v :
+  cmap_vars cm v -> (v <= max_cmap_var cm)%positive.
+Proof.
+  intros [s Hlk]. induction cm as [| [k' v'] cm' IH].
+  - simpl in Hlk. discriminate.
+  - simpl in Hlk. destruct (eq_kername s k').
+    + injection Hlk as <-. simpl. lia.
+    + simpl. specialize (IH Hlk). lia.
+Qed.
+
+
+Section ValRelExists.
+
+  Context (func_tag default_tag : positive)
+          (prim_map : M.t primitive)
+          (tgm : conId_map)
+          (prims : list (primitive * positive))
+          (cmap : const_map)
+          {efl : EWellformed.EEnvFlags}
+          (Σ : EAst.global_context)
+          (box_dc : dcon)
+          {src_trace : Type}
+          {Hf_src : @LambdaBox_resource nat}
+          {Ht_src : @LambdaBox_resource src_trace}.
+
+  Context (Hglob_term : globals_terminate Σ box_dc).
+  Context (Hwf_glob : EWellformed.wf_glob Σ).
+
+  (* Pipeline flags needed for anf_rel_exists *)
+  Context (HnoVar : has_tVar = false)
+          (HnoEvar : has_tEvar = false)
+          (HnoCoFix : has_tCoFix = false)
+          (HnoLazy : has_tLazy_Force = false)
+          (Hblocks : cstr_as_blocks = true)
+          (HnoArray : has_primarray = false).
+
+  Context (no_prims : forall s, find_prim prims s = None).
+  Context (cmap_complete : forall s d,
+    lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
+  Context (cmap_sound : forall k v,
+    lookup_const cmap k = Some v ->
+    exists decl body,
+      declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
+  Context (cmap_nodup_keys : NoDup (map fst cmap)).
+  Context (Hcmap_eval_coherent :
+    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
+
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
+
+  (* Convert anf_cvt_rel_mfix to anf_fix_rel.
+     Proved here since anf_correct.v (which has this lemma) imports anf_corresp.v. *)
+  Lemma anf_cvt_rel_mfix_to_fix_rel fnames_all names0 :
+    forall mfix S fnames S' fdefs,
+      anf_cvt_rel_mfix func_tag default_tag tgm cmap
+        S mfix (List.rev fnames_all ++ names0) fnames S' fdefs ->
+      Disjoint _ S (FromList fnames_all :|: FromList names0) ->
+      anf_fix_rel func_tag default_tag tgm cmap
+        fnames_all names0 S fnames mfix fdefs S'.
+  Proof.
+    intros mfix. induction mfix; intros S fnames S' fdefs Hcvt Hdis.
+    - inv Hcvt. constructor.
+    - inv Hcvt.
+      eapply anf_fix_fcons.
+      1: eassumption.
+      1: exact Hdis.
+      1: eassumption.
+      1: apply Included_refl.
+      1: apply Included_refl.
+      1: eassumption.
+      eapply IHmfix; [eassumption |].
+      eapply Disjoint_Included_l; [| exact Hdis].
+      eapply Included_trans.
+      + eapply (anf_cvt_exp_subset func_tag default_tag tgm cmap). eassumption.
+      + eapply Setminus_Included.
+  Qed.
+
+  (* well_formed_val is monotone w.r.t. extending Σ *)
+  Lemma well_formed_val_extends Σ_small Σ_big v :
+    EWellformed.wf_glob Σ_big ->
+    EGlobalEnv.extends Σ_small Σ_big ->
+    well_formed_val Σ_small v ->
+    well_formed_val Σ_big v.
+  Proof.
+    intros Hwf_big Hext Hwf_v. revert Hwf_v.
+    induction v using value_ind'; intros Hwf_v; inv Hwf_v.
+    - (* Con_v *)
+      constructor. clear -H H1.
+      induction H; inv H1; constructor; auto.
+    - (* Clos_v *)
+      constructor.
+      + clear -H H2.
+        induction H; inv H2; constructor; auto.
+      + eapply EWellformed.extends_wellformed; eassumption.
+    - (* ClosFix_v *)
+      econstructor.
+      + clear -H H3.
+        induction H; inv H3; constructor; auto.
+      + assumption.
+      + eapply Forall_impl; [| eassumption]. intros d0 [Hlam Hwf_b]. split;
+          [exact Hlam | eapply EWellformed.extends_wellformed; eassumption].
+  Qed.
+
+  (* If e is wellformed w.r.t. Σ0 and k ∈ kn_deps e, then k is declared in Σ0.
+     Follows from wellformed checking lookup_constant for tConst,
+     lookup_constructor for tConstruct, etc. Proof by induction on e. *)
+  Lemma kn_deps_declared Σ0 n e k :
+    wellformed Σ0 n e = true ->
+    kn_deps e k ->
+    List.In k (map fst Σ0).
+  Proof.
+    intros Hwf Hkd. exact (@term_global_deps_fresh _ Σ0 n e Hwf k Hkd).
+  Qed.
+
+  (* Generalized: all global bodies are wellformed w.r.t. their context *)
+  Lemma wf_glob_globals_wellformed_gen Σ0 :
+    EWellformed.wf_glob Σ0 ->
+    forall k decl body,
+      declared_constant Σ0 k decl ->
+      decl.(EAst.cst_body) = Some body ->
+      wellformed Σ0 0 body = true.
+  Proof.
+    induction 1 as [| kn0 d0 Σ0' Hwf0 IH Hwd Hfr].
+    - intros ? ? ? Hdecl. unfold declared_constant in Hdecl. discriminate.
+    - intros k0 decl0 body0 Hdecl Hbody.
+      unfold declared_constant in Hdecl. simpl in Hdecl.
+      assert (Hwf_full : EWellformed.wf_glob ((kn0, d0) :: Σ0')).
+      { exact (EWellformed.wf_glob_cons _ _ _ Hwf0 Hwd Hfr). }
+      eapply (EWellformed.extends_wellformed Hwf_full
+                (EWellformed.extends_fresh _ _ _ Hfr)).
+      destruct (ReflectEq.eqb k0 kn0) eqn:Hek.
+      + injection Hdecl as Heq. subst d0. simpl in Hwd. rewrite Hbody in Hwd. exact Hwd.
+      + exact (IH _ _ _ Hdecl Hbody).
+  Qed.
+
+  (* ================================================================= *)
+  (** * Construction helpers for anf_val_rel_exists                      *)
+  (* ================================================================= *)
+
+  (** Given ANF values for the captured environment and a global
+      environment satisfying [global_env_rel'], construct the full
+      ANF closure value. Encapsulates all fresh-name allocation,
+      disjointness, and ANF conversion boilerplate. *)
+  Lemma anf_val_rel_clos_exists vs vs' na e rho_g :
+    Forall2 anf_val_rel' vs vs' ->
+    wellformed Σ (S (List.length vs)) e = true ->
+    global_env_rel func_tag default_tag tgm cmap Σ box_dc (kn_deps e) rho_g ->
+    exists v', anf_val_rel' (Clos_v vs na e) v'.
+  Proof.
+    intros Hvs' Hwf_e Hglob_rel.
+    (* Fresh names *)
+    set (base := (max_cmap_var cmap + 1)%positive).
+    set (x := base).
+    set (f := (base + 1)%positive).
+    set (names := pos_seq (base + 2)%positive (List.length vs)).
+    set (next_id := (base + Pos.of_succ_nat (List.length vs + 2))%positive).
+    set (S1 := fun z : var => (next_id <= z)%positive).
+    (* Build target env *)
+    edestruct (@set_lists_length3 val) with
+      (rho := rho_g) (vs := vs') (xs := names) as [rho Hset].
+    { rewrite <- (Forall2_length _ _ _ Hvs'). unfold names. eapply pos_seq_len. }
+    (* ANF conversion of body *)
+    edestruct (anf_rel_exists func_tag default_tag prim_map tgm prims cmap Σ
+      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete
+      e (x :: names) next_id) as [C1 [r1 [S2 Hcvt]]].
+    { simpl. subst names. rewrite pos_seq_len. exact Hwf_e. }
+    (* Freshness helpers *)
+    assert (Hcmap_lt : forall v, cmap_vars cmap v -> (v < base)%positive).
+    { intros v0 Hv0. eapply max_cmap_var_bound in Hv0. unfold base. lia. }
+    assert (Hnames_range : forall z, List.In z names ->
+      (base + 2 <= z)%positive /\ (z < next_id)%positive).
+    { intros z Hz. split.
+      - eapply pos_seq_In in Hz. destruct Hz as [Hz _]. exact Hz.
+      - eapply pos_seq_lt in Hz. unfold base, next_id in *. lia. }
+    (* Construct the ANF closure value *)
+    eexists.
+    eapply anf_rel_Clos with
+      (x := x) (f := f) (rho := rho) (names := names)
+      (S1 := S1) (S2 := S2) (C1 := C1) (r1 := r1).
+    * (* anf_env_rel' *)
+      unfold anf_env_rel'.
+      assert (Hget : Forall2 (fun n v' => M.get n rho = Some v') names vs')
+        by (eapply set_lists_Forall2; [exact Hset | eapply pos_seq_NoDup]).
+      { assert (Hcombine : forall vs0 vs0' ns0,
+          Forall2 anf_val_rel' vs0 vs0' ->
+          Forall2 (fun n0 v' => M.get n0 rho = Some v') ns0 vs0' ->
+          Forall2 (fun v0 n0 => exists v', M.get n0 rho = Some v' /\
+                    anf_val_rel' v0 v') vs0 ns0).
+        { intros vs0 vs0' ns0 Hvs0. revert ns0.
+          induction Hvs0 as [| sv sv' svs svs' Hrel Hvs_tl IHc]; intros ns0 Hget0.
+          - inv Hget0. constructor.
+          - destruct ns0 as [| nn ns']; [inv Hget0 |]. inv Hget0.
+            constructor.
+            + eexists. split; eassumption.
+            + eapply IHc. eassumption. }
+        exact (Hcombine vs vs' names Hvs' Hget). }
+    * eapply NoDup_env_consistent. eapply pos_seq_NoDup.
+    * (* cmap_consistent — vacuous: names above max_cmap_var *)
+      intros i y k0 decl body Hnth Hlk0 _ _.
+      exfalso.
+      assert (Hy_in : List.In y names) by (eapply nth_error_In; exact Hnth).
+      destruct (Hnames_range y Hy_in) as [Hy_lo _].
+      specialize (Hcmap_lt y). assert (cmap_vars cmap y) by (exists k0; exact Hlk0).
+      unfold base in Hy_lo. lia.
+    * (* Disjoint (x |: (f |: FromList names)) S1 *)
+      apply Union_Disjoint_l.
+      -- apply Disjoint_Singleton_l. unfold Ensembles.In, S1, x, base, next_id.
+         pose proof (Pos.le_1_l (Pos.of_succ_nat (List.length vs + 2))). lia.
+      -- apply Union_Disjoint_l.
+         ++ apply Disjoint_Singleton_l. unfold Ensembles.In, S1, f, base, next_id.
+            pose proof (Pos.le_1_l (Pos.of_succ_nat (List.length vs + 2))). lia.
+         ++ constructor. intros z Hc. inversion Hc as [? HL HR].
+            unfold FromList, Ensembles.In in HL. unfold S1, Ensembles.In in HR.
+            destruct (Hnames_range z HL). lia.
+    * (* Disjoint (cmap_vars cmap) S1 *)
+      constructor. intros z Hc. inversion Hc as [? HL HR].
+      unfold S1, Ensembles.In in HR. specialize (Hcmap_lt z HL).
+      unfold base, next_id in *. pose proof (Pos.le_1_l (Pos.of_succ_nat (List.length vs + 2))). lia.
+    * intros Hc. specialize (Hcmap_lt x Hc). unfold x, base in *. lia.
+    * intros Hc. specialize (Hcmap_lt f Hc). unfold f, base in *. lia.
+    * (* ~ x ∈ f |: FromList names *)
+      intros Hc. apply Union_inv in Hc. destruct Hc as [Hc | Hc].
+      -- apply Singleton_inv in Hc. unfold x, f, base in Hc. lia.
+      -- unfold FromList, Ensembles.In in Hc.
+         destruct (Hnames_range x Hc) as [Hlo _]. unfold x, base in Hlo. lia.
+    * (* ~ f ∈ FromList names *)
+      intros Hc. unfold FromList, Ensembles.In in Hc.
+      destruct (Hnames_range f Hc) as [Hlo _]. unfold f, base in Hlo. lia.
+    * exact Hcvt.
+    * (* global_env_rel' — transfer from rho_g to rho *)
+      intros k v_g Hkdep Hlk.
+      specialize (Hglob_rel k v_g Hkdep Hlk).
+      destruct Hglob_rel as [decl [body [anf_v [Hdecl [Hbody [Hget Hrel]]]]]].
+      exists decl, body, anf_v. split; [exact Hdecl |]. split; [exact Hbody |]. split.
+      -- erewrite <- set_lists_not_In; [exact Hget | exact Hset |].
+         intros Hin. destruct (Hnames_range v_g Hin) as [Hlo _].
+         specialize (Hcmap_lt v_g). assert (cmap_vars cmap v_g) by (exists k; exact Hlk).
+         unfold base in Hlo. lia.
+      -- exact Hrel.
+  Qed.
+
+  (** Same construction for fixpoint closures. *)
+  Lemma anf_val_rel_closfix_exists vs vs' mfix n rho_g :
+    Forall2 anf_val_rel' vs vs' ->
+    (n < List.length mfix)%nat ->
+    Forall (fun d =>
+      EAst.isLambda (EAst.dbody d) = true /\
+      wellformed Σ (List.length mfix + List.length vs) (EAst.dbody d) = true) mfix ->
+    global_env_rel func_tag default_tag tgm cmap Σ box_dc (kn_deps_mfix mfix) rho_g ->
+    exists v', anf_val_rel' (ClosFix_v vs mfix n) v'.
+  Proof.
+    intros Hvs' Hn_lt Hwf_mfix Hglob_rel.
+    set (nf := List.length mfix). set (nv := List.length vs).
+    (* Fresh names: fnames for fix functions, names for captured env *)
+    set (base := (max_cmap_var cmap + 1)%positive).
+    set (fnames := pos_seq base nf).
+    set (names_start := (base + Pos.of_succ_nat nf)%positive).
+    set (names := pos_seq names_start nv).
+    set (next_id := (names_start + Pos.of_succ_nat nv)%positive).
+    set (S0 := fun z : var => (next_id <= z)%positive).
+    (* Build target env *)
+    edestruct (@set_lists_length3 val) with
+      (rho := rho_g) (vs := vs') (xs := names) as [rho Hset].
+    { rewrite <- (Forall2_length _ _ _ Hvs'). unfold names. eapply pos_seq_len. }
+    (* Convert Forall to forallb for anf_cvt_rel_mfix_exists *)
+    assert (Hlam : forallb (fun d => EAst.isLambda (EAst.dbody d)) mfix = true).
+    { apply forallb_forall. intros d Hd.
+      eapply Forall_forall in Hwf_mfix; [| exact Hd]. exact (proj1 Hwf_mfix). }
+    assert (Hwf_bodies : forallb (test_def (wellformed Σ (List.length (List.rev fnames ++ names)))) mfix = true).
+    { apply forallb_forall. intros d Hd.
+      eapply Forall_forall in Hwf_mfix; [| exact Hd]. unfold test_def.
+      rewrite List.length_app, List.length_rev.
+      unfold fnames, names. rewrite !pos_seq_len. exact (proj2 Hwf_mfix). }
+    (* ANF conversion of mfix bodies *)
+    edestruct (anf_cvt_rel_mfix_exists func_tag default_tag prim_map tgm prims cmap Σ
+      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete
+      mfix fnames (List.rev fnames ++ names) next_id) as [fdefs [S' Hcvt_mfix]].
+    { unfold fnames. rewrite pos_seq_len. reflexivity. }
+    { exact Hlam. }
+    { exact Hwf_bodies. }
+    (* Freshness helpers *)
+    assert (Hcmap_lt : forall v, cmap_vars cmap v -> (v < base)%positive).
+    { intros v0 Hv0. eapply max_cmap_var_bound in Hv0. unfold base. lia. }
+    assert (Hfnames_range : forall z, List.In z fnames ->
+      (base <= z)%positive /\ (z < names_start)%positive).
+    { intros z Hz. unfold fnames in Hz. split.
+      - eapply pos_seq_In in Hz. destruct Hz as [Hz _]. exact Hz.
+      - eapply pos_seq_lt in Hz. unfold base, names_start in *. lia. }
+    assert (Hnames_range : forall z, List.In z names ->
+      (names_start <= z)%positive /\ (z < next_id)%positive).
+    { intros z Hz. unfold names in Hz. split.
+      - eapply pos_seq_In in Hz. destruct Hz as [Hz _]. exact Hz.
+      - eapply pos_seq_lt in Hz. unfold names_start, next_id in *. lia. }
+    (* Convert anf_cvt_rel_mfix to anf_fix_rel *)
+    assert (Hfix : anf_fix_rel func_tag default_tag tgm cmap
+      fnames names S0 fnames mfix fdefs S').
+    { eapply anf_cvt_rel_mfix_to_fix_rel; [exact Hcvt_mfix |].
+      apply Union_Disjoint_r.
+      - constructor. intros z Hc. inversion Hc as [? HL HR].
+        unfold S0, Ensembles.In in HL. unfold FromList, Ensembles.In in HR.
+        destruct (Hfnames_range z HR). unfold base, names_start, next_id in *.
+        pose proof (Pos.le_1_l (Pos.of_succ_nat nv)). lia.
+      - constructor. intros z Hc. inversion Hc as [? HL HR].
+        unfold S0, Ensembles.In in HL. unfold FromList, Ensembles.In in HR.
+        destruct (Hnames_range z HR). lia. }
+    (* nth_error fnames n *)
+    assert (Hlen_fnames : List.length fnames = nf)
+      by (unfold fnames; apply pos_seq_len).
+    assert (Hnth : exists fn, nth_error fnames n = Some fn).
+    { destruct (nth_error fnames n) eqn:Heq.
+      - eexists. reflexivity.
+      - exfalso. apply nth_error_None in Heq. lia. }
+    destruct Hnth as [fn Hnth].
+    (* Construct the ANF closure value *)
+    eexists.
+    eapply anf_rel_ClosFix with
+      (names := names) (fnames := fnames) (rho := rho)
+      (S1 := S0) (S2 := S') (Bs := fdefs) (f := fn).
+    * (* anf_env_rel' *)
+      unfold anf_env_rel'.
+      assert (Hget : Forall2 (fun n v' => M.get n rho = Some v') names vs')
+        by (eapply set_lists_Forall2; [exact Hset | eapply pos_seq_NoDup]).
+      { assert (Hcombine : forall vs0 vs0' ns0,
+          Forall2 anf_val_rel' vs0 vs0' ->
+          Forall2 (fun n0 v' => M.get n0 rho = Some v') ns0 vs0' ->
+          Forall2 (fun v0 n0 => exists v', M.get n0 rho = Some v' /\
+                    anf_val_rel' v0 v') vs0 ns0).
+        { intros vs0 vs0' ns0 Hvs0. revert ns0.
+          induction Hvs0 as [| sv sv' svs svs' Hrel Hvs_tl IHc]; intros ns0 Hget0.
+          - inv Hget0. constructor.
+          - destruct ns0 as [| nn ns']; [inv Hget0 |]. inv Hget0.
+            constructor.
+            + eexists. split; eassumption.
+            + eapply IHc. eassumption. }
+        exact (Hcombine vs vs' names Hvs' Hget). }
+    * eapply NoDup_env_consistent. eapply pos_seq_NoDup.
+    * (* cmap_consistent — vacuous *)
+      intros i y k decl body Hnth' Hlk _ _.
+      exfalso.
+      assert (Hy_in : List.In y names) by (eapply nth_error_In; exact Hnth').
+      destruct (Hnames_range y Hy_in) as [Hy_lo _].
+      specialize (Hcmap_lt y). assert (cmap_vars cmap y) by (exists k; exact Hlk).
+      unfold base, names_start in *. pose proof (Pos.le_1_l (Pos.of_succ_nat nf)). lia.
+    * (* NoDup fnames *)
+      unfold fnames. eapply pos_seq_NoDup.
+    * (* Disjoint (FromList names :|: FromList fnames) S0 *)
+      apply Union_Disjoint_l.
+      -- constructor. intros z Hc. inversion Hc as [? HL HR].
+         unfold FromList, Ensembles.In in HL. unfold S0, Ensembles.In in HR.
+         destruct (Hnames_range z HL). lia.
+      -- constructor. intros z Hc. inversion Hc as [? HL HR].
+         unfold FromList, Ensembles.In in HL. unfold S0, Ensembles.In in HR.
+         destruct (Hfnames_range z HL). unfold base, names_start, next_id in *.
+         pose proof (Pos.le_1_l (Pos.of_succ_nat nv)). lia.
+    * (* Disjoint (cmap_vars cmap) S0 *)
+      constructor. intros z Hc. inversion Hc as [? HL HR].
+      unfold S0, Ensembles.In in HR. specialize (Hcmap_lt z HL).
+      unfold base, names_start, next_id in *.
+      pose proof (Pos.le_1_l (Pos.of_succ_nat nf)).
+      pose proof (Pos.le_1_l (Pos.of_succ_nat nv)). lia.
+    * (* Disjoint (cmap_vars cmap) (FromList fnames) *)
+      constructor. intros z Hc. inversion Hc as [? HL HR].
+      unfold FromList, Ensembles.In in HR.
+      destruct (Hfnames_range z HR) as [Hz _]. specialize (Hcmap_lt z HL).
+      unfold base in Hz. lia.
+    * (* Disjoint (FromList names) (FromList fnames) *)
+      constructor. intros z Hc. inversion Hc as [? HL HR].
+      unfold FromList, Ensembles.In in HL, HR.
+      destruct (Hnames_range z HL) as [Hz1 _].
+      destruct (Hfnames_range z HR) as [_ Hz2]. lia.
+    * exact Hnth.
+    * exact Hfix.
+    * (* global_env_rel' — transfer from rho_g to rho *)
+      intros k v_g Hkdep Hlk.
+      specialize (Hglob_rel k v_g Hkdep Hlk).
+      destruct Hglob_rel as [decl [body [anf_v [Hdecl [Hbody [Hget Hrel]]]]]].
+      exists decl, body, anf_v. split; [exact Hdecl |]. split; [exact Hbody |]. split.
+      -- erewrite <- set_lists_not_In; [exact Hget | exact Hset |].
+         intros Hin. destruct (Hnames_range v_g Hin) as [Hlo _].
+         specialize (Hcmap_lt v_g). assert (cmap_vars cmap v_g) by (exists k; exact Hlk).
+         unfold base, names_start in Hlo. pose proof (Pos.le_1_l (Pos.of_succ_nat nf)). lia.
+      -- exact Hrel.
+  Qed.
+
+  (** Every well-formed source value has a related ANF target value.
+      Proved by well-founded induction on wf_glob (outer) combined with
+      structural induction on values (inner). The wf_glob induction resolves
+      the circular dependency in global_env_rel'. *)
+  Lemma anf_val_rel_exists v :
+    well_formed_val Σ v ->
+    exists v', anf_val_rel' v v'.
+  Proof.
+    (* Strengthen: induct on wf_glob varying the well-formedness context.
+       anf_val_rel always uses the full Σ; only well_formed_val varies. *)
+    cut (forall Σ0, EWellformed.wf_glob Σ0 -> EGlobalEnv.extends Σ0 Σ ->
+      forall v0, well_formed_val Σ0 v0 ->
+      exists v', anf_val_rel' v0 v').
+    { intro Hgen. apply (Hgen Σ Hwf_glob). intros ? ? Hlk. exact Hlk. }
+    intros Σ0 Hwf0.
+    induction Hwf0 as [| kn d Σ' Hwf' IH Hwfd Hfresh].
+
+    (* ---- Base: Σ0 = [] ---- *)
+    - intros Hext v0 Hwf_v0.
+      induction v0 using value_ind'; intros; inv Hwf_v0.
+      + (* Con_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H1. induction vs.
+          + exists []. constructor.
+          + inv H. inv H1. destruct (H3 H2) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        eexists. eapply anf_rel_Con; [exact Hvs' | reflexivity].
+      + (* Clos_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H2. induction vs.
+          + exists []. constructor.
+          + inv H. inv H2. destruct (H3 H1) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        eapply anf_val_rel_clos_exists; [exact Hvs' | |].
+        * eapply EWellformed.extends_wellformed; [exact Hwf_glob | exact Hext | exact H4].
+        * intros k v_g Hkdep _. exfalso.
+          exact (kn_deps_declared [] _ e k H4 Hkdep).
+      + (* ClosFix_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H3. induction vs.
+          + exists []. constructor.
+          + inv H. inv H3. destruct (H2 H1) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        eapply anf_val_rel_closfix_exists; [exact Hvs' | | |].
+        * (* n < length mfix *)
+          match goal with H : (_ < List.length _)%nat |- _ => exact H end.
+        * (* Forall ... mfix — extend wellformed to Σ *)
+          match goal with Hmfix : Forall _ mfix |- _ =>
+            eapply Forall_impl; [| exact Hmfix]; intros d0 [Hlam Hwf_d]; split;
+            [exact Hlam | eapply EWellformed.extends_wellformed;
+             [exact Hwf_glob | exact Hext | exact Hwf_d]] end.
+        * intros k v_g Hkdep _. exfalso.
+          apply Exists_exists in Hkdep.
+          destruct Hkdep as [d0 [Hd0_in Hk_dep]].
+          match goal with Hmfix : Forall _ mfix |- _ =>
+            eapply Forall_forall in Hmfix; [| exact Hd0_in];
+            destruct Hmfix as [_ Hwf_d] end.
+          exact (@term_global_deps_fresh _ [] _ _ Hwf_d k Hk_dep).
+
+    (* ---- Step: Σ0 = (kn, d) :: Σ' ---- *)
+    - intros Hext v0 Hwf_v0.
+      (* Establish IH for Σ' *)
+      assert (Hext' : EGlobalEnv.extends Σ' Σ).
+      { intros k' d' Hlk. apply Hext. simpl.
+        destruct (ReflectEq.eqb k' kn) eqn:Heq; [| exact Hlk].
+        apply ReflectEq.eqb_eq in Heq. subst k'.
+        exfalso. exact (EGlobalEnv.lookup_env_Some_fresh Hlk Hfresh). }
+      specialize (IH Hext').
+
+      induction v0 using value_ind'; intros; inv Hwf_v0.
+      + (* Con_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H1. induction vs.
+          + exists []. constructor.
+          + inv H. inv H1. destruct (H3 H2) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        eexists. eapply anf_rel_Con; [exact Hvs' | reflexivity].
+
+      + (* Clos_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H2. induction vs.
+          + exists []. constructor.
+          + inv H. inv H2. destruct (H3 H1) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        (* Build global target env using wf_glob IH *)
+        assert (Hglob : exists rho_g,
+          global_env_rel func_tag default_tag tgm cmap Σ box_dc
+            (kn_deps e) rho_g).
+        { (* Build rho_g by iterating over cmap.
+             For each (k0, v0) in cmap: if k0 is declared in Σ0 with body,
+             get eval result, eval_wf_restricted gives wf Σ', IH gives anf_val. *)
+          unfold global_env_rel, global_env_rel'.
+          assert (Hbuild : forall cm,
+            NoDup (map fst cm) ->
+            (forall ka va, lookup_const cm ka = Some va -> lookup_const cmap ka = Some va) ->
+            exists rho_g, forall k v_g,
+            kn_deps e k -> lookup_const cm k = Some v_g ->
+            exists decl body anf_v,
+              declared_constant Σ k decl /\
+              EAst.cst_body decl = Some body /\
+              M.get v_g rho_g = Some anf_v /\
+              (forall src_v f0 t0,
+                eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
+                anf_val_rel' src_v anf_v)).
+          { induction cm as [| [k0 v0] cm' IHcm]; intros Hcm_nodup Hcm_sub.
+            - (* cm = [] *) exists (M.empty val). intros. discriminate.
+            - (* cm = (k0, v0) :: cm' *)
+              inversion Hcm_nodup as [| ? ? Hk0_notin_cm' Hcm'_nodup]; subst.
+              assert (Hcm_sub' : forall ka va,
+                lookup_const cm' ka = Some va ->
+                lookup_const cmap ka = Some va).
+              { intros ka va Hlk.
+                destruct (eq_kername ka k0) eqn:Hka.
+                - apply eq_kername_bool_eq in Hka. subst ka.
+                  exfalso. apply Hk0_notin_cm'. eapply lookup_const_in_map_fst. exact Hlk.
+                - eapply Hcm_sub. simpl. rewrite Hka. exact Hlk. }
+              destruct (IHcm Hcm'_nodup Hcm_sub')
+                as [rho_g' Hrho_g'].
+              destruct (EGlobalEnv.lookup_env ((kn, d) :: Σ') k0) as [[cb | ?] |] eqn:Hlk0;
+                [destruct (EAst.cst_body cb) as [body0 |] eqn:Hbody0 | |].
+              + (* k0 is a constant in Σ0 with body body0 *)
+                (* declared_constant Σ k0 cb — via extends *)
+                assert (Hdecl0 : declared_constant Σ k0 cb) by (apply Hext; exact Hlk0).
+                assert (Hlk_cmap0 : lookup_const cmap k0 = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                (* Get eval result from globals_terminate *)
+                destruct (Hglob_term k0 cb body0 Hdecl0 Hbody0)
+                  as [src_v0 [f0 [t0 Heval0]]].
+                (* wellformed Σ' 0 body0 — from wf_glob Σ0 *)
+                assert (Hwf_body0 : wellformed Σ' 0 body0 = true).
+                { simpl in Hlk0. destruct (ReflectEq.eqb k0 kn) eqn:Hkeq0.
+                  - (* k0 = kn: body0 comes from d *)
+                    injection Hlk0 as Heq_d. rewrite Heq_d in Hwfd.
+                    simpl in Hwfd. rewrite Hbody0 in Hwfd. exact Hwfd.
+                  - (* k0 ∈ Σ': use wf_glob_globals_wellformed_gen *)
+                    exact (wf_glob_globals_wellformed_gen Σ' Hwf' k0 cb body0 Hlk0 Hbody0). }
+                (* eval_preserves_wf_restricted: well_formed_val Σ' src_v0 *)
+                assert (Hwf_src0 : well_formed_val Σ' src_v0).
+                { eapply eval_preserves_wf_restricted;
+                    [exact Hwf' | exact Hext' | constructor | exact Hwf_body0
+                    | exact Heval0]. }
+                (* Get ANF value from wf_glob IH *)
+                destruct (IH src_v0 Hwf_src0) as [anf_v0 Hrel0].
+                (* Build extended map *)
+                exists (M.set v0 anf_v0 rho_g').
+                intros k v_g Hkdep Hlk.
+                simpl in Hlk. destruct (eq_kername k k0) eqn:Hkeq.
+                * (* k = k0 *)
+                  apply ReflectEq.eqb_eq in Hkeq. subst k0.
+                  injection Hlk as <-.
+                  exists cb, body0, anf_v0.
+                  split; [exact Hdecl0 |]. split; [exact Hbody0 |].
+                  split; [apply M.gss |].
+                  intros src_v' f' t' Heval'.
+                  assert (src_v' = src_v0)
+                    by (eapply eval_val_det; eassumption).
+                  subst src_v'. exact Hrel0.
+                * (* k ≠ k0: delegate to IH for cm' *)
+                  destruct (M.elt_eq v_g v0) as [Heq_v | Hneq_v].
+                  -- (* v_g = v0: use coherence and overwrite with anf_v0 *)
+                     subst v_g.
+                     specialize (Hrho_g' k v0 Hkdep Hlk).
+                     destruct Hrho_g' as [decl' [body' [anf_v' [Hd [Hb [Hg Hr]]]]]].
+                     exists decl', body', anf_v0.
+                     split; [exact Hd |]. split; [exact Hb |].
+                     split; [apply M.gss |].
+                     intros src_v' f' t' Heval'.
+                     destruct (Hcmap_eval_coherent
+                                 k k0 v0 decl' body' cb body0 src_v' f' t'
+                                 (Hcm_sub' _ _ Hlk) Hlk_cmap0
+                                 Hd Hb Hdecl0 Hbody0 Heval')
+                       as [f0' [t0' Heval0']].
+                     assert (src_v' = src_v0)
+                       by (eapply eval_val_det; eassumption).
+                     subst src_v'. exact Hrel0.
+                  -- (* v_g ≠ v0: standard case *)
+                     specialize (Hrho_g' k v_g Hkdep Hlk).
+                     destruct Hrho_g' as [decl' [body' [anf_v' [Hd [Hb [Hg Hr]]]]]].
+                     exists decl', body', anf_v'.
+                     split; [exact Hd |]. split; [exact Hb |].
+                     split; [| exact Hr].
+                     rewrite M.gso; [exact Hg | exact Hneq_v].
+              + (* k0 constant but no body in Σ0: skip *)
+                exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                (* k ∈ cmap, so cmap_sound gives declared_constant with body *)
+                injection Hlk as <-.
+                assert (Hlk_cmap : lookup_const cmap k = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                destruct (cmap_sound k v0 Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq.
+                injection Heq as <-. rewrite Hbody0 in Hbody'. discriminate.
+              + (* k0 is InductiveDecl in Σ0: skip *)
+                exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                injection Hlk as <-.
+                assert (Hlk_cmap : lookup_const cmap k = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                destruct (cmap_sound k v0 Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq. discriminate.
+              + (* k0 not in Σ0: skip *)
+                exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. injection Hlk as <-.
+                (* k not in Σ0, but kn_deps e k and wellformed Σ0 ... e
+                   requires In k (map fst Σ0). Contradiction with lookup_env = None. *)
+                exfalso.
+                assert (Hin := kn_deps_declared _ _ e k H4 Hkdep).
+                (* In k (map fst Σ0) but lookup_env Σ0 k = None *)
+                clear -Hin Hlk0.
+                induction ((kn, d) :: Σ') as [| [k' d'] Σ0' IH]; [exact Hin |].
+                simpl in Hlk0. destruct (ReflectEq.eqb k k') eqn:Heq.
+                * discriminate.
+                * simpl in Hin. destruct Hin as [Heq_k | Hin].
+                  -- subst. rewrite ReflectEq.eqb_refl in Heq. discriminate.
+                  -- exact (IH Hlk0 Hin).
+          }
+          exact (Hbuild cmap cmap_nodup_keys (fun k0' v0' Hlk => Hlk)). }
+        destruct Hglob as [rho_g Hglob_rel].
+        eapply anf_val_rel_clos_exists; [exact Hvs' | |exact Hglob_rel].
+        eapply EWellformed.extends_wellformed; [exact Hwf_glob | exact Hext | exact H4].
+
+      + (* ClosFix_v *)
+        assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
+        { clear -H H3. induction vs.
+          + exists []. constructor.
+          + inv H. inv H3. destruct (H2 H1) as [v' Hv'].
+            destruct (IHvs H4 H5) as [vs' Hvs'].
+            exists (v' :: vs'). constructor; assumption. }
+        destruct Hvs' as [vs' Hvs'].
+        (* Build global target env — same iteration as Clos_v *)
+        assert (Hglob : exists rho_g,
+          global_env_rel func_tag default_tag tgm cmap Σ box_dc
+            (kn_deps_mfix mfix) rho_g).
+        { unfold global_env_rel, global_env_rel'.
+          assert (Hbuild : forall cm,
+            NoDup (map fst cm) ->
+            (forall ka va, lookup_const cm ka = Some va -> lookup_const cmap ka = Some va) ->
+            exists rho_g, forall k v_g,
+            kn_deps_mfix mfix k -> lookup_const cm k = Some v_g ->
+            exists decl body anf_v,
+              declared_constant Σ k decl /\
+              EAst.cst_body decl = Some body /\
+              M.get v_g rho_g = Some anf_v /\
+              (forall src_v f0 t0,
+                eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
+                anf_val_rel' src_v anf_v)).
+          { induction cm as [| [k0 v0] cm' IHcm]; intros Hcm_nodup Hcm_sub.
+            - exists (M.empty val). intros. discriminate.
+            - inversion Hcm_nodup as [| ? ? Hk0_notin_cm' Hcm'_nodup]; subst.
+              assert (Hcm_sub' : forall ka va,
+                  lookup_const cm' ka = Some va ->
+                  lookup_const cmap ka = Some va).
+              { intros ka va Hlk.
+                destruct (eq_kername ka k0) eqn:Hka.
+                - apply eq_kername_bool_eq in Hka. subst ka.
+                  exfalso. apply Hk0_notin_cm'. eapply lookup_const_in_map_fst. exact Hlk.
+                - eapply Hcm_sub. simpl. rewrite Hka. exact Hlk. }
+              destruct (IHcm Hcm'_nodup Hcm_sub')
+                as [rho_g' Hrho_g'].
+              destruct (EGlobalEnv.lookup_env ((kn, d) :: Σ') k0) as [[cb | ?] |] eqn:Hlk0;
+                [destruct (EAst.cst_body cb) as [body0 |] eqn:Hbody0 | |].
+              + assert (Hdecl0 : declared_constant Σ k0 cb) by (apply Hext; exact Hlk0).
+                assert (Hlk_cmap0 : lookup_const cmap k0 = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                destruct (Hglob_term k0 cb body0 Hdecl0 Hbody0)
+                  as [src_v0 [f0 [t0 Heval0]]].
+                assert (Hwf_body0 : wellformed Σ' 0 body0 = true).
+                { simpl in Hlk0. destruct (ReflectEq.eqb k0 kn) eqn:Hkeq0.
+                  - injection Hlk0 as Heq_d. rewrite Heq_d in Hwfd.
+                    simpl in Hwfd. rewrite Hbody0 in Hwfd. exact Hwfd.
+                  - exact (wf_glob_globals_wellformed_gen Σ' Hwf' k0 cb body0 Hlk0 Hbody0). }
+                assert (Hwf_src0 : well_formed_val Σ' src_v0).
+                { eapply eval_preserves_wf_restricted;
+                    [exact Hwf' | exact Hext' | constructor | exact Hwf_body0
+                    | exact Heval0]. }
+                destruct (IH src_v0 Hwf_src0) as [anf_v0 Hrel0].
+                exists (M.set v0 anf_v0 rho_g').
+                intros k v_g Hkdep Hlk.
+                simpl in Hlk. destruct (eq_kername k k0) eqn:Hkeq.
+                * apply ReflectEq.eqb_eq in Hkeq. subst k0. injection Hlk as <-.
+                  exists cb, body0, anf_v0.
+                  split; [exact Hdecl0 |]. split; [exact Hbody0 |]. split; [apply M.gss |].
+                  intros src_v' f' t' Heval'.
+                  assert (src_v' = src_v0) by (eapply eval_val_det; eassumption).
+                  subst src_v'. exact Hrel0.
+                * destruct (M.elt_eq v_g v0) as [Heq_v | Hneq_v].
+                  -- subst v_g.
+                     specialize (Hrho_g' k v0 Hkdep Hlk).
+                     destruct Hrho_g' as [decl' [body' [anf_v' [Hd [Hb [Hg Hr]]]]]].
+                     exists decl', body', anf_v0.
+                     split; [exact Hd |]. split; [exact Hb |]. split; [apply M.gss |].
+                     intros src_v' f' t' Heval'.
+                     destruct (Hcmap_eval_coherent
+                                 k k0 v0 decl' body' cb body0 src_v' f' t'
+                                 (Hcm_sub' _ _ Hlk) Hlk_cmap0
+                                 Hd Hb Hdecl0 Hbody0 Heval')
+                       as [f0' [t0' Heval0']].
+                     assert (src_v' = src_v0)
+                       by (eapply eval_val_det; eassumption).
+                     subst src_v'. exact Hrel0.
+                  -- specialize (Hrho_g' k v_g Hkdep Hlk).
+                     destruct Hrho_g' as [decl' [body' [anf_v' [Hd [Hb [Hg Hr]]]]]].
+                     exists decl', body', anf_v'.
+                     split; [exact Hd |]. split; [exact Hb |]. split; [| exact Hr].
+                     rewrite M.gso; [exact Hg | exact Hneq_v].
+              + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                injection Hlk as <-.
+                assert (Hlk_cmap : lookup_const cmap k = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                destruct (cmap_sound k v0 Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq.
+                injection Heq as <-. rewrite Hbody0 in Hbody'. discriminate.
+              + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. exfalso.
+                injection Hlk as <-.
+                assert (Hlk_cmap : lookup_const cmap k = Some v0).
+                { eapply Hcm_sub. simpl. rewrite eq_kername_refl. reflexivity. }
+                destruct (cmap_sound k v0 Hlk_cmap) as [decl' [body' [Hdecl' Hbody']]].
+                unfold declared_constant in Hdecl'.
+                assert (Heq := Hext _ _ Hlk0). rewrite Hdecl' in Heq. discriminate.
+              + exists rho_g'. intros k v_g Hkdep Hlk. simpl in Hlk.
+                destruct (eq_kername k k0) eqn:Hkeq;
+                  [| exact (Hrho_g' k v_g Hkdep Hlk)].
+                apply ReflectEq.eqb_eq in Hkeq. subst k0. injection Hlk as <-.
+                exfalso.
+                (* kn_deps_mfix gives Exists, use term_global_deps_fresh on each body *)
+                apply Exists_exists in Hkdep.
+                destruct Hkdep as [d0 [Hd0_in Hk_dep]].
+                match goal with Hmfix : Forall _ mfix |- _ =>
+                  eapply Forall_forall in Hmfix; [| exact Hd0_in];
+                  destruct Hmfix as [_ Hwf_d] end.
+                assert (Hin := @term_global_deps_fresh _ ((kn, d) :: Σ') _ _ Hwf_d k Hk_dep).
+                clear -Hin Hlk0.
+                induction ((kn, d) :: Σ') as [| [k' d'] Σ0' IHΣ]; [exact Hin |].
+                simpl in Hlk0. destruct (ReflectEq.eqb k k') eqn:Heq.
+                * discriminate.
+                * simpl in Hin. destruct Hin as [Heq_k | Hin].
+                  -- subst. rewrite ReflectEq.eqb_refl in Heq. discriminate.
+                  -- exact (IHΣ Hlk0 Hin).
+          }
+          exact (Hbuild cmap cmap_nodup_keys (fun k0' v0' Hlk => Hlk)). }
+        destruct Hglob as [rho_g Hglob_rel].
+        eapply anf_val_rel_closfix_exists; [exact Hvs' | | | exact Hglob_rel].
+        * match goal with H : (_ < List.length _)%nat |- _ => exact H end.
+        * match goal with Hmfix : Forall _ mfix |- _ =>
+            eapply Forall_impl; [| exact Hmfix]; intros d0 [Hlam Hwf_d]; split;
+            [exact Hlam | eapply EWellformed.extends_wellformed;
+             [exact Hwf_glob | exact Hext | exact Hwf_d]] end.
+  Unshelve. all: exact (M.empty val).
+  Qed.
+
+End ValRelExists.

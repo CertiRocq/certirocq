@@ -16,7 +16,7 @@ Require Import Libraries.CpdtTactics.
 From Stdlib Require Import Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
-Require Import LambdaANF.Ensembles_util LambdaANF.cps LambdaANF.rename LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.cps_util
+Require Import LambdaANF.Ensembles_util LambdaANF.term LambdaANF.rename LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.term_util
         LambdaANF.List_util LambdaANF.shrink_cps LambdaANF.eval LambdaANF.set_util LambdaANF.identifiers LambdaANF.stemctx LambdaANF.shrink_cps_correct LambdaANF.inline_letapp.
 
 Import ListNotations.
@@ -456,7 +456,7 @@ Section CENSUS.
   Proof.
     revert v sig count; induction l; intros v sig count.
     - simpl; lia.
-    - simpl. rewrite IHl. destruct (cps_util.var_dec v (apply_r sig a)).
+    - simpl. rewrite IHl. destruct (term_util.var_dec v (apply_r sig a)).
       + subst. rewrite gdss. lia.
       + rewrite gdso by auto. unfold get_c. unfold maps_util.getd.
         reflexivity.
@@ -705,8 +705,8 @@ Section CONTRACT.
            apply Nat.eq_add_0 in H; destruct H; subst
          | [ H: 0 = _ + _ |- _ ] =>
            symmetry in H; pi0
-         (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
-         (*   destruct (cps_util.var_dec X Y); try inversion H; pi0 *)
+         (* | [ H: (if term_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
+         (*   destruct (term_util.var_dec X Y); try inversion H; pi0 *)
          | [ H: ?X <> ?X |- _] =>
            exfalso; apply H; auto
          end.
@@ -976,7 +976,7 @@ Section CONTRACT.
       constructor.
       constructor.
       simpl.
-      destruct (cps_util.var_dec v v0).
+      destruct (term_util.var_dec v v0).
       exfalso; apply H.
       subst. constructor.
       auto.
@@ -995,7 +995,7 @@ Section CONTRACT.
       eapply num_occur_n.
       constructor. constructor.
       apply H4. apply H7.
-      simpl. destruct (cps_util.var_dec v v0).
+      simpl. destruct (term_util.var_dec v v0).
       inv H8.
       auto.
       right.
@@ -1011,7 +1011,7 @@ Section CONTRACT.
       eapply num_occur_n.
       constructor; eauto.
       simpl.
-      destruct (cps_util.var_dec v v1).
+      destruct (term_util.var_dec v v1).
       exfalso; apply H0; subst; constructor.
       auto.
       right; auto.
@@ -1050,7 +1050,7 @@ Section CONTRACT.
     - left.
       eapply num_occur_n. constructor.
       simpl.
-      destruct (cps_util.var_dec v v0).
+      destruct (term_util.var_dec v v0).
       exfalso; apply H; subst; auto.
       apply not_occur_list_not_in.
       intro; apply H.
@@ -1086,7 +1086,7 @@ Section CONTRACT.
       eapply num_occur_n.
       constructor.
       simpl.
-      destruct (cps_util.var_dec v v0).
+      destruct (term_util.var_dec v v0).
       exfalso; apply H; subst; auto.
       auto.
     - destruct (var_dec v0 v).
@@ -1461,7 +1461,7 @@ Section CONTRACT.
       rewrite apply_r_empty.
       eapply num_occur_constr.
       constructor. constructor.
-      simpl. destruct (cps_util.var_dec vv v).
+      simpl. destruct (term_util.var_dec vv v).
       subst.
       rewrite gdss. auto.
       rewrite gdso by auto.
@@ -1489,7 +1489,7 @@ Section CONTRACT.
       rewrite gccombine'.
       rewrite apply_r_empty.
       rewrite <- (proj1 rename_all_ns_empty).
-      simpl. destruct (cps_util.var_dec vv v0). subst; rewrite gdss. auto.
+      simpl. destruct (term_util.var_dec vv v0). subst; rewrite gdss. auto.
       rewrite gdso by auto.
       rewrite gdempty. auto.
     - specialize (H vv).
@@ -1502,7 +1502,7 @@ Section CONTRACT.
       rewrite update_census_list_correct.
       rewrite apply_r_list_empty.
       rewrite <- (proj1 rename_all_ns_empty). rewrite !apply_r_empty.
-      simpl. destruct (cps_util.var_dec vv f).
+      simpl. destruct (term_util.var_dec vv f).
       + subst. unfold get_c at 2. rewrite M.gss. lia.
       + subst. unfold get_c at 2. rewrite M.gso, M.gempty; eauto.
     - unfold init_census; simpl.
@@ -1518,7 +1518,7 @@ Section CONTRACT.
       rewrite apply_r_empty.
       rewrite update_census_list_correct.
       rewrite apply_r_list_empty.
-      destruct (cps_util.var_dec vv v).
+      destruct (term_util.var_dec vv v).
       subst; rewrite gdss. rewrite ?gdempty. auto.
       rewrite gdso by auto. rewrite gdempty. auto.
     - unfold init_census; simpl.
@@ -1547,7 +1547,7 @@ Section CONTRACT.
       rewrite ?gdempty.
       rewrite apply_r_empty.
       simpl.
-      destruct (cps_util.var_dec vv v).
+      destruct (term_util.var_dec vv v).
       subst; rewrite gdss. auto.
       rewrite gdso by auto.
       rewrite gdempty.
@@ -1892,7 +1892,7 @@ Section CONTRACT.
           * left.
             eapply num_occur_ec_n.
             constructor. apply H1.
-            simpl. destruct (cps_util.var_dec v v1).
+            simpl. destruct (term_util.var_dec v v1).
             subst;
               exfalso; apply H; auto.
             auto.
@@ -1968,7 +1968,7 @@ Section CONTRACT.
       inv H2; pi0.
       eapply num_occur_ec_n.
       constructor; eauto.
-      simpl. destruct (cps_util.var_dec v v0). subst; exfalso; auto.
+      simpl. destruct (term_util.var_dec v v0). subst; exfalso; auto.
       auto.
       right; auto.
       right; auto.
@@ -2266,7 +2266,7 @@ Section CONTRACT.
       intro; intro; apply H.
       inv H0.
       intro. inv H0.
-      destruct (cps_util.var_dec x x).
+      destruct (term_util.var_dec x x).
       inv H5.
       apply n0; auto.
     - erewrite H.
@@ -2275,7 +2275,7 @@ Section CONTRACT.
         inv H3; pi0; auto. inv H7; pi0; auto.
         apply H2. eapply num_occur_n.
         constructor; eauto.
-        simpl. destruct (cps_util.var_dec x v); auto. }
+        simpl. destruct (term_util.var_dec x v); auto. }
       apply H0 in H2. simpl in H2. inv H2.
       now eauto.
       intro; intro; apply H1; intro.
@@ -2393,14 +2393,14 @@ Section CONTRACT.
       intro; intro; apply H; intro. inv H1; pi0; dec_vars. apply H0.
       eapply num_occur_n.
       constructor; eauto.
-      simpl. destruct (cps_util.var_dec x v); eauto. now exfalso; auto.
+      simpl. destruct (term_util.var_dec x v); eauto. now exfalso; auto.
       assert (rename_all_ns sub (Ecase v l0) = rename_all_ns sub' (Ecase v l0)).
       erewrite (proj1 eq_P_rename_all_ns).
       reflexivity.
       intro; intro; apply H; intro. inv H2; pi0; dec_vars. apply H1.
       eapply num_occur_n.
       constructor; eauto.
-      simpl. destruct (cps_util.var_dec x v); eauto. now exfalso; auto.
+      simpl. destruct (term_util.var_dec x v); eauto. now exfalso; auto.
       simpl in *. inv H0; inv H1.
       erewrite IHc. reflexivity.
       intro; intro; apply H; intro.
@@ -3963,7 +3963,7 @@ Section CONTRACT.
       intros. apply H in H1.
       inv H1. auto. left.
       inv H2. intro.
-      destruct (cps_util.var_dec x (apply_r sig v)).
+      destruct (term_util.var_dec x (apply_r sig v)).
       lia.
       auto.
     - rewrite H; auto.
@@ -3975,7 +3975,7 @@ Section CONTRACT.
       inv H4; pi0. inv H7; pi0. right.
       eapply num_occur_n.
       constructor; eauto. simpl.
-      destruct (cps_util.var_dec x (apply_r sig v)). now  exfalso; auto.
+      destruct (term_util.var_dec x (apply_r sig v)). now  exfalso; auto.
       lia.
       specialize (H0 H3 H2).
       simpl in H0. inv H0. auto.
@@ -4365,7 +4365,7 @@ Section CONTRACT.
         apply not_occurs_not_free.
         eapply num_occur_n.
         constructor; eauto.
-        simpl. destruct (cps_util.var_dec x0 x). exfalso; auto. auto.
+        simpl. destruct (term_util.var_dec x0 x). exfalso; auto. auto.
         auto.
         (* using H4 *)
         eapply sig_inv_dom_mon.
@@ -4601,9 +4601,9 @@ Section CONTRACT.
           apply num_occur_app_ctx in H13.
           destructAll; pi0.
           inv H13.
-          destruct (cps_util.var_dec x x). now inv H20. now eauto.
+          destruct (term_util.var_dec x x). now inv H20. now eauto.
           apply H0 in H13. inv H13. unfold var, M.elt in *. rewrite gxs.
-          destruct (cps_util.var_dec y x).
+          destruct (term_util.var_dec y x).
           now exfalso; auto.
           auto.
         * right.
@@ -4938,7 +4938,7 @@ Section CONTRACT.
     - inv H3.
       + simpl in H.
         simpl.
-        destruct  (cps_util.var_dec (apply_r sig a) (apply_r sig a)).
+        destruct  (term_util.var_dec (apply_r sig a) (apply_r sig a)).
         2: exfalso; auto.
         rewrite IHl with (n := n0); eauto.
         rewrite gdss.
@@ -4958,7 +4958,7 @@ Section CONTRACT.
         inv H4; auto.
       + simpl.
         simpl in H.
-        destruct ( cps_util.var_dec v0 (apply_r sig a)).
+        destruct ( term_util.var_dec v0 (apply_r sig a)).
         exfalso; auto.
         rewrite IHl with (n := n).
         rewrite gdso by auto. rewrite gdso. reflexivity.
@@ -4988,17 +4988,17 @@ Section CONTRACT.
         num_occur_list (apply_r_list sig l) y + num_occur_list l x.
   Proof.
     induction l. auto.
-    simpl. destruct (cps_util.var_dec x a).
+    simpl. destruct (term_util.var_dec x a).
     - subst.
       rewrite apply_r_set1.
-      destruct (cps_util.var_dec y y).
+      destruct (term_util.var_dec y y).
       2:{ exfalso. apply n; auto. }
       rewrite Disjoint_apply_r.
-      destruct (cps_util.var_dec y a). exfalso; auto.
+      destruct (term_util.var_dec y a). exfalso; auto.
       lia.
       split. intro. intro. inv H1. inv H2. apply H0. exists x0. inv H3; auto.
     - rewrite apply_r_set2 by auto.
-      destruct (cps_util.var_dec y (apply_r sig a)); lia.
+      destruct (term_util.var_dec y (apply_r sig a)); lia.
   Qed.
 
   Theorem num_occur_rename_all_set_x:
@@ -5562,7 +5562,7 @@ Section CONTRACT.
     apply H13. apply H27. auto.
     erewrite update_count_sum_range; eauto.
 
-    destruct (cps_util.var_dec v0 (apply_r sig v)).
+    destruct (term_util.var_dec v0 (apply_r sig v)).
     (* apply_r sig v *) subst. rewrite gdss.
     specialize (H (apply_r sig v)). assert ( (get_c (apply_r sig v) count) = 1).
     eapply (proj1 (num_occur_det _)); eauto. rewrite H16 in H15. clear H16.
@@ -5572,12 +5572,12 @@ Section CONTRACT.
     rewrite gdso by auto. unfold maps_util.getd.  unfold get_c in H16. rewrite H16.
     lia.
 
-    destruct (cps_util.var_dec v0 (apply_r sig v)).
+    destruct (term_util.var_dec v0 (apply_r sig v)).
     subst. rewrite gdss.
     specialize (H (apply_r sig v)). assert ( (get_c (apply_r sig v) count) = 1).
     eapply (proj1 (num_occur_det _)); eauto.
     rewrite H15 in H. apply num_occur_app_ctx in H; destructAll. inv H18.
-    simpl in H19. destruct  (cps_util.var_dec (apply_r sig v) (apply_r sig v)). lia.
+    simpl in H19. destruct  (term_util.var_dec (apply_r sig v) (apply_r sig v)). lia.
     exfalso; auto.
     rewrite gdso by auto. unfold get_c in H16; unfold maps_util.getd. lia.
 
@@ -6596,7 +6596,7 @@ Section CONTRACT.
       apply H0.
       auto.
     }
-    destruct (cps_util.var_dec v0 (apply_r sig v)).
+    destruct (term_util.var_dec v0 (apply_r sig v)).
     - subst. rewrite gdss. rewrite H2.
       lia.
     - rewrite gdso by auto.
@@ -7281,11 +7281,11 @@ Section CONTRACT.
     - inv H; eauto. eapply (proj1 (not_occurs_not_free _)); [| eassumption ].
       replace 0 with (num_occur_list [v0] v + 0).
       now constructor.
-      simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
+      simpl. destruct (term_util.var_dec v v0). exfalso; auto. auto.
       eapply (proj1 (not_occurs_not_free _)); [| eassumption ].
       replace 0 with (num_occur_list [v0] v + 0).
       now constructor.
-      simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
+      simpl. destruct (term_util.var_dec v v0). exfalso; auto. auto.
     - eapply (proj2 (not_occurs_not_free _)); eauto.
     - eapply (proj1 (not_occurs_not_free _)); eauto.
     - eapply (proj2 (not_occurs_not_free _)); eauto.
@@ -7981,13 +7981,13 @@ Section CONTRACT.
                   exists x2, (n4+n5). rewrite e0. split. now auto. split. now auto.
                   rewrite gdss. rewrite Hnv1_c. rewrite gvc in Hnv_c.
                   assert (num_occur_list [apply_r sig v0] v = 0). (* by UB *)
-                  simpl. destruct (cps_util.var_dec v (apply_r sig v0)); auto.
+                  simpl. destruct (term_util.var_dec v (apply_r sig v0)); auto.
                   subst. exfalso. apply ub_app_ctx_f in H0; destructAll. inv H11.
                   specialize (H12 (apply_r sig v0)). apply H12. split.
                   - repeat normalize_ctx. apply bound_var_ctx_comp_ctx. right. simpl. constructor; auto.
                   - constructor.
                   - assert (num_occur_list [apply_r sig v0] (apply_r sig v1) = 0).
-                    { simpl.  destruct (cps_util.var_dec (apply_r sig v1) (apply_r sig v0)); auto.
+                    { simpl.  destruct (term_util.var_dec (apply_r sig v1) (apply_r sig v0)); auto.
                       subst. exfalso.
                       assert (~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) (apply_r sig v0)) (* by UB *).
                       { intro. apply ub_app_ctx_f in H0. destructAll.
@@ -8019,7 +8019,7 @@ Section CONTRACT.
                   - rewrite M.gso in H12. rewrite M.gempty in H12. inv H12. auto. }
                 subst. eassumption.
                 rewrite get_c_minus. simpl in H10. rewrite H10.
-                destruct (cps_util.var_dec v2 (apply_r sig v0)).
+                destruct (term_util.var_dec v2 (apply_r sig v0)).
                 subst. rewrite gdss. lia.
                 rewrite gdso by auto. rewrite gdempty. lia.
               - (* inl_inv *)
@@ -9073,7 +9073,7 @@ Section CONTRACT.
         exfalso. specialize (H2 (apply_r sig v)). rewrite garvc in H2.
         unfold ce in H2. apply num_occur_app_ctx in H2.
         destructAll; pi0. simpl in H7. inv H7.
-        destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)).
+        destruct (term_util.var_dec (apply_r sig v) (apply_r sig v)).
         inv H13. now eauto.
       + (* only occ *)
         destruct (M.get (apply_r sig v) sub) eqn:garvs; [destruct s|].
@@ -9615,7 +9615,7 @@ Section CONTRACT.
                   exfalso. inv H14. specialize (H2 (apply_r sig v)). rewrite garvc in H2.
                   apply num_occur_app_ctx in H2. destructAll. inv H12.
                   simpl in H14.
-                  destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)); auto.
+                  destruct (term_util.var_dec (apply_r sig v) (apply_r sig v)); auto.
                   assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by lia.
                   apply not_occur_list in H12. now auto. now auto. now auto.
               + (* x3 is not from l0 *)
@@ -9646,7 +9646,7 @@ Section CONTRACT.
                      (* then dead *)
                      left. specialize (H2 (apply_r sig v)).
                      rewrite garvc in H2. apply num_occur_app_ctx in H2. destructAll.
-                     inv H9. simpl in H12. destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)).
+                     inv H9. simpl in H12. destruct (term_util.var_dec (apply_r sig v) (apply_r sig v)).
                      2: exfalso; auto.
                      assert (x4 = 0) by lia.
                      assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by lia.

@@ -5,7 +5,7 @@
 From Stdlib Require Import Classes.Morphisms Arith NArith.BinNat Relations
      Lia NArith.BinNat.
 
-From CertiRocq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
+From CertiRocq Require Import LambdaANF.term LambdaANF.ctx LambdaANF.tactics.
 
 
 Class resource {I : Type} {A : Type} :=

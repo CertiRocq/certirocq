@@ -1,4 +1,4 @@
-Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.size_cps LambdaANF.term_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.uncurry
         LambdaANF.shrink_cps_correct.
 From Stdlib Require Import FunInd.
@@ -50,7 +50,7 @@ Section list_lemmas.
      length l = length l1 -> (exists rho1, Some rho1 = set_lists l l1 rho).
   Proof. intros; now rewrite @exists_set_lists_iff_length with (rho := rho). Qed.
 
-  (* nesting set_listss (TODO: move to cps.v?) *)
+  (* nesting set_listss (TODO: move to term.v?) *)
   Lemma set_lists_set_lists : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
     Some rho1 = set_lists l v rho ->
     Some rho2 = set_lists l1 v1 rho1 ->
@@ -1877,7 +1877,7 @@ Proof with eauto with Ensembles_DB.
       }
       contradiction H0; apply Hused; left; right; now right.
     + repeat ensemble_compat_simpl; intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
-  - (* Fcons cps uncurry *)
+  - (* Fcons term uncurry *)
     intros Hused Huniq.
     do 2 rewrite occurs_free_fundefs_Fcons.
     do 2 rewrite occurs_free_Efun; simpl; repeat rewrite Union_Empty_set_neut_r.

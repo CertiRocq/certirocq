@@ -8,7 +8,7 @@ Import Nnat.
 From Stdlib Require Structures.Orders.
 Import RelationClasses.
 
-Require Import cps.
+Require Import term.
 
 Definition class := positive.
 Definition noclass : class := 1%positive.

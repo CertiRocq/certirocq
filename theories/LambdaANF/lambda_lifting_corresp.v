@@ -2,7 +2,7 @@
   spec for lambda lifting. Part of the CertiRocq project.
  * Author: Anonymized, 2016 *)
 
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.Ensembles_util
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.Ensembles_util
         LambdaANF.List_util LambdaANF.lambda_lifting LambdaANF.functions LambdaANF.state LambdaANF.tactics
         LambdaANF.logical_relations LambdaANF.eval LambdaANF.lambda_lifting_util LambdaANF.uncurry_correct.
 From CertiRocq.Common Require Import compM.

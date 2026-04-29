@@ -1,0 +1,358 @@
+(* Common definitions for converting MetaRocq Erasure (EAst.term) to LambdaANF *)
+
+(** Stdlib *)
+From Stdlib Require Import ZArith.ZArith Lists.List Arith.Arith Ensembles micromega.Lia.
+
+(** MetaRocq *)
+From MetaRocq.Erasure Require Import EAst EAstUtils EInduction EPrimitive.
+From MetaRocq.Common Require Import Primitive Kernames.
+From MetaRocq.Utils Require Import All_Forall.
+From MetaRocq.Utils Require Import bytestring.
+
+(** CompCert *)
+From compcert Require Import lib.Maps.
+
+(** CertiRocq *)
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq Require Import Pipeline_utils.
+From CertiRocq.LambdaANF Require Import term ctx Ensembles_util.
+
+Import ListNotations.
+Open Scope bs_scope.
+
+Local Notation string := bytestring.string.
+
+(** * Constructor discriminant *)
+
+Definition dcon : Set := inductive * N.
+
+Definition dcon_of_con (i : inductive) (n : nat) : dcon := (i, N.of_nat n).
+
+(** * Constructor tag mapping *)
+
+Definition conId_map := list (dcon * ctor_tag).
+
+Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
+Proof.
+  intros. destruct x,y.
+  assert (H:= AstCommon.inductive_dec i i0).
+  destruct H.
+  - destruct (classes.eq_dec n n0).
+    + subst. left. auto.
+    + right. intro. apply n1. inversion H. auto.
+  - right; intro; apply n1. inversion H; auto.
+Defined.
+
+Section TagLookup.
+
+  Context (default_tag : positive).
+
+  Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
+    match sig with
+    | nil => default_tag
+    | ((cId, inf)::sig') => match conId_dec a cId with
+                            | left _ => inf
+                            | right _ => dcon_to_info a sig'
+                            end
+    end.
+
+  Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
+    dcon_to_info a sig.
+
+End TagLookup.
+
+(** * Global constant environment *)
+
+(** Map from global constant names to LambdaANF variables.
+    Built when processing the global environment; used to translate [tConst]. *)
+Definition const_map := list (kername * var).
+
+Fixpoint lookup_const (cm : const_map) (k : kername) : option var :=
+  match cm with
+  | [] => None
+  | (k', v) :: cm' =>
+    if eq_kername k k' then Some v else lookup_const cm' k
+  end.
+
+(** The set of variables in the range of a [const_map]. *)
+Definition cmap_vars (cm : const_map) : Ensemble var :=
+  fun v => exists s, lookup_const cm s = Some v.
+
+(** The subset of [cmap_vars] restricted to kernames satisfying [D]. *)
+Definition cmap_vars_of (cm : const_map) (D : kername -> Prop) : Ensemble var :=
+  fun v => exists k, D k /\ lookup_const cm k = Some v.
+
+Lemma cmap_vars_of_subset cm D :
+  cmap_vars_of cm D \subset cmap_vars cm.
+Proof. intros v [k [_ Hlk]]. exists k. exact Hlk. Qed.
+
+Lemma cmap_vars_of_monotone cm (D1 D2 : kername -> Prop) :
+  (forall k, D1 k -> D2 k) ->
+  cmap_vars_of cm D1 \subset cmap_vars_of cm D2.
+Proof. intros Hsub v [k [Hd Hlk]]. exists k. split; [exact (Hsub k Hd) | exact Hlk]. Qed.
+
+(** ** Helpers for KernameSet fold_left inclusions *)
+
+(** If k is in [init], it survives any fold_left union. *)
+Lemma fold_left_union_In {A} (f : A -> KernameSet.t) (l : list A) init k :
+  KernameSet.In k init ->
+  KernameSet.In k (fold_left (fun acc x => KernameSet.union (f x) acc) l init).
+Proof.
+  revert init.
+  induction l as [| x l' IH]; intros init Hk.
+  - exact Hk.
+  - simpl. apply IH. apply KernameSet.union_spec. right. exact Hk.
+Qed.
+
+(** If k is in [f x] for some [x ∈ l], it appears in the fold_left union. *)
+Lemma Exists_fold_left_union {A} (f : A -> KernameSet.t) (l : list A) init k :
+  Exists (fun x => KernameSet.In k (f x)) l ->
+  KernameSet.In k (fold_left (fun acc x => KernameSet.union (f x) acc) l init).
+Proof.
+  revert init.
+  induction l as [| x l' IH]; intros init HE.
+  - inv HE.
+  - inv HE.
+    + simpl. apply fold_left_union_In.
+      apply KernameSet.union_spec. left. assumption.
+    + simpl. apply IH. assumption.
+Qed.
+
+(** ** Dependency predicates at kername level *)
+
+(** Kernames referenced by a single term. *)
+Definition kn_deps (e : EAst.term) : kername -> Prop :=
+  fun k => KernameSet.In k (term_global_deps e).
+
+(** Kernames referenced by any term in a list. *)
+Definition kn_deps_list (es : list EAst.term) : kername -> Prop :=
+  fun k => Exists (fun e => KernameSet.In k (term_global_deps e)) es.
+
+(** Kernames referenced by any body in a mutual fixpoint. *)
+Definition kn_deps_mfix (mfix : list (EAst.def EAst.term)) : kername -> Prop :=
+  fun k => Exists (fun d => KernameSet.In k (term_global_deps d.(EAst.dbody))) mfix.
+
+(** ** Dependency-restricted cmap variable sets *)
+
+(** Cmap variables needed by a single term. *)
+Definition cmap_deps (cm : const_map) (e : EAst.term) : Ensemble var :=
+  cmap_vars_of cm (kn_deps e).
+
+(** Cmap variables needed by a list of terms (e.g. constructor args). *)
+Definition cmap_deps_list (cm : const_map) (es : list EAst.term) : Ensemble var :=
+  cmap_vars_of cm (kn_deps_list es).
+
+(** Cmap variables needed by case branch bodies. *)
+Definition cmap_deps_brs (cm : const_map) (brs : list (list name * EAst.term)) : Ensemble var :=
+  cmap_vars_of cm (fun k => Exists (fun br => KernameSet.In k (term_global_deps (snd br))) brs).
+
+(** Cmap variables needed by mutual fixpoint bodies. *)
+Definition cmap_deps_mfix (cm : const_map) (mfix : list (EAst.def EAst.term)) : Ensemble var :=
+  cmap_vars_of cm (kn_deps_mfix mfix).
+
+(** Primitive lookup *)
+Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
+  match prims with
+  | [] => None
+  | (prim, pos) :: prims =>
+    if eq_kername n prim.(prim_name) then Some pos else find_prim prims n
+  end.
+
+
+(** * Inductive environment processing *)
+
+Definition ienv := list (Kernames.kername * AstCommon.itypPack).
+
+Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
+  match m with
+  | O => (nil, n)
+  | S m' =>
+    let (l, nm) := (fromN (n+1) (m')) in
+    (n::l, nm)
+  end.
+
+(** Bind m projections. The first variable in the list binds the last constructor argument. *)
+Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (args:nat)
+  : exp_ctx :=
+  match vars with
+  | [] => Hole_c
+  | v :: vars =>
+    let ctx_p' := ctx_bind_proj tg r vars (args - 1) in
+    (Eproj_c v tg (N.of_nat (args - 1)) r ctx_p')
+  end.
+
+Section InductiveEnv.
+
+  Context (default_tag default_itag : positive).
+
+  Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr)
+           (ind:Kernames.inductive) (nCon:N) (unboxed : N) (boxed : N)
+           (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
+    match (cct, itC) with
+    | (cn::cct', cst::icT') =>
+      let (cname, ccn) := cst in
+      let is_unboxed := Nat.eqb ccn 0 in
+      let info := {| ctor_name := BasicAst.nNamed cname
+                     ; ctor_ind_name := BasicAst.nNamed tyname
+                     ; ctor_ind_tag := niT
+                     ; ctor_arity := N.of_nat ccn
+                     ; ctor_ordinal := if is_unboxed then unboxed else boxed
+                  |} in
+      convert_cnstrs tyname cct' icT' ind (nCon+1)%N
+                     (if is_unboxed then unboxed + 1 else unboxed)
+                     (if is_unboxed then boxed else boxed + 1)
+                     niT
+                     (M.set cn info ce)
+                     (((ind,nCon), cn)::dcm)
+    | (_, _) => (ce, dcm)
+    end.
+
+  Fixpoint convert_typack typ (idBundle:Kernames.kername) (n:nat)
+           (ice : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map))
+    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+    let '(ie, ce, ncT, niT, dcm) := ice in
+    match typ with
+    | nil => ice
+    | (AstCommon.mkItyp itN itC) :: typ' =>
+      let (cct, ncT') := fromN ncT (List.length itC) in
+      let (ce', dcm') :=
+          convert_cnstrs itN cct itC (Kernames.mkInd idBundle n) 0 0 0 niT ce dcm
+      in
+      let ityi :=
+          combine cct (map (fun (c:AstCommon.Cnstr) =>
+                              let (_, n) := c in N.of_nat n) itC)
+      in
+      convert_typack typ' idBundle (n+1)
+                     (M.set niT ityi ie, ce', ncT', (Pos.succ niT), dcm')
+    end.
+
+  Fixpoint convert_env' (g:ienv) (ice:ind_env * ctor_env * ctor_tag * ind_tag * conId_map)
+    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+    let '(ie, ce, ncT, niT, dcm) := ice in
+    match g with
+    | nil => ice
+    | (id, ty)::g' =>
+      convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
+    end.
+
+  Definition convert_env (g:ienv): (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+    let default_ind_env := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty ind_ty_info) in
+    let info := {| ctor_name := BasicAst.nAnon
+                   ; ctor_ind_name := BasicAst.nAnon
+                   ; ctor_ind_tag := default_itag
+                   ; ctor_arity := 0%N
+                   ; ctor_ordinal := 0%N
+                |} in
+    let default_ctor_env := M.set default_tag info (M.empty ctor_ty_info) in
+    convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
+
+End InductiveEnv.
+
+
+(** * Primitive value translation *)
+
+(** Translate MetaRocq's [prim_val] to CertiRocq's [primitive_value].
+    Arrays are not supported and return [None]. *)
+Definition trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive_value :=
+  match prim_val_model p in prim_model t return option primitive_value with
+  | primIntModel i => Some (existT _ AstCommon.primInt i)
+  | primFloatModel f => Some (existT _ AstCommon.primFloat f)
+  | primStringModel s => Some (existT _ AstCommon.primString s)
+  | primArrayModel _ => None
+  end.
+
+
+(** * Helper: pad name list to given length *)
+
+Fixpoint names_lst_len (ns : list name) (m : nat) : list name :=
+  match ns, m with
+  | _, 0%nat => []
+  | [], S _ => repeat nAnon m
+  | n :: ns, S m => n :: names_lst_len ns m
+  end.
+
+
+(** * Induction principle for EAst.term that gives [P] on lambda bodies
+    inside tFix, rather than [P] on the whole [tLambda]. *)
+
+Lemma term_ind_fix_body (P : EAst.term -> Type) :
+  (P EAst.tBox) ->
+  (forall n, P (EAst.tRel n)) ->
+  (forall i, P (EAst.tVar i)) ->
+  (forall n l, All P l -> P (EAst.tEvar n l)) ->
+  (forall na t, P t -> P (EAst.tLambda na t)) ->
+  (forall na b t, P b -> P t -> P (EAst.tLetIn na b t)) ->
+  (forall u v, P u -> P v -> P (EAst.tApp u v)) ->
+  (forall s, P (EAst.tConst s)) ->
+  (forall ind c args, All P args -> P (EAst.tConstruct ind c args)) ->
+  (forall p t, P t -> forall brs, All (fun x => P (snd x)) brs ->
+               P (EAst.tCase p t brs)) ->
+  (forall p t, P t -> P (EAst.tProj p t)) ->
+  (forall mfix idx,
+     All (fun d => match EAst.dbody d with
+                   | EAst.tLambda _ e1 => P e1
+                   | _ => True
+                   end) mfix ->
+     P (EAst.tFix mfix idx)) ->
+  (forall mfix idx, All (fun x => P (EAst.dbody x)) mfix ->
+                    P (EAst.tCoFix mfix idx)) ->
+  (forall p, primProp P p -> P (EAst.tPrim p)) ->
+  (forall t, P t -> P (EAst.tLazy t)) ->
+  (forall t, P t -> P (EAst.tForce t)) ->
+  forall t, P t.
+Proof.
+  intros Hbox Hrel Hvar Hevar Hlam Hletin Happ Hconst Hconstruct
+         Hcase Hproj Hfix Hcofix Hprim Hlazy Hforce.
+  intro t. induction t as [t IH]
+    using (well_founded_induction_type
+             (Wf_nat.well_founded_ltof _ EInduction.size)).
+  unfold Wf_nat.ltof in IH.
+  destruct t; try (apply Hbox || apply Hrel || apply Hvar || apply Hconst).
+  - (* tEvar *) apply Hevar. revert l IH. fix aux 1. intros [| t l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tLambda *) apply Hlam. apply IH. simpl. lia.
+  - (* tLetIn *) apply Hletin; apply IH; simpl; lia.
+  - (* tApp *) apply Happ; apply IH; simpl; lia.
+  - (* tConstruct *) apply Hconstruct. revert args IH. fix aux 1. intros [| t l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tCase *) apply Hcase.
+    + apply IH. simpl. lia.
+    + revert brs IH. fix aux 1. intros [| [lnames e] l'] IH.
+      * constructor.
+      * constructor.
+        -- simpl. apply IH. simpl. lia.
+        -- apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tProj *) apply Hproj. apply IH. simpl. lia.
+  - (* tFix *)
+    apply Hfix. revert mfix IH. fix aux 1. intros [| d l'] IH.
+    + constructor.
+    + constructor.
+      * destruct (EAst.dbody d) eqn:Hbody; try exact I.
+        apply IH. simpl. rewrite Hbody. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tCoFix *) apply Hcofix. revert mfix IH. fix aux 1. intros [| d l'] IH.
+    + constructor.
+    + constructor.
+      * apply IH. simpl. lia.
+      * apply aux. intros y Hy. apply IH. simpl in *. lia.
+  - (* tPrim *)
+    apply Hprim.
+    match goal with |- primProp _ ?pv =>
+      destruct pv as [? [i | f | s | a]]; constructor end.
+    split.
+    + apply IH. cbn in *. lia.
+    + destruct a as [def vals]. simpl.
+      revert vals IH. fix aux 1. intros [| t0 vals'] IH.
+      * constructor.
+      * constructor.
+        -- apply IH. cbn in *. lia.
+        -- apply aux. intros y Hy. apply IH. cbn in *. lia.
+  - (* tLazy *) apply Hlazy. apply IH. simpl. lia.
+  - (* tForce *) apply Hforce. apply IH. simpl. lia.
+Qed.

@@ -10,10 +10,10 @@ From ExtLib Require Import Structures.Monad.
 
 From CertiRocq Require Import
   LambdaANF.toplevel
-  LambdaANF.cps_util
+  LambdaANF.term_util
   Common.Pipeline_utils
   Common.Common
-  LambdaANF.cps
+  LambdaANF.term
   LambdaANF.cps_show.
 
 From MetaRocq.Utils Require Import bytestring MRString.
@@ -79,7 +79,7 @@ Fixpoint check_restrictions (cenv : ctor_env) (e : exp) : error Datatypes.unit :
   end.
 
 
-(* copy-pasted from C backend TODO: move this to cps_util *)
+(* copy-pasted from C backend TODO: move this to term_util *)
 Definition Forall_constructors_in_e (P: var -> ctor_tag -> list var -> Prop) (e:exp) :=
   forall x t  ys e',
     subterm_or_eq (Econstr x t ys e') e -> P x t ys.
@@ -131,13 +131,13 @@ Proof.
   (* f0<>v *) constructor. eapply IHfds; eauto.
 Qed.
 
-(* END move to cps_util *)
+(* END move to term_util *)
 
 
 (* TODO: incorporate into expression_restricted *)
 (* all constructors in the exp exists in cenv and are applied to
    the right number of args *)
-Definition correct_cenv_of_exp: LambdaANF.cps.ctor_env -> exp -> Prop :=
+Definition correct_cenv_of_exp: LambdaANF.term.ctor_env -> exp -> Prop :=
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
@@ -162,7 +162,7 @@ Definition ctor_ordinal_restricted (cenv : ctor_env) (t : ctor_tag) : Prop :=
       (Z.of_N n < Wasm_int.Int32.half_modulus)%Z.
 
 
-Inductive expression_restricted : ctor_env -> cps.exp -> Prop :=
+Inductive expression_restricted : ctor_env -> term.exp -> Prop :=
 | ER_constr : forall x t ys e cenv,
     ctor_ordinal_restricted cenv t ->
       (Z.of_nat (Datatypes.length ys) <= max_constr_args)%Z ->

@@ -1,5 +1,5 @@
 Require Import Common.compM Common.Pipeline_utils.
-Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+Require Import LambdaANF.term LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.List_util LambdaANF.functions LambdaANF.cps_show LambdaANF.Ensembles_util LambdaANF.tactics.
 From Stdlib Require Import ZArith.ZArith.
 From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -85,6 +85,20 @@ Section CompM.
     let names' := M.set n s names in
     compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
+
+  Definition reserve_named_var (x : var) (s : name) : compM' var :=
+    p <- compM.get ;;
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
+    let names' := M.set x s names in
+    let n' := Pos.succ (Pos.max n x) in
+    compM.put (mkCompData n' c i f e fenv names' imap log, st) ;;
+    ret x.
+
+  Definition set_var_name (x : var) (s : name) : compM' unit :=
+    p <- compM.get ;;
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
+    let names' := M.set x s names in
+    compM.put (mkCompData n c i f e fenv names' imap log, st).
 
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
 

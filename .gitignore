@@ -93,9 +93,9 @@ cplugin/.merlin
 result
 /tests/metarocq_erasure/CertiRocq.Tests.metarocq_erasure.metarocq_erasure.metarocq_erasure.c
 /tests/metarocq_erasure/CertiRocq.Tests.metarocq_erasure.metarocq_erasure.metarocq_erasure.h
-/tests/metarocq_erasure/Makefile
 /tests/ffi/Makefile
 /tests/ffi/.Makefile.d
+/tests/lib/Makefile
 /tests/lib/.Makefile.d
 /tests/axioms/CertiRocq.Tests.tests.*.c
 /tests/axioms/CertiRocq.Tests.tests.*.h

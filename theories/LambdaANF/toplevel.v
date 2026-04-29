@@ -1,10 +1,11 @@
 From Stdlib Require Import ZArith.
 Require Import Common.
 From CertiRocq Require Import
-     LambdaANF.cps LambdaANF.cps_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps LambdaANF.LambdaBoxLocal_to_LambdaANF
+     LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
-From CertiRocq Require Import LambdaBoxLocal.toplevel.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
+From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
 
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -18,9 +19,10 @@ Definition prim_env := M.t primitive.
 
 Definition LambdaANFenv : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
 
-Definition LambdaANFterm : Type := cps.exp.
-Definition LambdaANFval : Type := cps.val.
+Definition LambdaANFterm : Type := term.exp.
+Definition LambdaANFval : Type := term.val.
 Definition LambdaANF_FullTerm : Type := LambdaANFenv * LambdaANFterm.
+Definition LambdaBoxEAstTerm : Type := EAst.global_declarations * EAst.term.
 
 Section IDENT.
 
@@ -53,26 +55,44 @@ Section IDENT.
   Definition make_prim_env (prims : list (primitive * positive)) : prim_env :=
     List.fold_left (fun map '(p, pos) => M.set pos p map) prims (M.empty _).
 
-  Definition compile_LambdaANF_CPS prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition inductive_entry_aux_east (x : kername * EAst.global_decl) acc : common.ienv :=
+    match x with
+    | (s, EAst.ConstantDecl _) => acc
+    | (s, EAst.InductiveDecl m) =>
+      (s, ibodies_itypPack m.(ind_bodies)) :: acc
+    end.
+
+  Definition inductive_env_east (e : EAst.global_declarations) : common.ienv :=
+    fold_right inductive_entry_aux_east [] e.
+
+  Definition compile_LambdaANF_CPS prims : CertiRocqTrans LambdaBoxEAstTerm LambdaANF_FullTerm :=
     fun src =>
-      debug_msg "Translating from LambdaBoxLocal to LambdaANF (CPS)" ;;
+      debug_msg "Translating from LambdaBox (EAst) to LambdaANF (CPS)" ;;
       LiftErrorCertiRocqTrans "LambdaANF CPS"
-                             (fun (p : toplevel.LambdaBoxLocalTerm) =>
+                             (fun (p : LambdaBoxEAstTerm) =>
                                 let prim_env := make_prim_env prims in
-                                match convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let ie := inductive_env_east (fst p) in
+                                match cps.convert_top_cps prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var
+                                                          prims (fun _ => None) ie (List.rev (fst p)) (snd p) with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
                                   Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
                                 | (compM.Err s, _) => Err s
                                 end) src.
 
-  Definition compile_LambdaANF_ANF prims : CertiRocqTrans toplevel.LambdaBoxLocalTerm LambdaANF_FullTerm :=
+  Definition compile_LambdaANF_ANF prims : CertiRocqTrans LambdaBoxEAstTerm LambdaANF_FullTerm :=
     fun src =>
-      debug_msg "Translating from LambdaBoxLocal to LambdaANF (ANF)" ;;
+      debug_msg "Translating from LambdaBox (EAst) to LambdaANF (ANF)" ;;
       LiftErrorCertiRocqTrans "LambdaANF ANF"
-                             (fun (p : toplevel.LambdaBoxLocalTerm) =>
+                             (fun (p : LambdaBoxEAstTerm) =>
                                 let prim_env := make_prim_env prims in
-                                match convert_top_anf prim_env fun_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let ie := inductive_env_east (fst p) in
+                                let '(_, _, _, _, dcm) :=
+                                  CertiRocq.LambdaBox_to_LambdaANF.common.convert_env default_ctor_tag default_ind_tag ie in
+                                match CertiRocq.LambdaBox_to_LambdaANF.anf.convert_top_anf
+                                        fun_fun_tag default_ctor_tag prim_env
+                                        default_ind_tag next_var dcm
+                                        prims (fun _ => None) ie (List.rev (fst p)) (snd p) with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
                                   Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
@@ -82,8 +102,8 @@ Section IDENT.
   (** * Definition of LambdaANF backend pipelines *)
 
   (* Add all names to name env *)
-  Definition update_var (names : cps_util.name_env) (x : var)
-    : cps_util.name_env :=
+  Definition update_var (names : term_util.name_env) (x : var)
+    : term_util.name_env :=
     match M.get x names with
     | Some (nNamed _) => names
     | Some nAnon => M.set x (nNamed "x") names
@@ -94,7 +114,7 @@ Section IDENT.
     List.fold_left update_var xs names.
 
   (** Adds missing names to name environment for the C translation *)
-  Fixpoint add_binders_exp (names : cps_util.name_env) (e : exp)
+  Fixpoint add_binders_exp (names : term_util.name_env) (e : exp)
     : name_env :=
     match e with
     | Econstr x _ _ e
@@ -108,7 +128,7 @@ Section IDENT.
     | Ehalt _ => names
     | Efun B e => add_binders_exp (add_binders_fundefs names B) e
     end
-  with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.name_env :=
+  with add_binders_fundefs (names : term_util.name_env) (B : fundefs) : term_util.name_env :=
          match B with
          | Fcons f _ xs e1 B1 =>
            add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1

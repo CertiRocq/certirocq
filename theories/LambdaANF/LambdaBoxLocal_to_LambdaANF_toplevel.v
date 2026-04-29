@@ -7,10 +7,10 @@ Import ListNotations.
 
 Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 
-Require Import cps cps_show eval ctx logical_relations
+Require Import term cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         tactics LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util LambdaBoxLocal_to_LambdaANF_corresp LambdaBoxLocal_to_LambdaANF_correct
-        LambdaANF.tactics identifiers bounds cps_util rename.
+        LambdaANF.tactics identifiers bounds term_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -78,7 +78,7 @@ Section Refinement.
     forall (c : nat), exists t, eval_env_fuel v e fuel_sem.OOT c t.
 
 
-  Program Definition refines M (e1 : expression.exp) (e2 : cps.exp) :=
+  Program Definition refines M (e1 : expression.exp) (e2 : term.exp) :=
     (* Termination *)
     (forall (v1 : value) (c1 t1 : nat),
         eval_env_fuel [] e1 (Val v1) c1 t1 ->
@@ -97,7 +97,7 @@ Section Refinement.
                dcon_to_tag dtag dc tgm = dcon_to_tag dtag dc' tgm -> dc = dc').
 
   Definition cps_rel_top (e : expression.exp) (xs : list var)
-             (k : var) (e' : cps.exp) :=
+             (k : var) (e' : term.exp) :=
     let S := fun x => (max_list xs k + 1 <= x)%positive in
     exists S', cps_cvt_rel func_tag kon_tag dtag S e xs k cnstrs S' e'.
 
@@ -238,7 +238,7 @@ Section Refinement.
       Let_e nAnon e_lib e_cli.
 
 
-    Definition link_trg (k1 x1 : var) (e_lib e_cli : cps.exp) :=
+    Definition link_trg (k1 x1 : var) (e_lib e_cli : term.exp) :=
       (* Efun (Fcons k2 kon_tag [x2] (Ehalt x1) Fnil) *)
       (Efun (Fcons k1 kon_tag [x1] e_cli Fnil) e_lib).
 
@@ -264,7 +264,7 @@ Section Refinement.
             r = (Val v) ->
             cps_val_rel func_tag kon_tag dtag cnstrs v v' ->
             preord_exp cenv (cps_bound f t) eq_fuel i
-                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
+                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty term.val))))
                   (link_trg k1 x1 e_lib' e_cli', rho)) /\
         (* SOurce diverges *)
         (r = fuel_sem.OOT ->

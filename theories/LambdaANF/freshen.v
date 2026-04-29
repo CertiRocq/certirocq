@@ -1,19 +1,19 @@
 (* Freshen the names in a term by renaming its bound variables to be unique positives starting from a given positive, except for a finite number of positives *)
 
-Require Import Common.compM LambdaANF.cps.
+Require Import Common.compM LambdaANF.term.
 From Stdlib Require Import ZArith.ZArith Lists.List.
 Import ListNotations.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-Require Import LambdaANF.cps_util LambdaANF.cps_util LambdaANF.cps_show LambdaANF.state.
+Require Import LambdaANF.term_util LambdaANF.term_util LambdaANF.cps_show LambdaANF.state.
 Require Import MetaRocq.Utils.bytestring.
 Open Scope monad_scope.
 Import MonadNotation.
 
 Definition freshM : Type -> Type := @compM' unit.
 
-(* TODO: move apply_r and apply_r_list to cps_util, and all_fun_name (and proofs) to identifiers *)
+(* TODO: move apply_r and apply_r_list to term_util, and all_fun_name (and proofs) to identifiers *)
 (* after freshen_term e sigma curr l = e', curr', l', BV(e') are in interval [curr, curr'[ and disjoint from l *)
 
 (* XXX Copied temporarily from shrink_cps. Probably move to common file *)

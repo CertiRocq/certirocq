@@ -4,7 +4,7 @@
     minimal formatting so that it's much more readable.
 *)
 From Stdlib Require Import List.
-Require Import LambdaANF.cps.
+Require Import LambdaANF.term.
 Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.

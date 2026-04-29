@@ -4,7 +4,7 @@
 
 From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.MSetRBT
         Lists.List micromega.Lia Sets.Ensembles.
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
+Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.tactics LambdaANF.algebra.
 Require Export LambdaANF.logical_relations.
 Require Import compcert.lib.Coqlib.
@@ -48,7 +48,7 @@ Section LogRelCC.
 
   End Exp_rel.
 
-  (** step-indexed relation on cps terms. Relates terms with open function with closure-converted terms *)
+  (** step-indexed relation on LambdaANF terms. Relates terms with open function with closure-converted terms *)
 
   Fixpoint cc_approx_val (k : nat) (PG : PostGT) (v1 v2 : val) {struct k} : Prop :=
     let fix cc_approx_val_aux (v1 v2 : val) {struct v1} : Prop :=

@@ -3,7 +3,7 @@
  *)
 
 
-Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.Ensembles_util LambdaANF.List_util
+Require Import LambdaANF.term LambdaANF.ctx LambdaANF.term_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.Ensembles_util LambdaANF.List_util
         LambdaANF.eval LambdaANF.logical_relations LambdaANF.functions LambdaANF.tactics LambdaANF.map_util LambdaANF.rename.
 Require Import compcert.lib.Coqlib.
 From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.
@@ -40,7 +40,7 @@ Qed.
 
 
 Lemma extend_fundefs_name_in_fundefs f B1 B2 x :
-  cps_util.numOf_fundefs B1 = cps_util.numOf_fundefs B2 ->
+  term_util.numOf_fundefs B1 = term_util.numOf_fundefs B2 ->
   x \in name_in_fundefs B1 ->
   exists y, extend_fundefs f B1 B2 x = y /\ y \in name_in_fundefs B2.
 Proof.

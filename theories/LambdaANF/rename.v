@@ -1,7 +1,7 @@
 From Stdlib Require Import Lists.List SetoidList NArith.BinNat
      PArith.BinPos MSets.MSetRBT Sets.Ensembles micromega.Lia Logic.Decidable.
 From compcert.lib Require Import Coqlib.
-From CertiRocq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util
+From CertiRocq.LambdaANF Require Import term term_util ctx set_util Ensembles_util
      List_util map_util identifiers functions.
 From CertiRocq Require Import Libraries.maps_util.
 Require Import LambdaANF.tactics.

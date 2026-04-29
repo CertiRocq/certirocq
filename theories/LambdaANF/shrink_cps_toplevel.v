@@ -1,6 +1,6 @@
 Require compcert.lib.Maps compcert.lib.Coqlib.
 From Stdlib Require Import Relation_Definitions Ensembles micromega.Lia micromega.Zify PArith.BinPos.
-Require Import LambdaANF.Ensembles_util LambdaANF.cps LambdaANF.rename LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.cps_util
+Require Import LambdaANF.Ensembles_util LambdaANF.term LambdaANF.rename LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.term_util
         LambdaANF.List_util LambdaANF.shrink_cps LambdaANF.eval LambdaANF.set_util LambdaANF.identifiers LambdaANF.stemctx LambdaANF.shrink_cps_correct
         LambdaANF.shrink_cps_corresp LambdaANF.inline_letapp LambdaANF.algebra LambdaANF.Ensembles_util
         LambdaANF.rel_comp LambdaANF.functions.

@@ -405,9 +405,9 @@ module type CompilerInterface = sig
 end
 
 module MLCompiler : CompilerInterface with
-  type name_env = BasicAst.name Cps.M.t
+  type name_env = BasicAst.name Term0.M.t
   = struct
-  type name_env = BasicAst.name Cps.M.t
+  type name_env = BasicAst.name Term0.M.t
   let compile = Pipeline.compile
   let printProg prog names (dest : string) (imports : import list) =
     let imports' = List.filter_map (fun i -> match i with
@@ -417,7 +417,7 @@ module MLCompiler : CompilerInterface with
       | Link _ -> None
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
-    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
+    PrintClight.print_dest_names_imports prog (Term0.M.elements names) dest imports'
   let generate_glue = Glue.generate_glue
   let generate_ffi = Ffi.generate_ffi
 end

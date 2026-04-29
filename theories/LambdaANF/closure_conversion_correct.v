@@ -5,7 +5,7 @@
 Require Import LambdaANF.tactics LambdaANF.closure_conversion_invariants LambdaANF.closure_conversion LambdaANF.closure_conversion_util
         LambdaANF.algebra.
 Require Import LambdaANF.closure_conversion_corresp LambdaANF.state compM.
-From CertiRocq.LambdaANF Require Import cps size_cps cps_util set_util hoisting identifiers ctx
+From CertiRocq.LambdaANF Require Import term size_cps term_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions eval logical_relations_cc.
 Require Import compcert.lib.Coqlib.
 From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat

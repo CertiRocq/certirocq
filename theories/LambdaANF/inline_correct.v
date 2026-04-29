@@ -1,6 +1,6 @@
 From Stdlib Require Import ZArith.ZArith Lists.List Strings.String Sets.Ensembles Classes.Morphisms micromega.Lia micromega.Zify.
 Require Import compcert.lib.Maps compcert.lib.Coqlib.
-Require Import LambdaANF.cps LambdaANF.state LambdaANF.freshen LambdaANF.cps_util LambdaANF.cps_show LambdaANF.ctx LambdaANF.inline LambdaANF.rename LambdaANF.identifiers
+Require Import LambdaANF.term LambdaANF.state LambdaANF.freshen LambdaANF.term_util LambdaANF.cps_show LambdaANF.ctx LambdaANF.inline LambdaANF.rename LambdaANF.identifiers
         LambdaANF.Ensembles_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.logical_relations LambdaANF.tactics LambdaANF.eval LambdaANF.map_util LambdaANF.inline_letapp
         LambdaANF.List_util LambdaANF.algebra.
 Require Import Common.compM Common.Pipeline_utils Libraries.CpdtTactics Libraries.maps_util.
@@ -2340,7 +2340,7 @@ Section Inline_correct.
           eapply Included_trans. eapply Setminus_Included.
           eapply Included_trans. eassumption. eapply Range_Subset; zify; lia.
       + simpl. rewrite H14. reflexivity.
-      + intros. destruct (cps.M.elt_eq f v); subst.
+      + intros. destruct (term.M.elt_eq f v); subst.
         * inv H21. do 2 eexists. split; [| split; [| split; [| split ]]].
           -- simpl. rewrite peq_true. reflexivity.
           -- now eauto.

@@ -7,7 +7,7 @@ From Stdlib Require Import Lists.List SetoidList NArith.BinNat PArith.BinPos
 
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
-From CertiRocq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util List_util map_util.
+From CertiRocq.LambdaANF Require Import term term_util ctx set_util Ensembles_util List_util map_util.
 
 Import ListNotations.
 
@@ -177,7 +177,7 @@ Qed.
 
 Lemma def_funs_spec x v B B' rho rho' :
   M.get x (def_funs B' B rho rho') = Some v ->
-  (name_in_fundefs B x /\ v = cps.Vfun rho B' x) \/
+  (name_in_fundefs B x /\ v = term.Vfun rho B' x) \/
   (~ name_in_fundefs B x /\ M.get x rho' = Some v).
 Proof.
   induction B; intros Hget.
@@ -191,7 +191,7 @@ Qed.
 
 Lemma def_funs_eq x B B' rho rho' :
   name_in_fundefs B x ->
-  M.get x (def_funs B' B rho rho') = Some (cps.Vfun rho B' x).
+  M.get x (def_funs B' B rho rho') = Some (term.Vfun rho B' x).
 Proof.
   induction B; intros Hin; inv Hin.
   - simpl. inv H; rewrite M.gss. eauto.
@@ -5058,7 +5058,7 @@ Proof.
   - inv H2. pi0. eapply IHl; eauto.
     replace 0 with (num_occur_list [v0] v + 0).
     now constructor.
-    simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
+    simpl. destruct (term_util.var_dec v v0). exfalso; auto. auto.
   - inv H5; eauto. eapply not_occur_list_not_in; eauto.
   Unshelve. all:now econstructor.
 Qed.

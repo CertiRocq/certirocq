@@ -7,7 +7,7 @@ From compcert Require Import
   Coqlib.
 
 From CertiRocq Require Import
-  LambdaANF.cps LambdaANF.cps_util
+  LambdaANF.term LambdaANF.term_util
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_correct
   CodegenWasm.LambdaANF_to_Wasm_primitives

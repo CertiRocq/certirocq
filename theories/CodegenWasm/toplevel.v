@@ -2,7 +2,8 @@ From Wasm Require Import datatypes.
 
 From Stdlib Require Import ZArith List.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
-Require Import LambdaANF.cps LambdaANF.cps_show CodegenWasm.LambdaANF_to_Wasm.
+Require Import LambdaANF.cps_show CodegenWasm.LambdaANF_to_Wasm.
+Require Import LambdaANF.term.
 
 Require Import ExtLib.Structures.Monad.
 Import MonadNotation.
@@ -11,10 +12,10 @@ Definition add_prim_names (prims : list (primitive * positive)) (nenv : name_env
   List.fold_left (fun m '(prim, p) => M.set p (nNamed prim.(prim_target)) m) prims nenv.
 
 
-Definition ensure_top_level_Efun (prog : exp) :=
+Definition ensure_top_level_Efun (prog : LambdaANF.term.exp) : LambdaANF.term.exp :=
   match prog with
-  | Efun _ _ => prog
-  | _ => Efun Fnil prog
+  | LambdaANF.term.Efun _ _ => prog
+  | _ => LambdaANF.term.Efun LambdaANF.term.Fnil prog
   end.
 
 

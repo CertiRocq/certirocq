@@ -11,12 +11,12 @@ Import ListNotations.
 
 Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 
-Require Import cps cps_show eval ctx logical_relations LambdaANF.tactics
+Require Import term cps_show eval ctx logical_relations LambdaANF.tactics
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
         LambdaBoxLocal_to_LambdaANF_anf_util
         LambdaBoxLocal_to_LambdaANF_anf_corresp LambdaBoxLocal_to_LambdaANF_anf_correct
-        identifiers bounds cps_util rename.
+        identifiers bounds term_util rename.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -94,7 +94,7 @@ Section Refinement.
   (* ANF refines: if source terminates, target terminates with bounded cost
      and related value. If source diverges, target diverges.
      The constant M accounts for the Ehalt step at the end. *)
-  Program Definition refines M (e1 : expression.exp) (e2 : cps.exp) :=
+  Program Definition refines M (e1 : expression.exp) (e2 : term.exp) :=
     (* Termination *)
     (forall (v1 : value) (c1 t1 : nat),
         eval_env_fuel [] e1 (Val v1) c1 t1 ->
