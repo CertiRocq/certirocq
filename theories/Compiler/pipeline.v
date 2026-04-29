@@ -91,10 +91,9 @@ Section Pipeline.
     o <- get_options ;;
     p <- compile_LambdaBoxEAst o.(erasure_config) o.(inductives_mapping) p ;;
     check_axioms p ;;
-    p <- match direct o with
-         | true => compile_LambdaANF_ANF next_id prims p
-         | false => compile_LambdaANF_CPS next_id prims p
-         end ;;
+    p <- (if direct o
+          then compile_LambdaANF_ANF next_id prims p
+          else compile_LambdaANF_CPS next_id prims p) ;;
     if debug then compile_LambdaANF_debug next_id p  (* For debugging intermediate states of the λanf pipeline *)
     else compile_LambdaANF next_id p.
 
