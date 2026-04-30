@@ -4,20 +4,15 @@
 -R theories/common              CertiRocq.Common
 -R theories/Extraction          CertiRocq.extraction
 -R theories/Glue                CertiRocq.Glue
--R theories/LambdaBoxMut        CertiRocq.LambdaBoxMut
--R theories/LambdaBoxLocal      CertiRocq.LambdaBoxLocal
+-R theories/LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF
 -R theories/LambdaANF           CertiRocq.LambdaANF
 -R theories/Codegen             CertiRocq.Codegen
 -R theories/CodegenWasm         CertiRocq.CodegenWasm
--R theories/Runtime             CertiRocq.runtime
 
--R benchmarks                   CertiRocq.Benchmarks
 -R plugin                       CertiRocq.Plugin
 -I plugin
 -R cplugin                      CertiRocq.VanillaPlugin
 -I cplugin
--I benchmarks/metacoq_erasure
--I benchmarks/certirocq_pipeline
 
 -R bootstrap/certirocqc/theories CertiRocq.CertiRocqC
 -I bootstrap/certirocqc

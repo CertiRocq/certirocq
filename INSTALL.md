@@ -79,8 +79,8 @@ $ make install
 
 ## Testing the installation
 
-You can test the installation using the including benchmark suite:
+You can test the installation using the regression suites under `tests/`:
 
 ```console
-$ make -C benchmarks all
+$ make -C tests all
 ```

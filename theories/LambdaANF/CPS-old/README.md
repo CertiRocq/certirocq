@@ -1,0 +1,1 @@
+This is a directory containing the original proof of the CPS transformation. The transformation is no longer in use. There is a new tranformation in `LambdaBox_to_LambdaANF`. The old proof is kept for reference, so that we can use it when we prove correct the new CPS transformation.

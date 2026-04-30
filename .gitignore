@@ -16,7 +16,6 @@
 Makefile.coq
 /libraries/Makefile
 /theories/Makefile
-/theories/Makefile.plugin
 /theories/Extraction/*.ml
 /theories/Extraction/*.mli
 /theories/ExtractionVanilla/*.ml
@@ -27,7 +26,6 @@ Makefile.coq
 .DS_Store
 *.bak
 Makefile.conf
-Makefile.plugin.conf
 /plugin/Makefile
 /plugin/extraction
 /cplugin/extraction
@@ -38,14 +36,11 @@ myMain.ml
 myMain.mli
 vs.ml
 vs.mli
-test_plugin.*.c
-test_plugin.*.h
 theories/.Makefile.d
 libraries/.Makefile.d
 plugin/.Makefile.d
 plugin/g_certirocq.ml
 cplugin/g_certirocq_vanilla.ml
-bootstrap/certirocq_pipeline/g_certirocqc.ml
 bootstrap/certirocqc/CertiRocq.CertiRocqC.compile.certirocqc.c
 bootstrap/certirocqc/CertiRocq.CertiRocqC.compile.certirocqc.h
 bootstrap/certirocqc/glue.CertiRocq.CertiRocqC.compile.certirocqc.c

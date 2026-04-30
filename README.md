@@ -19,7 +19,7 @@ Large parts of the CertiRocq compiler have been verified whereas others are in t
 
 The [CertiRocq Wiki](https://github.com/certirocq/certirocq/wiki) has instructions for using the [CertiRocq plugin](https://github.com/certirocq/certirocq/wiki/The-CertiRocq-plugin) to compile Gallina to C and interfacing with the generated C code.
 
-You can also find some demos [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/tests.v) and [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/axioms/tests.v).
+You can also find end-to-end examples in [tests/programs/tests.v](tests/programs/tests.v) and [tests/axioms/tests.v](tests/axioms/tests.v).
 
 ## Installation Instructions
 
@@ -39,24 +39,25 @@ CertiRocq is open source and distributed under the [MIT license](LICENSE.md).
 
 ## Directory structure
 
-* `theories/` contains the sources of the compiler
-* `plugin/` contains the CertiRocq plugin for Rocq
-* `benchmarks/` contains the benchmark suite
-* `glue/` contains the glue code generator
+* `libraries/` contains shared Coq utilities used throughout the development
+* `theories/` contains the core compiler development and proofs
+* `plugin/` contains the optimized CertiRocq plugin for Rocq
+* `cplugin/` contains the vanilla extraction-based CertiRocq plugin for Rocq
+* `runtime/` contains the C runtime support and FFI helpers used by generated programs
+* `tests/` contains demos, regression tests, and end-to-end test harnesses
 * `bootstrap/` contains the bootstrapped CertiRocq plugin for Rocq and
   a CertiRocq-compiled variant of MetaRocq's safe type checker.
 
 Structure of the theories directory:
 
-* `theories/common`: contains common code utilities 
-* `theories/Compiler`: contains the toplevel CertiRocq pipeline
-* `theories/LambdaBoxMut`: mutual inductive version of MetaRocq's LambdaBox erased language
-* `theories/LambdaBoxLocal`: variant where deBruijn indices are represented using `N` instead of `nat`.
-   The transformation from LambdaBoxMut let-binds the definitions in the environment to
-   produce a closed term.
-* `theories/LambdaANF` contains the λANF pipeline (and conversions -- direct and LambdaANF -- to λANF)
-* `theories/Codegen` contains the C code generator.
-* `theories/CodegenWasm` contains the Wasm code generator.
+* `theories/common`: contains common utilities shared across the development
+* `theories/LambdaBox_to_LambdaANF`: contains the translation from MetaRocq's erased LambdaBox language to CertiRocq's ANF IR
+* `theories/LambdaANF`: contains the λANF IR, optimization pipeline, and proofs
+* `theories/Compiler`: contains the top-level CertiRocq pipeline
+* `theories/Codegen`: contains the Clight code generator
+* `theories/CodegenWasm`: contains the Wasm code generator
+* `theories/Glue`: contains glue-code generation support
+* `theories/Extraction` and `theories/ExtractionVanilla`: contain the extraction entry points used to build the two plugin variants
 
 
 ## Bugs 
