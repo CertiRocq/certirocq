@@ -1,56 +1,46 @@
-CertiRocq compiler plugin
-========================
+# CertiRocq Plugin
 
-This directory contains the sources of a plugin for running the
-extracted CertiRocq compiler on arbitrary Coq definitions.
-It uses the Template-Coq reifier to the extracted Template-Coq Ast
-to build an ML representation of the term which is then directly
-fed to the extracted version of the compiler.
+This directory contains the main CertiRocq plugin for Rocq. It packages
+the compiler extracted from `theories/Extraction/` together with the
+Rocq frontend and the registration modules for runtime primitives and GMP.
 
-Usage
-=====
+## What It Provides
 
-The plugin provides a single command:
+This is the regular user-facing plugin. Its core commands include:
 
+* `CertiRocq Compile <ref>`
+* `CertiRocq Compile Wasm <ref>`
+* `CertiRocq Run <ref>`
+* `CertiRocq Show IR <ref>`
+* `CertiRocq Generate Glue [...]`
+* `CertiRocq Eval <ref>`
+
+Here `<ref>` denotes a Rocq global reference, typically the name of a
+Gallina definition or constant.
+
+## Building
+
+From the repository root:
+
+```console
+$ make plugin
 ```
-CertiRocq Compile ref.
+
+This refreshes the extracted OCaml code from `theories/Extraction/` into
+`plugin/extraction/` and then builds the Rocq plugin.
+
+## Loading
+
+In Rocq, load the plugin with:
+
+```coq
+From CertiRocq.Plugin Require Import CertiRocq.
 ```
 
-Where `ref` must be the name of a Coq definition.  The extracted
-compiler relies on the `Compiler.allInstances.compile_template_Codegen` and
-`Compiler.allInstances.printProg` functions. It will compile the
-definition and output the program to file `fullref.c` where fullref is
-the fully qualified name of the reference `ref`, in the current working
-directory. The resulting code can then be compiled with `gcc` or
-`compcert` using the runtime support in `Runtime`.
+## Maintaining The Extracted Build
 
-Installation
-============
-
-To build the plugin, first make the CertiRocq project (including
-`Extraction/extraction.v`). Then, in the directory above:
-
-``sh make_plugin.sh all`` 
-
-This will copy the extract the implementation to this directory and
-compile the plugin. The plugin can then be loaded using `Require Import
-CertiRocq` within a `Coq` toplevel having the includes `-R
-theories/plugin` and `-I theories/plugin` (as e.g. in the toplevel
-`_CoqProject` for running `benchmarks/test_plugin.v`).
-
-In case of trouble building the plugin, it is recommended to try first:
-
-`make -f Makefile.plugin clean` 
-
-Before running `make_plugin.sh`
-
-Adding phases
-=============
-
-To ensure proper linking of the extracted code, when one adds a phase to
-the compiler, one must add the corresponding .ml and .mli files to
-`../_PluginProject` (beware the first letter is always lowercase to
-comply with `OCaml` tools) and the module name to `certirocq_plugin.mllib`,
-at the right level according to module dependencies. Then `make -f
-Makefile.plugin clean && make -f Makefile.plugin all` to rebuild the
-dependencies and the plugin.
+The extracted `.ml` and `.mli` files used by the plugin are listed
+explicitly in `plugin/_CoqProject`, and the packed plugin module list is
+maintained in `plugin/certirocq_plugin.mlpack`. If a change to the
+extraction pipeline adds or removes generated modules, update both files
+and rebuild with `make plugin`.
