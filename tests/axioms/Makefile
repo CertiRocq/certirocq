@@ -4,11 +4,11 @@ INCLUDE=../../runtime
 WARN_OPTS=-w -Wno-everything
 
 # Names of the tests
-TESTS=print_lst fibn list_sum_int63 list_sum_int63_tinfo
+TESTS=$(shell cat TESTS)
 # Names of the generated C files
 CFILES=$(patsubst %, CertiRocq.Tests.tests.%.c, $(TESTS)) glue.c
 
-default: exec
+default: run
 
 .PHONY: compile exec clean run
 
