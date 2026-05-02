@@ -1,17 +1,22 @@
-Extraction to OCaml Tests
---------------------------
+# `tests/ocaml`
 
-Extract and compile the CertiRocq tests with the OCaml compiler
-(bytecode + native) to compare performance.
+This directory extracts selected CertiRocq test programs to OCaml, builds them
+with both the bytecode and native OCaml compilers, and reports execution times.
 
+Run from the top-level test driver with:
 
-To extract, compile and run:
+```sh
+make -C tests ocaml
+```
 
-   # make all
+If you run this directory directly, build `tests/lib` first:
 
-Note that vs_easy and vs_hard are modified by hand so they will not
-become extracted every time the script run.
+```sh
+make -C tests lib
+make -C tests/ocaml run
+```
 
-The modification is neede to suspend top-level computations from
-becoming evaluated once (and for all), so that we can run the
-computation multiple times.
+`tests.v` regenerates the OCaml benchmark modules used by this directory. The
+`vs_easy` and `vs_hard` wrappers are written so that the expensive VeriStar
+computations remain deferred until the benchmark function is called, rather than
+being evaluated at OCaml module initialization time.

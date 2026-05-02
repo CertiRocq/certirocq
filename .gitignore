@@ -105,6 +105,9 @@ result
 /tests/ocaml/demo1.*
 /tests/ocaml/demo2.*
 /tests/ocaml/list_sum.*
+/tests/ocaml/binom.*
+/tests/ocaml/vs_easy.*
+/tests/ocaml/vs_hard.*
 /tests/ocaml/color.*
 /tests/ocaml/sha.*
 /tests/ocaml/sha_fast.*
