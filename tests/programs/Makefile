@@ -16,7 +16,7 @@ OPTS=opt opt1 opt2 opt3 opt4 opt5
 TESTS_OPTS=$(foreach TEST,$(TESTS),$(OPTS:%=$(TEST)_%))
 CFILES=$(TESTS_OPTS:%=CertiRocq.Tests.tests.%.c)
 
-default: exec
+default: run
 all: lib exec run
 
 .PHONY: all default clean cleanexec lib cleanlib run $(TESTS)
@@ -27,6 +27,8 @@ clean: cleanexec
 	rm -f ./*.*.c
 	rm -f ./*.*.h
 	rm -f ./*.vo
+	rm -f ./*.vok
+	rm -f ./*.vos
 	rm -f ./*.glob
 	rm -f ./glue_*.*
 	rm -f ./CertiRocq.Tests.tests.*.c
