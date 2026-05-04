@@ -54,7 +54,7 @@ mainopt: $(CMXFILES) main.cmx
 	ocamlopt -o mainopt unix.cmxa $(CMXFILES) main.cmx
 
 tests: tests.v
-	coqc $(COQOPTS) tests.v
+	rocq c $(COQOPTS) tests.v
 
 run: main mainopt
 	./main 10

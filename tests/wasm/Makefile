@@ -27,10 +27,10 @@ cleanlib:
 	$(MAKE) clean -C ../lib
 
 tests: tests.v lib
-	ulimit -s $(STACKSIZE) && coqc $(COQOPTS) $<
+	ulimit -s $(STACKSIZE) && rocq c $(COQOPTS) $<
 
 primitive_unit_tests: uint63_unit_tests.v lib
-	coqc -quiet $(COQOPTS) $<
+	rocq c -quiet $(COQOPTS) $<
 
 run: run_tests run_primitive_unit_tests
 

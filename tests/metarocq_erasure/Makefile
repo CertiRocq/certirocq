@@ -20,16 +20,16 @@ plugin: metarocq_erasure.vo Loader.vo
 test: test.vo
 
 test.vo: plugin test.v
-	coqc -I . -Q . CertiRocq.Tests.metarocq_erasure test.v
+	rocq c -I . -Q . CertiRocq.Tests.metarocq_erasure test.v
 
 clean: 
 	rm *.cm*
 
 Loader.vo: Loader.v install
-	coqc -I . -Q . CertiRocq.Tests.metarocq_erasure Loader.v
+	rocq c -I . -Q . CertiRocq.Tests.metarocq_erasure Loader.v
 
 metarocq_erasure.vo: metarocq_erasure.v
-	coqc ${COQOPTS} $<
+	rocq c ${COQOPTS} $<
 
 %.o: %.c
 	gcc ${COPTS} -c -Wno-everything -O2 -fomit-frame-pointer -o $@ $<

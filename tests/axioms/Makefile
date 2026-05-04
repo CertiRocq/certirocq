@@ -23,7 +23,7 @@ clean:
 	rm -f glue.*
 
 compile: tests.v
-	coqc $(COQOPTS) tests.v
+	rocq c $(COQOPTS) tests.v
 
 $(CFILES): compile
 

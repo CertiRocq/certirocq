@@ -47,7 +47,7 @@ cleanlib:
 	$(MAKE) clean -C ../lib
 
 $(GLUE) $(CFILES): tests.v
-	coqc $(COQOPTS) $<
+	rocq c $(COQOPTS) $<
 
 %_opt:  $(TEST_PREQS) CertiRocq.Tests.tests.%_opt.c  ; $(TEST_RECIPE)
 %_opt1: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt1.c ; $(TEST_RECIPE)
