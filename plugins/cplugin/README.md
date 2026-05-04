@@ -31,7 +31,7 @@ $ make cplugin
 ```
 
 This refreshes the extracted OCaml code from
-`theories/ExtractionVanilla/` into `cplugin/extraction/` and then builds
+`theories/ExtractionVanilla/` into `plugins/cplugin/extraction/` and then builds
 the Rocq plugin.
 
 ## Loading
@@ -45,7 +45,7 @@ From CertiRocq.VanillaPlugin Require Import CertiRocqVanilla.
 ## Maintaining The Extracted Build
 
 The extracted `.ml` and `.mli` files used by this plugin are listed
-explicitly in `cplugin/_CoqProject`, and the packed plugin module list
-is maintained in `cplugin/certirocq_vanilla_plugin.mlpack`. If a change
+explicitly in `plugins/cplugin/_CoqProject`, and the packed plugin module list
+is maintained in `plugins/cplugin/certirocq_vanilla_plugin.mlpack`. If a change
 to the extraction pipeline adds or removes generated modules, update
 both files and rebuild with `make cplugin`.

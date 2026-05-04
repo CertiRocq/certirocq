@@ -1,5 +1,5 @@
--Q ../../cplugin CertiRocq.VanillaPlugin
--I ../../cplugin
+-Q ../../plugins/cplugin CertiRocq.VanillaPlugin
+-I ../../plugins/cplugin
 -R theories CertiRocq.CertiRocqC
 -I .
 

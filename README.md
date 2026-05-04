@@ -41,8 +41,7 @@ CertiRocq is open source and distributed under the [MIT license](LICENSE.md).
 
 * `libraries/` contains shared Rocq utilities used throughout the development
 * `theories/` contains the core compiler development and proofs
-* `plugin/` contains the main CertiRocq plugin for Rocq, intended for regular use and built from the standard extraction pipeline
-* `cplugin/` contains the vanilla-extraction variant of the CertiRocq plugin, used as the more conservative plugin variant and as the basis for bootstrapped tools
+* `plugins/` contains the Rocq plugins, with `plugins/plugin/` as the main plugin and `plugins/cplugin/` as the vanilla-extraction variant used as the more conservative plugin variant and as the basis for the bootstrapped tools
 * `runtime/` contains the C runtime support and FFI helpers used by generated programs
 * `tests/` contains demos, regression tests, and end-to-end test harnesses
 * `bootstrap/` contains the bootstrapped CertiRocq plugin for Rocq and

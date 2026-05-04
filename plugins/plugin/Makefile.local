@@ -1,13 +1,13 @@
 COQ_SRC_SUBDIRS+=user-contrib/MetaRocq/Template
-# OPENS=-open Metarocq_template_plugin
-CAMLFLAGS+=$(OPENS)
 CAMLFLAGS+=-w -33 # Unused opens
 CAMLFLAGS+=-w -34 # Unused type program
 CAMLFLAGS+=-w -32 # Unused values
 CAMLFLAGS+=-w -39 # Unused rec flagss
 CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
-CAMLPKGS += -package rocq-metarocq-template-ocaml.plugin,stdlib-shims
+CAMLFLAGS+=-w -8 # Non-exhaustive matches produced by extraction
+CAMLFLAGS+=-w -37 # Unused constructor
+CAMLPKGS += -package rocq-metarocq-template-ocaml.plugin,stdlib-shims 
 
 CC=$(shell which gcc || which clang-11)
 
@@ -15,4 +15,4 @@ merlin-hook::
 		$(HIDE)echo 'PKG rocq-metarocq-template-ocaml.plugin' >> .merlin
 		$(HIDE)echo 'PKG stdlib-shims' >> .merlin
 
-certirocq_plugin.cmxs: ../runtime/get_ordinal.o
+certirocq_vanilla_plugin.cmxs: ../../runtime/get_ordinal.o

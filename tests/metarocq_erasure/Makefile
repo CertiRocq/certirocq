@@ -10,7 +10,7 @@ COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRo
 	-Q ../../theories/LambdaANF CertiRocq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiRocq.LambdaBoxLocal \
 	-Q ../../theories/Compiler CertiRocq.Compiler -Q ../../theories/common CertiRocq.Common \
 	-Q ../../theories/LambdaBoxMut CertiRocq.LambdaBoxMut -Q .. CertiRocq.Tests \
-        -R ../../plugin CertiRocq.Plugin -I ../../plugin
+        -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin
 
 RUNTIME_DIR = ../../runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o
