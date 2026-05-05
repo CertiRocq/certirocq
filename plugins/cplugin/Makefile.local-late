@@ -1,6 +1,42 @@
 certirocq_vanilla_plugin.cmxa: certirocq_vanilla_plugin.cmx ../../runtime/get_ordinal.o
 	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
 
+certirocq_vanilla_plugin.cmx: plugin_utils.cmx | certirocq_vanilla_plugin.mlpack certirocq_vanilla_plugin.mlpack.d
+	$(SHOW)'CAMLOPT -pack -o $@'
+	$(HIDE)mods=$$(sed -n 's/^certirocq_vanilla_plugin_MLPACK_DEPENDENCIES:=//p' certirocq_vanilla_plugin.mlpack.d | \
+		sed 's#extraction/pipeline certirocq#extraction/pipeline plugin_utils certirocq#' | \
+		tr ' ' '\n' | awk '!seen[$$0]++' | tr '\n' ' '); \
+	objs=""; \
+	for m in $$mods; do objs="$$objs $$m.cmx"; done; \
+	$(TIMER) $(CAMLOPTLINK) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -pack -o $@ $$objs
+
+plugin_utils.cmi: ../common/plugin_utils.mli extraction/bytestring.cmi extraction/kernames.cmi
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+plugin_utils.cmo: ../common/plugin_utils.ml plugin_utils.cmi extraction/bytestring.cmi extraction/kernames.cmi static/caml_bytestring.cmo
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+plugin_utils.cmx: ../common/plugin_utils.ml plugin_utils.cmi extraction/bytestring.cmx extraction/kernames.cmx static/caml_bytestring.cmx
+	$(SHOW)'CAMLOPT -c -for-pack Certirocq_vanilla_plugin $<'
+	$(HIDE)$(TIMER) $(CAMLOPTC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -for-pack Certirocq_vanilla_plugin -o $@ $<
+
+plugin_utils.mli.d: ../common/plugin_utils.mli
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/plugin_utils#plugin_utils#g' > $@
+
+plugin_utils.ml.d: ../common/plugin_utils.ml
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/plugin_utils#plugin_utils#g' > $@
+
+certirocq.cmi: plugin_utils.cmi
+certirocq.cmo: plugin_utils.cmi
+certirocq.cmx: plugin_utils.cmi
+g_certirocq_vanilla.cmi: plugin_utils.cmi
+g_certirocq_vanilla.cmo: plugin_utils.cmi
+g_certirocq_vanilla.cmx: plugin_utils.cmi
+
 g_certirocq_vanilla.ml: g_certirocq_vanilla.mlg ../common/certirocq_commands.mlg
 	$(SHOW)'CPP+COQPP $<'
 	$(HIDE)tmp=$$(mktemp /tmp/g_certirocq_vanilla.XXXXXX.mlg); \

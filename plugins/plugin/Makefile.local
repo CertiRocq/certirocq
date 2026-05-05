@@ -16,4 +16,7 @@ merlin-hook::
 		$(HIDE)echo 'PKG rocq-metarocq-template-ocaml.plugin' >> .merlin
 		$(HIDE)echo 'PKG stdlib-shims' >> .merlin
 
+archclean::
+		$(HIDE)rm -f plugin_utils.cmi plugin_utils.cmt plugin_utils.cmti plugin_utils.cmx plugin_utils.ml.d plugin_utils.mli.d plugin_utils.o
+
 certirocq_vanilla_plugin.cmxs: ../../runtime/get_ordinal.o

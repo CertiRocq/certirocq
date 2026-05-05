@@ -82,6 +82,12 @@ let interp_extract_cnst ~loc gr str arity alloc =
   in
   (extract_constant gref str, arity, alloc)
 
+#if CERTIROCQ_HAS_WASM
+let help_msg = make_help_msg ~supports_wasm:true
+#else
+let help_msg = make_help_msg ~supports_wasm:false
+#endif
+
 }
 
 ARGUMENT EXTEND cargs

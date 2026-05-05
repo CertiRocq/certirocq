@@ -12,6 +12,8 @@ open Plugin_utils
 open Certirocq
 open Tacarg
 open G_certirocq_vanilla
+
+let help_msg = make_help_msg ~supports_wasm:false
 }
 
 VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
