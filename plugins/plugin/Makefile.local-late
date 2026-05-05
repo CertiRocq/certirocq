@@ -1,7 +1,7 @@
 certirocq_plugin.cmxa: certirocq_plugin.cmx ../../runtime/get_ordinal.o
 	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
 
-certirocq_plugin.cmx: plugin_utils.cmx | certirocq_plugin.mlpack certirocq_plugin.mlpack.d
+certirocq_plugin.cmx: certirocq_debug.cmx tm_util.cmx plugin_utils.cmx | certirocq_plugin.mlpack certirocq_plugin.mlpack.d
 	$(SHOW)'CAMLOPT -pack -o $@'
 	$(HIDE)mods=$$(sed -n 's/^certirocq_plugin_MLPACK_DEPENDENCIES:=//p' certirocq_plugin.mlpack.d | \
 		sed 's#extraction/pipeline certirocq#extraction/pipeline plugin_utils certirocq#' | \
@@ -9,6 +9,44 @@ certirocq_plugin.cmx: plugin_utils.cmx | certirocq_plugin.mlpack certirocq_plugi
 	objs=""; \
 	for m in $$mods; do objs="$$objs $$m.cmx"; done; \
 	$(TIMER) $(CAMLOPTLINK) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -pack -o $@ $$objs
+
+certirocq_debug.mli: ../common/certirocq_debug.mli ;
+certirocq_debug.ml: ../common/certirocq_debug.ml ;
+tm_util.ml: ../common/tm_util.ml ;
+plugin_utils.mli: ../common/plugin_utils.mli ;
+plugin_utils.ml: ../common/plugin_utils.ml ;
+
+certirocq_debug.cmi: ../common/certirocq_debug.mli
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+certirocq_debug.cmo: ../common/certirocq_debug.ml certirocq_debug.cmi
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+certirocq_debug.cmx: ../common/certirocq_debug.ml certirocq_debug.cmi
+	$(SHOW)'CAMLOPT -c -for-pack Certirocq_plugin $<'
+	$(HIDE)$(TIMER) $(CAMLOPTC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -for-pack Certirocq_plugin -o $@ $<
+
+certirocq_debug.mli.d: ../common/certirocq_debug.mli
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/certirocq_debug#certirocq_debug#g' > $@
+
+certirocq_debug.ml.d: ../common/certirocq_debug.ml
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/certirocq_debug#certirocq_debug#g' > $@
+
+tm_util.cmo: ../common/tm_util.ml
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+tm_util.cmx: ../common/tm_util.ml
+	$(SHOW)'CAMLOPT -c -for-pack Certirocq_plugin $<'
+	$(HIDE)$(TIMER) $(CAMLOPTC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -for-pack Certirocq_plugin -o $@ $<
+
+tm_util.ml.d: ../common/tm_util.ml
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/tm_util#tm_util#g' > $@
 
 plugin_utils.cmi: ../common/plugin_utils.mli extraction/bytestring.cmi extraction/kernames.cmi
 	$(SHOW)'CAMLC -c $<'

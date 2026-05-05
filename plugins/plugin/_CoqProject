@@ -7,8 +7,8 @@ META.rocq-certirocq
 
 tm_util.ml
 
-../common/plugin_utils.ml
-../common/plugin_utils.mli
+plugin_utils.ml
+plugin_utils.mli
 certirocq.mli
 certirocq.ml
 g_certirocq.mlg

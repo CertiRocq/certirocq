@@ -33,14 +33,15 @@ let debug_opt =
       | _ -> assert false
       end
   | None ->
-   (declare_bool_option_and_ref ~key ~value:false ()).get
+    (declare_bool_option_and_ref ~key ~value:false ()).get
 
-let debug (m : unit ->Pp.t) =
+let debug (m : unit -> Pp.t) =
   if debug_opt () then
     Feedback.(msg_debug (m ()))
   else
     ()
-type ('a,'b) sum =
+
+type ('a, 'b) sum =
   Left of 'a | Right of 'b
 
 (* todo(gmm): these are helper functions *)
@@ -90,7 +91,6 @@ let bad_term_verb trm rs =
   let env = Global.env () in
   CErrors.user_err (str "Bad term:" ++ spc () ++ Printer.pr_constr_env env (Evd.from_env env) trm
                     ++ spc () ++ str " Error: " ++ str rs)
-
 
 module CaseCompat =
   struct

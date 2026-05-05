@@ -1,6 +1,6 @@
 let certirocq_debug = ref true
 
-let camlstring_of_coqstring (s: char list) =
+let camlstring_of_coqstring (s : char list) =
   let r = Stdlib.Bytes.create (List.length s) in
   let rec fill pos = function
   | [] -> r
