@@ -1,7 +1,7 @@
 certirocq_vanilla_plugin.cmxa: certirocq_vanilla_plugin.cmx ../../runtime/get_ordinal.o
 	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
 
-g_certirocq_vanilla.ml: g_certirocq_vanilla.mlg ../common/certirocq_grammar.mlg
+g_certirocq_vanilla.ml: g_certirocq_vanilla.mlg ../common/certirocq_commands.mlg
 	$(SHOW)'CPP+COQPP $<'
 	$(HIDE)tmp=$$(mktemp /tmp/g_certirocq_vanilla.XXXXXX.mlg); \
 		cpp -traditional-cpp -P $< > $$tmp; \
