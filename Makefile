@@ -1,5 +1,7 @@
-.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap
+.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap plugin-manifests
 
+PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-manifest
+PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
 
 all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries 
@@ -17,9 +19,17 @@ submodules:
 
 plugins: plugin cplugin
 
+plugin-manifests: $(PLUGIN_MANIFEST_OUTPUTS)
+
+plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS)
+	python3 plugins/manifests/generate.py plugin
+
+plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS)
+	python3 plugins/manifests/generate.py cplugin
+
 plugin: all runtime plugins/plugin/CertiRocq.vo
 
-plugins/plugin/Makefile: plugins/plugin/_CoqProject
+plugins/plugin/Makefile: plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack
 	cd plugins/plugin ; coq_makefile -f _CoqProject -o Makefile
 
 plugins/plugin/CertiRocq.vo: all plugins/plugin/Makefile
@@ -28,7 +38,7 @@ plugins/plugin/CertiRocq.vo: all plugins/plugin/Makefile
 
 cplugin: all runtime plugins/cplugin/CertiRocq.vo
 
-plugins/cplugin/Makefile: plugins/cplugin/_CoqProject
+plugins/cplugin/Makefile: plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
 	cd plugins/cplugin ; coq_makefile -f _CoqProject -o Makefile
 
 plugins/cplugin/CertiRocq.vo: all plugins/cplugin/Makefile

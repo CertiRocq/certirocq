@@ -30,7 +30,6 @@ PrimString
 Uint63Axioms
 PrimStringAxioms
 Int0
-Int63
 Byte
 Caml_byte
 Ascii
@@ -94,33 +93,21 @@ Ast0
 Typing0
 AstUtils
 EnvMap
-LiftSubst
-UnivSubst0
-WcbvEval
-Pretty
-Extractable
 Logic0
 
 Errors0
 
-Digits
 List_util
 Monad0
 MonadState
-Orders
 OrdersEx
-OrdersTac
 POrderedType
-Specif
 StateMonad
-MSetWeakList
-EqdepFacts
 Utils
 Init
 MonadExc
 OptionMonad
 Monad_utils
-
 TemplateEnvMap
 TemplateProgram
 EtaExpand
@@ -129,23 +116,13 @@ EnvironmentTyping
 Ssrbool
 WGraph
 UGraph0
-Typing0
 PCUICPrimitive
 PCUICAst
 PCUICAstUtils
 PCUICCases
-PCUICUnivSubst
-PCUICLiftSubst
-PCUICEquality
 PCUICTyping
-PCUICInduction
 PCUICNormal
 PCUICPosition
-PCUICChecker
-PCUICPretty
-PCUICReflect
-PCUICSafeLemmata
-PCUICCumulativity
 PCUICProgram
 PCUICExpandLets
 TemplateToPCUIC
@@ -153,14 +130,9 @@ PCUICTransform
 PCUICErrors
 PCUICEqualityDec
 PCUICWfEnv
-PCUICWfUniverses
 PCUICWfEnvImpl
-PCUICUnivSubst
 PCUICSafeReduce
-PCUICSafeConversion
-PCUICSafeChecker
 PCUICSafeRetyping
-SafeTemplateChecker
 
 EPrimitive
 EAst
@@ -197,8 +169,6 @@ EBeta
 ECoInductiveToInductive
 ETransform
 Erasure0
-ErasureCorrectness
-SafeTemplateErasure
 
 ZArith_dec
 Coqlib0
@@ -207,9 +177,6 @@ ExceptionMonad
 RandyPrelude
 Classes2
 
-OrdersFacts
-MSetInterface
-ExtLibMisc
 Smallstep
 
 AstCommon
@@ -240,7 +207,6 @@ Proto_util
 Frame
 Rewriting
 Uncurry_proto
-Color
 Shrink_cps
 Closure_conversion
 Hoisting
@@ -254,7 +220,6 @@ Zbits
 Integers
 Floats
 AST
-Values
 Values0
 Camlrocq
 

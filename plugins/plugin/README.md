@@ -39,8 +39,16 @@ From CertiRocq.Plugin Require Import CertiRocq.
 
 ## Maintaining The Extracted Build
 
-The extracted `.ml` and `.mli` files used by the plugin are listed
-explicitly in `plugins/plugin/_CoqProject`, and the packed plugin module list is
-maintained in `plugins/plugin/certirocq_plugin.mlpack`. If a change to the
-extraction pipeline adds or removes generated modules, update both files
-and rebuild with `make plugin`.
+The file lists in `plugins/plugin/_CoqProject` and
+`plugins/plugin/certirocq_plugin.mlpack` are generated from
+`plugins/manifests/`. The `_CoqProject` extraction entries are discovered from
+`plugins/plugin/extraction/`; the `.mlpack` order is maintained in the shared
+manifest.
+
+If a change to the extraction pipeline adds or removes generated modules, run:
+
+```console
+$ make plugin-manifests
+```
+
+Then rebuild with `make plugin`.

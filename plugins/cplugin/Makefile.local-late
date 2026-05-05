@@ -4,17 +4,12 @@ certirocq_vanilla_plugin.cmxa: certirocq_vanilla_plugin.cmx ../../runtime/get_or
 certirocq_vanilla_plugin.cmx: certirocq_debug.cmx tm_util.cmx plugin_utils.cmx | certirocq_vanilla_plugin.mlpack certirocq_vanilla_plugin.mlpack.d
 	$(SHOW)'CAMLOPT -pack -o $@'
 	$(HIDE)mods=$$(sed -n 's/^certirocq_vanilla_plugin_MLPACK_DEPENDENCIES:=//p' certirocq_vanilla_plugin.mlpack.d | \
+		sed 's#^#certirocq_debug tm_util #' | \
 		sed 's#extraction/pipeline certirocq#extraction/pipeline plugin_utils certirocq#' | \
 		tr ' ' '\n' | awk '!seen[$$0]++' | tr '\n' ' '); \
 	objs=""; \
 	for m in $$mods; do objs="$$objs $$m.cmx"; done; \
 	$(TIMER) $(CAMLOPTLINK) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -pack -o $@ $$objs
-
-certirocq_debug.mli: ../common/certirocq_debug.mli ;
-certirocq_debug.ml: ../common/certirocq_debug.ml ;
-tm_util.ml: ../common/tm_util.ml ;
-plugin_utils.mli: ../common/plugin_utils.mli ;
-plugin_utils.ml: ../common/plugin_utils.ml ;
 
 certirocq_debug.cmi: ../common/certirocq_debug.mli
 	$(SHOW)'CAMLC -c $<'
