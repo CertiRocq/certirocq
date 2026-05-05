@@ -7,6 +7,7 @@ CAMLFLAGS+=-w -32 # Unused values
 CAMLFLAGS+=-w -39 # Unused rec flagss
 CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
+CAMLFLAGS+=-rectypes
 CAMLPKGS += -package rocq-metarocq-template-ocaml.plugin,stdlib-shims
 
 CC=$(shell which gcc || which clang-11)

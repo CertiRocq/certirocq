@@ -549,9 +549,11 @@ module MLCompiler : CompilerInterface with
     let opts = fix_opts opts in
     Pipeline.compile opts (FixRepr.fix_quoted_program prg)
   let printProg prog names (dest : string) (imports : import list) =
-    let imports' = List.map (fun i -> match i with
-      | FromRelativePath s -> "#include \"" ^ s ^ "\""
-      | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
+    let imports' = List.filter_map (fun i -> match i with
+      | FromRelativePath s -> Some ("#include \"" ^ s ^ "\"")
+      | FromLibrary (s, _) -> Some ("#include <" ^ s ^ ">")
+      | LibraryPath _ -> None
+      | Link _ -> None
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Term0.M.elements names) dest imports'
@@ -766,6 +768,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | LibraryPath s -> ["-L"; s]
+        | Link s -> ["-l" ^ s]
         | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
       let l = make_rt_file "certirocq_run_main.o" :: imports' in
       String.concat " " l
@@ -997,6 +1001,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
+        | Link s -> ["-cclib"; "-l" ^ s]
+        | LibraryPath s -> ["-cclib"; "-L"; "-cclib"; s]
         | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
         | FromLibrary (s, None) -> [make_rt_file (oname s)]) imports) in
       let l = imports' in

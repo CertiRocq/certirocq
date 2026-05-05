@@ -26,6 +26,8 @@ type import =
     FromRelativePath of string
   | FromAbsolutePath of string
   | FromLibrary of string * string option
+  | LibraryPath of string
+  | Link of string
 
 let string_of_bytestring = caml_string_of_bytestring
 let bytestring_of_string = bytestring_of_caml_string
@@ -52,11 +54,11 @@ let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
 let help_msg : string =
   "Usage:\n\
 To compile an Gallina definition named <gid> type:\n\
-   CertiRocqC Compile <options> <gid>.\n\n\
+   CertiRocq Compile <options> <gid>.\n\n\
 To show this help message type:\n\
-   CertiRocqC -help.\n\n\
+   CertiRocq -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiRocqC Show IR <options> <gid>.\n\n\
+   CertiRocq Show IR <options> <gid>.\n\n\
 Valid options:\n\
 -file S   :  Specify the filename. Default: the fully qualified name of <gid>.\n\
 -ext S    :  Specify the string s to be appended to the filename\n\
@@ -71,4 +73,4 @@ Valid options:\n\
 -typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaRocq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiRocqC Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
+   CertiRocq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."

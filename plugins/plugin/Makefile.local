@@ -7,6 +7,7 @@ CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
 CAMLFLAGS+=-w -8 # Non-exhaustive matches produced by extraction
 CAMLFLAGS+=-w -37 # Unused constructor
+CAMLFLAGS+=-rectypes
 CAMLPKGS += -package rocq-metarocq-template-ocaml.plugin,stdlib-shims 
 
 CC=$(shell which gcc || which clang-11)

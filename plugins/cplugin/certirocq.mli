@@ -54,6 +54,7 @@ val make_options : command_args list -> prim list -> string -> options
 val register : prim list -> import list -> unit
 
 val register_inductives : inductives_mapping -> unit
+val register_constant_inductives : extract_inductives -> unit
 
 val get_name : Names.GlobRef.t -> string
 
