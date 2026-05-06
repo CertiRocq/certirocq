@@ -5,6 +5,13 @@
 
 META.rocq-certirocq-vanilla
 
+../common/certirocq_debug.mli
+../common/certirocq_debug.ml
+../common/tm_util.ml
+../common/certirocq_options.mli
+../common/certirocq_options.ml
+../common/plugin_utils.mli
+../common/plugin_utils.ml
 certirocq.mli
 certirocq.ml
 g_certirocq_vanilla.mlg

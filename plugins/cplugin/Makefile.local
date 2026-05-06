@@ -1,3 +1,5 @@
+include ../common/Makefile.plugin-common
+
 COQ_SRC_SUBDIRS+=user-contrib/MetaRocq/Template
 # OPENS=-open Metarocq_template_plugin
 CAMLFLAGS+=$(OPENS)

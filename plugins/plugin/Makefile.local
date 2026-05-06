@@ -1,3 +1,5 @@
+include ../common/Makefile.plugin-common
+
 COQ_SRC_SUBDIRS+=user-contrib/MetaRocq/Template
 CAMLFLAGS+=-w -33 # Unused opens
 CAMLFLAGS+=-w -34 # Unused type program

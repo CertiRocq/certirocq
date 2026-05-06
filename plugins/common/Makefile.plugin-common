@@ -1,0 +1,17 @@
+# Shared OCaml sources are listed in _CoqProject using their real ../common
+# paths so Rocq's dependency scanners can read them. Build their objects
+# locally, though, because each plugin variant needs a different -for-pack.
+COMMON_MLFILES := $(filter ../common/%.ml,$(MLFILES))
+COMMON_MLIFILES := $(filter ../common/%.mli,$(MLIFILES))
+
+MLFILES := $(filter-out $(COMMON_MLFILES),$(MLFILES)) $(notdir $(COMMON_MLFILES))
+MLIFILES := $(filter-out $(COMMON_MLIFILES),$(MLIFILES)) $(notdir $(COMMON_MLIFILES))
+
+OCAMLLIBS += -I ../common
+vpath %.ml ../common
+vpath %.mli ../common
+
+CAMLC ?= "$(OCAMLFIND)" ocamlc -c -o $@
+CAMLOPTC ?= "$(OCAMLFIND)" opt -c -o $@
+CAMLDEP ?= sh -c '$(OCAMLFIND) ocamldep -slash -ml-synonym .mlpack "$$@" | sed "s|\.\./common/||g"' camldep
+OCAMLLIBDEP ?= sh -c '"$(COQBIN)ocamllibdep" "$$@" | sed "s|\.\./common/||g"' ocamllibdep
