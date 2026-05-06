@@ -261,7 +261,6 @@ LambdaANF_to_Wasm
 Toplevel1
 Glue_utils
 Glue
-Ffi
 Pipeline
 Certirocq
 G_certirocq

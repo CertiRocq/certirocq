@@ -70,7 +70,6 @@ To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
 Valid options:\n\
 --output S                 : Use S as the output name stem. Default: the fully qualified name of <gid>.\n\
 --output-suffix S          : Append S to generated output names.\n\
---ffi-prefix S             : Prefix generated FFI functions to avoid C symbol clashes.\n\
 -O N                       : Set the optimization level. N=1 enables lambda lifting; N=0 disables it.\n\
 --debug                    : Show debugging information.\n\
 --c-args N                 : Set the C-argument threshold used by lambda lifting and C translation.\n\

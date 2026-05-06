@@ -279,13 +279,12 @@ let make_pipeline_options (opts : options) =
   let timing_anf = opts.time_anf in
   let debug  = opts.debug in
   let anf_variant = coq_nat_of_int opts.anf_variant in
-  let prefix = bytestring_of_string opts.prefix in
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   let prims = quote_prims prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config inductives_mapping cps args anf_variant olevel timing timing_anf debug prefix toplevel_name prims
+  Pipeline.make_opts erasure_config inductives_mapping cps args anf_variant olevel timing timing_anf debug toplevel_name prims
 
 (** Main Compilation Functions *)
 
@@ -322,9 +321,6 @@ module type CompilerInterface = sig
 
   val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations ->
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-
-  val generate_ffi :
-    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
 
 end
 
@@ -480,9 +476,6 @@ module MLCompiler : CompilerInterface with
   let generate_glue opts decls =
     let opts = fix_opts opts in
     Glue.generate_glue opts (FixRepr.fix_declarations decls)
-  let generate_ffi opts prg =
-    let opts = fix_opts opts in
-    Ffi.generate_ffi opts (FixRepr.fix_quoted_program prg)
 end
 
 
@@ -1047,30 +1040,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
     (term, name)
-
-  let ffi_command ~opaque_access opts gr =
-    let (term, name) = quote_ind ~opaque_access opts gr in
-    let debug = opts.debug in
-    let options = make_pipeline_options opts in
-
-    let time = Unix.gettimeofday() in
-    (match CI.generate_ffi options (Obj.magic term) with
-    | CompM.Ret (((nenv, header), prg), logs) ->
-      let time = (Unix.gettimeofday() -. time) in
-      debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
-      (match logs with [] -> () | _ ->
-        debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
-      let time = Unix.gettimeofday() in
-      let suff = opts.ext in
-      let cstr = ("ffi." ^ name ^ suff ^ ".c") in
-      let hstr = ("ffi." ^ name ^ suff ^ ".h") in
-      CI.printProg prg nenv cstr [];
-      CI.printProg header nenv hstr [];
-
-      let time = (Unix.gettimeofday() -. time) in
-      debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
-    | CompM.Err s ->
-      CErrors.user_err Pp.(str "Could not generate FFI glue code: " ++ pr_string s))
 
   let glue_command ~opaque_access opts grs =
     let terms = grs |> List.rev

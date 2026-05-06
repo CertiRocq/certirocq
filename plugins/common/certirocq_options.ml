@@ -11,7 +11,6 @@ type command_args =
  | ANFVARIANT of int
  | BUILD_DIR of string
  | OUTPUT_SUFFIX of string
- | FFI_PREFIX of string
  | ENTRY_POINT of string
  | OUTPUT of string
 
@@ -37,7 +36,6 @@ type options =
     build_dir : string;
     filename : string;
     ext : string;
-    prefix : string;
     toplevel_name : string;
     prims : prim list;
     inductives_mapping : inductives_mapping;
@@ -69,7 +67,6 @@ let default_options ~build_dir ~inductives_mapping ~extracted_inductives () : op
     build_dir = check_build_dir build_dir;
     filename = "";
     ext = "";
-    prefix = "";
     toplevel_name = "body";
     prims = [];
     inductives_mapping;
@@ -93,7 +90,6 @@ let make_options ~build_dir ~inductives_mapping ~extracted_inductives
     | ANFVARIANT n :: xs -> aux {o with anf_variant = n} xs
     | BUILD_DIR s :: xs -> aux {o with build_dir = check_build_dir s} xs
     | OUTPUT_SUFFIX s :: xs -> aux {o with ext = s} xs
-    | FFI_PREFIX s :: xs -> aux {o with prefix = s} xs
     | ENTRY_POINT s :: xs -> aux {o with toplevel_name = s} xs
     | OUTPUT s :: xs -> aux {o with filename = s} xs
   in

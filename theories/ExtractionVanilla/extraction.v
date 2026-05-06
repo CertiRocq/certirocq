@@ -117,7 +117,6 @@ Separate Extraction
          Compiler.pipeline.compile
          Erasure.default_dearging_config
          Glue.glue.generate_glue
-         Glue.ffi.generate_ffi
          term.M.elements
          Compiler.pipeline.show_IR.
 

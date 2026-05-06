@@ -114,7 +114,6 @@ CodegenWasm/toplevel_theorem.v
 # Glue
 Glue/glue_utils.v
 Glue/glue.v
-Glue/ffi.v
 
 # Compiler
 Compiler/pipeline.v

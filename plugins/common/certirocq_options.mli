@@ -11,7 +11,6 @@ type command_args =
  | ANFVARIANT of int
  | BUILD_DIR of string
  | OUTPUT_SUFFIX of string
- | FFI_PREFIX of string
  | ENTRY_POINT of string
  | OUTPUT of string
 
@@ -37,7 +36,6 @@ type options =
     build_dir : string;
     filename : string;
     ext : string;
-    prefix : string;
     toplevel_name : string;
     prims : prim list;
     inductives_mapping : inductives_mapping;

@@ -324,7 +324,6 @@ LambdaANF_to_Wasm :: plugin
 Toplevel1 :: plugin
 Glue_utils
 Glue
-Ffi
 Pipeline
 Plugin_utils :: cplugin
 Certirocq

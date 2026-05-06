@@ -47,11 +47,6 @@ VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
     let opts = make_options l cs (get_name gr) in
     Certirocqc.show_ir opts gr
   }
-| [ "CertiRocqC" "FFI" ffiargs_list(l) global(gr) ] -> {
-    let gr = Nametab.global gr in
-    let opts = make_options l [] "" in
-    Certirocqc.ffi_command opts gr
-  }
 | [ "CertiRocqC" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
     let grs = List.map Nametab.global grs in
     let opts = make_options l [] "" in

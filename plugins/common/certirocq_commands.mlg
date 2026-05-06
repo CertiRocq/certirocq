@@ -113,11 +113,6 @@ VERNAC ARGUMENT EXTEND extract_cnst
 | [ reference(gr) "=>" string(str) natural_opt(arity) "with" "tinfo" ] -> { interp_extract_cnst ~loc gr str arity true }
 END
 
-VERNAC ARGUMENT EXTEND ffiargs
-| [ "--ffi-prefix" string(s) ] -> { FFI_PREFIX(s) }
-| [ cargs(c) ] -> { c }
-END
-
 VERNAC ARGUMENT EXTEND glueargs
 | [ "--cps" ] -> { CPS }
 | [ "--debug" ] -> { DEBUG }
@@ -199,11 +194,6 @@ VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY STATE opaque_access
     let gr = Nametab.global gr in
     let opts = Certirocq.make_options l cs (get_name gr) in
     Certirocq.show_ir opts gr
-  }
-| [ "CertiRocq" "FFI" ffiargs_list(l) global(gr) ] -> {
-    let gr = Nametab.global gr in
-    let opts = Certirocq.make_options l [] "" in
-    Certirocq.ffi_command opts gr
   }
 | [ "CertiRocq" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
     let grs = List.map Nametab.global grs in

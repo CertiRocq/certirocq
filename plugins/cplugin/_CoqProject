@@ -223,8 +223,6 @@ extraction/fMapInterface.ml
 extraction/fMapInterface.mli
 extraction/fMapList.ml
 extraction/fMapList.mli
-extraction/ffi.ml
-extraction/ffi.mli
 extraction/fin.ml
 extraction/fin.mli
 extraction/floatOps.ml

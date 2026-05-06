@@ -38,7 +38,6 @@ Record Options :=
     time     : bool;  (* Track timing information *)
     time_anf : bool;  (* Track timing for the ANF pipeline *)
     debug    : bool;  (* Log debug messages *)
-    prefix   : string; (* prefix to generated FFI *)
 
     body_name : string; (* Name of the toplevel function *)
     prims    : primitives;

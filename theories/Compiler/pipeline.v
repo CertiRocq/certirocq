@@ -7,7 +7,6 @@ Require Import Common.Common Common.compM Common.Pipeline_utils.
 From Stdlib Require Import List.
 Require Import maps_util.
 Require Import Glue.glue.
-Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
 From MetaRocq.Erasure Require Import EAst Erasure.
@@ -129,7 +128,6 @@ Definition default_opts : Options :=
      time := false;
      time_anf := false;
      debug := false;
-     Pipeline_utils.prefix := "";
      Pipeline_utils.body_name := "body";
      prims := [];
   |}.
@@ -143,7 +141,6 @@ Definition make_opts
            (o_level : nat)                           (* optimization level *)
            (time : bool) (time_anf : bool)           (* timing options *)
            (debug : bool)                            (* Debug log *)
-           (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
            (prims : list primitive)  (* list of extracted constants *)
   : Options :=
@@ -157,7 +154,6 @@ Definition make_opts
      time := time;
      time_anf := time_anf;
      debug := debug;
-     Pipeline_utils.prefix := prefix;
      Pipeline_utils.body_name := toplevel_name;
      prims :=  prims |}.
 

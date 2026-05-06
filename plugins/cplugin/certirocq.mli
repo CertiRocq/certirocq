@@ -35,9 +35,6 @@ module type CompilerInterface = sig
 
   val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
-  val generate_ffi :
-    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error  
 end
 
 module CompileFunctor (CI : CompilerInterface) : sig
@@ -49,8 +46,6 @@ module CompileFunctor (CI : CompilerInterface) : sig
                   options -> Names.GlobRef.t -> import list -> unit
   val show_ir : opaque_access:Global.indirect_accessor ->
                 options -> Names.GlobRef.t -> unit
-  val ffi_command : opaque_access:Global.indirect_accessor ->
-                    options -> Names.GlobRef.t -> unit
   val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
   val eval_gr : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> Constr.t
   val eval : opaque_access:Global.indirect_accessor -> options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
@@ -60,7 +55,6 @@ val compile_only : opaque_access:Global.indirect_accessor -> options -> Names.Gl
 val generate_glue_only : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
 val compile_C : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> unit
 val show_ir : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
-val ffi_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
 val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
 val eval_gr : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> Constr.t
 val eval : opaque_access:Global.indirect_accessor -> options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
