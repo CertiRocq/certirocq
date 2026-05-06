@@ -217,8 +217,6 @@ extraction/eval.ml
 extraction/eval.mli
 extraction/exAst.ml
 extraction/exAst.mli
-extraction/exceptionMonad.ml
-extraction/exceptionMonad.mli
 extraction/extract.ml
 extraction/extract.mli
 extraction/extractionCorrectness.ml
@@ -427,8 +425,6 @@ extraction/proto_util.ml
 extraction/proto_util.mli
 extraction/prototype.ml
 extraction/prototype.mli
-extraction/randyPrelude.ml
-extraction/randyPrelude.mli
 extraction/reflect.ml
 extraction/reflect.mli
 extraction/reflectEq.ml

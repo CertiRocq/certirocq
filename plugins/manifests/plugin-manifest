@@ -233,8 +233,6 @@ Erasure0
 ZArith_dec
 Coqlib0
 
-ExceptionMonad
-RandyPrelude
 Classes2
 
 Smallstep

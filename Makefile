@@ -3,7 +3,7 @@
 PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-manifest
 PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
 
-all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
+all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries 
 	$(MAKE) -C theories 
 
@@ -21,10 +21,12 @@ plugins: plugin cplugin
 
 plugin-manifests: $(PLUGIN_MANIFEST_OUTPUTS)
 
-plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS)
+plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS) theories/Extraction/extraction.vo
+	bash ./clean_extraction.sh plugins/plugin
 	python3 plugins/manifests/generate.py plugin
 
-plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS)
+plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS) theories/ExtractionVanilla/extraction.vo
+	bash ./clean_extraction.sh plugins/cplugin
 	python3 plugins/manifests/generate.py cplugin
 
 plugin: all runtime plugins/plugin/CertiRocq.vo
