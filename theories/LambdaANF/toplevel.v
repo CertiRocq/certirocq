@@ -146,7 +146,7 @@ Section IDENT.
   Record anf_options :=
     { time            : bool;    (* Keep ANF per phase timing *)
       cps             : bool;    (* CPS *)
-      do_lambda_lift  : bool;    (* Do lambda lifting *)
+      do_lambda_lift  : bool;    (* Optimize closure allocation with lambda lifting *)
       args            : nat;     (* Arg threshold for lambda lifting *)
       no_push         : nat;     (* *)
       inl_wrappers    : bool;    (* If true, all known calls to lambda lifted functions are inlined *)

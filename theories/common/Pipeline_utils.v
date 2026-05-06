@@ -34,7 +34,7 @@ Record Options :=
 
     show_anf : bool;  (* show ANF IR. TODO generalize for other IR's of the compiler,
                        * (perhaps add Show lang instances ?) *)
-    o_level  : nat;   (* optimization level *)
+    o_level  : nat;   (* closure-allocation optimization level: 0 disables lambda lifting; 1 and above enable it *)
     time     : bool;  (* Track timing information *)
     time_anf : bool;  (* Track timing for the ANF pipeline *)
     debug    : bool;  (* Log debug messages *)

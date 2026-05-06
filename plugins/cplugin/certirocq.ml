@@ -534,7 +534,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = [FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None)] in
+    let runtime_imports = [FromLibrary ("gc_stack.h", None)] in
     let curlib = Sys.getcwd () in
     let imports = List.map (fun i ->
       match i with
@@ -577,7 +577,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let runtime_imports =
-      [ FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None); FromLibrary ("stdio.h", None) ] in
+      [ FromLibrary ("gc_stack.h", None); FromLibrary ("stdio.h", None) ] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->

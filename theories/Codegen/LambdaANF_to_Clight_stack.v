@@ -1180,7 +1180,8 @@ Definition translate_program
                     ((tinfIdent, threadInf) :: nil)
                     (stack_decl (Z.of_N slots))
                     (map (fun x => (x , val)) localVars ++
-                    (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil)
+                    (allocIdent, valPtr) :: (limitIdent, valPtr) ::
+                    (argsIdent, valPtr) :: (resultIdent, val) :: nil)
                     (allocIdent ::= Efield tinfd allocIdent valPtr ;
                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                     argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);

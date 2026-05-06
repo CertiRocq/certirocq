@@ -117,89 +117,28 @@ CertiRocq Compile Wasm even_10000.
 Eval compute in "Compiling demo1".
 CertiRocq Compile Wasm demo1.
 
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" demo1. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" demo1. *)
-(* CertiRocq Generate Glue --output "glue_demo1" [ list, bool ]. *)
-
 Eval compute in "Compiling demo2".
 CertiRocq Compile Wasm demo2.
 
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" demo2. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" demo2. *)
-(* CertiRocq Generate Glue --output "glue_demo2" [ list, bool ]. *)
-
-(*
-Eval compute in "Compiling demo3".
-
-CertiRocq Compile Wasm --cps --debug demo3.
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" demo3. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" demo3. *)
-*)
-(* CertiRocq Generate Glue --output "glue_demo3" [ list, bool ]. *)
-
 Eval compute in "Compiling list_sum".
 CertiRocq Compile Wasm list_sum.
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" list_sum. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" list_sum. *)
-(* CertiRocq Generate Glue --output "glue_list_sum" [ nat ]. *)
-
-(* Eval compute in "Compiling list_sum_primitive".
-CertiRocq Compile Wasm --debug list_sum_primitive. *)
-(* Eval compute in "Compiling lazy factorial (using unsafe passes)". *)
-
-(* CertiRocq Compile --allow-unsafe-erasure -O 1 lazy_factorial. *)
-(* CertiRocq Compile --allow-unsafe-erasure --output-suffix "_opt" lazy_factorial. *)
-(* CertiRocq Compile --allow-unsafe-erasure --c-args 1000 --anf-variant 9 -O 1 --output-suffix "_opt_ll" lazy_factorial. *)
-(* (1* CertiRocq Compile -O 0 --cps --output-suffix "_cps" demo1. *1) *)
-(* (1* CertiRocq Compile --cps --output-suffix "_cps_opt" demo1. *1) *)
-(* CertiRocq Generate Glue --output "glue_lazy_factorial" [ ]. *)
 
 Eval compute in "Compiling vs_easy".
 CertiRocq Compile Wasm vs_easy.
-(* CertiRocq Compile Wasm --cps --time --debug vs_easy. *)
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" --time-anf vs_easy. *)
-(* CertiRocq Compile --time --cps --output-suffix "_cps_opt" vs_easy. *)
-(* CertiRocq Generate Glue --output "glue_vs_easy" [ list, bool, vs.space_atom, vs.clause ]. *)
 
 Eval compute in "Compiling vs_hard".
 CertiRocq Compile Wasm vs_hard.
-(* CertiRocq Compile Wasm --cps --time --debug vs_hard. *)
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" vs_hard. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" vs_hard. *)
-(* CertiRocq Generate Glue --output "glue_vs_hard" [ list, bool ]. *)
 
 
 Eval compute in "Compiling binom".
 CertiRocq Compile Wasm binom.
-(* CertiRocq Show IR --output "binom" binom. *)
-(* CertiRocq Compile Wasm --cps --time --debug binom. *)
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" binom. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" binom. *)
-(* CertiRocq Generate Glue --output "glue_binom" [ nat ]. *)
 
 
 Eval compute in "Compiling color".
 CertiRocq Compile Wasm color.
 
-(* CertiRocq Compile -O 0 --time --cps --output-suffix "_cps" color. *)
-(* CertiRocq Compile --time --cps --output-suffix "_cps_opt" color. *)
-(* CertiRocq Generate Glue --output "glue_color" [ prod, Z ]. *)
-
-(* Don't compile slow sha *)
-(* Eval compute in "Compiling sha". *)
-
-(* CertiRocq Compile --cps --output-suffix "_cps" sha. *)
-(* CertiRocq Compile sha. *)
-(* CertiRocq Compile -O 1 --cps --output-suffix "_cps_opt" sha. *)
-(* CertiRocq Compile -O 1 --output-suffix "_opt" sha. *)
-(* CertiRocq Generate Glue --output "glue_sha" [ ]. *)
-
 Eval compute in "Compiling sha_fast".
 CertiRocq Compile Wasm sha_fast.
-(* CertiRocq Compile Wasm --cps --time --debug sha_fast. *)
-(* CertiRocq Compile -O 0 --cps --output-suffix "_cps" sha_fast. *)
-(* CertiRocq Compile --cps --output-suffix "_cps_opt" sha_fast. *)
-(* CertiRocq Generate Glue --output "glue_sha_fast" [ ]. *)
 
 (* Eval compute in "Compiling parse_wasm_module". *)
 (* CertiRocq Compile Wasm --time --debug test_module. *)

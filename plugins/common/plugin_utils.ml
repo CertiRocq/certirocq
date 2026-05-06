@@ -70,7 +70,7 @@ To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
 Valid options:\n\
 --output S                 : Use S as the output name stem. Default: the fully qualified name of <gid>.\n\
 --output-suffix S          : Append S to generated output names.\n\
--O N                       : Set the optimization level. N=1 enables lambda lifting; N=0 disables it.\n\
+-O N                       : Control closure-allocation optimization. N=0 disables lambda lifting; N=1 optimizes closures with lambda lifting. Values above 1 currently behave like 1.\n\
 --debug                    : Show debugging information.\n\
 --c-args N                 : Set the C-argument threshold used by lambda lifting and C translation.\n\
 --cps                      : Compile through continuation-passing style (default: direct style).\n\
