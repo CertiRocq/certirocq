@@ -1,51 +1,12 @@
 open Plugin_utils
 
-type command_args =
- | TYPED_ERASURE
- | UNSAFE_ERASURE
- | BYPASS_QED
- | CPS
- | TIME
- | TIMEANF
- | OPT of int
- | DEBUG
- | ARGS of int 
- | ANFCONFIG of int (* The number of fvs passed as params and the original params shall not exceed this number *)
- | BUILDDIR of string
- | EXT of string (* Filename extension to be appended to the file name *)
- | DEV of int
- | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
- | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
- | FILENAME of string (* Name of the generated file *)
-
-type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
-type inductives_mapping = inductive_mapping list 
-type prim = ((Kernames.kername * Kernames.ident) * int * bool)
-
-type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
-type extract_inductives = (Kernames.kername * extract_inductive list) list
-
-type options =
-  { typed_erasure : bool;
-    unsafe_erasure : bool;
-    bypass_qed : bool;
-    cps       : bool;
-    time      : bool;
-    time_anf  : bool;
-    olevel    : int;
-    debug     : bool;
-    args      : int;
-    anf_conf  : int;
-    build_dir : string;
-    filename  : string;
-    ext       : string;
-    dev       : int;
-    prefix    : string;
-    toplevel_name : string;
-    prims     : prim list;
-    inductives_mapping : inductives_mapping;
-    extracted_inductives : extract_inductives;
-  }
+type command_args = Certirocq_options.command_args
+type prim = Certirocq_options.prim
+type inductive_mapping = Certirocq_options.inductive_mapping
+type inductives_mapping = Certirocq_options.inductives_mapping
+type extract_inductive = Certirocq_options.extract_inductive
+type extract_inductives = Certirocq_options.extract_inductives
+type options = Certirocq_options.options
 
 val default_options : unit -> options
 val make_options : command_args list -> prim list -> string -> options

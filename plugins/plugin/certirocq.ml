@@ -9,6 +9,15 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 open Caml_nat
+open Certirocq_options
+
+type command_args = Certirocq_options.command_args
+type prim = Certirocq_options.prim
+type inductive_mapping = Certirocq_options.inductive_mapping
+type inductives_mapping = Certirocq_options.inductives_mapping
+type extract_inductive = Certirocq_options.extract_inductive
+type extract_inductives = Certirocq_options.extract_inductives
+type options = Certirocq_options.options
 
 let get_stringopt_option key =
   let open Goptions in
@@ -77,7 +86,6 @@ let debug_msg (flag : bool) (s : string) =
 
 (* Separate registration of primitive extraction *)
 
-type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 let global_registers =
   Summary.ref (([], []) : prim list * import list) ~name:"CertiRocq Registration"
 
@@ -106,8 +114,6 @@ let get_global_prims () = fst !global_registers
 let get_global_includes () = snd !global_registers
 
 (* Extract Inductive *)
-type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
-type inductives_mapping = inductive_mapping list
 
 let global_inductive_registers =
   Summary.ref ([] : inductives_mapping) ~name:"CertiRocq Extract Inductive Registration"
@@ -131,9 +137,6 @@ let register_inductives (inds : inductives_mapping) : unit =
 let get_global_inductives_mapping () = !global_inductive_registers
 
 (* Extract Inductive to Constants *)
-
-type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
-type extract_inductives = (Kernames.kername * extract_inductive list) list
 
 let global_inductive_constant_registers =
   Summary.ref ([] : extract_inductives) ~name:"CertiRocq Inductive to Constants Registration"
@@ -217,105 +220,22 @@ let _ = Callback.register "rocq_user_error" rocq_user_error
 
 (** Compilation Command Arguments *)
 
-type command_args =
- | TYPED_ERASURE
- | UNSAFE_ERASURE
- | BYPASS_QED
- | CPS
- | TIME
- | TIMEANF
- | OPT of int
- | DEBUG
- | ARGS of int
- | ANFCONFIG of int (* To measure different ANF configurations *)
- | BUILDDIR of string (* Directory name to be prepended to the file name *)
- | EXT of string (* Filename extension to be appended to the file name *)
- | DEV of int    (* For development purposes *)
- | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
- | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
- | FILENAME of string (* Name of the generated file *)
-
-type options =
-  { typed_erasure : bool;
-    unsafe_erasure : bool;
-    bypass_qed : bool;
-    cps       : bool;
-    time      : bool;
-    time_anf  : bool;
-    olevel    : int;
-    debug     : bool;
-    args      : int;
-    anf_conf  : int;
-    build_dir : string;
-    filename  : string;
-    ext       : string;
-    dev       : int;
-    prefix    : string;
-    toplevel_name : string;
-    prims     : prim list;
-    inductives_mapping : inductives_mapping;
-    extracted_inductives : extract_inductives;
-  }
-
-let check_build_dir d =
-  if d = "" then "." else
-  let isdir =
-    try Unix.((stat d).st_kind = S_DIR)
-    with Unix.Unix_error (Unix.ENOENT, _, _) ->
-      CErrors.user_err Pp.(str "Could not compile: build directory " ++ str d ++ str " not found.")
-  in
-  if not isdir then
-    CErrors.user_err Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
-  else d
+let default_build_dir () =
+  match get_build_dir_opt () with None -> "." | Some s -> s
 
 let default_options () : options =
-  { typed_erasure = false;
-    unsafe_erasure = false;
-    bypass_qed = false;
-    cps       = false;
-    time      = false;
-    time_anf  = false;
-    olevel    = 1;
-    debug     = false;
-    args      = 5;
-    anf_conf  = 0;
-    build_dir = (match get_build_dir_opt () with None -> "." | Some s -> check_build_dir s);
-    filename  = "";
-    ext       = "";
-    dev       = 0;
-    prefix    = "";
-    toplevel_name = "body";
-    prims     = [];
-    inductives_mapping = get_global_inductives_mapping ();
-    extracted_inductives = get_global_inductives_constant_mapping ();
-  }
+  Certirocq_options.default_options
+    ~build_dir:(default_build_dir ())
+    ~inductives_mapping:(get_global_inductives_mapping ())
+    ~extracted_inductives:(get_global_inductives_constant_mapping ())
+    ()
 
 let make_options (l : command_args list) (pr : prim list) (fname : string) : options =
-  let rec aux (o : options) l =
-    match l with
-    | [] -> o
-    | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
-    | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
-    | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
-    | CPS      :: xs -> aux {o with cps = true} xs
-    | TIME     :: xs -> aux {o with time = true} xs
-    | TIMEANF  :: xs -> aux {o with time_anf = true} xs
-    | OPT n    :: xs -> aux {o with olevel = n} xs
-    | DEBUG    :: xs -> aux {o with debug = true} xs
-    | ARGS n   :: xs -> aux {o with args = n} xs
-    | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
-    | BUILDDIR s  :: xs ->
-      let s = check_build_dir s in
-      aux {o with build_dir = s} xs
-    | EXT s    :: xs -> aux {o with ext = s} xs
-    | DEV n    :: xs -> aux {o with dev = n} xs
-    | PREFIX s :: xs -> aux {o with prefix = s} xs
-    | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
-    | FILENAME s :: xs -> aux {o with filename = s} xs
-  in
-  let opts = { (default_options ()) with filename = fname } in
-  let o = aux opts l in
-  {o with prims = pr}
+  Certirocq_options.make_options
+    ~build_dir:(default_build_dir ())
+    ~inductives_mapping:(get_global_inductives_mapping ())
+    ~extracted_inductives:(get_global_inductives_constant_mapping ())
+    l pr fname
 
 let make_unsafe_passes b =
   let open Erasure0 in

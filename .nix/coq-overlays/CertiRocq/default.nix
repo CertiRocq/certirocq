@@ -59,8 +59,8 @@ mkCoqDerivation {
     DST=$OUTDIR/CertiRocq/Plugin/runtime make -C runtime install
     COQLIBINSTALL=$OUTDIR make -C theories install
     COQLIBINSTALL=$OUTDIR make -C libraries install
-    COQLIBINSTALL=$OUTDIR COQPLUGININSTALL=$OCAMLFIND_DESTDIR make -C plugin install
-    COQLIBINSTALL=$OUTDIR COQPLUGININSTALL=$OCAMLFIND_DESTDIR make -C cplugin install
+    COQLIBINSTALL=$OUTDIR COQPLUGININSTALL=$OCAMLFIND_DESTDIR make -C plugins/plugin install
+    COQLIBINSTALL=$OUTDIR COQPLUGININSTALL=$OCAMLFIND_DESTDIR make -C plugins/cplugin install
 
     runHook postInstall
   '';

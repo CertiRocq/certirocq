@@ -83,7 +83,7 @@ bootstrap/certirocqc/CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
 bootstrap/certirocqc/CertiRocq.CertiRocqC.CertiRocqC.certirocqc.h
 bootstrap/certirocqc/tests/test.demo1.c
 bootstrap/certirocqc/tests/test.demo1.h
-plugins/plugin/.filestoinstall
+.filestoinstall
 plugins/cplugin/.merlin
 result
 /tests/metarocq_erasure/CertiRocq.Tests.metarocq_erasure.metarocq_erasure.metarocq_erasure.c

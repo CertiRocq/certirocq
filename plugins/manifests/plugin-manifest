@@ -276,6 +276,7 @@ AST
 Values0
 Camlrocq
 
+Certirocq_options
 Plugin_utils :: plugin
 Ctypes
 Cop

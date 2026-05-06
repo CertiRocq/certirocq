@@ -220,6 +220,7 @@ AST
 Values0
 Camlrocq
 
+Certirocq_options
 Plugin_utils
 Ctypes
 Cop

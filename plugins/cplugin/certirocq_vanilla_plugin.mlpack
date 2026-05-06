@@ -223,6 +223,7 @@ AST
 Values0
 Camlrocq
 
+Certirocq_options
 Ctypes
 Cop
 Dead_param_elim

@@ -1,10 +1,10 @@
 certirocq_plugin.cmxa: certirocq_plugin.cmx ../../runtime/get_ordinal.o
 	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
 
-certirocq_plugin.cmx: certirocq_debug.cmx tm_util.cmx plugin_utils.cmx | certirocq_plugin.mlpack certirocq_plugin.mlpack.d
+certirocq_plugin.cmx: certirocq_debug.cmx tm_util.cmx certirocq_options.cmx plugin_utils.cmx | certirocq_plugin.mlpack certirocq_plugin.mlpack.d
 	$(SHOW)'CAMLOPT -pack -o $@'
 	$(HIDE)mods=$$(sed -n 's/^certirocq_plugin_MLPACK_DEPENDENCIES:=//p' certirocq_plugin.mlpack.d | \
-		sed 's#^#certirocq_debug tm_util #' | \
+		sed 's#^#certirocq_debug tm_util certirocq_options #' | \
 		sed 's#extraction/pipeline certirocq#extraction/pipeline plugin_utils certirocq#' | \
 		tr ' ' '\n' | awk '!seen[$$0]++' | tr '\n' ' '); \
 	objs=""; \
@@ -43,6 +43,26 @@ tm_util.ml.d: ../common/tm_util.ml
 	$(SHOW)'CAMLDEP $<'
 	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/tm_util#tm_util#g' > $@
 
+certirocq_options.cmi: ../common/certirocq_options.mli extraction/kernames.cmi
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+certirocq_options.cmo: ../common/certirocq_options.ml certirocq_options.cmi extraction/kernames.cmi
+	$(SHOW)'CAMLC -c $<'
+	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
+
+certirocq_options.cmx: ../common/certirocq_options.ml certirocq_options.cmi extraction/kernames.cmx
+	$(SHOW)'CAMLOPT -c -for-pack Certirocq_plugin $<'
+	$(HIDE)$(TIMER) $(CAMLOPTC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -for-pack Certirocq_plugin -o $@ $<
+
+certirocq_options.mli.d: ../common/certirocq_options.mli
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/certirocq_options#certirocq_options#g' > $@
+
+certirocq_options.ml.d: ../common/certirocq_options.ml
+	$(SHOW)'CAMLDEP $<'
+	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/certirocq_options#certirocq_options#g' > $@
+
 plugin_utils.cmi: ../common/plugin_utils.mli extraction/bytestring.cmi extraction/kernames.cmi
 	$(SHOW)'CAMLC -c $<'
 	$(HIDE)$(TIMER) $(CAMLC) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -o $@ $<
@@ -63,12 +83,12 @@ plugin_utils.ml.d: ../common/plugin_utils.ml
 	$(SHOW)'CAMLDEP $<'
 	$(HIDE)$(CAMLDEP) $(OCAMLLIBS) "$<" | sed 's#\.\./common/plugin_utils#plugin_utils#g' > $@
 
-certirocq.cmi: plugin_utils.cmi
-certirocq.cmo: plugin_utils.cmi
-certirocq.cmx: plugin_utils.cmi
-g_certirocq.cmi: plugin_utils.cmi
-g_certirocq.cmo: plugin_utils.cmi
-g_certirocq.cmx: plugin_utils.cmi
+certirocq.cmi: certirocq_options.cmi plugin_utils.cmi
+certirocq.cmo: certirocq_options.cmi plugin_utils.cmi
+certirocq.cmx: certirocq_options.cmx plugin_utils.cmx
+g_certirocq.cmi: certirocq_options.cmi plugin_utils.cmi
+g_certirocq.cmo: certirocq_options.cmi plugin_utils.cmi
+g_certirocq.cmx: certirocq_options.cmi plugin_utils.cmi
 
 g_certirocq.ml: g_certirocq.mlg ../common/certirocq_commands.mlg
 	$(SHOW)'CPP+COQPP $<'

@@ -19,6 +19,7 @@ merlin-hook::
 archclean::
 		$(HIDE)rm -f certirocq_debug.cmi certirocq_debug.cmt certirocq_debug.cmti certirocq_debug.cmx certirocq_debug.ml.d certirocq_debug.mli.d certirocq_debug.o
 		$(HIDE)rm -f tm_util.cmi tm_util.cmt tm_util.cmti tm_util.cmx tm_util.ml.d tm_util.o
+		$(HIDE)rm -f certirocq_options.cmi certirocq_options.cmt certirocq_options.cmti certirocq_options.cmx certirocq_options.ml.d certirocq_options.mli.d certirocq_options.o
 		$(HIDE)rm -f plugin_utils.cmi plugin_utils.cmt plugin_utils.cmti plugin_utils.cmx plugin_utils.ml.d plugin_utils.mli.d plugin_utils.o
 
 certirocq_plugin.cmxs: ../../runtime/get_ordinal.o
