@@ -17,7 +17,7 @@ VERNAC COMMAND EXTEND CertiRocqCheck CLASSIFIED AS QUERY STATE opaque_access
     let gr = Nametab.global gr in
     Certirocqchk.check gr
   }
-(* | [ "CertiRocqCheck" "-help" ] -> { *)
+(* | [ "CertiRocqCheck" "--help" ] -> { *)
     (* Feedback.msg_info (str help_msg) *)
   (* } *)
 END

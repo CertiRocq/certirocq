@@ -7,14 +7,13 @@ type command_args =
  | TIMEANF
  | OPT of int
  | DEBUG
- | ARGS of int
- | ANFCONFIG of int
- | BUILDDIR of string
- | EXT of string
- | DEV of int
- | PREFIX of string
- | TOPLEVEL_NAME of string
- | FILENAME of string
+ | CARGS of int
+ | ANFVARIANT of int
+ | BUILD_DIR of string
+ | OUTPUT_SUFFIX of string
+ | FFI_PREFIX of string
+ | ENTRY_POINT of string
+ | OUTPUT of string
 
 type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 
@@ -34,11 +33,10 @@ type options =
     olevel : int;
     debug : bool;
     args : int;
-    anf_conf : int;
+    anf_variant : int;
     build_dir : string;
     filename : string;
     ext : string;
-    dev : int;
     prefix : string;
     toplevel_name : string;
     prims : prim list;

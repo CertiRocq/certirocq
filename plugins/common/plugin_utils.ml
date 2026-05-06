@@ -64,21 +64,25 @@ To compile a Gallina definition named <gid> to C type:\n\
   ^ "To evaluate a Gallina definition named <gid> type:\n\
    CertiRocq Eval <options> <gid>.\n\n\
 To show this help message type:\n\
-   CertiRocq -help.\n\n\
+   CertiRocq --help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
    CertiRocq Show IR <options> <gid>.\n\n\
 Valid options:\n\
--file S   :  Specify the filename. Default: the fully qualified name of <gid>.\n\
--ext S    :  Specify the string s to be appended to the filename\n\
--prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
--O N      :  Where N=0 or N=1. N=1 (default) will enable the λΑΝF transformation lambda-lifting that will try to allocate closure environments is registers. N=0 disables lambda lifting.\n\
--debug    :  Show debugging information\n\
--args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
--cps      :  Compile using continuation-passing style code (default: direct-style compilation)\n\
--time     :  Time each compilation phase\n\
--time_anf :  Time λanf optimizations\n\
--unsafe-erasure   :  Allow to use unsafe passes in the MetaRocq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
--typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaRocq Erasure pipeline.\n\
+--output S                 : Use S as the output name stem. Default: the fully qualified name of <gid>.\n\
+--output-suffix S          : Append S to generated output names.\n\
+--ffi-prefix S             : Prefix generated FFI functions to avoid C symbol clashes.\n\
+-O N                       : Set the optimization level. N=1 enables lambda lifting; N=0 disables it.\n\
+--debug                    : Show debugging information.\n\
+--c-args N                 : Set the C-argument threshold used by lambda lifting and C translation.\n\
+--cps                      : Compile through continuation-passing style (default: direct style).\n\
+--time                     : Time the main compilation phases.\n\
+--time-anf                 : Time LambdaANF optimization subphases.\n\
+--anf-variant N            : Select an experimental LambdaANF pipeline variant.\n\
+--allow-unsafe-erasure     : Allow unsafe MetaRocq erasure passes, including cofixpoint-to-fixpoint translation.\n\
+--typed-erasure            : Use MetaRocq typed erasure and dearging.\n\
+--bypass-qed               : Allow quotation to inspect Qed-opaque constants.\n\
+--build-dir DIR            : Write generated files under DIR.\n\
+--entry-point S            : Use S as the generated top-level function name.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
    CertiRocq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" , Library \"runtime_header.h\", ... , Absolute \"fileM.h\" ].\n\

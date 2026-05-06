@@ -86,4 +86,4 @@ Extract Constants [ add_int63 => "add_int63" with tinfo, zero_int63 => "zero_int
 Include [ "int63_tinfo.h" ].
 
 
-CertiRocq Generate Glue -file "glue" [ nat, bool, String ].
+CertiRocq Generate Glue --output "glue" [ nat, bool, String ].

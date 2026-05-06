@@ -51,5 +51,5 @@ Definition certirocqchk (p : Template.Ast.Env.program) : bool :=
 Eval compute in "Compiling MetaRocq's checker".
 Set Warnings "-primitive-turned-into-axiom".
 
-CertiRocq Compile -time -O 1 certirocqchk.
-CertiRocq Generate Glue -file "glue" [ ].
+CertiRocq Compile --time -O 1 certirocqchk.
+CertiRocq Generate Glue --output "glue" [ ].

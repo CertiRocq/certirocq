@@ -7,14 +7,13 @@ type command_args =
  | TIMEANF
  | OPT of int
  | DEBUG
- | ARGS of int
- | ANFCONFIG of int
- | BUILDDIR of string
- | EXT of string
- | DEV of int
- | PREFIX of string
- | TOPLEVEL_NAME of string
- | FILENAME of string
+ | CARGS of int
+ | ANFVARIANT of int
+ | BUILD_DIR of string
+ | OUTPUT_SUFFIX of string
+ | FFI_PREFIX of string
+ | ENTRY_POINT of string
+ | OUTPUT of string
 
 type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 
@@ -34,11 +33,10 @@ type options =
     olevel : int;
     debug : bool;
     args : int;
-    anf_conf : int;
+    anf_variant : int;
     build_dir : string;
     filename : string;
     ext : string;
-    dev : int;
     prefix : string;
     toplevel_name : string;
     prims : prim list;
@@ -67,11 +65,10 @@ let default_options ~build_dir ~inductives_mapping ~extracted_inductives () : op
     olevel = 1;
     debug = false;
     args = 5;
-    anf_conf = 0;
+    anf_variant = 0;
     build_dir = check_build_dir build_dir;
     filename = "";
     ext = "";
-    dev = 0;
     prefix = "";
     toplevel_name = "body";
     prims = [];
@@ -92,14 +89,13 @@ let make_options ~build_dir ~inductives_mapping ~extracted_inductives
     | TIMEANF :: xs -> aux {o with time_anf = true} xs
     | OPT n :: xs -> aux {o with olevel = n} xs
     | DEBUG :: xs -> aux {o with debug = true} xs
-    | ARGS n :: xs -> aux {o with args = n} xs
-    | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
-    | BUILDDIR s :: xs -> aux {o with build_dir = check_build_dir s} xs
-    | EXT s :: xs -> aux {o with ext = s} xs
-    | DEV n :: xs -> aux {o with dev = n} xs
-    | PREFIX s :: xs -> aux {o with prefix = s} xs
-    | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
-    | FILENAME s :: xs -> aux {o with filename = s} xs
+    | CARGS n :: xs -> aux {o with args = n} xs
+    | ANFVARIANT n :: xs -> aux {o with anf_variant = n} xs
+    | BUILD_DIR s :: xs -> aux {o with build_dir = check_build_dir s} xs
+    | OUTPUT_SUFFIX s :: xs -> aux {o with ext = s} xs
+    | FFI_PREFIX s :: xs -> aux {o with prefix = s} xs
+    | ENTRY_POINT s :: xs -> aux {o with toplevel_name = s} xs
+    | OUTPUT s :: xs -> aux {o with filename = s} xs
   in
   let opts =
     { (default_options ~build_dir ~inductives_mapping ~extracted_inductives ())

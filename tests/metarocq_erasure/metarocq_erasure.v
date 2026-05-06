@@ -32,7 +32,7 @@ Program Definition erase_and_print_template_program (p : Ast.Env.program) : unit
 Definition metarocq_erasure (p : Ast.Env.program) :=
   erase_and_print_template_program p.
 
-CertiRocq Compile -time -O 1 metarocq_erasure
+CertiRocq Compile --time -O 1 metarocq_erasure
 Extract Constants [
   (* rocq_msg_debug => "print_msg_debug", *)
   msg_info => "rocq_msg_info",

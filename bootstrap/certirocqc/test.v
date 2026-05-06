@@ -45,8 +45,8 @@ CertiRocqC Eval demo1.
 Definition demo2 := if false then false else true.
 CertiRocqC Eval demo2. *)
 
-(* Time CertiRocqC Compile -build_dir "tests" -time -O 1 demo1. *)
+(* Time CertiRocqC Compile --build-dir "tests" --time -O 1 demo1. *)
 
 From Stdlib Require Import Strings.PrimString.
 
-Time CertiRocqC Compile -build_dir "tests" -time -O 1 certirocqc.
+Time CertiRocqC Compile --build-dir "tests" --time -O 1 certirocqc.

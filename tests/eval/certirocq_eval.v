@@ -1,7 +1,7 @@
 From Equations Require Import Equations.
 From Stdlib Require Import Uint63 Wf_nat ZArith Lia Arith.
 From CertiRocq Require Import CertiRocq.
-CertiRocq -help.
+CertiRocq --help.
 Set CertiRocq Build Directory "_build".
 
 (* This warns about uses of primitive operations, but we compile them fine *)
@@ -20,9 +20,9 @@ Definition silent_long_vector :=
 (* 1.23s *)
 (* Set Debug "certirocq-reify". *)
 (* Set Debug "backtrace". *)
-CertiRocq Eval -time -debug silent_long_vector.
-CertiRocq Eval -time -debug silent_long_vector.
-CertiRocq Eval -time -debug silent_long_vector.
+CertiRocq Eval --time --debug silent_long_vector.
+CertiRocq Eval --time --debug silent_long_vector.
+CertiRocq Eval --time --debug silent_long_vector.
 
 Definition inspect {A} (a : A) : {b | a = b} :=
   exist _ a eq_refl.
@@ -64,15 +64,15 @@ Definition sha_fast_noproofs := let x := sha_fast in tt.
 Time Eval vm_compute in sha_fast_noproofs.
 (* Executed in 0.004 sec *)
 
-CertiRocq Eval -time sha_fast_noproofs.
+CertiRocq Eval --time sha_fast_noproofs.
 (* Executed in 0.037175 sec *)
 
 Time CertiRocq Eval sha_fast_noproofs.
 (* Finished transaction in 0.02 sec *)
 
-CertiRocq Eval -time sha_fast_noproofs.
+CertiRocq Eval --time sha_fast_noproofs.
 (* Executed in 0.045 sec *)
-CertiRocq Eval -time sha_fast_noproofs.
+CertiRocq Eval --time sha_fast_noproofs.
 
 
 From CertiRocq.Benchmarks Require Import Color.
@@ -106,9 +106,9 @@ Definition vs_hard :=
 (* Blows up *) Time Eval vm_compute in vs_hard.
 *)
 
-CertiRocq Eval -time vs_hard.
+CertiRocq Eval --time vs_hard.
 (* Executed in 0.06s *)
-CertiRocq Eval -time vs_hard.
+CertiRocq Eval --time vs_hard.
 
-(* CertiRocq Eval -time vs_easy. *)
+(* CertiRocq Eval --time vs_easy. *)
 (* Executed in 0.007s *)

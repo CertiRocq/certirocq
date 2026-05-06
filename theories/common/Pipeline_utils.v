@@ -30,7 +30,7 @@ Record Options :=
     inductives_mapping : EProgram.inductives_mapping; (* Mapping for inductives, set by global declarations in the plugin *)
     direct   : bool;  (* direct or CPS code *)
     c_args   : nat;   (* numbers of C arguments *)
-    anf_conf  : nat;  (* for different ANF pipeline configs. For development purposes *)
+    anf_variant : nat;  (* experimental ANF pipeline variant *)
 
     show_anf : bool;  (* show ANF IR. TODO generalize for other IR's of the compiler,
                        * (perhaps add Show lang instances ?) *)
@@ -38,7 +38,6 @@ Record Options :=
     time     : bool;  (* Track timing information *)
     time_anf : bool;  (* Track timing for the ANF pipeline *)
     debug    : bool;  (* Log debug messages *)
-    dev      : nat;   (* for development purposes *)
     prefix   : string; (* prefix to generated FFI *)
 
     body_name : string; (* Name of the toplevel function *)

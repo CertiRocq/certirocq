@@ -15,7 +15,7 @@ Definition string_of_bool b :=
 #[export] Instance bool_show : Show bool := string_of_bool.
 
 Definition test := true.
-CertiRocq Eval -time -debug test.
+CertiRocq Eval --time --debug test.
 
 #[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 From MetaRocq.Common Require Import Primitive.
@@ -52,21 +52,21 @@ Definition certirocqc4 :=  (List.map S [26; 20]).
 Time Eval compute in certirocqc4.
 Set Warnings "-primitive-turned-into-axiom".
 Set Warnings "backtrace".
-CertiRocq Eval -time -debug certirocqc4.
+CertiRocq Eval --time --debug certirocqc4.
 
 Definition largertag := S754_finite true xH 0%Z.
 Definition otherlargertag := S754_infinity true.
-CertiRocq Eval -time -debug otherlargertag.
+CertiRocq Eval --time --debug otherlargertag.
 
 Set Debug "certirocq-reify".
-Time CertiRocq Eval -time one.
-CertiRocq Eval -time two.
-CertiRocq Eval -time -debug three.
-Time CertiRocq Eval -time -debug three.
+Time CertiRocq Eval --time one.
+CertiRocq Eval --time two.
+CertiRocq Eval --time --debug three.
+Time CertiRocq Eval --time --debug three.
 
 (*
 Goal True.
   intros.
-  certirocq_eval -build_dir "_build" certirocqc4 ltac:(fun c => assert (certirocqc4 = c) by reflexivity).
+  certirocq_eval --build-dir "_build" certirocqc4 ltac:(fun c => assert (certirocqc4 = c) by reflexivity).
   exact I.
 Qed. *)

@@ -273,15 +273,14 @@ let make_pipeline_options (opts : options) =
   let timing = opts.time in
   let timing_anf = opts.time_anf in
   let debug  = opts.debug in
-  let anfc = nat_of_caml_int opts.anf_conf in
-  let dev = nat_of_caml_int opts.dev in
+  let anf_variant = nat_of_caml_int opts.anf_variant in
   let prefix = bytestring_of_string opts.prefix in
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   let prims = quote_prims prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+  Pipeline.make_opts erasure_config inductives_mapping cps args anf_variant olevel timing timing_anf debug prefix toplevel_name prims
 
 (** Main Compilation Functions *)
 
@@ -436,7 +435,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   (* Generate glue code for the compiled program *)
   let generate_glue (standalone : bool) opts globs =
     if standalone && opts.filename = "" then
-      CErrors.user_err Pp.(str "You need to provide a file name with the -file option.")
+      CErrors.user_err Pp.(str "You need to provide an output name with the --output option.")
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in

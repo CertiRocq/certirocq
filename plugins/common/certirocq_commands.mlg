@@ -92,22 +92,20 @@ let help_msg = make_help_msg ~supports_wasm:false
 }
 
 ARGUMENT EXTEND cargs
-| [ "-typed-erasure" ] -> { TYPED_ERASURE }
-| [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
-| [ "-bypass_qed" ] -> { BYPASS_QED }
-| [ "-cps" ] -> { CPS }
-| [ "-time" ] -> { TIME }
-| [ "-time_anf" ] -> { TIMEANF }
+| [ "--typed-erasure" ] -> { TYPED_ERASURE }
+| [ "--allow-unsafe-erasure" ] -> { UNSAFE_ERASURE }
+| [ "--bypass-qed" ] -> { BYPASS_QED }
+| [ "--cps" ] -> { CPS }
+| [ "--time" ] -> { TIME }
+| [ "--time-anf" ] -> { TIMEANF }
 | [ "-O" natural(n) ] -> { OPT(n) }
-| [ "-debug" ] -> { DEBUG }
-| [ "-args" natural(n) ] -> { ARGS(n) }
-| [ "-config" natural(n) ] -> { ANFCONFIG(n) }
-(* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
-| [ "-build_dir" string(s) ] -> { BUILDDIR(s) }
-| [ "-dev" natural(n) ] -> { DEV(n) }
-| [ "-ext" string(s) ] -> { EXT(s) }
-| [ "-file" string(s) ] -> { FILENAME(s) }
-| [ "-toplevel_name" string(s) ] -> { TOPLEVEL_NAME(s) }
+| [ "--debug" ] -> { DEBUG }
+| [ "--c-args" natural(n) ] -> { CARGS(n) }
+| [ "--anf-variant" natural(n) ] -> { ANFVARIANT(n) }
+| [ "--build-dir" string(s) ] -> { BUILD_DIR(s) }
+| [ "--output-suffix" string(s) ] -> { OUTPUT_SUFFIX(s) }
+| [ "--output" string(s) ] -> { OUTPUT(s) }
+| [ "--entry-point" string(s) ] -> { ENTRY_POINT(s) }
 END
 
 VERNAC ARGUMENT EXTEND extract_cnst
@@ -116,16 +114,16 @@ VERNAC ARGUMENT EXTEND extract_cnst
 END
 
 VERNAC ARGUMENT EXTEND ffiargs
-| [ "-prefix" string(s) ] -> { PREFIX(s) }
+| [ "--ffi-prefix" string(s) ] -> { FFI_PREFIX(s) }
 | [ cargs(c) ] -> { c }
 END
 
 VERNAC ARGUMENT EXTEND glueargs
-| [ "-cps" ] -> { CPS }
-| [ "-debug" ] -> { DEBUG }
-| [ "-args" natural(n) ] -> { ARGS(n) }
-| [ "-file" string(s) ] -> { FILENAME(s) }
-| [ "-build_dir" string(s) ] -> { BUILDDIR(s) }
+| [ "--cps" ] -> { CPS }
+| [ "--debug" ] -> { DEBUG }
+| [ "--c-args" natural(n) ] -> { CARGS(n) }
+| [ "--output" string(s) ] -> { OUTPUT(s) }
+| [ "--build-dir" string(s) ] -> { BUILD_DIR(s) }
 END
 
 VERNAC ARGUMENT EXTEND cinclude
@@ -215,7 +213,7 @@ VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY STATE opaque_access
 END
 
 VERNAC COMMAND EXTEND CertiRocq_help CLASSIFIED AS QUERY
-| [ "CertiRocq" "-help" ] -> {
+| [ "CertiRocq" "--help" ] -> {
     Feedback.msg_info (str help_msg)
   }
 END

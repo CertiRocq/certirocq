@@ -60,7 +60,7 @@ VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
 END
 
 VERNAC COMMAND EXTEND CertiRocqCHelp CLASSIFIED AS QUERY
-| [ "CertiRocqC" "-help" ] -> {
+| [ "CertiRocqC" "--help" ] -> {
     Feedback.msg_info (str help_msg)
   }
 END

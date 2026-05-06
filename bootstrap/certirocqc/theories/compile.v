@@ -8,5 +8,5 @@ From CertiRocq.CertiRocqC Require Import CertiRocqC.
 
 Set Warnings "-primitive-turned-into-axiom".
 
-CertiRocq Compile -time -O 1 certirocqc.
-CertiRocq Generate Glue -file "glue" [ ].
+CertiRocq Compile --time -O 1 certirocqc.
+CertiRocq Generate Glue --output "glue" [ ].
