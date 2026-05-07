@@ -7,15 +7,48 @@ From Stdlib Require Import Arith.Peano_dec.
 From Stdlib Require Import Logic.Eqdep_dec.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import FunInd.
+From MetaRocq.Utils Require Import MRString.
 
 Require Import Common.exceptionMonad.
-Require Import Common.RandyPrelude.
 Require Import Common.classes.
 
+Local Infix "++" := String.append : bs_scope.
 Open Scope list_scope.
+Local Open Scope bs_scope.
 Set Implicit Arguments.
 
 Ltac inv H := inversion H; subst; clear H.
+Ltac inversion_Clear H := inversion H; subst; clear H.
+Ltac nreflexivity H := elim H; reflexivity.
+Ltac myInjection H := injection H; intros; subst; clear H.
+
+Lemma neq_sym : forall (A : Type) (a b : A), a <> b -> b <> a.
+Proof.
+  intuition auto.
+Qed.
+
+Lemma deMorgan_impl : forall A B : Prop, (A -> B) -> (~ B -> ~ A).
+Proof.
+  intuition auto.
+Qed.
+
+Section list_eq_dec.
+  Variable A : Type.
+  Hypothesis eq_dec : forall x y : A, x = y \/ x <> y.
+
+  Lemma list_eq_dec : forall l l' : list A, l = l' \/ l <> l'.
+  Proof.
+    induction l; destruct l'.
+    - left. reflexivity.
+    - right. discriminate.
+    - right. discriminate.
+    - destruct (eq_dec a a0); subst.
+      + destruct (IHl l') as [-> | Hneq].
+        * left. reflexivity.
+        * right. intros Heq. injection Heq. contradiction.
+      + right. intros Heq. injection Heq. contradiction.
+  Qed.
+End list_eq_dec.
 
 (** Fix arguments scope for [mkInd]. *)
 Arguments mkInd _%_bs _%_nat.
@@ -31,13 +64,13 @@ Definition print_name nm : string :=
   end.
 Definition print_inductive (i:inductive) : string :=
   match i with
-  | mkInd str n => ("(inductive:" ++ string_of_kername str ++ ":" ++ nat_to_string n ++ ")")
+  | mkInd str n => ("(inductive:" ++ string_of_kername str ++ ":" ++ MRString.string_of_nat n ++ ")")
   end.
 Definition print_projection (p:projection) : string :=
   match p with
   | Kernames.mkProjection i n m =>
     ("(project:" ++ (print_inductive i) ++ ":" ++
-                 (nat_to_string n) ++ ":" ++ (nat_to_string m) ++")")
+                 (MRString.string_of_nat n) ++ ":" ++ (MRString.string_of_nat m) ++")")
   end.
 
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
@@ -99,7 +132,7 @@ Record ityp := mkItyp { itypNm:string; itypCnstrs:list Cnstr }.
 Definition print_ityp (x:ityp) : string :=
   match x with
   | mkItyp str ys =>
-    ("(ityp:" ++ str ++ "," ++ nat_to_string (List.length ys) ++ ")")
+    ("(ityp:" ++ str ++ "," ++ MRString.string_of_nat (List.length ys) ++ ")")
   end.
 
 (* a mutual type package is a list of ityps *)
@@ -171,7 +204,7 @@ Proof.
   - destruct (trm_dec t t0).
     + left. subst. reflexivity.
     + right. intros h. injection h. intros. contradiction.
-  - destruct (eq_nat_dec n n0), (Common.RandyPrelude.list_eq_dec ityp_dec i i0).
+  - destruct (eq_nat_dec n n0), (list_eq_dec ityp_dec i i0).
     + subst. left. reflexivity.
     + right. intros h. injection h. contradiction.
     + right. intros h. injection h. contradiction.
@@ -515,6 +548,15 @@ Function Lkup_index (nm:kername) (env:environ) : nat :=
 
 
 (** find an ityp in an itypPack **)
+Fixpoint exnNth (A : Type) (xs : list A) (n : nat) : exception A :=
+  match xs, n with
+  | nil, _ =>
+      raise ("(exnNth:" ++ MRString.string_of_nat (List.length xs) ++ ","
+                      ++ MRString.string_of_nat n ++ ")")%bs
+  | cons y _, 0 => ret y
+  | cons _ ys, S m => exnNth ys m
+  end.
+
 Definition getInd (ipkg:itypPack) (inum:nat) : exception ityp :=
   exnNth ipkg inum.
 

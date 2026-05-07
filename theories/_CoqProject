@@ -12,7 +12,6 @@
 
 # common
 common/exceptionMonad.v
-common/RandyPrelude.v
 common/AstCommon.v
 common/Common.v
 common/compM.v

@@ -19,8 +19,9 @@ mkCoqDerivation {
   inherit version;
   releaseRev = v: "v${v}";
 
-  buildInputs = [
+  nativeBuildInputs = [
     pkgs.clang
+    pkgs.python3
   ];
 
   propagatedBuildInputs = [
