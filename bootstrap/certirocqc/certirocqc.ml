@@ -6,7 +6,6 @@
 open Pp
 open Printer
 open Metarocq_template_plugin.Ast_quoter
-open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
