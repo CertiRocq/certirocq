@@ -4,9 +4,9 @@ CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
 
 ifeq '$(CERTIROCQ_CONFIG)' 'local'
   ifeq ($(shell which cygpath 2>/dev/null),)
-  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
+  OCAMLPATH := $(shell pwd)/../../plugins/cplugin/:$(OCAMLPATH)
   else
-  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+  OCAMLPATH := $(shell cygpath -m `pwd`)/../../plugins/cplugin/;$(OCAMLPATH)
   endif
   export OCAMLPATH
 
@@ -16,10 +16,10 @@ ifeq '$(CERTIROCQ_CONFIG)' 'local'
 	-Q ../../theories/CodegenWasm CertiRocq.CodegenWasm \
 	-Q ../../theories/Compiler CertiRocq.Compiler -Q ../../theories/common CertiRocq.Common \
 	-Q ../../theories/Glue CertiRocq.Glue \
-	-Q ../../plugin CertiRocq.Plugin \
-	-I ../../plugin \
-	-Q ../../cplugin CertiRocq.VanillaPlugin \
-	-I ../../cplugin \
+	-Q ../../plugins/plugin CertiRocq.Plugin \
+	-I ../../plugins/plugin \
+	-Q ../../plugins/cplugin CertiRocq.VanillaPlugin \
+	-I ../../plugins/cplugin \
 	-Q . CertiRocq.CertiRocqCheck \
 	-I .
   TESTCOQOPTS = $(COQOPTS)

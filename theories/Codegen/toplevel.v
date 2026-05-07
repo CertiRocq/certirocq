@@ -82,8 +82,4 @@ Definition compile_Clight prims : CertiRocqTrans toplevel.LambdaANF_FullTerm Cpr
     debug_msg "Translating from LambdaANF to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    let cps := negb (direct opts) in
-    if cps then
-      LiftErrorCertiRocqTrans "Codegen" (Clight_trans opts.(body_name) prims args) s
-    else
-      LiftErrorLogCertiRocqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
+    LiftErrorLogCertiRocqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.

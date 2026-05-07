@@ -1,0 +1,10 @@
+certirocq_plugin.cmxa: certirocq_plugin.cmx ../../runtime/get_ordinal.o
+	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
+
+g_certirocq.ml: g_certirocq.mlg ../common/certirocq_commands.mlg
+	$(SHOW)'CPP+COQPP $<'
+	$(HIDE)tmp=$$(mktemp /tmp/g_certirocq.XXXXXX.mlg); \
+		cpp -traditional-cpp -P $< > $$tmp; \
+		$(COQPP) $$tmp; \
+		mv $${tmp%.mlg}.ml $@; \
+		rm -f $$tmp

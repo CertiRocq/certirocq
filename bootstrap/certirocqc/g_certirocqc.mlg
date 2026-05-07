@@ -12,45 +12,42 @@ open Plugin_utils
 open Certirocq
 open Tacarg
 open G_certirocq_vanilla
+
+let help_msg = make_help_msg ~supports_wasm:false
 }
 
 VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
-| [ "CertiRocqC" "Compile" vanilla_cargs_list(l) global(gr) ] -> {
+| [ "CertiRocqC" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = make_options l [] (get_name gr) in
     Certirocqc.compile_only opts gr []
   }
-| [ "CertiRocqC" "Compile" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+| [ "CertiRocqC" "Compile" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
     let gr = Nametab.global gr in
     let opts = make_options l cs (get_name gr) in
     Certirocqc.compile_only opts gr imps
   }
-| [ "CertiRocqC" "Run" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+| [ "CertiRocqC" "Run" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
   let gr = Nametab.global gr in
   let opts = make_options l cs (get_name gr) in
   Certirocqc.compile_C opts gr imps
   }
-| [ "CertiRocqC" "Run" vanilla_cargs_list(l) global(gr) ] -> {
+| [ "CertiRocqC" "Run" cargs_list(l) global(gr) ] -> {
   let gr = Nametab.global gr in
   let opts = make_options l [] (get_name gr) in
   Certirocqc.compile_C opts gr []
   }
-| [ "CertiRocqC" "Show" "IR" vanilla_cargs_list(l) global(gr) ] -> {
+| [ "CertiRocqC" "Show" "IR" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = make_options l [] (get_name gr) in
     Certirocqc.show_ir opts gr
   }
-| [ "CertiRocqC" "Show" "IR" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" ] -> {
+| [ "CertiRocqC" "Show" "IR" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
     let gr = Nametab.global gr in
     let opts = make_options l cs (get_name gr) in
     Certirocqc.show_ir opts gr
   }
-| [ "CertiRocqC" "FFI" vanilla_ffiargs_list(l) global(gr) ] -> {
-    let gr = Nametab.global gr in
-    let opts = make_options l [] "" in
-    Certirocqc.ffi_command opts gr
-  }
-| [ "CertiRocqC" "Generate" "Glue" vanilla_glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
+| [ "CertiRocqC" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
     let grs = List.map Nametab.global grs in
     let opts = make_options l [] "" in
     Certirocqc.glue_command opts grs
@@ -58,21 +55,21 @@ VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
 END
 
 VERNAC COMMAND EXTEND CertiRocqCHelp CLASSIFIED AS QUERY
-| [ "CertiRocqC" "-help" ] -> {
+| [ "CertiRocqC" "--help" ] -> {
     Feedback.msg_info (str help_msg)
   }
 END
 
 
 VERNAC COMMAND EXTEND CertiRocqC_Eval CLASSIFIED AS SIDEFF
-| ![ opaque_access] [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+| ![ opaque_access] [ "CertiRocqC" "Eval" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
   fun ~opaque_access ->
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l cs (get_name gr) in
   let result = Certirocq.eval_gr ~opaque_access opts gr imps in
   Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
   }
-| ![ opaque_access ] [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) ] -> {
+| ![ opaque_access ] [ "CertiRocqC" "Eval" cargs_list(l) global(gr) ] -> {
   fun ~opaque_access ->
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l [] (get_name gr) in
@@ -82,7 +79,7 @@ VERNAC COMMAND EXTEND CertiRocqC_Eval CLASSIFIED AS SIDEFF
 END
 
 TACTIC EXTEND CertiRocqc_eval
-| [ "certirocqc_eval" vanilla_cargs_list(l) constr(c) tactic(tac) ] ->
+| [ "certirocqc_eval" cargs_list(l) constr(c) tactic(tac) ] ->
   { (* quote and evaluate the given term, unquote, pass the result to t *)
     Proofview.Goal.enter begin fun gl ->
       let env = Proofview.Goal.env gl in

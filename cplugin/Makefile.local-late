@@ -1,2 +1,0 @@
-certirocq_vanilla_plugin.cmxa: certirocq_vanilla_plugin.cmx ../runtime/get_ordinal.o
-	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "gc.h"
+#include "gc_stack.h"
 
 
 extern void body(struct thread_info *);

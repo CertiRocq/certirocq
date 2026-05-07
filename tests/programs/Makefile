@@ -1,10 +1,11 @@
-COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
+COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
 CCOMPILER?=gcc
 INCLUDE=../../runtime
 WARN_OPTS=-w -Wno-everything
 
 # Names of the tests
 TESTS=$(shell cat TESTS)
+CPS_TESTS=$(shell cat CPS_TESTS)
 TEST_PREQS=%_main.c glue_%.c $(INCLUDE)/gc_stack.c
 TEST_RECIPE=$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) $^
 
@@ -12,16 +13,17 @@ TEST_RECIPE=$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE
 GLUE=$(TESTS:%=glue_%.c) $(TESTS:%=glue_%.h)
 
 # Names of the generated C files
-OPTS=opt opt1 opt2 opt3 opt4 opt5
+OPTS=default O0
 TESTS_OPTS=$(foreach TEST,$(TESTS),$(OPTS:%=$(TEST)_%))
-CFILES=$(TESTS_OPTS:%=CertiRocq.Tests.tests.%.c)
+CPS_TESTS_OPTS=$(CPS_TESTS:%=%_cps)
+CFILES=$(TESTS_OPTS:%=CertiRocq.Tests.tests.%.c) $(CPS_TESTS_OPTS:%=CertiRocq.Tests.tests.%.c)
 
 default: run
 all: lib exec run
 
 .PHONY: all default clean cleanexec lib cleanlib run $(TESTS)
 
-exec: $(TESTS)
+exec: $(TESTS) $(CPS_TESTS_OPTS)
 
 clean: cleanexec
 	rm -f ./*.*.c
@@ -34,6 +36,9 @@ clean: cleanexec
 	rm -f ./CertiRocq.Tests.tests.*.c
 
 cleanexec:
+	rm -f ./*_default
+	rm -f ./*_O0
+	rm -f ./*_cps
 	rm -f ./*_opt
 	rm -f ./*_opt[1-5]
 
@@ -49,14 +54,10 @@ cleanlib:
 $(GLUE) $(CFILES): tests.v
 	rocq c $(COQOPTS) $<
 
-%_opt:  $(TEST_PREQS) CertiRocq.Tests.tests.%_opt.c  ; $(TEST_RECIPE)
-%_opt1: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt1.c ; $(TEST_RECIPE)
-%_opt2: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt2.c ; $(TEST_RECIPE)
-%_opt3: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt3.c ; $(TEST_RECIPE)
-%_opt4: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt4.c ; $(TEST_RECIPE)
-%_opt5: $(TEST_PREQS) CertiRocq.Tests.tests.%_opt5.c ; $(TEST_RECIPE)
-
-$(TESTS):%: %_opt %_opt1 %_opt2 %_opt3 %_opt4 %_opt5
+%_default: $(TEST_PREQS) CertiRocq.Tests.tests.%_default.c ; $(TEST_RECIPE)
+%_O0:      $(TEST_PREQS) CertiRocq.Tests.tests.%_O0.c      ; $(TEST_RECIPE)
+%_cps:     $(TEST_PREQS) CertiRocq.Tests.tests.%_cps.c     ; $(TEST_RECIPE)
+$(TESTS):%: %_default %_O0
 
 run: run.sh exec
 	sh $<

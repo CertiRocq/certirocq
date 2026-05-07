@@ -121,4 +121,4 @@ CertiRocq Compile rec_clos2_direct
 Extract Constants [ print_nat => "print_gallina_nat", print_str => "print_gallina_string", new_line => "print_new_line" ]
 Include [ "print.h" ].
 
-CertiRocq Generate Glue -file "glue" [ nat, bool, String ].
+CertiRocq Generate Glue --output "glue" [ nat, bool, String ].

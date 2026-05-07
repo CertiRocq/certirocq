@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 
 PLUGIN=$1
+if [ ! -d "${PLUGIN}" ]
+then
+    PLUGIN="plugins/${PLUGIN}"
+fi
+
+PLUGIN_NAME=$(basename "${PLUGIN}")
 EPATH=
 
-if [ "${PLUGIN}" == "plugin" ]
+if [ "${PLUGIN_NAME}" == "plugin" ]
 then 
     echo "Building optimized ML plugin"
     EPATH="theories/Extraction"
 else
-    if [ "${PLUGIN}" == "cplugin" ]
+    if [ "${PLUGIN_NAME}" == "cplugin" ]
     then
         echo "Building vanila ML plugin"
         EPATH="theories/ExtractionVanilla"

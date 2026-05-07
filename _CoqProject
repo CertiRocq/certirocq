@@ -9,10 +9,10 @@
 -R theories/Codegen             CertiRocq.Codegen
 -R theories/CodegenWasm         CertiRocq.CodegenWasm
 
--R plugin                       CertiRocq.Plugin
--I plugin
--R cplugin                      CertiRocq.VanillaPlugin
--I cplugin
+-R plugins/plugin               CertiRocq.Plugin
+-I plugins/plugin
+-R plugins/cplugin              CertiRocq.VanillaPlugin
+-I plugins/cplugin
 
 -R bootstrap/certirocqc/theories CertiRocq.CertiRocqC
 -I bootstrap/certirocqc

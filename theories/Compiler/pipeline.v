@@ -7,7 +7,6 @@ Require Import Common.Common Common.compM Common.Pipeline_utils.
 From Stdlib Require Import List.
 Require Import maps_util.
 Require Import Glue.glue.
-Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
 From MetaRocq.Erasure Require Import EAst Erasure.
@@ -123,14 +122,12 @@ Definition default_opts : Options :=
      inductives_mapping := [];
      direct := true;
      c_args := 5;
-     anf_conf := 0;
+     anf_variant := 0;
      show_anf := false;
      o_level := 0;
      time := false;
      time_anf := false;
      debug := false;
-     dev := 0;
-     Pipeline_utils.prefix := "";
      Pipeline_utils.body_name := "body";
      prims := [];
   |}.
@@ -140,12 +137,10 @@ Definition make_opts
            (im : EProgram.inductives_mapping)
            (cps : bool)                              (* CPS or direct *)
            (args : nat)                              (* number of C args *)
-           (conf : nat)                              (* λ_ANF configuration *)
+           (anf_variant : nat)                       (* λ_ANF pipeline variant *)
            (o_level : nat)                           (* optimization level *)
            (time : bool) (time_anf : bool)           (* timing options *)
            (debug : bool)                            (* Debug log *)
-           (dev : nat)                               (* Extra flag for development purposes *)
-           (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
            (prims : list primitive)  (* list of extracted constants *)
   : Options :=
@@ -153,14 +148,12 @@ Definition make_opts
      inductives_mapping := im;
      direct := negb cps;
      c_args := args;
-     anf_conf := conf;
+     anf_variant := anf_variant;
      show_anf := false;
      o_level := o_level;
      time := time;
      time_anf := time_anf;
      debug := debug;
-     dev := dev;
-     Pipeline_utils.prefix := prefix;
      Pipeline_utils.body_name := toplevel_name;
      prims :=  prims |}.
 
@@ -174,10 +167,8 @@ Definition compile (opts : Options) (p : Template.Ast.Env.program) :=
 Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error string * string) :=
   let genv := fst p in
   let ir_term p :=
-      o <- get_options ;;
       '(prims, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-      (* The flag -dev 3 *)
-      (* p <- erase_PCUIC p ;; *) CertiRocq_pipeline next_id prims (dev o =? 3)%nat p
+      CertiRocq_pipeline next_id prims false p
   in
   let (perr, log) := run_pipeline _ _ opts p ir_term in
   match perr with

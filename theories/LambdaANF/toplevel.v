@@ -146,7 +146,7 @@ Section IDENT.
   Record anf_options :=
     { time            : bool;    (* Keep ANF per phase timing *)
       cps             : bool;    (* CPS *)
-      do_lambda_lift  : bool;    (* Do lambda lifting *)
+      do_lambda_lift  : bool;    (* Optimize closure allocation with lambda lifting *)
       args            : nat;     (* Arg threshold for lambda lifting *)
       no_push         : nat;     (* *)
       inl_wrappers    : bool;    (* If true, all known calls to lambda lifted functions are inlined *)
@@ -233,7 +233,7 @@ Section IDENT.
   End Pipeline.
 
 
-  (* ANF/Lambda-lifting Configurations for measuring performance. Passed through the anf_conf flag.
+  (* ANF/Lambda-lifting variants for measuring performance. Passed through the ANF variant option.
 
 0: (DEFAULT)
    - LL: agressive inlining of wrappers at known call cites (always the known function is called)
@@ -255,7 +255,7 @@ Section IDENT.
   Definition make_anf_options (opts : Options) : anf_options :=
     let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) :=
         let default := (true, false, 1, true, true) in
-        match anf_conf opts with
+        match anf_variant opts with
         | 0 => default
         | 1 => (false, false, 1, true, true)
         | 2 => (true, true, 1, true, true)
@@ -269,10 +269,10 @@ Section IDENT.
         | _ => default
         end
     in
-    {| time := Pipeline_utils.time opts;
+    {| time := Pipeline_utils.time_anf opts;
        cps  := negb (Pipeline_utils.direct opts);
        do_lambda_lift := (1 <=? o_level opts);
-       args := if anf_conf opts =? 9 then 1000 else Pipeline_utils.c_args opts;
+       args := if anf_variant opts =? 9 then 1000 else Pipeline_utils.c_args opts;
        no_push := no_push;
        inl_wrappers := inl_wrappers;
        inl_known    := inl_known;

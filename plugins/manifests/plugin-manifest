@@ -1,0 +1,329 @@
+; Source of truth for generated plugin _CoqProject and .mlpack files.
+; Lines without a suffix are shared by both plugin variants.
+; Lines ending in " :: plugin" or " :: cplugin" are variant-specific.
+
+[coqproject]
+-I extraction
+-I static
+-I .
+-R . CertiRocq.Plugin :: plugin
+-R . CertiRocq.VanillaPlugin :: cplugin
+
+META.rocq-certirocq :: plugin
+META.rocq-certirocq-vanilla :: cplugin
+
+../common/certirocq_debug.mli
+../common/certirocq_debug.ml
+../common/tm_util.ml
+../common/certirocq_options.mli
+../common/certirocq_options.ml
+../common/plugin_utils.mli
+../common/plugin_utils.ml
+certirocq.mli
+certirocq.ml
+g_certirocq.mlg :: plugin
+g_certirocq_vanilla.mlg :: cplugin
+certirocq_plugin.mlpack :: plugin
+certirocq_vanilla_plugin.mlpack :: cplugin
+Loader.v
+RocqMsgFFI.v
+PrimInt63.v
+PrimFloats.v
+PrimString.v
+GMP.v :: plugin
+CertiRocq.v :: plugin
+CertiRocqVanilla.v :: cplugin
+
+static/caml_option.mli :: cplugin
+static/caml_option.ml :: cplugin
+static/caml_nat.mli
+static/caml_nat.ml
+static/caml_byte.mli
+static/caml_byte.ml
+static/caml_ascii_string.ml :: cplugin
+static/caml_bytestring.ml
+static/caml_comparison.mli :: cplugin
+static/caml_comparison.ml :: cplugin
+static/camlrocq.ml
+static/printAST.ml
+static/printClight.ml
+static/printCsyntax.ml
+
+[mlpack]
+Certirocq_debug
+
+Tm_util
+
+Datatypes
+Caml_nat
+Caml_option :: cplugin
+Caml_comparison :: cplugin
+DecidableClass
+Bool
+Equalities
+Decimal
+Hexadecimal
+Nat0
+Wf
+List0
+PeanoNat
+Specif
+Basics
+PosDef
+IntDef
+NatDef
+ListDef
+BinPosDef
+BinPos
+BinNat
+BinInt
+PrimInt63
+Int0 :: plugin
+PrimString
+Uint63Axioms
+PrimStringAxioms
+Int0 :: cplugin
+Byte
+Caml_byte
+Ascii
+String0
+Fin
+VectorDef
+Vector
+Orders
+OrdersTac
+OrdersFacts
+OrdersLists
+OrderedType0
+OrderedTypeAlt
+MSetInterface
+MSetFacts
+MSetDecide
+MSetList
+MSetAVL
+MSetProperties
+FMapList
+DecidableType
+FMapInterface
+FMapAVL
+FMapFacts
+BinNums
+Classes1
+EqDecInstances
+MRReflect
+MRPrelude
+MROption
+MRList
+MRProd
+ReflectEq
+MRCompare
+Number0
+Signature
+CRelationClasses
+
+ResultMonad
+Byte0
+ByteCompare
+Bytestring
+Caml_bytestring
+Caml_ascii_string :: cplugin
+MRString
+Zpower
+SpecFloat
+PrimFloat
+FloatOps
+Config0
+Kernames
+Reflect
+Transform
+Universes0
+All_Forall
+BasicAst
+Primitive :: cplugin
+Show
+Primitive :: plugin
+Environment
+Ast0
+Typing0
+AstUtils
+EnvMap
+Logic0
+
+Errors0
+
+List_util
+Monad0
+MonadState
+OrdersEx
+POrderedType
+StateMonad
+OptionMonad :: plugin
+Monad_utils :: plugin
+Utils
+Init
+MonadExc :: cplugin
+OptionMonad :: cplugin
+Monad_utils :: cplugin
+TemplateEnvMap
+TemplateProgram
+EtaExpand
+EnvironmentTyping
+MonadExc :: plugin
+
+Ssrbool
+WGraph
+UGraph0
+PCUICPrimitive
+PCUICAst
+PCUICAstUtils
+PCUICCases
+PCUICTyping
+PCUICNormal
+PCUICPosition
+PCUICProgram
+PCUICExpandLets
+TemplateToPCUIC
+PCUICTransform
+PCUICErrors
+PCUICEqualityDec
+PCUICWfEnv
+PCUICWfEnvImpl
+PCUICSafeReduce
+PCUICSafeRetyping
+
+EPrimitive
+EAst
+EAstUtils
+EInduction
+ECSubst
+EWellformed
+ELiftSubst :: cplugin
+EEnvMap
+ELiftSubst :: plugin
+EGlobalEnv
+EWcbvEval
+ESpineView
+EPretty
+Extract
+EEtaExpanded
+ErasureFunction
+ErasureFunctionProperties
+EProgram
+ERemoveParams
+EOptimizePropDiscr :: plugin
+EInlineProjections
+EConstructorsAsBlocks
+ExAst
+Erasure
+Optimize
+OptimizeCorrectness
+EOptimizePropDiscr :: cplugin
+OptimizePropDiscr :: cplugin
+ExtractionCorrectness
+OptimizePropDiscr :: plugin
+EUnboxing
+EInlining
+EReorderCstrs
+ERemapInductives
+EBeta
+ECoInductiveToInductive
+ETransform
+Erasure0
+
+ZArith_dec
+Coqlib0
+
+Classes2
+
+Smallstep
+
+AstCommon
+Round
+MSetRBT
+Maps
+Maps_util
+Map_util
+CompM
+Term0
+Common0
+Term_util
+Cps_show
+State
+Ctx
+Eval
+Pipeline_utils
+Set_util
+Identifiers
+Rename
+Inline_letapp
+Uncurry
+BinNatDef
+Cps_proto_univ
+Cps_proto
+Prototype
+Proto_util
+Frame
+Rewriting
+Uncurry_proto
+Shrink_cps
+Closure_conversion
+Hoisting
+Lambda_lifting
+BinarySingleNaN
+Binary
+Bits
+IEEE754_extra
+Archi
+Zbits
+Integers
+Floats
+AST
+Values0
+Camlrocq
+
+Certirocq_options
+Plugin_utils :: plugin
+Ctypes
+Cop
+Dead_param_elim
+Inline
+Csyntax
+Ctypesdefs
+Memtype
+Memdata
+Memory
+Memory0 :: plugin
+Globalenvs
+Clight
+PrintAST
+PrintCsyntax
+PrintClight
+LambdaANF_to_Clight
+LambdaANF_to_Clight_stack
+Anf
+Cps
+Toplevel
+Toplevel0
+Ssrnat :: plugin
+Eqtype :: plugin
+Seq :: plugin
+Numerics :: plugin
+Bytes :: plugin
+Leb128 :: plugin
+Simd :: plugin
+Datatypes0 :: plugin
+Common1 :: plugin
+Datatypes_properties :: plugin
+List_extra :: plugin
+Binary_format_printer :: plugin
+LambdaANF_to_Wasm_restrictions :: plugin
+LambdaANF_to_Wasm_primitives :: plugin
+LambdaANF_to_Wasm :: plugin
+Toplevel1 :: plugin
+Glue_utils
+Glue
+Pipeline
+Plugin_utils :: cplugin
+Certirocq
+G_certirocq :: plugin
+G_certirocq_vanilla :: cplugin

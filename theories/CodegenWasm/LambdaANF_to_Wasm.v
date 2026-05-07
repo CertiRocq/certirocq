@@ -102,7 +102,7 @@ Definition translate_var (nenv : name_env) (lenv : localvar_env) (v : term.var) 
   : error u32 :=
   match M.get v lenv with
   | Some n => Ret n
-  | None => Err ("expected to find id for variable " ++ (show_tree (show_var nenv v)) ++ " in var/fvar mapping: " ++ err)
+  | None => Err ("expected to find id for variable " ++ (show_tree (show_var nenv v)) ++ " in var/fvar mapping: " ++ err)%bs
   end.
 
 Definition is_function_var (fenv : fname_env) (v : term.var) : bool :=
@@ -265,7 +265,7 @@ Definition translate_primitive_operation (nenv : name_env) (lenv : localvar_env)
 
       | _ => Err "Only primitive operations with 1, 2 or 3 arguments are supported"
       end
-  | _ => Err ("Unsupported primitive operator: " ++ (Kernames.string_of_kername op_name))
+  | _ => Err ("Unsupported primitive operator: " ++ (Kernames.string_of_kername op_name))%bs
   end.
 
 (* **** GROWING THE LINEAR MEMORY **** *)

@@ -1,0 +1,10 @@
+
+package "plugin" (
+  directory = "."
+  requires = "rocq-runtime.plugins.ltac rocq-metarocq-template-ocaml.plugin stdlib-shims"
+  archive(byte) = "certirocq_vanilla_plugin.cma"
+  archive(native) = "certirocq_vanilla_plugin.cmxa"
+  plugin(byte) = "certirocq_vanilla_plugin.cma"
+  plugin(native) = "certirocq_vanilla_plugin.cmxs"
+)
+directory = "."
