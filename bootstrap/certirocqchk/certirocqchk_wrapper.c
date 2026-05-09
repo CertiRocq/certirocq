@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "values.h"
-#include "gc.h"
+#include "gc_stack.h"
 #include <caml/memory.h>
 #include <time.h>
 #include <caml/callback.h>

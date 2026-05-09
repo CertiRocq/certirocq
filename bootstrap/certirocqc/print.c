@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "print.h"
 #include "values.h"
-#include "gc.h"
+#include "gc_stack.h"
 #include <caml/memory.h>
 #include <caml/callback.h>
 

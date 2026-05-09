@@ -23,9 +23,15 @@ ifeq '$(CERTIROCQ_CONFIG)' 'local'
 	-Q . CertiRocq.CertiRocqCheck \
 	-I .
   TESTCOQOPTS = $(COQOPTS)
+  CERTIROCQ_VANILLA_PLUGIN_DEPS = \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmi \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmx \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmxa \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmxs
 else
   COQOPTS = -I . -Q . CertiRocq.CertiRocqCheck
   TESTCOQOPTS = 
+  CERTIROCQ_VANILLA_PLUGIN_DEPS =
 endif
 
 PKGS = -package rocq-runtime,rocq-runtime.clib,rocq-runtime.config,rocq-runtime.engine,rocq-runtime.gramlib,rocq-runtime.interp,rocq-runtime.kernel,rocq-runtime.lib,rocq-runtime.library,rocq-runtime.toplevel,rocq-runtime.vernac,rocq-runtime.plugins.ltac
@@ -90,10 +96,10 @@ certirocqchk.cmx: certirocqchk_plugin_wrapper.cmx certirocqchk_plugin_wrapper.cm
 # %.mli: %.ml
 # 	[ -f "$@" ] || ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certirocqchk_plugin -i $< > $@
 
-%.cmi: %.mli
+%.cmi: %.mli $(CERTIROCQ_VANILLA_PLUGIN_DEPS)
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certirocqchk_plugin $<
 
-%.cmx: %.ml	%.cmi
+%.cmx: %.ml	%.cmi $(CERTIROCQ_VANILLA_PLUGIN_DEPS)
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certirocqchk_plugin -o $@ $<
 
 install: Loader.vo certirocqchk_plugin.cmxs

@@ -44,11 +44,17 @@ ifeq '$(CERTIROCQ_CONFIG)' 'local'
 
   TESTCOQOPTS = $(COQOPTS)
   CERTIROCQ_PIPELINE_DEPS = ../../theories/Compiler/pipeline.vo
+  CERTIROCQ_VANILLA_PLUGIN_DEPS = \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmi \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmx \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmxa \
+	../../plugins/cplugin/certirocq_vanilla_plugin.cmxs
 else
  ifeq '$(CERTIROCQ_CONFIG)' 'global'
   COQOPTS = -I . -Q theories CertiRocq.CertiRocqC
   TESTCOQOPTS = 
   CERTIROCQ_PIPELINE_DEPS =
+  CERTIROCQ_VANILLA_PLUGIN_DEPS =
  else
   $(error "Must first set CERTIROCQ_CONFIG by running ./configure.sh")
  endif
@@ -129,10 +135,10 @@ certirocqc_plugin.cmxs: certirocqc_plugin.cmxa $(CFILES:.c=.o) $(RUNTIME_FILES)
 	ocamlfind ocamlopt $(OCAMLOPTS) -shared -o $@ $+
 
 .PRECIOUS: %.cmi
-%.cmi: %.mli
+%.cmi: %.mli $(CERTIROCQ_VANILLA_PLUGIN_DEPS)
 	ocamlfind opt $(PKGS) $(OCAMLOPTS) -for-pack Certirocqc_plugin $<
 
-%.cmx: %.ml	%.cmi
+%.cmx: %.ml	%.cmi $(CERTIROCQ_VANILLA_PLUGIN_DEPS)
 	ocamlfind opt -c $(PKGS) $(OCAMLOPTS) -for-pack Certirocqc_plugin -o $@ $<
 
 install: theories/compile.vo certirocqc_plugin.cmxs
