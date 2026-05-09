@@ -1193,8 +1193,8 @@ Definition translate_program
                     (allocIdent ::= Efield tinfd allocIdent valPtr ;
                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                     argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                    init_stack ;
-                    gc_call;
+                    if_gc_generational init_stack ;
+                    if_gc_generational gc_call;
                     body)))) :: funs)
   | _ => Err "translate_program: Missing toplevel function block"
   end.
