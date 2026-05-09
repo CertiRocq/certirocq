@@ -393,10 +393,18 @@ module CompileFunctor (CI : CompilerInterface) = struct
       str"was signaled with code " ++ int n ++ str"." ++ fnl () ++
       str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
 
+  let runtime_gc_header = "gc_stack.h"
+  let runtime_gc_object = "gc_stack.o"
+  let runtime_standalone_driver_object = "certirocq_run_main.o"
+
+  let runtime_library_import header = FromLibrary (header, None)
+  let runtime_imports = [runtime_library_import runtime_gc_header]
+  let runtime_glue_imports =
+    [runtime_library_import runtime_gc_header; runtime_library_import "stdio.h"]
+
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = [FromLibrary ("gc_stack.h", None)] in
     let curlib = Sys.getcwd () in
     let imports = List.map (fun i ->
       match i with
@@ -438,8 +446,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports =
-      [ FromLibrary ("gc_stack.h", None); FromLibrary ("stdio.h", None) ] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->
@@ -454,8 +460,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
       let cstr' = make_fname opts cstr in
       let hstr' = make_fname opts hstr in
-      CI.printProg prg nenv cstr' (runtime_imports @ [FromRelativePath hstr]);
-      CI.printProg header nenv hstr' runtime_imports;
+      CI.printProg prg nenv cstr' (runtime_glue_imports @ [FromRelativePath hstr]);
+      CI.printProg header nenv hstr' runtime_glue_imports;
 
       let time = (Unix.gettimeofday() -. time) in
       debug_msg debug (Printf.sprintf "Printed glue code to file %s in %f s.." cstr time)
@@ -518,6 +524,22 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_rt_file na =
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
+  let object_name_of_header s =
+    assert (CString.is_suffix ".h" s);
+    String.sub s 0 (String.length s - 2) ^ ".o"
+
+  let runtime_object_file na =
+    make_rt_file na
+
+  let runtime_object_for_header header =
+    runtime_object_file (object_name_of_header header)
+
+  let runtime_gc_object_file () =
+    runtime_object_file runtime_gc_object
+
+  let runtime_standalone_driver_object_file () =
+    runtime_object_file runtime_standalone_driver_object
+
   let compile_C ~opaque_access opts gr imports =
     let () = compile_only ~opaque_access opts gr imports in
     let imports = get_global_includes () @ imports in
@@ -532,21 +554,17 @@ module CompileFunctor (CI : CompilerInterface) = struct
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
     in
     let importso =
-      let oname s =
-        assert (CString.is_suffix ".h" s);
-        String.sub s 0 (String.length s - 2) ^ ".o"
-      in
       let imports' = List.concat (List.map (fun i ->
         match i with
-        | FromAbsolutePath s -> [oname s]
-        | FromRelativePath s -> [oname s]
+        | FromAbsolutePath s -> [object_name_of_header s]
+        | FromRelativePath s -> [object_name_of_header s]
         | LibraryPath s -> ["-L"; s]
         | Link s -> ["-l" ^ s]
-        | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
-      let l = make_rt_file "certirocq_run_main.o" :: imports' in
+        | FromLibrary (s, _) -> [runtime_object_for_header s]) imports) in
+      let l = runtime_standalone_driver_object_file () :: imports' in
       String.concat " " l
     in
-    let gc_stack_o = make_rt_file "gc_stack.o" in
+    let gc_stack_o = runtime_gc_object_file () in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
@@ -720,7 +738,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let template name =
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
   let template_header name =
-    Printf.sprintf "#include <gc_stack.h>\nextern value %s ();\n" name
+    Printf.sprintf "#include <%s>\nextern value %s ();\n" runtime_gc_header name
 
   let write_c_driver opts name =
     let fname = make_fname opts (opts.filename ^ ".c") in
@@ -769,22 +787,18 @@ module CompileFunctor (CI : CompilerInterface) = struct
           compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
-      let oname s =
-        assert (CString.is_suffix ".h" s);
-        String.sub s 0 (String.length s - 2) ^ ".o"
-      in
       let imports' = List.concat (List.map (fun i ->
         match i with
-        | FromAbsolutePath s -> [oname s]
-        | FromRelativePath s -> [oname s]
+        | FromAbsolutePath s -> [object_name_of_header s]
+        | FromRelativePath s -> [object_name_of_header s]
         | Link s -> ["-cclib"; "-l" ^ s]
         | LibraryPath s -> ["-cclib"; "-L"; "-cclib"; s]
-        | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
-        | FromLibrary (s, None) -> [make_rt_file (oname s)]) imports) in
+        | FromLibrary (_, Some s) -> [runtime_object_for_header s]
+        | FromLibrary (s, None) -> [runtime_object_for_header s]) imports) in
       let l = imports' in
       String.concat " " l
     in
-    let gc_stack_o = make_rt_file "gc_stack.o" in
+    let gc_stack_o = runtime_gc_object_file () in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"; "rocq-certirocq.plugin"] in
