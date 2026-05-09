@@ -18,7 +18,7 @@ RUNTIME_GC_HEADERS = gc_stack.h
 
 # Optional executable driver used by CertiRocq Compile when it builds and runs C.
 RUNTIME_DRIVER_SRC = certirocq_run_main.c
-RUNTIME_DRIVER_HEADERS = certirocq_run_main.h
+RUNTIME_DRIVER_HEADERS =
 
 # Rocq message FFI for standalone C and dynamically loaded plugins.
 RUNTIME_FFI_SRC = rocq_c_ffi.c rocq_ffi.c
