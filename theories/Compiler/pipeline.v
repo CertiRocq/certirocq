@@ -130,6 +130,7 @@ Definition default_opts : Options :=
      debug := false;
      Pipeline_utils.body_name := "body";
      prims := [];
+     gc := GC_Generational;
   |}.
 
 Definition make_opts
@@ -142,7 +143,8 @@ Definition make_opts
            (time : bool) (time_anf : bool)           (* timing options *)
            (debug : bool)                            (* Debug log *)
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
-           (prims : list primitive)  (* list of extracted constants *)
+           (prims : list primitive)                  (* list of extracted constants *)
+           (gc : GC_strategy)                        (* GC strategy for generated C code *)
   : Options :=
   {| erasure_config := erasure_config;
      inductives_mapping := im;
@@ -155,7 +157,8 @@ Definition make_opts
      time_anf := time_anf;
      debug := debug;
      Pipeline_utils.body_name := toplevel_name;
-     prims :=  prims |}.
+     prims := prims;
+     gc := gc |}.
 
 
 Definition compile (opts : Options) (p : Template.Ast.Env.program) :=

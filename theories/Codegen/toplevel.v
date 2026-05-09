@@ -1,5 +1,5 @@
 From Stdlib Require Import ZArith.
-From CertiRocq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight Codegen.LambdaANF_to_Clight_stack.
+From CertiRocq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight_stack.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
 
@@ -37,32 +37,11 @@ Definition Cprogram := (term_util.name_env * Clight.program * Clight.program)%ty
 Definition add_prim_names (prims : list (primitive * positive)) (nenv : term_util.name_env) : term_util.name_env :=
   List.fold_left (fun map '(prim, p) => term.M.set p (nNamed prim.(prim_target)) map) prims nenv.
 
-Definition Clight_trans (bodyName : string) prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
-  let '(_, p_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let p := LambdaANF_to_Clight.compile
-             argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
-             tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-             args p_env prog cenv nenv in
-  match p with
-  | exceptionMonad.Ret (nenv, prog, head) =>
-    Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head)
-  | Exc s => Err s
-  end.
-
-
-(* TODO unify with the one above, propagate errors *)
-Definition Clight_trans_fast (bodyName : string) prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
-  let '(_, p_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let '(nenv, prog, head) := LambdaANF_to_Clight.compile_fast
-                               argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
-                               tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                               args p_env prog cenv nenv in
-  Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head).
-
-
-Definition Clight_trans_ANF bodyName prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
+Definition ANF_to_Clight bodyName prims (args : nat) (gc : GC_strategy)
+  (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
   let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := LambdaANF_to_Clight_stack.compile
+                     gc
                      argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
                      tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent resultIdent
                      args
@@ -82,4 +61,4 @@ Definition compile_Clight prims : CertiRocqTrans toplevel.LambdaANF_FullTerm Cpr
     debug_msg "Translating from LambdaANF to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    LiftErrorLogCertiRocqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
+    LiftErrorLogCertiRocqTrans "Codegen" (ANF_to_Clight opts.(body_name) prims args opts.(gc)) s.

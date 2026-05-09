@@ -24,6 +24,10 @@ Record primitive := mk_primitive {
 
 Definition primitives := list primitive.
 
+Inductive GC_strategy :=
+| GC_None
+| GC_Generational.
+
 (* Compiler options *)
 Record Options :=
   { erasure_config : erasure_configuration;
@@ -43,6 +47,7 @@ Record Options :=
     prims    : primitives;
     (* List of constants that are realized in the target code.
      * kername: constant name, string: name of target primitive *)
+    gc       : GC_strategy;
   }.
 
 

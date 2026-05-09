@@ -1,4 +1,4 @@
-Require Import Common.compM.
+Require Import Common.compM Common.Pipeline_utils.
 
 From Stdlib Require Import ZArith.ZArith
         Program.Basics
@@ -93,6 +93,8 @@ Require Import
 
 From MetaRocq.Utils Require Import bytestring MRString.
 Section TRANSLATION.
+
+Variable (gc_strategy : GC_strategy).
 
 (* Stand-in for arbitrary identifiers *)
 Variable (argsIdent : ident).
@@ -783,7 +785,13 @@ Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_o
          Scall None gc (tinf :: nil) ;
          discard_stack;
          allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr)
-        Sskip), slots).
+            Sskip), slots).
+
+Definition if_gc_generational (st : statement) : statement :=
+  match gc_strategy with
+  | GC_Generational => st
+  | GC_None => Sskip
+  end.
 
 Definition make_case_switch
           (x : positive)
@@ -971,12 +979,12 @@ Section Translation.
           let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
           progn <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
           Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
-               make_stack;
+               if_gc_generational make_stack;
                c;
                allocIdent ::= Efield tinfd allocIdent valPtr;
                limitIdent ::= Efield tinfd limitIdent valPtr;
-               gc_call;
-               discard_stack;
+               if_gc_generational gc_call;
+               if_gc_generational discard_stack;
                fst progn),
                snd progn)
         | None => Err "translate_body: Unknown function application in Eletapp"
@@ -1037,11 +1045,11 @@ Section Translation.
         let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
         '(prog, slots) <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
         Ret ((Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
-             make_stack;
+             if_gc_generational make_stack;
              c;
              allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
-             gc_call;
-             discard_stack;
+             if_gc_generational gc_call;
+             if_gc_generational discard_stack;
              prog),
              slots)
     | None => Err "translate_body: Unknown primitive identifier"
@@ -1099,8 +1107,8 @@ Fixpoint translate_fundefs
                                limitIdent ::= Efield tinfd limitIdent valPtr ;
                                argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
                                asgn ;
-                               init_stack ;
-                               gc;
+                               if_gc_generational init_stack ;
+                               if_gc_generational gc;
                                body))))) :: rest)
     end
   end.

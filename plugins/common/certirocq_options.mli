@@ -3,6 +3,7 @@ type command_args =
  | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
+ | GC_MODE of gc_mode
  | TIME
  | TIMEANF
  | OPT of int
@@ -13,6 +14,10 @@ type command_args =
  | OUTPUT_SUFFIX of string
  | ENTRY_POINT of string
  | OUTPUT of string
+
+and gc_mode =
+ | GC_None
+ | GC_Generational
 
 type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 
@@ -37,6 +42,7 @@ type options =
     filename : string;
     ext : string;
     toplevel_name : string;
+    gc_mode : gc_mode;
     prims : prim list;
     inductives_mapping : inductives_mapping;
     extracted_inductives : extract_inductives;

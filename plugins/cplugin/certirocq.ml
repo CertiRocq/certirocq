@@ -282,8 +282,13 @@ let make_pipeline_options (opts : options) =
   let prims = get_global_prims () @ opts.prims in
   let prims = quote_prims prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
+  let gc =
+    match opts.gc_mode with
+    | Certirocq_options.GC_None -> Pipeline_utils.GC_None
+    | Certirocq_options.GC_Generational -> Pipeline_utils.GC_Generational
+  in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config inductives_mapping cps args anf_variant olevel timing timing_anf debug toplevel_name prims
+  Pipeline.make_opts erasure_config inductives_mapping cps args anf_variant olevel timing timing_anf debug toplevel_name prims gc
 
 (** Main Compilation Functions *)
 

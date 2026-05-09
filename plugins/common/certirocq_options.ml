@@ -3,6 +3,7 @@ type command_args =
  | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
+ | GC_MODE of gc_mode
  | TIME
  | TIMEANF
  | OPT of int
@@ -13,6 +14,10 @@ type command_args =
  | OUTPUT_SUFFIX of string
  | ENTRY_POINT of string
  | OUTPUT of string
+
+and gc_mode =
+ | GC_None
+ | GC_Generational
 
 type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 
@@ -37,6 +42,7 @@ type options =
     filename : string;
     ext : string;
     toplevel_name : string;
+    gc_mode : gc_mode;
     prims : prim list;
     inductives_mapping : inductives_mapping;
     extracted_inductives : extract_inductives;
@@ -68,6 +74,7 @@ let default_options ~build_dir ~inductives_mapping ~extracted_inductives () : op
     filename = "";
     ext = "";
     toplevel_name = "body";
+    gc_mode = GC_Generational;
     prims = [];
     inductives_mapping;
     extracted_inductives;
@@ -82,6 +89,7 @@ let make_options ~build_dir ~inductives_mapping ~extracted_inductives
     | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
     | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS :: xs -> aux {o with cps = true} xs
+    | GC_MODE m :: xs -> aux {o with gc_mode = m} xs
     | TIME :: xs -> aux {o with time = true} xs
     | TIMEANF :: xs -> aux {o with time_anf = true} xs
     | OPT n :: xs -> aux {o with olevel = n} xs

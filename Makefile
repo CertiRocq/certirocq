@@ -1,10 +1,16 @@
-.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap plugin-manifests
+.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap plugin-manifests clean-theory-extraction
 
 PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-manifest
 PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
 PYTHON ?= python3
 
-all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo: theories/Makefile libraries/Makefile
+clean-theory-extraction:
+	find theories/Extraction -maxdepth 1 \( -name "*.ml" -o -name "*.mli" \) -delete
+	find theories/ExtractionVanilla -maxdepth 1 \( -name "*.ml" -o -name "*.mli" \) -delete
+	rm -f theories/Extraction/extraction.vo theories/Extraction/extraction.vos theories/Extraction/extraction.vok theories/Extraction/extraction.glob
+	rm -f theories/ExtractionVanilla/extraction.vo theories/ExtractionVanilla/extraction.vos theories/ExtractionVanilla/extraction.vok theories/ExtractionVanilla/extraction.glob
+
+all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo: clean-theory-extraction theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries 
 	$(MAKE) -C theories 
 
@@ -20,7 +26,7 @@ submodules:
 
 plugins: plugin cplugin
 
-plugin-manifests: $(PLUGIN_MANIFEST_OUTPUTS)
+plugin-manifests: all $(PLUGIN_MANIFEST_OUTPUTS)
 
 plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack: $(PLUGIN_MANIFEST_INPUTS) theories/Extraction/extraction.vo
 	bash ./clean_extraction.sh plugins/plugin

@@ -96,6 +96,7 @@ ARGUMENT EXTEND cargs
 | [ "--allow-unsafe-erasure" ] -> { UNSAFE_ERASURE }
 | [ "--bypass-qed" ] -> { BYPASS_QED }
 | [ "--cps" ] -> { CPS }
+| [ "--no-gc" ] -> { GC_MODE GC_None }
 | [ "--time" ] -> { TIME }
 | [ "--time-anf" ] -> { TIMEANF }
 | [ "-O" natural(n) ] -> { OPT(n) }
