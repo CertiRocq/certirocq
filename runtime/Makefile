@@ -9,8 +9,8 @@ CPPFLAGS += $(SYSTEM_INCLUDE_DIRS:%=-I%) -I . -I $(shell $(OCAMLC) -where)
 COQLIB = $(shell $(COQC) -where)
 DST ?= $(COQLIB)/user-contrib/CertiRocq/Plugin/runtime
 
-# Generated programs share this OCaml-compatible value layout.
-RUNTIME_CORE_HEADERS = m.h config.h values.h
+# Generated programs share this OCaml-compatible value layout and runtime ABI.
+RUNTIME_CORE_HEADERS = m.h config.h values.h certirocq_runtime.h
 
 # Current GC/thread interface used directly by generated code.
 RUNTIME_GC_SRC = gc_stack.c

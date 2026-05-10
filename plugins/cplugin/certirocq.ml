@@ -535,14 +535,18 @@ module CompileFunctor (CI : CompilerInterface) = struct
       str"was signaled with code " ++ int n ++ str"." ++ fnl () ++
       str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
 
+  let runtime_abi_header = "certirocq_runtime.h"
   let runtime_gc_header = "gc_stack.h"
   let runtime_gc_object = "gc_stack.o"
   let runtime_standalone_driver_object = "certirocq_run_main.o"
 
   let runtime_library_import header = FromLibrary (header, None)
-  let runtime_imports = [runtime_library_import runtime_gc_header]
-  let runtime_glue_imports =
-    [runtime_library_import runtime_gc_header; runtime_library_import "stdio.h"]
+  let runtime_imports opts =
+    match opts.gc_mode with
+    | Certirocq_options.GC_None -> [runtime_library_import runtime_abi_header]
+    | Certirocq_options.GC_Generational -> [runtime_library_import runtime_gc_header]
+  let runtime_glue_imports opts =
+    runtime_imports opts @ [runtime_library_import "stdio.h"]
 
   let compile opts term imports =
     let debug = opts.debug in
@@ -552,6 +556,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       match i with
       | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
       | _ -> i) imports in
+    let runtime_imports = runtime_imports opts in
     let imports = runtime_imports @ get_global_includes () @ imports in
     let p = CI.compile options term in
     match p with
@@ -588,6 +593,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in
+    let runtime_glue_imports = runtime_glue_imports opts in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->
@@ -880,7 +886,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let template name =
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
   let template_header name =
-    Printf.sprintf "#include <%s>\nextern value %s ();\n" runtime_gc_header name
+    Printf.sprintf "#include <%s>\nextern value %s ();\n" runtime_abi_header name
 
   let write_c_driver opts name =
     let fname = make_fname opts (opts.filename ^ ".c") in
