@@ -17,7 +17,6 @@ struct thread_info {
   struct heap *heap;
   value args[MAX_ARGS];
   uintnat nalloc;
-  void *odata;
 #ifdef CERTIROCQ_GENERATIONAL_GC
   struct stack_frame *fp;
 #endif

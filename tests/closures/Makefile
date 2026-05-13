@@ -26,7 +26,7 @@ compile: tests.v
 $(CFILES): compile
 
 $(TESTS): %: CertiRocq.Tests.tests.%.c glue.c print.c
-	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc/gc.c $^
+	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/certirocq_runtime.c $(INCLUDE)/gc/gc.c $^
 
 exec: $(TESTS)
 

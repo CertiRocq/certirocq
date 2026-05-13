@@ -130,24 +130,6 @@ void printtree(FILE *f, struct heap *h, value v) {
   else fprintf(f,"%ld",v>>1);
 }
 
-// XXX todo update for roots arrays
-/* void printroots (FILE *f, struct heap *h, */
-/* 		  fun_info fi,   /\* which args contain live roots? *\/ */
-/* 		  struct thread_info *ti) /\* where's the args array? *\/ */
-/*  { */
-/*    value *args; int n; uintnat i, *roots; */
-/*    roots = fi+2; */
-/*    n = fi[1]; */
-/*    args = ti->args; */
-
-/*   for(i = 0; i < n; i++) { */
-/*     fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]); */
-/*     printtree(f, h, args[roots[i]]); */
-/*     fprintf(f,"\n"); */
-/*   } */
-/*   fprintf(f,"\n"); */
-/* } */
-
 #endif
 
 void abort_with(char *s) {
@@ -370,7 +352,6 @@ struct thread_info *make_tinfo(void) {
   tinfo->limit=h->spaces[0].limit;
   tinfo->fp=NULL; /* the initial stack pointer is NULL */
   tinfo->nalloc=0;
-  tinfo->odata=NULL;
   return tinfo;
 }
 
@@ -550,18 +531,5 @@ void print_heapsize(struct thread_info *ti) {
  might be similar in size to the entire address space. 
 */
 
-struct closure {
-  value (*func)(struct thread_info *, value, value);
-  value env;
-};
-
-value closure_call(struct thread_info *$tinfo, value $clo, value $arg)
-{
-  register value (*$f)(struct thread_info*, value, value);
-  register value $envi;
-  register value $tmp;
-  $f = (*((struct closure *) $clo)).func;
-  $envi = (*((struct closure *) $clo)).env;
-  $tmp = $f($tinfo, $envi, $arg);
-  return $tmp;
-}
+/* closure_call moved to runtime/certirocq_runtime.c -- it is shared with
+ * no-GC builds and has no GC dependency. */

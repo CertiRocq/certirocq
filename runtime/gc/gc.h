@@ -1,6 +1,10 @@
 #ifndef CERTIROCQ_GC_STACK_H
 #define CERTIROCQ_GC_STACK_H
 
+/* Defining CERTIROCQ_GENERATIONAL_GC before including certirocq_runtime.h
+ * makes the GC-only fields of thread_info (nalloc, heap, fp) and the
+ * stack_frame struct visible. Including this header is the canonical
+ * way to opt in. */
 #define CERTIROCQ_GENERATIONAL_GC 1
 
 #include "certirocq_runtime.h"
@@ -97,24 +101,19 @@ The "start" value is not actually a variable of the mutator,
 but it was the value of "alloc" immediately after the most
 recent collection.
 
-To call the garbage collector, the mutator passes a fun_info and
-a thread_info, as follows. */
-
-typedef const uintnat *fun_info;
-/* fi[0]: How many words the function might allocate
-   fi[1]: How many slots of the args array contain live roots
-   fi[2..(fi[1]-2)]: Indices of the live roots in the args array
-*/
+To call the garbage collector, the mutator passes a thread_info,
+as follows. */
 
 /* ideally struct heap should be more abstract (opaque)
       struct heap;
   and ideally, the following definitions should live in gc.c rather than gc.h:
 */
-#if  SIZEOF_PTR == 8
+#if SIZEOF_PTR == 8
 #define LOG_WORDSIZE 3
-#endif
-#if SIZEOF_PTR == 4
+#elif SIZEOF_PTR == 4
 #define LOG_WORDSIZE 2
+#else
+#error "Unsupported SIZEOF_PTR for generational GC"
 #endif
 #define LOG_NURSERY_SIZE 16
 #define NURSERY_SIZE (1<<LOG_NURSERY_SIZE)
@@ -125,8 +124,8 @@ struct heap {  struct space spaces[MAX_SPACES]; };
 /* END of the stuff that would ideally be more opaque */
 
 void garbage_collect(struct thread_info *ti);
-/* Performs one garbage collection; 
-   or if ti->heap==NULL, initializes the heap. 
+/* Performs one garbage collection;
+   or if ti->heap==NULL, initializes the heap.
 
  The returns in a state where
  (1) the "after" graph of nodes reachable from args[indices[0..num_args]]
@@ -145,29 +144,11 @@ void reset_heap(struct heap *h);
 /* Empties the heap without freeing its storage.
  * After a complete execution of the mutator,
  * and after whoever invoked the mutator copies whatever result they want
- * out of the heap, one can call this function before starting 
- * another mutator execution.  This saves the operating-system overhead of 
+ * out of the heap, one can call this function before starting
+ * another mutator execution.  This saves the operating-system overhead of
  * free_heap() followed by the implicit create_heap that would have been
  * done in the first garbage_collect() call of the next execution.
  */
-
-/* which slot of the args array has the answer of a certirocq program */
-#define answer_index 1
-
-value* extract_answer(struct thread_info *ti);
-/* y=extract_answer(x,ti) copies the dag rooted at ti->args[answer_index]
-  into a compact data structure starting at y[1], outside the heap,
-  in a single malloc'ed (therefore freeable) object at address y.
-  All within-the-heap pointers will now be within the object y.
-  If (the answer within) the heap pointed to records outside
-  the heap, then those will point at their original locations
-  outside the object y. 
-
-  Note that the start is *(y+1), not (y+1); that is, there's an
-  extra wrapper-record round the object.  That's so that the
-  root-within-the-heap and the root-outside-the-heap (or root-unboxed)
-  can be treated uniformly by the caller of extract_answer().
-*/
 
 void* export_heap(struct thread_info *ti, value root);
 

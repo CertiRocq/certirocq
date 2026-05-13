@@ -11,6 +11,7 @@ COQLIB = $(shell $(COQC) -where)
 DST ?= $(COQLIB)/user-contrib/CertiRocq/Plugin/runtime
 
 # Generated programs share this OCaml-compatible value layout and runtime ABI.
+RUNTIME_CORE_SRC = certirocq_runtime.c
 RUNTIME_CORE_HEADERS = m.h config.h values.h certirocq_runtime.h
 
 # Current GC/thread interface used directly by generated code.
@@ -34,6 +35,7 @@ RUNTIME_PLUGIN_HELPER_SRC = lib/get_ordinal.c
 RUNTIME_PLUGIN_HELPER_HEADERS = lib/get_ordinal.h
 
 RUNTIME_SRC = \
+	$(RUNTIME_CORE_SRC) \
 	$(RUNTIME_GC_SRC) \
 	$(RUNTIME_DRIVER_SRC) \
 	$(RUNTIME_FFI_SRC) \
@@ -69,7 +71,7 @@ all: $(RUNTIME_OBJECTS)
 
 install: all
 	install -d $(DST) $(DST)/gc $(DST)/lib $(DST)/driver
-	install -m 0644 $(RUNTIME_CORE_HEADERS) $(DST)
+	install -m 0644 $(RUNTIME_CORE_HEADERS) $(RUNTIME_CORE_SRC) $(RUNTIME_CORE_SRC:.c=.o) $(DST)
 	install -m 0644 $(RUNTIME_DRIVER_SRC) $(RUNTIME_DRIVER_OBJECTS) $(DST)/driver
 	install -m 0644 $(RUNTIME_GC_HEADERS) $(RUNTIME_GC_SRC) $(RUNTIME_GC_OBJECTS) $(DST)/gc
 	install -m 0644 $(RUNTIME_LIB_HEADERS) $(RUNTIME_LIB_SRC) $(RUNTIME_LIB_OBJECTS) $(DST)/lib

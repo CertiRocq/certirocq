@@ -28,16 +28,16 @@ compile: tests.v
 $(CFILES): compile
 
 fibn: CertiRocq.Tests.tests.fibn.c glue.c int63.c
-	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc/gc.c $^
+	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/certirocq_runtime.c $(INCLUDE)/gc/gc.c $^
 
 print_lst: CertiRocq.Tests.tests.print_lst.c glue.c print.c
-	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc/gc.c $^
+	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/certirocq_runtime.c $(INCLUDE)/gc/gc.c $^
 
 list_sum_int63: CertiRocq.Tests.tests.list_sum_int63.c glue.c int63.c
-	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc/gc.c $^
+	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/certirocq_runtime.c $(INCLUDE)/gc/gc.c $^
 
 list_sum_int63_tinfo: CertiRocq.Tests.tests.list_sum_int63_tinfo.c glue.c int63_tinfo.c
-	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc/gc.c $^
+	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/certirocq_runtime.c $(INCLUDE)/gc/gc.c $^
 
 exec: $(TESTS)
 
