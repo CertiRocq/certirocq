@@ -1,7 +1,16 @@
 #ifndef CERTIROCQ_GC_STACK_H
 #define CERTIROCQ_GC_STACK_H
 
+#define CERTIROCQ_GENERATIONAL_GC 1
+
 #include "certirocq_runtime.h"
+
+/* A frame of the shadow stack used to keep track of live roots. */
+struct stack_frame {
+  value *next;
+  value *root;
+  struct stack_frame *prev;
+};
 
 /* EXPLANATION OF THE CERTIROCQ GENERATIONAL GARBAGE COLLECTOR.
  Andrew W. Appel, September 2016
@@ -163,5 +172,7 @@ value* extract_answer(struct thread_info *ti);
 void* export_heap(struct thread_info *ti, value root);
 
 void print_heapsize(struct thread_info *ti);
+
+void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val);
 
 #endif /* CERTIROCQ_GC_STACK_H */

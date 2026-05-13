@@ -4,8 +4,6 @@
 #ifndef PRIM_STRING_H
 #define PRIM_STRING_H 1
 
-#define String_tag 252
-
 typedef value primstring;
 
 intnat prim_strlen(primstring s);

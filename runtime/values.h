@@ -215,8 +215,11 @@ bits  63        (64-P) (63-P)        10 9     8 7   0
 }
 #endif
 
-/* Floating-point numbers. */
+/* Block tags. */
+#define No_scan_tag 251
+#define String_tag 252
 #define Double_tag 253
+#define No_scan(t) ((t) >= No_scan_tag)
 #define Double_wosize ((sizeof(double) / sizeof(value)))
 #define Double_val(v) (* (double *)(v))
 #define Store_double_val(v,d) (* (double *)(v) = (d))

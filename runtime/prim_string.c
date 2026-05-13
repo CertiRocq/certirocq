@@ -5,8 +5,6 @@
 #include "gc_stack.h"
 #include "prim_int63.h"
 
-#define String_tag 252
-
 typedef value primstring;
 
 #define trace(...) // printf(__VA_ARGS__)

@@ -498,8 +498,12 @@ Definition rootTPtr := valPtr.
 (* local vars declared when a function uses the stack *)
 (* struct stack_frame frame; val roots[MAX_LOCS]; *)
 Definition stack_decl size : list (ident * type)  :=
-  (frameIdent, stackframeT) :: (* local variable for local stack frame *)
-  (rootIdent, rootT size) :: nil. (* local variable for the live array *)
+  match gc_strategy with
+  | GC_Generational =>
+    (frameIdent, stackframeT) :: (* local variable for local stack frame *)
+    (rootIdent, rootT size) :: nil (* local variable for the live array *)
+  | GC_None => nil
+  end.
 
 (* Notation for handling the roots array *)
 Notation roots := (Evar rootIdent valPtr).

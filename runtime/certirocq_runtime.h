@@ -3,33 +3,27 @@
 
 #include "values.h"
 
-#define No_scan_tag 251
-#define No_scan(t) ((t) >= No_scan_tag)
-
 #define MAX_ARGS 1024
 
 struct heap;
 
-/* A frame of the shadow stack used to keep track of live roots. */
-struct stack_frame {
-  value *next;
-  value *root;
-  struct stack_frame *prev;
-};
+#ifdef CERTIROCQ_GENERATIONAL_GC
+struct stack_frame;
+#endif
 
 struct thread_info {
   value *alloc;
   value *limit;
   struct heap *heap;
   value args[MAX_ARGS];
-  struct stack_frame *fp;
   uintnat nalloc;
   void *odata;
+#ifdef CERTIROCQ_GENERATIONAL_GC
+  struct stack_frame *fp;
+#endif
 };
 
 struct thread_info *make_tinfo(void);
-
-void certirocq_modify(struct thread_info *ti, value *p_cell, value p_val);
 
 value closure_call(struct thread_info *, value, value);
 
