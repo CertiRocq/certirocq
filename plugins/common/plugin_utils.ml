@@ -74,7 +74,7 @@ Valid options:\n\
 --debug                    : Show debugging information.\n\
 --c-args N                 : Set the C-argument threshold used by lambda lifting and C translation.\n\
 --cps                      : Compile through continuation-passing style (default: direct style).\n\
---no-gc                    : Disable generated garbage-collection calls. Use only when the program fits in the initial heap.\n\
+--no-gc                    : Omit GC checks/calls; only safe when total allocation is bounded by the initial allocation arena.\n\
 --time                     : Time the main compilation phases.\n\
 --time-anf                 : Time LambdaANF optimization subphases.\n\
 --anf-variant N            : Select an experimental LambdaANF pipeline variant.\n\
