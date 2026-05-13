@@ -10,4 +10,4 @@ CertiRocq Register [
   Corelib.Strings.PrimString.sub => "prim_string_sub" with tinfo,
   Corelib.Strings.PrimString.cat => "prim_string_cat" with tinfo
 ]
-Include [ Library "prim_string.h" ].
+Include [ Library "lib/prim_string.h" ].

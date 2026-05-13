@@ -34,4 +34,4 @@ CertiRocq Register [
   Corelib.Numbers.Cyclic.Int63.PrimInt63.lesb => "prim_int63_lesb",
   Corelib.Numbers.Cyclic.Int63.PrimInt63.ltsb => "prim_int63_ltsb"
 ]
-Include [ Library "prim_int63.h" ].
+Include [ Library "lib/prim_int63.h" ].

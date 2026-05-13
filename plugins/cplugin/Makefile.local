@@ -24,4 +24,4 @@ archclean::
 		$(HIDE)rm -f certirocq_options.cmi certirocq_options.cmt certirocq_options.cmti certirocq_options.cmx certirocq_options.ml.d certirocq_options.mli.d certirocq_options.o
 		$(HIDE)rm -f plugin_utils.cmi plugin_utils.cmt plugin_utils.cmti plugin_utils.cmx plugin_utils.ml.d plugin_utils.mli.d plugin_utils.o
 
-certirocq_plugin.cmxs: ../../runtime/get_ordinal.o
+certirocq_plugin.cmxs: ../../runtime/lib/get_ordinal.o

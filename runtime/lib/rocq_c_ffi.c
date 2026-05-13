@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "rocq_c_ffi.h"
-#include "gc_stack.h"
+#include "gc/gc.h"
 #include "values.h"
 
 unsigned long long length_of_coq_string(value s) {

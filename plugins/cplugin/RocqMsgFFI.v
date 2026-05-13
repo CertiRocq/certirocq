@@ -11,4 +11,4 @@ CertiRocq Register [
   msg_notice => "rocq_msg_notice",
   msg_debug => "rocq_msg_debug",
   user_error => "rocq_user_error" ]
-Include [ Library "rocq_c_ffi.h" "rocq_ffi.h" ].
+Include [ Library "lib/rocq_c_ffi.h" "lib/rocq_ffi.h" ].

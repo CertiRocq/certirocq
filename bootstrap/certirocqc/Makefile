@@ -1,7 +1,7 @@
 # clang compiler 
 CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
 # clang options
-CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
+CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I 20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400RUNTIME_DIR)/gc -I $(RUNTIME_DIR)/lib -I ${OCAMLLIB} -w -Wno-everything -O2
 UNAME=$(shell uname -s)
 ifeq '$(UNAME)' 'Darwin'
   SED= $(shell which gsed)
@@ -64,7 +64,7 @@ GENCFILES = glue.c CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
 CFILES = certirocqc_wrapper.c $(GENCFILES)
 
 RUNTIME_DIR = ../../runtime
-RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o ${RUNTIME_DIR}/prim_string.o $(RUNTIME_DIR)/prim_int63.o $(RUNTIME_DIR)/rocq_c_ffi.o
+RUNTIME_FILES = $(RUNTIME_DIR)/gc/gc.o $(RUNTIME_DIR)/lib/prim_floats.o ${RUNTIME_DIR}/lib/prim_string.o $(RUNTIME_DIR)/lib/prim_int63.o $(RUNTIME_DIR)/lib/rocq_c_ffi.o
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiRocqC.v
 

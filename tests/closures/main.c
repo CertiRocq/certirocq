@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc_stack.h"
+#include "gc/gc.h"
 
 extern value body(struct thread_info *);
 

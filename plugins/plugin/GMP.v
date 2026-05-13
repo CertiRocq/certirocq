@@ -101,7 +101,7 @@ CertiRocq Register [
 
   equal => "z_equal"
 ]
-Include [ Library "certirocq_gmp.h", LibraryPath "/opt/homebrew/lib", Link "gmp" ].
+Include [ Library "lib/certirocq_gmp.h", LibraryPath "/opt/homebrew/lib", Link "gmp" ].
 (* TODO test presence of files/paths? *)
 
 Definition compare_signed x y := wrap_int (compare x y).

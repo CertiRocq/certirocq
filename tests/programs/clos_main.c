@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "gc_stack.h"
+#include "gc/gc.h"
 #include "glue_clos.h"
 
 extern value body(struct thread_info *);

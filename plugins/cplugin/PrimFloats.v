@@ -20,4 +20,4 @@ CertiRocq Register [
   Corelib.Floats.PrimFloat.of_uint63 => "prim_float_of_uint63" with tinfo,
   Corelib.Floats.PrimFloat.next_up => "prim_float_next_up" with tinfo,
   Corelib.Floats.PrimFloat.next_down => "prim_float_next_down" with tinfo ]
-Include [ Library "prim_floats.h" ].
+Include [ Library "lib/prim_floats.h" ].

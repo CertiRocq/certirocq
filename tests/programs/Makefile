@@ -6,7 +6,7 @@ WARN_OPTS=-w -Wno-everything
 # Names of the tests
 TESTS=$(shell cat TESTS)
 CPS_TESTS=$(shell cat CPS_TESTS)
-TEST_PREQS=%_main.c glue_%.c $(INCLUDE)/gc_stack.c
+TEST_PREQS=%_main.c glue_%.c $(INCLUDE)/gc/gc.c
 TEST_RECIPE=$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) $^
 
 # Names of the generated glue code files

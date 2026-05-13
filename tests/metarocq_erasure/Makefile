@@ -3,8 +3,8 @@ LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 OCAMLOPTS = -open Metarocq_template_plugin -I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiRocq.Tests.metacoq_erasure.metacoq_erasure.metacoq_erasure.c \
 		CertiRocq.Tests.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
-CFILES = certirocq_erasure.c ${GENCFILES} gc_stack.c print.c
-COPTS = -g -I ../../_opam/lib/ocaml -I . -I ../../theories/Runtime
+CFILES = certirocq_erasure.c ${GENCFILES} print.c
+COPTS = -g -I ../../_opam/lib/ocaml -I . -I ../../runtime -I ../../runtime/gc -I ../../runtime/lib
 # ffi.CertiRocq.Tests.metacoq_erasure.metacoq_erasure.QuoteFFI.c
 COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRocq.Libraries \
 	-Q ../../theories/LambdaANF CertiRocq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiRocq.LambdaBoxLocal \
@@ -13,7 +13,7 @@ COQOPTS = -Q ../../theories/Codegen CertiRocq.Codegen -Q ../../libraries CertiRo
         -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin
 
 RUNTIME_DIR = ../../runtime
-RUNTIME_FILES = ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o
+RUNTIME_FILES = ${RUNTIME_DIR}/gc/gc.o ${RUNTIME_DIR}/lib/prim_floats.o ${RUNTIME_DIR}/lib/prim_int63.o
 
 plugin: metarocq_erasure.vo Loader.vo
 

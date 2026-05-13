@@ -536,9 +536,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
       str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
 
   let runtime_abi_header = "certirocq_runtime.h"
-  let runtime_gc_header = "gc_stack.h"
-  let runtime_gc_object = "gc_stack.o"
-  let runtime_standalone_driver_object = "certirocq_run_main.o"
+  let runtime_gc_header = "gc/gc.h"
+  let runtime_gc_object = "gc/gc.o"
+  let runtime_standalone_driver_object = "driver/certirocq_run_main.o"
 
   let runtime_library_import header = FromLibrary (header, None)
   let runtime_imports opts =
@@ -714,13 +714,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let l = runtime_standalone_driver_object_file () :: imports' in
       String.concat " " l
     in
-    let gc_stack_o = runtime_gc_object_file () in
+    let gc_o = runtime_gc_object_file () in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
       let linkcmd =
         Printf.sprintf "%s -fPIC -Wno-everything -g -L %s -L %s -o %s %s %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
+          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
@@ -944,7 +944,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let l = imports' in
       String.concat " " l
     in
-    let gc_stack_o = runtime_gc_object_file () in
+    let gc_o = runtime_gc_object_file () in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"; "rocq-certirocq-vanilla.plugin"] in
@@ -955,7 +955,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let linkcmd =
       Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
       -I %s -package rocq-certirocq-vanilla -o %s %s %s %s %s"
-      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o
+      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_o
       (make_fname opts opts.filename ^ ".o") importso
     in
     debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);

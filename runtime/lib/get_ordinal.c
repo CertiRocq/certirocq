@@ -1,4 +1,4 @@
-#include "gc_stack.h"
+#include "gc/gc.h"
 #include <stdio.h>
 
 value get_unboxed_ordinal(value $v)

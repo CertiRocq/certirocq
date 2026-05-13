@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc_stack.h"
+#include "gc/gc.h"
 
 typedef value primint;
 typedef value primbool;

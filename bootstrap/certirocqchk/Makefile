@@ -38,9 +38,9 @@ GENCFILES = glue.c CertiRocq.CertiRocqCheck.compile.certirocqchk.c
 CFILES = certirocqchk_wrapper.c ${GENCFILES}
 
 RUNTIME_DIR = ../../runtime
-RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_string.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/rocq_ffi.o
+RUNTIME_FILES = ${RUNTIME_DIR}/gc/gc.o ${RUNTIME_DIR}/lib/prim_floats.o ${RUNTIME_DIR}/lib/prim_string.o ${RUNTIME_DIR}/lib/prim_int63.o ${RUNTIME_DIR}/lib/rocq_ffi.o
 
-CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
+CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I /gc -I ${RUNTIME_DIR}/lib -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp: CCOMPILEROPTS = -g -c -I . -I ${OCAMLLIB} -O2
 
 .PHONY: certirocqchk

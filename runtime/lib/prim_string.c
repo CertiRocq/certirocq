@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "gc_stack.h"
+#include "gc/gc.h"
 #include "prim_int63.h"
 
 typedef value primstring;

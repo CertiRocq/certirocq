@@ -5,7 +5,7 @@
 #include <math.h>
 #include <gmp.h>
 #include "values.h"
-#include "gc_stack.h"
+#include "gc/gc.h"
 #include "prim_int63.h"
 #include "prim_string.h"
 
