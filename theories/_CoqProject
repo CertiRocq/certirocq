@@ -94,7 +94,6 @@ LambdaANF/toplevel_theorems.v
 
 # Codegen
 Codegen/tactics.v
-Codegen/LambdaANF_to_Clight.v
 Codegen/LambdaANF_to_Clight_stack.v
 Codegen/toplevel.v
 

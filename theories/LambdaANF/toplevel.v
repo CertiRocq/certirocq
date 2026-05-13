@@ -6,8 +6,6 @@ From CertiRocq Require Import
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
-(* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
-
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
 

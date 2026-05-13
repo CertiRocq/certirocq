@@ -236,7 +236,6 @@ Clight
 PrintAST
 PrintCsyntax
 PrintClight
-LambdaANF_to_Clight
 LambdaANF_to_Clight_stack
 Anf
 Cps

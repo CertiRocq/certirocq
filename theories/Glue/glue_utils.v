@@ -25,13 +25,39 @@ Require Import compcert.common.AST
 Require Import LambdaANF.term
                LambdaANF.identifiers
                LambdaANF.cps_show
-               LambdaANF_to_Clight
+               LambdaANF_to_Clight_stack
                compM.
 
 Import MonadNotation.
 Open Scope monad_scope.
 
 Definition main_ident : positive := 1.
+
+(* TODO these notations are taken from LambdaANF_to_Clight_stack. Make them global. *)
+Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
+
+Notation c_int := c_int'.
+
+Notation uintTy := (Tint I32 Unsigned
+                        {| attr_volatile := false; attr_alignas := None |}).
+
+Notation ulongTy := (Tlong Unsigned
+                        {| attr_volatile := false; attr_alignas := None |}).
+
+Definition threadStructInf (thread_info_ident : ident) : type :=
+  Tstruct thread_info_ident noattr.
+
+Definition threadInf (thread_info_ident : ident) : type :=
+  Tpointer (threadStructInf thread_info_ident) noattr.
+
+Definition funTy (thread_info_ident : ident) : type :=
+  Tfunction (threadInf thread_info_ident :: nil) val cc_default.
+
+Definition tinf (thread_info_ident tinf_ident : ident) : expr :=
+  Etempvar tinf_ident (threadInf thread_info_ident).
+
+Definition tinfd (thread_info_ident tinf_ident : ident) : expr :=
+  Ederef (tinf thread_info_ident tinf_ident) (threadStructInf thread_info_ident).
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
 

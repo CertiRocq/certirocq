@@ -265,8 +265,6 @@ extraction/integers.ml
 extraction/integers.mli
 extraction/kernames.ml
 extraction/kernames.mli
-extraction/lambdaANF_to_Clight.ml
-extraction/lambdaANF_to_Clight.mli
 extraction/lambdaANF_to_Clight_stack.ml
 extraction/lambdaANF_to_Clight_stack.mli
 extraction/lambdaANF_to_Wasm.ml

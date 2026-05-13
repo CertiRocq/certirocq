@@ -24,7 +24,7 @@ Require Import compcert.common.AST
 Require Import LambdaANF.term
                LambdaANF.identifiers
                LambdaANF.cps_show
-               LambdaANF_to_Clight
+               LambdaANF_to_Clight_stack
                compM
                glue_utils.
 
@@ -45,7 +45,7 @@ Definition argvTy : type := tptr val.
 Notation "'Field(' t ',' n ')'" :=
   ( *(add t (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
-(* from LambdaANF_to_Clight *)
+(* Shared constructor assignment helper. *)
 Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
   match argList with
   | nil => Sskip
