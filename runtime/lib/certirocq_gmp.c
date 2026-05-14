@@ -40,9 +40,9 @@ char* print_mpz(mpz_ptr x) {
 char* print_gmp_int(gmp_int x) {
   char* str = NULL;
   if (Is_long(x)) {
-    int length = snprintf(NULL, 0, "%li", Long_val(x));
+    int length = snprintf(NULL, 0, "%lli", (long long) Long_val(x));
     str = malloc(length + 1);
-    snprintf(str, length + 1, "%li", Long_val(x));
+    snprintf(str, length + 1, "%lli", (long long) Long_val(x));
     return str;
   } else {
     str = mpz_get_str(NULL, 10, MPZ_val(x));
@@ -94,7 +94,7 @@ gmp_int gmp_succ(struct thread_info *tinfo, mpz_t x) {
 
 gmp_int z_succ(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
-    intnat y = Long_val(x);
+    value y = Long_val(x);
     if (y < Max_long) {
       return (Val_long (y + 1));
     } else {
@@ -114,7 +114,7 @@ mpz_ptr gmp_pred(struct thread_info *tinfo, mpz_t x) {
 
 gmp_int z_pred(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
-    intnat y = Long_val(x);
+    value y = Long_val(x);
     if (y > Min_long) { return (Val_long (y - 1)); }
     { return mk_gmp_int(tinfo, gmp_pred(tinfo, mpz_of_value(x))); }
   } else {
@@ -142,7 +142,7 @@ mpz_ptr gmp_nat_pred(struct thread_info *tinfo, mpz_t x) {
 
 gmp_int z_nat_pred(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
-    uintnat y = Unsigned_long_val(x);
+    value y = Unsigned_long_val(x);
     if (y == 0) { return x; }
     else { return Val_long(y-1); }
   } else {
@@ -197,7 +197,7 @@ gmp_int gmp_neg(struct thread_info *tinfo, mpz_t x) {
 
 gmp_int z_neg(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
-    intnat y = Long_val(x);
+    value y = Long_val(x);
     if (y < Max_long) { return (Val_long (- y)); }
     { mpz_ptr res = malloc(sizeof(__mpz_struct));
       mpz_init_set_si(res, y);
@@ -480,9 +480,9 @@ primstring z_to_string(struct thread_info *tinfo, gmp_int x) {
   char* str = NULL;
   if (Is_long(x)) {
     trace("z_to_string: long\n");
-    int length = snprintf(NULL, 0, "%li", Long_val(x));
+    int length = snprintf(NULL, 0, "%lli", (long long) Long_val(x));
     str = malloc(length + 1);
-    snprintf(str, length + 1, "%li", Long_val(x));
+    snprintf(str, length + 1, "%lli", (long long) Long_val(x));
     return mk_ocaml_string(tinfo, str);
   } else {
     trace("z_to_string: GMP\n");

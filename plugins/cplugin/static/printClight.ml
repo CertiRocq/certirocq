@@ -26,16 +26,16 @@ open Clight
 
 (* Naming temporaries.
    Some temporaries are obtained by lifting variables in SimplLocals.
-   For these we use a meaningful name "$var", as found in the table of
+   For these we use a meaningful name "var", as found in the table of
    atoms.  Other temporaries are generated during SimplExpr, and are
-   not in the table of atoms.  We print them as "$NNN" (a unique
+   not in the table of atoms.  We print them as "certirocq_tmp_NNN" (a unique
    integer). *)
 
 let temp_name (id: AST.ident) =
   try
-    "$" ^ Hashtbl.find string_of_atom (P.to_int id)
+    Hashtbl.find string_of_atom (P.to_int id)
   with Not_found ->
-    Printf.sprintf "$%d" (P.to_int id)
+    Printf.sprintf "certirocq_tmp_%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 

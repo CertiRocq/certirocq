@@ -1,8 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "m.h"  /* use printm.c to create m.h */
-#include "config.h"
 #include "values.h"
 #include "gc.h"
 
@@ -11,25 +9,17 @@
  */
 
 
-/* The following 5 functions should (in practice) compile correctly in CompCert,
-   but the CompCert correctness specification does not _require_ that
-   they compile correctly:  their semantics is "undefined behavior" in
-   CompCert C (and in C11), but in practice they will work in any compiler. */
+/* These helpers implement the collector's current low-bit tagged view of a
+   value. The pointer/integer casts are outside CompCert C's defined semantics
+   and are implementation-defined in ISO C, but they are the representation
+   assumption used by this collector. */
 
 int test_int_or_ptr (value x) /* returns 1 if int, 0 if aligned ptr */ {
-    return (int)(((intnat)x)&1);
-}
-
-intnat int_or_ptr_to_int (value x) /* precondition: is int */ {
-    return (intnat)x;
+    return Is_long(x);
 }
 
 void * int_or_ptr_to_ptr (value x) /* precond: is aligned ptr */ {
     return (void *)x;
-}
-
-value int_to_int_or_ptr(intnat x) /* precondition: is odd */ {
-    return (value)x;
 }
 
 value ptr_to_int_or_ptr(void *x) /* precondition: is aligned */ {
@@ -112,7 +102,7 @@ int in_heap(struct heap *h, value v) {
 void printtree(FILE *f, struct heap *h, value v) {
   if(is_ptr(v))
     if (in_heap(h,v)) {
-      header_t hd = Field(v,-1);
+      value hd = Field(v,-1);
       int sz = Wosize_hd(hd);
       int i;
       fprintf(f,"%d(", Tag_hd(hd));
@@ -167,12 +157,12 @@ void forward (value *from_start,  /* beginning of from-space */
     /* if  (v == 4360698480) printf ("Found it\n"); */
     if(Is_from(from_start, from_limit, v)) {
       /* printf("Moving\n"); */
-      header_t hd = Hd_val(v);
+      value hd = Hd_val(v);
       if(hd == 0) { /* already forwarded */
         *p = Field(v,0);
       } else {
-        intnat i;
-        intnat sz;
+        size_t i;
+        size_t sz;
         value *newv;
         sz = Wosize_hd(hd);
         newv = *next+1;
@@ -248,11 +238,11 @@ void do_scan(value *from_start,  /* beginning of from-space */
   s = scan;
   /* printf("in scan \n"); */
   while(s < *next) {
-    header_t hd = *((header_t*)s);
-    mlsize_t sz = Wosize_hd(hd);
+    value hd = *s;
+    size_t sz = Wosize_hd(hd);
     int tag = Tag_hd(hd);
     if (!No_scan(tag)) {
-      intnat j;
+      size_t j;
       for(j = 1; j <= sz; j++) {
         forward (from_start, from_limit, next, &Field(s, j), DEPTH);
         /* printf("after \n"); */
@@ -284,15 +274,15 @@ void do_generation (struct space *from,  /* descriptor of from-space */
 #if 0
 /* This "gensize" function is only useful if the desired ratio is >2,
    but empirical measurements show that ratio=2 is better than ratio>2. */
-uintnat gensize(uintnat words)
+size_t gensize(size_t words)
 /* words is size of one generation; calculate size of the next generation */
 {
-  uintnat maxint = 0u-1u;
-  uintnat n,d;
+  size_t maxint = 0u-1u;
+  size_t n,d;
   /* The next few lines calculate a value "n" that's at least words*2,
      preferably words*RATIO, and without overflowing the size of an
      unsigned integer. */
-  /* minor bug:  this assumes sizeof(uintnat)==sizeof(void*)==sizeof(value) */
+  /* minor bug:  this assumes sizeof(size_t)==sizeof(void*)==sizeof(value) */
   if (words > maxint/(2*sizeof(value)))
     abort_with("Next generation would be too big for address space\n");
   d = maxint/RATIO;
@@ -304,7 +294,7 @@ uintnat gensize(uintnat words)
 #endif
 
 void create_space(struct space *s,  /* which generation to create */
-		  uintnat n) /* size of the generation */
+		  size_t n) /* size of the generation */
   /* malloc an array of words for generation "s", and
      set s->start and s->next to the beginning, and s->limit to the end.
   */
@@ -363,7 +353,7 @@ void resume(struct thread_info *ti)
  {
   struct heap *h = ti->heap;
   value *lo, *hi;
-  uintnat num_allocs = ti->nalloc;
+  size_t num_allocs = ti->nalloc;
   assert (h);
   lo = h->spaces[0].start;
   hi = h->spaces[0].limit;
@@ -390,7 +380,7 @@ void garbage_collect(struct thread_info *ti)
 
       /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL) {
-        intnat w = h->spaces[i].rem_limit-h->spaces[i].start;    /* See NOTE-POINTER-ARITH below */
+        size_t w = h->spaces[i].rem_limit-h->spaces[i].start;    /* See NOTE-POINTER-ARITH below */
         create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */

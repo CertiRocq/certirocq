@@ -299,7 +299,7 @@ let extern_atom a =
   with Not_found ->
     (* Printf.printf "not_found, in %i bindings\n" (Hashtbl.length string_of_atom); *)
     (* Hashtbl.iter (fun pos str -> Printf.printf "%i -> %s, %b, %b\n" pos str (Hashtbl.mem string_of_atom pos) (pos = P.to_int a)) string_of_atom; *)
-    Printf.sprintf "$%d" (P.to_int a)
+    Printf.sprintf "x%d" (P.to_int a)
 
 (* Ignoring the terminating "1" bit, canonical encodings of strings can
    be viewed as lists of bits, formed by concatenation of 6-bit fragments

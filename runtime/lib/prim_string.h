@@ -6,7 +6,7 @@
 
 typedef value primstring;
 
-intnat prim_strlen(primstring s);
+size_t prim_strlen(primstring s);
 
 // Encodes the string as a block, with special padding
 value mk_ocaml_string (struct thread_info *tinfo, char* str);

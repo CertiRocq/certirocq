@@ -3,33 +3,25 @@
 
 /* Architecture-dependent sizes (in bytes).
  *
- * Auto-detected from the __SIZEOF_*__ macros that GCC and Clang predefine.
- * If the toolchain does not expose them, override SIZEOF_PTR / SIZEOF_LONG
- * / SIZEOF_INT on the command line; the fallbacks below assume a 64-bit
- * LP64 host and are unlikely to be right on smaller targets. */
+ * SIZEOF_PTR is the C data-pointer width for the target. SIZEOF_CODE_PTR is
+ * the generated closure code-pointer width; override it for targets where
+ * code pointers differ from data pointers. SIZEOF_VALUE is the width of a
+ * Rocq value slot; it may be larger than pointers on small targets. */
 
 #ifndef SIZEOF_PTR
 #  ifdef __SIZEOF_POINTER__
 #    define SIZEOF_PTR __SIZEOF_POINTER__
 #  else
-#    define SIZEOF_PTR 8
+#    error "SIZEOF_PTR is not defined; pass -DSIZEOF_PTR=<bytes> for this target"
 #  endif
 #endif
 
-#ifndef SIZEOF_LONG
-#  ifdef __SIZEOF_LONG__
-#    define SIZEOF_LONG __SIZEOF_LONG__
-#  else
-#    define SIZEOF_LONG SIZEOF_PTR
-#  endif
+#ifndef SIZEOF_VALUE
+#  define SIZEOF_VALUE SIZEOF_PTR
 #endif
 
-#ifndef SIZEOF_INT
-#  ifdef __SIZEOF_INT__
-#    define SIZEOF_INT __SIZEOF_INT__
-#  else
-#    define SIZEOF_INT 4
-#  endif
+#ifndef SIZEOF_CODE_PTR
+#  define SIZEOF_CODE_PTR SIZEOF_PTR
 #endif
 
 #endif /* M_H */

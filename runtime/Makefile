@@ -12,7 +12,7 @@ DST ?= $(COQLIB)/user-contrib/CertiRocq/Plugin/runtime
 
 # Generated programs share this OCaml-compatible value layout and runtime ABI.
 RUNTIME_CORE_SRC = certirocq_runtime.c
-RUNTIME_CORE_HEADERS = m.h config.h values.h certirocq_runtime.h
+RUNTIME_CORE_HEADERS = m.h values.h certirocq_runtime.h
 
 # Fixed-arena initialization for --no-gc programs.
 RUNTIME_NO_GC_SRC = certirocq_no_gc.c

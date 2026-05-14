@@ -9,6 +9,10 @@
 
 #include "certirocq_runtime.h"
 
+#if SIZEOF_VALUE != SIZEOF_PTR
+#error "The generational GC currently requires SIZEOF_VALUE == SIZEOF_PTR"
+#endif
+
 /* A frame of the shadow stack used to keep track of live roots. */
 struct stack_frame {
   value *next;
@@ -46,12 +50,6 @@ At present we'll assume 32-bit words.
 
 The header file "values.h", from the OCaml distribution,
 has macros (etc.) for accessing these fields and headers.
-
-The header file "config.h", from the OCaml distribution, defines
-typedef "intnat", the "natural integer type" for this compiler/machine,
-and "uintnat", the "natural unsigned integer type".
-Config.h also defines (BUT WE DO NOT USE) parameters for the Ocaml
-generational garbage collector.
 
 The important definitions we use from values.h are:
 

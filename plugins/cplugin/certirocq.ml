@@ -115,7 +115,6 @@ let register (prims : prim list) (imports : import list) : unit =
   Lib.add_leaf (global_registers_input newr)
 
 let get_global_prims () = fst !global_registers
-let get_global_includes () = snd !global_registers
 
 (* Extract Inductive *)
 
@@ -556,7 +555,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
       | _ -> i) imports in
     let runtime_imports = runtime_imports opts in
-    let imports = runtime_imports @ get_global_includes () @ imports in
+    let imports = runtime_imports @ imports in
     let p = CI.compile options term in
     match p with
     | (CompM.Ret ((nenv, header), prg), dbg) ->
@@ -694,7 +693,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let compile_C ~opaque_access opts gr imports =
     let () = compile_only ~opaque_access opts gr imports in
-    let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let fname = opts.filename in
     let suff = opts.ext in
@@ -924,7 +922,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     (* Write wrapping code *)
     let c_driver = write_c_driver opts id in
     let ocaml_driver = write_ocaml_driver global_id opts id in
-    let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let suff = opts.ext in
     let compiler = compiler_executable debug in
