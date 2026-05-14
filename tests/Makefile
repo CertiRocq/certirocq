@@ -1,4 +1,4 @@
-DIRS=lib axioms closures ffi ocaml programs wasm
+DIRS=lib axioms closures ffi no-gc ocaml programs wasm
 CLEAN_DIRS=$(addprefix clean,$(DIRS))
 
 .PHONY: all clean $(DIRS) $(CLEAN_DIRS)
@@ -17,7 +17,7 @@ ffi/Makefile:
 ffi: ffi/Makefile
 	$(MAKE) -C $@
 
-axioms closures ocaml programs wasm: lib
+axioms closures no-gc ocaml programs wasm: lib
 	$(MAKE) -C $@ run
 
 $(CLEAN_DIRS): clean%:

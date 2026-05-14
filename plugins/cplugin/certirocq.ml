@@ -681,6 +681,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let runtime_object_for_header header =
     runtime_object_file (object_name_of_header header)
 
+  (* TODO(runtime): this plugin still knows too much about installed runtime
+     object layout. Move standalone driver/runtime object selection behind a
+     runtime-owned packaging/link abstraction. *)
   let runtime_object_files () =
     List.map runtime_object_for_header [runtime_abi_header; runtime_gc_header]
 

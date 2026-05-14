@@ -14,6 +14,10 @@ DST ?= $(COQLIB)/user-contrib/CertiRocq/Plugin/runtime
 RUNTIME_CORE_SRC = certirocq_runtime.c
 RUNTIME_CORE_HEADERS = m.h config.h values.h certirocq_runtime.h
 
+# Fixed-arena initialization for --no-gc programs.
+RUNTIME_NO_GC_SRC = certirocq_no_gc.c
+RUNTIME_NO_GC_HEADERS = certirocq_no_gc.h
+
 # Current GC/thread interface used directly by generated code.
 RUNTIME_GC_SRC = gc/gc.c
 RUNTIME_GC_HEADERS = gc/gc.h
@@ -36,6 +40,7 @@ RUNTIME_PLUGIN_HELPER_HEADERS = lib/get_ordinal.h
 
 RUNTIME_SRC = \
 	$(RUNTIME_CORE_SRC) \
+	$(RUNTIME_NO_GC_SRC) \
 	$(RUNTIME_GC_SRC) \
 	$(RUNTIME_DRIVER_SRC) \
 	$(RUNTIME_FFI_SRC) \
@@ -44,6 +49,7 @@ RUNTIME_SRC = \
 
 RUNTIME_HEADERS = \
 	$(RUNTIME_CORE_HEADERS) \
+	$(RUNTIME_NO_GC_HEADERS) \
 	$(RUNTIME_GC_HEADERS) \
 	$(RUNTIME_DRIVER_HEADERS) \
 	$(RUNTIME_FFI_HEADERS) \
@@ -72,6 +78,7 @@ all: $(RUNTIME_OBJECTS)
 install: all
 	install -d $(DST) $(DST)/gc $(DST)/lib $(DST)/driver
 	install -m 0644 $(RUNTIME_CORE_HEADERS) $(RUNTIME_CORE_SRC) $(RUNTIME_CORE_SRC:.c=.o) $(DST)
+	install -m 0644 $(RUNTIME_NO_GC_HEADERS) $(RUNTIME_NO_GC_SRC) $(RUNTIME_NO_GC_SRC:.c=.o) $(DST)
 	install -m 0644 $(RUNTIME_DRIVER_SRC) $(RUNTIME_DRIVER_OBJECTS) $(DST)/driver
 	install -m 0644 $(RUNTIME_GC_HEADERS) $(RUNTIME_GC_SRC) $(RUNTIME_GC_OBJECTS) $(DST)/gc
 	install -m 0644 $(RUNTIME_LIB_HEADERS) $(RUNTIME_LIB_SRC) $(RUNTIME_LIB_OBJECTS) $(DST)/lib
