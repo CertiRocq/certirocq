@@ -303,3 +303,145 @@ Section Refinement.
   End Linking.
 
 End Refinement.
+
+
+Section RefinmentTermination.
+
+  Context (cnstrs : conId_map)
+          (dtag : positive) (* default tag *)
+          (cenv : ctor_env).
+
+  Program Definition refines_term M (e1 : expression.exp) (e2 : cps.exp) :=
+    (* Termination *)
+    (forall (v1 : value) (c1 t1 : nat),
+        eval_env_fuel [] e1 (Val v1) c1 t1 ->
+        exists (v2 : val) (c2 : nat),
+          bstep_fuel cenv (M.empty val) e2 c2 (Res v2) tt /\
+          (c2 <= t1 + M)%nat /\
+          value_ref cnstrs dtag v1 v2).
+
+  Context (prim_map : M.t primitive).
+  Context (func_tag kon_tag default_itag : positive)
+          (next_id : positive).
+  Context (dcon_to_tag_inj :
+             forall (tgm : conId_map) (dc dc' : dcon),
+               dcon_to_tag dtag dc tgm = dcon_to_tag dtag dc' tgm -> dc = dc').
+
+  Theorem anf_correct_top_termination e :
+    exp_wf 0%N e ->
+    exists C r,
+      anf_rel_top cnstrs dtag func_tag e [] C r /\
+      refines_term 1 e (C |[ Ehalt r ]|).
+  Proof.
+    intros Hwf.
+    edestruct (LambdaBoxLocal_to_LambdaANF_anf_corresp.anf_rel_exists
+                 prim_map func_tag dtag)
+      with (xs := @nil var) (m := (max_list (@nil var) 1 + 1)%positive).
+    eassumption.
+
+    destructAll.
+    eexists. eexists. split.
+    eexists. eassumption.
+
+    (* Termination *)
+    { intro; intros.
+      pose proof (LambdaBoxLocal_to_LambdaANF_anf_correct.anf_cvt_correct
+                   prim_map func_tag kon_tag dtag default_itag cnstrs cenv dcon_to_tag_inj
+                   _ _ _ _ _ H0) as Hcorr.
+      unfold LambdaBoxLocal_to_LambdaANF_anf_correct.anf_cvt_correct_exp in Hcorr.
+
+      (* Forward-apply Hcorr to all arguments including e_k := Ehalt x0 *)
+      specialize (Hcorr (M.empty val) (@nil var) x x0
+                        (fun z => (max_list (@nil var) 1 + 1 <= z)%positive) x1 1%nat).
+
+      assert (Hwfe : well_formed_env []) by constructor.
+      assert (Hewf : exp_wf (N.of_nat (Datatypes.length (@nil var))) e) by (simpl; exact Hwf).
+      assert (Hec : env_consistent [] []) by (intros i j y Hi; destruct i; discriminate).
+      assert (Hdis1 : Disjoint var (FromList (@nil var))
+                                (fun z => (max_list (@nil var) 1 + 1 <= z)%positive)).
+      { constructor. intros ? [? H1 _]. exact H1. }
+      assert (Henv : anf_env_rel func_tag dtag cnstrs (@nil var) [] (M.empty val)) by constructor.
+
+      specialize (Hcorr Hwfe Hewf Hec Hdis1 Henv H (Ehalt x0)).
+
+      (* Disjointness: occurs_free (Ehalt x0) = [set x0],
+         and x0 is excluded from (S \\ S') \\ [set x0] *)
+      assert (Hdis2 : Disjoint var (occurs_free (Ehalt x0))
+                                ((fun z => (max_list (@nil var) 1 + 1 <= z)%positive) \\ x1 \\ [set x0])).
+      { constructor. intros y Hy.
+        destruct Hy as [? Hof Hsm].
+        inv Hof.
+        destruct Hsm as [_ Habs]. apply Habs. constructor. }
+
+      specialize (Hcorr Hdis2).
+      destruct Hcorr as [Hterm Hoot].
+      clear Hoot.
+
+      edestruct (LambdaBoxLocal_to_LambdaANF_anf_corresp.anf_val_rel_exists
+                   prim_map func_tag dtag) as [v2 Hval].
+      eapply (@eval_env_step_preserves_wf nat LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace).
+      eassumption. reflexivity. constructor. eassumption.
+
+      specialize (Hterm v1 v2 eq_refl Hval).
+
+      (* Instantiate preord_exp: LHS is (Ehalt x0, M.set x0 v2 (M.empty val))
+         which steps in 1 fuel to (Res v2).
+         Solve bstep_fuel first to determine cin, then prove to_nat cin <= 1. *)
+      edestruct Hterm as [v3 [cin' [cout' [Hstep [Hbound Hres]]]]].
+      2: { econstructor 2. econstructor. rewrite M.gss. reflexivity. }
+      simpl. unfold algebra.one, one_i. simpl. lia.
+
+      destruct v3; try contradiction.
+      destruct cout'.
+
+      do 2 eexists. split; [ | split ].
+
+      + eassumption.
+      + (* c2 <= t1 + 1 *)
+        unfold LambdaBoxLocal_to_LambdaANF_anf_correct.eq_fuel in *.
+        unfold LambdaBoxLocal_to_LambdaANF_anf_correct.anf_bound in Hbound.
+        destruct Hbound as [Hlb Hub]. simpl in *. lia.
+      + eapply anf_val_comp. eassumption. eassumption. }
+  Qed.
+
+  Print Assumptions anf_correct_top_termination.
+
+  Section Linking.
+
+    Theorem anf_correct_sep_comp_term e_lib e_cli :
+      exp_wf 0%N e_lib ->
+      exp_wf 1%N e_cli ->
+      exists C_lib x_lib C_cli r,
+        anf_rel_top cnstrs dtag func_tag e_lib [] C_lib x_lib /\
+        (exists S_mid S',
+           LambdaBoxLocal_to_LambdaANF.anf_cvt_rel func_tag dtag S_mid
+             e_cli [x_lib] cnstrs S' C_cli r) /\
+        refines_term 1 (link_src e_lib e_cli)
+                  (link_trg C_lib C_cli |[ Ehalt r ]|).
+    Proof.
+      intros Hwf_lib Hwf_cli.
+      assert (Hwf_link : exp_wf 0%N (link_src e_lib e_cli)).
+      { unfold link_src. apply let_e_wf.
+        - exact Hwf_lib.
+        - replace (1 + 0)%N with 1%N by lia. exact Hwf_cli. }
+
+      edestruct (anf_correct_top_termination (link_src e_lib e_cli) Hwf_link)
+        as [C [r [Hrel Href]]].
+      unfold anf_rel_top in Hrel. destruct Hrel as [S' Hcvt].
+      inv Hcvt. fold anf_cvt_rel in *.
+
+      (* anf_Let inversion gives: C = comp_ctx_f C1 C2, r = x2,
+         with anf_cvt_rel for e_lib (context C1, result x1)
+         and  anf_cvt_rel for e_cli (context C2, result x2). *)
+      do 4 eexists. split; [ | split ].
+      - (* anf_rel_top e_lib [] C1 x1 *)
+        unfold anf_rel_top. eexists. eassumption.
+      - (* anf_cvt_rel for e_cli *)
+        do 2 eexists. eassumption.
+      - (* refines *)
+        unfold link_trg. exact Href.
+    Qed.
+
+    Print Assumptions anf_correct_sep_comp_term.
+
+  End Linking.
