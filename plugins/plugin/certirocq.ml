@@ -239,7 +239,6 @@ let make_options (l : command_args list) (pr : prim list) (fname : string) : opt
 let make_unsafe_passes b =
   let open Erasure0 in
   { cofix_to_lazy = b;
-    inlining = b;
     unboxing = b;
     betared = b;
     inductives_extraction = b }
@@ -261,6 +260,7 @@ let make_pipeline_options (opts : options) =
       Erasure0.({
         enable_typed_erasure = opts.typed_erasure;
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
+        inlining = not (opts.no_inlining);
         dearging_config = default_dearging_config;
         inlined_constants = Kernames.KernameSet.empty;
         extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)

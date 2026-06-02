@@ -1,5 +1,6 @@
 type command_args =
  | TYPED_ERASURE
+ | NO_INLINING
  | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
@@ -24,6 +25,7 @@ type extract_inductives = (Kernames.kername * extract_inductive list) list
 
 type options =
   { typed_erasure : bool;
+    no_inlining : bool;
     unsafe_erasure : bool;
     bypass_qed : bool;
     cps : bool;
@@ -55,6 +57,7 @@ let check_build_dir d =
 
 let default_options ~build_dir ~inductives_mapping ~extracted_inductives () : options =
   { typed_erasure = false;
+    no_inlining = false;
     unsafe_erasure = false;
     bypass_qed = false;
     cps = false;
@@ -79,6 +82,7 @@ let make_options ~build_dir ~inductives_mapping ~extracted_inductives
     match l with
     | [] -> o
     | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
+    | NO_INLINING :: xs -> aux {o with no_inlining = true} xs
     | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
     | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS :: xs -> aux {o with cps = true} xs

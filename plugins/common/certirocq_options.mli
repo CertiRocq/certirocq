@@ -1,5 +1,6 @@
 type command_args =
  | TYPED_ERASURE
+ | NO_INLINING
  | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
@@ -24,6 +25,7 @@ type extract_inductives = (Kernames.kername * extract_inductive list) list
 
 type options =
   { typed_erasure : bool;
+    no_inlining : bool;
     unsafe_erasure : bool;
     bypass_qed : bool;
     cps : bool;
