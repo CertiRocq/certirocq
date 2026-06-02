@@ -113,6 +113,10 @@ VERNAC ARGUMENT EXTEND extract_cnst
 | [ reference(gr) "=>" string(str) natural_opt(arity) "with" "tinfo" ] -> { interp_extract_cnst ~loc gr str arity true }
 END
 
+VERNAC ARGUMENT EXTEND extract_inline
+| [ reference(gr) ] -> { (constant_of_qualid ~loc gr) }
+END
+
 VERNAC ARGUMENT EXTEND glueargs
 | [ "--cps" ] -> { CPS }
 | [ "--debug" ] -> { DEBUG }
@@ -154,6 +158,9 @@ VERNAC COMMAND EXTEND CertiRocq_Register CLASSIFIED AS SIDEFF
 }
 | [ "CertiRocq" "Extract" "Inductive" "To" "Constants" "[" certirocq_register_extract_inductives_to_constants_list_sep(inds, ",") "]" ] -> {
     Certirocq.register_constant_inductives inds
+}
+| [ "CertiRocq" "Extract" "Inline" "[" extract_inline_list_sep(csts, ",") "]" ] -> {
+    Certirocq.register_inlines csts
 }
 END
 
