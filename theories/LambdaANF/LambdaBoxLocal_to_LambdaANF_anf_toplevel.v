@@ -445,3 +445,5 @@ Section RefinmentTermination.
     Print Assumptions anf_correct_sep_comp_term.
 
   End Linking.
+
+End RefinmentTermination.
