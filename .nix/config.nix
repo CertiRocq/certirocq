@@ -28,7 +28,7 @@
       ExtLib.job = false;
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;
-      metarocq.override.version = "v1.5.1-9.1";
+      metarocq.override.version = "9.1";
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };
