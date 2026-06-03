@@ -17,6 +17,12 @@ Definition string_of_bool b :=
 Definition test := true.
 CertiRocq Eval --time --debug test.
 
+CertiRocq Extract Inline [ test ].
+
+Definition foo := test.
+
+CertiRocq Eval --time --debug foo.
+
 #[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 From MetaRocq.Common Require Import Primitive.
 From Stdlib Require Import PrimFloat PrimInt63.

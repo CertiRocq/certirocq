@@ -135,6 +135,29 @@ let register_inductives (inds : inductives_mapping) : unit =
 
 let get_global_inductives_mapping () = !global_inductive_registers
 
+(* Extract Inline *)
+
+let global_inlining_registers =
+  Summary.ref ~name:"CertiRocq Extraction Inlining Registration" Kernames.KernameSet.empty
+
+let global_inlining_registers_name = "certirocq-inlining-registration"
+
+let cache_inlining_registers csts =
+  let csts' = !global_inlining_registers in
+  global_inlining_registers := Kernames.KernameSet.union csts csts'
+
+let global_inlining_registers_input =
+  let open Libobject in
+  declare_object
+    (global_object_nodischarge global_inlining_registers_name
+    ~cache:(fun r -> cache_inlining_registers r)
+    ~subst:None)
+
+let register_inlines (csts : Kernames.kername list) : unit =
+  Lib.add_leaf (global_inlining_registers_input (Obj.magic (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts))))
+
+let get_global_inlinings_mapping () = !global_inlining_registers
+
 (* Extract Inductive to Constants *)
 
 let global_inductive_constant_registers =
@@ -239,7 +262,6 @@ let make_options (l : command_args list) (pr : prim list) (fname : string) : opt
 let make_unsafe_passes b =
   let open Erasure0 in
   { cofix_to_lazy = b;
-    inlining = b;
     unboxing = b;
     betared = b;
     inductives_extraction = b }
@@ -261,8 +283,9 @@ let make_pipeline_options (opts : options) =
       Erasure0.({
         enable_typed_erasure = opts.typed_erasure;
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
+        inlining = not (opts.no_inlining);
         dearging_config = default_dearging_config;
-        inlined_constants = Kernames.KernameSet.empty;
+        inlined_constants = get_global_inlinings_mapping ();
         extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)
         })
   in

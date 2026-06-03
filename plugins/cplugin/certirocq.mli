@@ -16,6 +16,7 @@ val register : prim list -> import list -> unit
 
 val register_inductives : inductives_mapping -> unit
 val register_constant_inductives : extract_inductives -> unit
+val register_inlines : Kernames.kername list -> unit
 
 val get_name : Names.GlobRef.t -> string
 
