@@ -358,10 +358,8 @@ Notation ulongTy := (Tlong Unsigned
 
 
 Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
-(* NOTE for val: in Clight, SIZEOF_PTR == SIZEOF_INT *)
-
-Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
-(* Definition val := if Archi.ptr64 then ulongTy else uintTy. *)
+(* Runtime values are signed machine words; [uval] is the unsigned bit view. *)
+Definition val := if Archi.ptr64 then longTy else intTy.
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval := if Archi.ptr64 then longTy else intTy.
 Definition val_typ := if Archi.ptr64 then  Xlong else (Xany32:xtype).
