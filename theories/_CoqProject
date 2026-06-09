@@ -115,6 +115,7 @@ Glue/glue_utils.v
 Glue/glue.v
 
 # Compiler
+Compiler/metarocq_pipeline.v
 Compiler/pipeline.v
 
 # Extraction

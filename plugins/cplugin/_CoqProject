@@ -143,6 +143,8 @@ extraction/eCSubst.ml
 extraction/eCSubst.mli
 extraction/eCoInductiveToInductive.ml
 extraction/eCoInductiveToInductive.mli
+extraction/eConstantsToValues.ml
+extraction/eConstantsToValues.mli
 extraction/eConstructorsAsBlocks.ml
 extraction/eConstructorsAsBlocks.mli
 extraction/eEnvMap.ml
@@ -151,6 +153,10 @@ extraction/eEtaExpanded.ml
 extraction/eEtaExpanded.mli
 extraction/eGlobalEnv.ml
 extraction/eGlobalEnv.mli
+extraction/eImplementBox.ml
+extraction/eImplementBox.mli
+extraction/eImplementLazyForce.ml
+extraction/eImplementLazyForce.mli
 extraction/eInduction.ml
 extraction/eInduction.mli
 extraction/eInlineProjections.ml
@@ -311,6 +317,8 @@ extraction/memory.ml
 extraction/memory.mli
 extraction/memtype.ml
 extraction/memtype.mli
+extraction/metarocq_pipeline.ml
+extraction/metarocq_pipeline.mli
 extraction/monad0.ml
 extraction/monad0.mli
 extraction/monadExc.ml

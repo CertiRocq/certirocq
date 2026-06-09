@@ -167,6 +167,9 @@ EReorderCstrs
 ERemapInductives
 EBeta
 ECoInductiveToInductive
+EImplementBox
+EImplementLazyForce
+EConstantsToValues
 ETransform
 Erasure0
 
@@ -244,6 +247,7 @@ Toplevel
 Toplevel0
 Glue_utils
 Glue
+Metarocq_pipeline
 Pipeline
 Plugin_utils
 Certirocq
