@@ -12,7 +12,7 @@ Require Import MetaRocq.Common.BasicAst.
 From MetaRocq.Erasure Require Import EAst Erasure.
 From MetaRocq.ErasurePlugin Require Import Erasure.
 From MetaRocq.Utils Require Import MRString.
-
+From CertiRocq Require Import metarocq_pipeline.
 Import Monads.
 Import MonadNotation.
 Import ListNotations.
@@ -106,16 +106,14 @@ Definition next_id := 100%positive.
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-(*   p <- erase_PCUIC p ;;
- *)  p <- CertiRocq_pipeline next_id prs false p ;;
+  p <- CertiRocq_pipeline next_id prs false p ;;
   compile_Clight prs p.
 
 Definition pipeline_Wasm (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-(*   p <- erase_PCUIC p ;;
- *)  p <- CertiRocq_pipeline next_id prs false p ;;
-     compile_LambdaANF_to_Wasm prs p.
+  p <- CertiRocq_pipeline next_id prs false p ;;
+  compile_LambdaANF_to_Wasm prs p.
 
 Definition default_opts : Options :=
   {| erasure_config := Erasure.default_erasure_config;
