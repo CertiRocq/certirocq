@@ -55,9 +55,6 @@ Section Correct.
     forall dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
-  Context (box_dc : dcon)
-          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
-
   Context (cenv_case_consistent : forall P ctag,
     caseConsistent cenv P ctag).
 
@@ -181,7 +178,7 @@ Section Correct.
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t,
         @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                       Σ box_dc [] body (fuel_sem.Val src_v) f t.
+                       Σ [] body (fuel_sem.Val src_v) f t.
 
   Definition globals_zero_fuel_prop :=
     (* Source constant unfolding is now semantic rather than hardcoded at fuel 0,
@@ -191,7 +188,7 @@ Section Correct.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       @eval_env_fuel _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                     Σ box_dc [] body (fuel_sem.Val src_v) f t ->
+                     Σ [] body (fuel_sem.Val src_v) f t ->
       f = 0.
 
 
@@ -228,30 +225,30 @@ Section Correct.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap nat
-                 LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc.
+                 LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
   Let anf_env_rel' :=
     @anf_env_rel func_tag default_tag tgm cmap nat
-                 LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc.
+                 LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
   Let global_env_rel' :=
     @global_env_rel func_tag default_tag tgm cmap nat
-                    LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc.
+                    LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
 
   (* Shorthand for the source evaluation relation.
      Must be explicit about both resource instances since both are
      [@LambdaBox_resource nat] and Coq's instance resolution can't
      distinguish them by type. *)
   Let src_eval := @eval_env_fuel nat LambdaBox_resource_fuel
-                                 LambdaBox_resource_trace Σ box_dc.
+                                 LambdaBox_resource_trace Σ.
   Let src_diverge := @fuel_sem.diverge nat LambdaBox_resource_fuel
-                                        LambdaBox_resource_trace Σ box_dc.
+                                        LambdaBox_resource_trace Σ.
   Let src_not_stuck := @fuel_sem.not_stuck nat LambdaBox_resource_fuel
-                                            LambdaBox_resource_trace Σ box_dc.
+                                            LambdaBox_resource_trace Σ.
   Let src_diverge_not_stuck := @fuel_sem.diverge_not_stuck nat LambdaBox_resource_fuel
-                                                          LambdaBox_resource_trace Σ box_dc.
+                                                          LambdaBox_resource_trace Σ.
 
   Context (Hcmap_eval_coherent :
     @cmap_eval_coherent cmap _ LambdaBox_resource_fuel
-                        LambdaBox_resource_trace Σ box_dc).
+                        LambdaBox_resource_trace Σ).
 
 
   (** ** Helpers *)
@@ -631,7 +628,7 @@ Section Correct.
   (* Extract individual evaluation from eval_fuel_many at position k. *)
   Lemma eval_fuel_many_nth rho es vs f t k e v :
     @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc rho es vs f t ->
+                    Σ rho es vs f t ->
     nth_error es k = Some e ->
     nth_error vs k = Some v ->
     exists f_k t_k, src_eval rho e (fuel_sem.Val v) f_k t_k.
@@ -648,7 +645,7 @@ Section Correct.
 
   Lemma eval_fuel_many_length vs es vs1 f1 t1 :
     @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc vs es vs1 f1 t1 ->
+                    Σ vs es vs1 f1 t1 ->
     Datatypes.length vs1 = Datatypes.length es.
   Proof.
     intros Hrel. induction Hrel.
@@ -1080,7 +1077,7 @@ Section Correct.
     src_eval rho0 e0 (fuel_sem.Val v0) f0 t0 ->
     well_formed_val Σ v0.
   Proof.
-    apply (wf.eval_preserves_wf _ _ Hglob_wf).
+    apply (wf.eval_preserves_wf _ Hglob_wf).
   Qed.
 
   (** Combined: eval preserves env_consistent when extending.
@@ -1103,7 +1100,7 @@ Section Correct.
   (** cmap_consistent shorthand — instantiates the definition from anf_util. *)
   Let cmap_consistent :=
     @anf_util.cmap_consistent cmap nat
-      LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc.
+      LambdaBox_resource_fuel LambdaBox_resource_trace Σ.
 
   (** env_consistent extends when all duplicates of x1 map to v1 in rho.
       Same as old proof (trivial 4-line lemma). *)
@@ -1179,7 +1176,7 @@ Section Correct.
            exists f' t', src_eval [] body (fuel_sem.Val v) f' t')).
     intros rho e r f t Heval.
     eapply (@eval_env_fuel_ind'
-              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ
               Pcombined
               (fun _ _ _ _ _ => True)
               Pcombined);
@@ -1243,21 +1240,7 @@ Section Correct.
         * match goal with
           | [ H : FromList _ \subset _ |- _ ] =>
             eapply H; eapply nth_error_In; eassumption
-          end.
-
-    - (* Box *)
-      intros ?
-             v Hv S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
-      injection Hv as <-.
-      remember EAst.tBox as e_box.
-      destruct Hcvt; try discriminate. clear Heqe_box.
-      split.
-      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
-        * eapply nth_error_In. exact Hnth_i.
-        * assumption.
-      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
-        * exists k_f. exact Hlk_f.
-        * assumption.
+          end.    
 
     - (* App: x ∈ S3 ⊆ S2 ⊆ S, contradiction *)
       intros ? ? ? ? ? ? ? ? ? ? ? ? ? ?
@@ -1488,7 +1471,7 @@ Section Correct.
   (* Position tracking for args: if xs[j] = vn[i] = x, then vs[j] = rho[i]. *)
   Lemma anf_cvt_rel_args_var_lookup rho es vs f t :
     @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc rho es vs f t ->
+                    Σ rho es vs f t ->
     forall S vn S' C xs,
       anf_cvt_rel_args' S es vn S' C xs ->
       Disjoint _ (FromList vn) S ->
@@ -2503,7 +2486,7 @@ Section Correct.
   Lemma anf_cvt_args_consistent k rho_src es vs_src f t
         S vn S' C xs vs_tgt (rho_tgt : M.t val) :
     @eval_fuel_many _ LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc rho_src es vs_src f t ->
+                    Σ rho_src es vs_src f t ->
     anf_cvt_rel_args' S es vn S' C xs ->
     Disjoint _ (FromList vn) S ->
     Disjoint _ (cmap_vars cmap) S ->
@@ -2538,7 +2521,7 @@ Section Correct.
                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                   eq_fuel_compat (fun _ _ H0 => H0)
                   nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                  Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                  Σ Hglob_term func_tag default_tag); eassumption.
       + (* x ∉ FromList vn: use In_range to split S vs cmap *)
         destruct (anf_cvt_rel_args_In_range _ _ _ _ _ _ Hcvt x (nth_error_In _ _ Hxi))
           as [Hvn | [HS | Hcm]].
@@ -2605,7 +2588,7 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ H0 => H0)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                    Σ Hglob_term func_tag default_tag); eassumption.
   Qed.
 
 
@@ -2892,7 +2875,7 @@ Section Correct.
           rewrite Henames. eapply nth_error_In. exact Hfn_idx. }
         (* Build anf_rel_ClosFix *)
         rewrite Hflen in Hfn_idx.
-        exact (@anf_rel_ClosFix _ _ _ _ _ _ _ _ _ S1 S2 names0 fnames0
+        exact (@anf_rel_ClosFix _ _ _ _ _ _ _ _ S1 S2 names0 fnames0
                   rho_s rho_t mfix Bs
                   (Datatypes.length mfix - 1 - k) fname
                   Henv Hcons Hcmap_c Hnd Hdis1 Hdis_cm Hdis_cm_fn Hdis_nf
@@ -3211,7 +3194,7 @@ Section Correct.
   Proof.
     intros vs e r f t Heval.
     eapply (@eval_env_fuel_ind'
-              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ box_dc
+              nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ
               (fun vs e r f t => anf_cvt_correct_exp_step vs e r f t)
               (fun vs es vs1 f t => anf_cvt_correct_exps vs es vs1 f t)).
 
@@ -3247,7 +3230,7 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ H => H)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag);
+                    Σ Hglob_term func_tag default_tag);
             eassumption.
         * unfold preord_var_env. intros w Hget.
           rewrite M.gso in Hget; [| exact Hneq].
@@ -3273,7 +3256,7 @@ Section Correct.
                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                         eq_fuel_compat (fun _ _ H => H)
                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag).
+                        Σ Hglob_term func_tag default_tag).
               + eassumption.
               + eapply anf_rel_Clos
                   with (names := vnames) (S1 := S \\ [set x1] \\ [set x]);
@@ -3328,7 +3311,7 @@ Section Correct.
                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                         eq_fuel_compat (fun _ _ H => H)
                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag).
+                        Σ Hglob_term func_tag default_tag).
               + eassumption.
               + eapply anf_rel_ClosFix
                   with (names := vnames) (S1 := S \\ FromList fnames);
@@ -3360,34 +3343,6 @@ Section Correct.
                   apply Hsub_mfix in Hin_S'. destruct Hin_S' as [_ Habs].
                   apply Habs. exact Hc.
                 - intro Habs. inv Habs. contradiction. }
-              eapply preord_val_refl. tci. }
-        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
-        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
-        unfold_all. cbn in *. lia.
-
-    (* eval_Box_fuel *)
-    - intros rho0.
-      unfold anf_cvt_correct_exp_step.
-      intros rho vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
-      inv Hrel.
-      intros v0 v' Heq Hvrel. injection Heq as <-.
-        eapply preord_exp_post_monotonic.
-        2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
-            2:{ intros m. eapply preord_exp_Econstr_red.
-                simpl. reflexivity. }
-            eapply preord_exp_refl. now eapply eq_fuel_compat.
-            intros y Hy.
-            destruct (Pos.eq_dec y x) as [Heq | Hneq].
-            - subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
-              eexists. split. rewrite M.gss. reflexivity.
-              inv Hvrel.
-              match goal with
-              | [ H : Forall2 _ [] ?vs |- _ ] => inv H
-              end.
-              rewrite preord_val_eq. simpl. split; [| constructor].
-              exact box_tag.
-            - intros v1 Hget. rewrite M.gso in Hget; eauto.
-              eexists. split. rewrite M.gso; eauto.
               eapply preord_val_refl. tci. }
         unfold inclusion, comp, eq_fuel, one_step, anf_bound.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
@@ -3724,7 +3679,7 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ H => H)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag).
+                    Σ Hglob_term func_tag default_tag).
                   exact Hrel_clos_saved.
                   exact Hrel_rho.
                 - intros m0.
@@ -3732,7 +3687,7 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ H => H)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag).
+                    Σ Hglob_term func_tag default_tag).
                   rewrite Heq_v2 in Hrel_rho. exact Hrel_rho.
                   exact Hrel_v2. }
               (* Step 4: extract Vfun structure of v2' from preord_val *)
@@ -3843,7 +3798,7 @@ Section Correct.
                       _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                       eq_fuel_compat (fun _ _ H => H)
                       nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                      Σ box_dc Hglob_term func_tag default_tag).
+                      Σ Hglob_term func_tag default_tag).
                     * assert (v0 = v_rho) by congruence. subst v0.
                       exact Hrel_rho_v2.
                     * exact Hrel_v2.
@@ -3916,7 +3871,7 @@ Section Correct.
                               _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                               eq_fuel_compat (fun _ _ H => H)
                               nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                              Σ box_dc Hglob_term func_tag default_tag);
+                              Σ Hglob_term func_tag default_tag);
                       [exact Hrel_k0 | exact Hrel_v2].
                   * (* x2 ∈ S2: contradiction via Hdis_ek *)
                     exfalso.
@@ -3956,7 +3911,7 @@ Section Correct.
                                  _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                  eq_fuel_compat (fun _ _ H => H)
                                  nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                 Σ box_dc Hglob_term func_tag default_tag);
+                                 Σ Hglob_term func_tag default_tag);
                          [exact Hrel_k0' | exact Hrel_v2].
                     -- (* x2 not in FromList: use global_env_rel' *)
                        eexists. split.
@@ -3986,7 +3941,7 @@ Section Correct.
                                  _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                  eq_fuel_compat (fun _ _ H => H)
                                  nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                 Σ box_dc Hglob_term func_tag default_tag);
+                                 Σ Hglob_term func_tag default_tag);
                          [exact (Hrel_c v2 f_c t_c Heval2_c) | exact Hrel_v2].
                 + destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
                   * (* y = x1 *)
@@ -4011,7 +3966,7 @@ Section Correct.
                                  _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                  eq_fuel_compat (fun _ _ H => H)
                                  nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                 Σ box_dc Hglob_term func_tag default_tag);
+                                 Σ Hglob_term func_tag default_tag);
                          [exact Hrel_k1 | exact Hrel_clos_saved].
                     -- (* x1 ∈ S: contradiction via Hdis_ek *)
                        exfalso.
@@ -4048,7 +4003,7 @@ Section Correct.
                                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                     eq_fuel_compat (fun _ _ H => H)
                                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                    Σ box_dc Hglob_term func_tag default_tag);
+                                    Σ Hglob_term func_tag default_tag);
                             [exact Hrel_k1' | exact Hrel_clos_saved].
                        ++ (* x1 not in FromList: use global_env_rel' *)
                           eexists. split.
@@ -4073,7 +4028,7 @@ Section Correct.
                                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                     eq_fuel_compat (fun _ _ H => H)
                                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                 Σ box_dc Hglob_term func_tag default_tag);
+                                 Σ Hglob_term func_tag default_tag);
                          [exact (Hrel_c1 (Clos_v rho' na0 body0) f_c1 t_c1 Heval1_c1) | exact Hrel_clos_saved].
                   * (* y ≠ x, ≠ x1, ≠ x2 *)
                     eexists. split.
@@ -4447,14 +4402,14 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ HH => HH)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag).
+                    Σ Hglob_term func_tag default_tag).
                   exact Hrel_fix_saved. exact Hrel_rho.
                 - intros m0.
                   eapply (@anf_cvt_val_alpha_equiv
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ HH => HH)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag).
+                    Σ Hglob_term func_tag default_tag).
                   rewrite Heq_v2 in Hrel_rho. exact Hrel_rho. exact Hrel_v2. }
               (* Step 3: extract Vfun from v2' *)
               assert (Hpv_inst := Hpv_cv (cin_bc + i + 1)%nat).
@@ -4553,7 +4508,7 @@ Section Correct.
                       _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                       eq_fuel_compat (fun _ _ HH => HH)
                       nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                      Σ box_dc Hglob_term func_tag default_tag).
+                      Σ Hglob_term func_tag default_tag).
                     * assert (w = v_rho) by congruence. subst w.
                       exact Hrel_rho_v2.
                     * exact Hrel_v2.
@@ -4616,7 +4571,7 @@ Section Correct.
                                 _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                 eq_fuel_compat (fun _ _ HH => HH)
                                 nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                Σ box_dc Hglob_term func_tag default_tag);
+                                Σ Hglob_term func_tag default_tag);
                         [exact Hrel_k0 | exact Hrel_v2].
                     * (* x2 ∈ S2: contradiction *)
                       exfalso.
@@ -4652,7 +4607,7 @@ Section Correct.
                                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                    eq_fuel_compat (fun _ _ HH => HH)
                                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                   Σ box_dc Hglob_term func_tag default_tag);
+                                   Σ Hglob_term func_tag default_tag);
                            [exact Hrel_k0' | exact Hrel_v2].
                       -- eexists. split.
                          { rewrite M.gso; [rewrite M.gss; reflexivity | exact Hneq_x]. }
@@ -4679,7 +4634,7 @@ Section Correct.
                                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                    eq_fuel_compat (fun _ _ HH => HH)
                                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                   Σ box_dc Hglob_term func_tag default_tag);
+                                   Σ Hglob_term func_tag default_tag);
                            [exact (Hrel_c v2 f_c' t_c' Heval2_c) | exact Hrel_v2].
                   + destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
                     * (* y = x1: same as App but with ClosFix_v *)
@@ -4702,7 +4657,7 @@ Section Correct.
                                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                    eq_fuel_compat (fun _ _ HH => HH)
                                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                   Σ box_dc Hglob_term func_tag default_tag);
+                                   Σ Hglob_term func_tag default_tag);
                            [exact Hrel_k1 | exact Hrel_fix_saved].
                       -- (* x1 ∈ S: contradiction *)
                          exfalso.
@@ -4735,7 +4690,7 @@ Section Correct.
                                       _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                       eq_fuel_compat (fun _ _ HH => HH)
                                       nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                      Σ box_dc Hglob_term func_tag default_tag);
+                                      Σ Hglob_term func_tag default_tag);
                               [exact Hrel_k1' | exact Hrel_fix_saved].
                          ++ eexists. split.
                             { rewrite M.gso; [| exact Hneq_x].
@@ -4759,7 +4714,7 @@ Section Correct.
                                       _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                                       eq_fuel_compat (fun _ _ HH => HH)
                                       nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                                      Σ box_dc Hglob_term func_tag default_tag);
+                                      Σ Hglob_term func_tag default_tag);
                               [exact (Hrel_c1 _ _ _ Heval1_c1) | exact Hrel_fix_saved].
                     * (* y ≠ x, ≠ x1, ≠ x2 *)
                       eexists. split.
@@ -5001,7 +4956,7 @@ Section Correct.
                            _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                            eq_fuel_compat (fun _ _ H => H)
                            nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                           Σ box_dc Hglob_term func_tag default_tag);
+                           Σ Hglob_term func_tag default_tag);
                    [exact Hrel_w | exact Hrel1].
               -- (* y ≠ x1 *)
                  eexists. split.
@@ -5154,7 +5109,7 @@ Section Correct.
                      _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                      eq_fuel_compat (fun _ _ H0 => H0)
                      nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                     Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                     Σ Hglob_term func_tag default_tag); eassumption.
                 ++ (* y ∈ S \ {x} (fresh): contradiction with Hdis_ek *)
                    exfalso.
                    assert (Hy_not_S' : ~ y \in S').
@@ -5193,7 +5148,7 @@ Section Correct.
                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                         eq_fuel_compat (fun _ _ H0 => H0)
                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag); eassumption.
+                        Σ Hglob_term func_tag default_tag); eassumption.
                    ** (* y ∉ FromList vnames: cmap approach *)
                       destruct (In_nth_error _ _ Hyin) as [k Hk].
                       destruct (first_occurrence_exists xs k y Hk) as [k0 [Hle [Hk0 Hfirst]]].
@@ -5257,7 +5212,7 @@ Section Correct.
                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                         eq_fuel_compat (fun _ _ H0 => H0)
                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag).
+                        Σ Hglob_term func_tag default_tag).
                       { eapply Hrel_glob. exact Heval_body_k0. }
                       { exact Hrel_vy. }
               -- (* y ∉ xs: set_many doesn't affect y *)
@@ -5719,7 +5674,7 @@ Section Correct.
                    _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                    eq_fuel_compat (fun _ _ H0 => H0)
                    nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                   Σ box_dc Hglob_term func_tag default_tag).
+                   Σ Hglob_term func_tag default_tag).
                  exact Hrel_vz.
                  exact Hcon_rel.
               -- (* z ≠ x1 *)
@@ -5898,7 +5853,7 @@ Section Correct.
                         _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                         eq_fuel_compat (fun _ _ H => H)
                         nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                        Σ box_dc Hglob_term func_tag default_tag);
+                        Σ Hglob_term func_tag default_tag);
                 [exact Hrel' | exact Hrel_proj].
             * destruct (Pos.eq_dec z x) as [-> | Hneq_zx].
               -- (* z = x: M.get x rho ≈ v_con' *)
@@ -5973,7 +5928,7 @@ Section Correct.
                            _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                            eq_fuel_compat (fun _ _ H => H)
                            nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                           Σ box_dc Hglob_term func_tag default_tag);
+                           Σ Hglob_term func_tag default_tag);
                    [exact Hrel_w0 | exact Hrel_con_saved].
               -- (* z ≠ x_res, z ≠ x *)
                  unfold preord_var_env. intros w Hget.
@@ -6047,7 +6002,7 @@ Section Correct.
                     _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                     eq_fuel_compat (fun _ _ H => H)
                     nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                    Σ box_dc Hglob_term func_tag default_tag);
+                    Σ Hglob_term func_tag default_tag);
             [exact Hrel1 | exact Hav_rel].
         * (* z ≠ x *)
           unfold preord_var_env. intros w Hget.
@@ -6416,7 +6371,7 @@ Section Correct.
                          _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                          eq_fuel_compat (fun _ _ H => H)
                          nat LambdaBox_resource_fuel LambdaBox_resource_trace
-                         Σ box_dc Hglob_term func_tag default_tag);
+                         Σ Hglob_term func_tag default_tag);
                  [exact H1 | exact Hrel_j].
             -- (* x1 ∉ xs0 *)
                eexists. split.

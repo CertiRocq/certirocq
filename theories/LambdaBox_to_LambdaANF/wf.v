@@ -212,7 +212,6 @@ Section WF_EVAL.
           {Hf : @LambdaBox_resource nat}
           {Ht : @LambdaBox_resource trace}.
   Context (Σ : EAst.global_context).
-  Context (box_dc : dcon).
 
   Hypothesis globals_wellformed :
     forall k decl body,
@@ -223,7 +222,7 @@ Section WF_EVAL.
   Lemma eval_preserves_wf rho e v f t :
     well_formed_env Σ rho ->
     wellformed Σ (List.length rho) e = true ->
-    eval_env_fuel Σ box_dc rho e (Val v) f t ->
+    eval_env_fuel Σ rho e (Val v) f t ->
     well_formed_val Σ v.
   Proof.
     intros Hwf_env Hwf_e Heval.
@@ -237,7 +236,7 @@ Section WF_EVAL.
       Forall (fun e => wellformed Σ (List.length rho) e = true) es ->
       Forall (well_formed_val Σ) vs).
     enough (Haux : Pwf rho e (Val v) f t) by exact (Haux Hwf_env Hwf_e).
-    apply (eval_env_fuel_ind' Σ box_dc Pwf Pmany Pwf); try exact Heval;
+    apply (eval_env_fuel_ind' Σ Pwf Pmany Pwf); try exact Heval;
     unfold Pwf, Pmany; try solve [intros; exact I].
     (* eval_Rel_fuel *)
     - intros n rho0 v0 Hnth Hwfe Hwft.
@@ -253,8 +252,6 @@ Section WF_EVAL.
     - intros mfix idx rho0 Hwfe Hwft.
       apply wellformed_tFix in Hwft as [Hidx Hwf_mfix].
       apply Wf_ClosFix; assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -375,7 +372,7 @@ Section WF_EVAL.
     EGlobalEnv.extends Σ_tail Σ ->
     well_formed_env Σ_tail rho ->
     wellformed Σ_tail (List.length rho) e = true ->
-    eval_env_fuel Σ box_dc rho e (Val v) f t ->
+    eval_env_fuel Σ rho e (Val v) f t ->
     well_formed_val Σ_tail v.
   Proof.
     intros Hwf_tail Hext.
@@ -393,7 +390,7 @@ Section WF_EVAL.
       Forall (fun e => wellformed Σ_tail (List.length rho) e = true) es ->
       Forall (well_formed_val Σ_tail) vs).
     enough (Haux : Pwf rho e (Val v) f t) by exact (Haux Hwf_env Hwf_e).
-    apply (eval_env_fuel_ind' Σ box_dc Pwf Pmany Pwf); try exact Heval;
+    apply (eval_env_fuel_ind' Σ Pwf Pmany Pwf); try exact Heval;
     unfold Pwf, Pmany; try solve [intros; exact I].
     (* eval_Rel_fuel *)
     - intros n rho0 v0 Hnth Hwfe Hwft.
@@ -409,8 +406,6 @@ Section WF_EVAL.
     - intros mfix idx rho0 Hwfe Hwft.
       apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
       apply (Wf_ClosFix Σ_tail); assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -511,7 +506,7 @@ Section EVAL_RESTRICT.
   Context {trace : Type}
           {Hf : @LambdaBox_resource nat}
           {Ht : @LambdaBox_resource trace}.
-  Context (Σ : EAst.global_context) (box_dc : dcon).
+  Context (Σ : EAst.global_context).
 
   (** If a term is wellformed w.r.t. Σ_tail and evaluates under Σ,
       then it evaluates identically under Σ_tail (same result, fuel, trace).
@@ -522,8 +517,8 @@ Section EVAL_RESTRICT.
     EGlobalEnv.extends Σ_tail Σ ->
     well_formed_env Σ_tail rho ->
     wellformed Σ_tail (List.length rho) e = true ->
-    @eval_env_fuel trace Hf Ht Σ box_dc rho e r f t ->
-    @eval_env_fuel trace Hf Ht Σ_tail box_dc rho e r f t /\
+    @eval_env_fuel trace Hf Ht Σ rho e r f t ->
+    @eval_env_fuel trace Hf Ht Σ_tail rho e r f t /\
     match r with Val v => well_formed_val Σ_tail v | OOT => True end.
   Proof.
     intros Hwf_tail Hext.
@@ -533,22 +528,22 @@ Section EVAL_RESTRICT.
                       (r : fuel_sem.result) (f : nat) (t : trace) =>
       well_formed_env Σ_tail rho ->
       wellformed Σ_tail (List.length rho) e = true ->
-      @fuel_sem.eval_env_step trace Hf Ht Σ_tail box_dc rho e r f t /\
+      @fuel_sem.eval_env_step trace Hf Ht Σ_tail rho e r f t /\
       match r with fuel_sem.Val v => well_formed_val Σ_tail v | fuel_sem.OOT => True end).
     set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
                       (vs : list fuel_sem.value) (fs : nat) (ts : trace) =>
       well_formed_env Σ_tail rho ->
       Forall (fun e => wellformed Σ_tail (List.length rho) e = true) es ->
-      @fuel_sem.eval_fuel_many trace Hf Ht Σ_tail box_dc rho es vs fs ts /\
+      @fuel_sem.eval_fuel_many trace Hf Ht Σ_tail rho es vs fs ts /\
       Forall (well_formed_val Σ_tail) vs).
     set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
                       (r : fuel_sem.result) (f : nat) (t : trace) =>
       well_formed_env Σ_tail rho ->
       wellformed Σ_tail (List.length rho) e = true ->
-      @eval_env_fuel trace Hf Ht Σ_tail box_dc rho e r f t /\
+      @eval_env_fuel trace Hf Ht Σ_tail rho e r f t /\
       match r with fuel_sem.Val v => well_formed_val Σ_tail v | fuel_sem.OOT => True end).
     enough (Haux : Pfuel rho e r f t) by exact (Haux Hwf_env Hwf_e).
-    apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ box_dc Pstep Pmany Pfuel);
+    apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ Pstep Pmany Pfuel);
       try exact Heval;
     unfold Pstep, Pmany, Pfuel; try solve [intros; exact I].
     (* eval_Rel_fuel *)
@@ -567,10 +562,6 @@ Section EVAL_RESTRICT.
       + eapply fuel_sem.eval_Fix_fuel.
       + apply (wellformed_tFix Σ_tail) in Hwft as [Hidx Hwf_mfix].
         apply (Wf_ClosFix Σ_tail); assumption.
-    (* eval_Box_fuel *)
-    - intros rho0 _ _. split.
-      + eapply fuel_sem.eval_Box_fuel.
-      + constructor. constructor.
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2 r0 na rho0 rho' f1 f2 f3 t1 t2 t3
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
@@ -729,26 +720,25 @@ Section EVAL_RESTRICT.
       Doesn't need well-formedness. *)
   Lemma eval_env_fuel_extends Σ_tail rho e r f t :
     EGlobalEnv.extends Σ_tail Σ ->
-    @eval_env_fuel trace Hf Ht Σ_tail box_dc rho e r f t ->
-    @eval_env_fuel trace Hf Ht Σ box_dc rho e r f t.
+    @eval_env_fuel trace Hf Ht Σ_tail rho e r f t ->
+    @eval_env_fuel trace Hf Ht Σ rho e r f t.
   Proof.
     intros Hext Heval.
     set (Pstep := fun (rho : fuel_sem.env) (e : EAst.term)
                       (r : fuel_sem.result) (f : nat) (t : trace) =>
-      @fuel_sem.eval_env_step trace Hf Ht Σ box_dc rho e r f t).
+      @fuel_sem.eval_env_step trace Hf Ht Σ rho e r f t).
     set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
                       (vs : list fuel_sem.value) (fs : nat) (ts : trace) =>
-      @fuel_sem.eval_fuel_many trace Hf Ht Σ box_dc rho es vs fs ts).
+      @fuel_sem.eval_fuel_many trace Hf Ht Σ rho es vs fs ts).
     set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
                       (r : fuel_sem.result) (f : nat) (t : trace) =>
-      @eval_env_fuel trace Hf Ht Σ box_dc rho e r f t).
+      @eval_env_fuel trace Hf Ht Σ rho e r f t).
     enough (Haux : Pfuel rho e r f t) by exact Haux.
-    apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ_tail box_dc Pstep Pmany Pfuel);
+    apply (@fuel_sem.eval_env_fuel_ind' trace Hf Ht Σ_tail Pstep Pmany Pfuel);
       try exact Heval; unfold Pstep, Pmany, Pfuel; intros.
     - eapply fuel_sem.eval_Rel_fuel; eassumption.
     - eapply fuel_sem.eval_Lam_fuel.
     - eapply fuel_sem.eval_Fix_fuel.
-    - eapply fuel_sem.eval_Box_fuel.
     - eapply fuel_sem.eval_App_step; eassumption.
     - eapply fuel_sem.eval_App_step_OOT1; eassumption.
     - eapply fuel_sem.eval_App_step_OOT2; eassumption.

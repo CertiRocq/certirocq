@@ -37,27 +37,24 @@ Section Refinement.
     forall dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
-  Context (box_dc : dcon)
-          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
-
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
 
-  Let Hf_src := LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
-  Let Ht_src := LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+  Let Hf_src := LambdaBox_resource_fuel.
+  Let Ht_src := LambdaBox_resource_trace.
 
   Let anf_val_rel' :=
-    @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
+    @anf_val_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ.
   Let anf_env_rel0 :=
-    @anf_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
+    @anf_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ.
 
   Let global_env_rel' :=
-    @global_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ box_dc.
+    @global_env_rel func_tag default_tag tgm cmap nat Hf_src Ht_src Σ.
 
-  Let src_eval := @eval_env_fuel nat Hf_src Ht_src Σ box_dc.
-  Let src_diverge := @fuel_sem.diverge nat Hf_src Ht_src Σ box_dc.
-  Let src_diverge_not_stuck := @fuel_sem.diverge_not_stuck nat Hf_src Ht_src Σ box_dc.
+  Let src_eval := @eval_env_fuel nat Hf_src Ht_src Σ.
+  Let src_diverge := @fuel_sem.diverge nat Hf_src Ht_src Σ.
+  Let src_diverge_not_stuck := @fuel_sem.diverge_not_stuck nat Hf_src Ht_src Σ.
   Let cmap_consistent' :=
-    @cmap_consistent cmap nat Hf_src Ht_src Σ box_dc.
+    @cmap_consistent cmap nat Hf_src Ht_src Σ.
 
   Lemma anf_bound_post_upper_bound f_src t_src :
     post_upper_bound (anf_bound f_src t_src).
@@ -208,12 +205,12 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  box_dc box_tag Hglob_term Hglob_fuel_zero Hwf_glob
+                  Hglob_term Hglob_fuel_zero Hwf_glob
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
       @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
-        _ Σ box_dc nat Hf_src Ht_src
+        _ Σ nat Hf_src Ht_src
         Hglob_term Hwf_glob
         HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
         no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
@@ -222,7 +219,6 @@ Section Refinement.
                 tgm cmap cenv Σ efl
                 HnoAxioms
                 dcon_to_tag_inj
-                box_dc box_tag
                 cenv_case_consistent
                 Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
@@ -238,7 +234,6 @@ Section Refinement.
                   func_tag default_tag default_itag
                   tgm cmap cenv Σ efl
                   dcon_to_tag_inj
-                  box_dc box_tag
                   cenv_case_consistent Hcmap_eval_coherent
                   Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                   [] e (Val src_v) f t Heval)
@@ -289,7 +284,7 @@ Section Refinement.
     assert (Hctx_main0 :
       occurs_free_ctx C \subset FromList [] :|: (Sg' \\ S') :|: cmap_vars cmap).
     { exact (@anf_cvt_occurs_free_ctx_exp
-               func_tag default_tag tgm cmap Σ box_dc box_tag
+               func_tag default_tag tgm cmap Σ
                Sg' e [] S' C r Hmain_cvt Hdis_nil Hdis_main). }
     assert (Hctx_main :
       occurs_free_ctx C \subset (Sg' \\ S') :|: cmap_vars cmap).
@@ -388,12 +383,12 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  box_dc box_tag Hglob_term Hglob_fuel_zero Hwf_glob
+                  Hglob_term Hglob_fuel_zero Hwf_glob
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
       @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
-        _ Σ box_dc nat Hf_src Ht_src
+        _ Σ nat Hf_src Ht_src
         Hglob_term Hwf_glob
         HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
         no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
@@ -401,8 +396,7 @@ Section Refinement.
                 func_tag kon_tag default_tag default_itag
                 tgm cmap cenv Σ efl
                 HnoAxioms
-                dcon_to_tag_inj
-                box_dc box_tag
+                dcon_to_tag_inj              
                 cenv_case_consistent
                 Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
@@ -448,8 +442,7 @@ Section Refinement.
       pose proof (@anf_cvt_correct_oot_lower_bound
                     func_tag default_tag default_itag
                     tgm cmap cenv Σ efl
-                    dcon_to_tag_inj
-                    box_dc box_tag
+                    dcon_to_tag_inj                    
                     cenv_case_consistent Hcmap_eval_coherent
                     Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                     [] e cin t Hoot)
@@ -471,7 +464,7 @@ Section Refinement.
     assert (Hctx_main0 :
       occurs_free_ctx C \subset FromList [] :|: (Sg' \\ S') :|: cmap_vars cmap).
     { exact (@anf_cvt_occurs_free_ctx_exp
-               func_tag default_tag tgm cmap Σ box_dc box_tag
+               func_tag default_tag tgm cmap Σ
                Sg' e [] S' C r Hmain_cvt Hdis_nil Hdis_main). }
     assert (Hctx_main :
       occurs_free_ctx C \subset (Sg' \\ S') :|: cmap_vars cmap).
@@ -537,25 +530,22 @@ Section ComputationalRefinement.
     forall dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
-  Context (box_dc : dcon)
-          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
-
   Context (Hglob_term :
     forall k decl body,
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t, @eval_env_fuel nat
-        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-        Σ box_dc [] body (Val src_v) f t).
+        LambdaBox_resource_fuel
+        LambdaBox_resource_trace
+        Σ [] body (Val src_v) f t).
   Context (Hglob_fuel_zero :
     forall k decl body src_v f t,
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       @eval_env_fuel nat
-        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-        Σ box_dc [] body (Val src_v) f t ->
+        LambdaBox_resource_fuel
+        LambdaBox_resource_trace
+        Σ [] body (Val src_v) f t ->
       f = 0).
 
   Context (Hglob_wf :
@@ -581,7 +571,7 @@ Section ComputationalRefinement.
     end.
 
   Definition refines_top (ie : ienv) (M : nat) (e_src : EAst.term) (e_tgt : exp) : Prop :=
-    refines default_tag tgm (top_cenv ie) Σ box_dc box_tag M e_src e_tgt.
+    refines default_tag tgm (top_cenv ie) Σ M e_src e_tgt.
 
   Context (ie : ienv).
   Context (cenv_case_consistent_top :
@@ -607,8 +597,7 @@ Section ComputationalRefinement.
               func_tag kon_tag default_tag default_itag
               tgm cm (top_cenv ie) Σ efl
               HnoAxioms
-              dcon_to_tag_inj
-              box_dc box_tag
+              dcon_to_tag_inj              
               cenv_case_consistent_top
               Hglob_term Hglob_fuel_zero Hglob_wf
               prim_map prims Hwf_glob
@@ -624,9 +613,9 @@ Section ComputationalRefinement.
       (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     @fuel_sem.diverge nat
-      (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-      (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-      Σ box_dc [] e ->
+      LambdaBox_resource_fuel
+      LambdaBox_resource_trace
+      Σ [] e ->
     eval.diverge (top_cenv ie) (M.empty val) e_tgt.
   Proof.
     intros Hwf Hrun Hdiv.
@@ -643,7 +632,6 @@ Section ComputationalRefinement.
               tgm cm (top_cenv ie) Σ efl
               HnoAxioms
               dcon_to_tag_inj
-              box_dc box_tag
               cenv_case_consistent_top
               Hglob_term Hglob_fuel_zero Hglob_wf
               prim_map prims Hwf_glob
