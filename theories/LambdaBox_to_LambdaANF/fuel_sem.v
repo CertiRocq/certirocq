@@ -106,7 +106,6 @@ Section FUEL_SEM.
           {Ht : @LambdaBox_resource trace}.
 
   Context (Σ : EAst.global_context).
-  Context (box_dc : dcon).
 
   (** * Big-step resource semantics for EAst.term *)
 
@@ -129,12 +128,6 @@ Section FUEL_SEM.
       forall (mfix : list (EAst.def EAst.term)) (idx : nat) (rho : env),
         eval_env_step rho (EAst.tFix mfix idx)
                       (Val (ClosFix_v rho mfix idx))
-                      <0>
-                      <0>
-  | eval_Box_fuel :
-      forall (rho : env),
-        eval_env_step rho EAst.tBox
-                      (Val (Con_v box_dc []))
                       <0>
                       <0>
 
@@ -310,16 +303,7 @@ Section FUEL_SEM.
       remember (EAst.tFix mfix idx) as ea in H.
       remember (Val v2) as rv in H.
       destruct H; try discriminate.
-      injection Heqea as <- <-. injection Heqrv as <-. reflexivity.
-    (* eval_Box_fuel *)
-    - intros rho0 v2 f2 t2 Heval2.
-      remember EAst.tBox as ea in Heval2.
-      remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate. subst.
-      remember EAst.tBox as ea in H.
-      remember (Val v2) as rv in H.
-      destruct H; try discriminate.
-      injection Heqrv as <-. reflexivity.
+      injection Heqea as <- <-. injection Heqrv as <-. reflexivity.    
     (* eval_App_step: e1 → Clos_v *)
     - intros e1 e2 body v2' r na rho0 rho' f0 f2 f3 t0 t2 t3
              _ IH1 _ IH2 _ IH3.
@@ -498,15 +482,7 @@ Section FUEL_SEM.
             | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
             end.
       injection Heqea as <- <-. subst.
-      split; [reflexivity | split; reflexivity].
-    - intros rho0 v2 f2 t2 Heval2.
-      remember EAst.tBox as ea in Heval2.
-      remember (Val v2) as rv in Heval2.
-      destruct Heval2; try discriminate;
-        try match goal with
-            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
-            end.
-      split; [reflexivity | split; reflexivity].
+      split; [reflexivity | split; reflexivity].    
     - intros e1 e2 body v2' r na rho0 rho' f0 f2 t0 t2 f3 t3
              _ IH1 _ IH2 _ IH3.
       destruct r as [v_r |]; [| exact I].
