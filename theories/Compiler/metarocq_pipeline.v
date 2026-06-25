@@ -40,7 +40,7 @@ Program Definition certirocq_post_metarocq_pipeline econf : Transform.t global_c
   rebuild_wf_env_transform (efl := efl) false false ▷
   (* Coinductives & cofixpoints are translated to inductive types and thunked fixpoints *)
   coinductive_to_inductive_transformation efl
-      (has_app := eq_refl) (has_box := eq_refl) (has_rel := eq_refl) (has_pars := eq_refl) (has_cstrblocks := eq_refl) ▷
+      (has_app := eq_refl) (has_rel := eq_refl) (has_pars := eq_refl) (has_cstrblocks := eq_refl) ▷
   consts_to_values_transformation efl' final_wcbv_flags eq_refl eq_refl eq_refl ▷
   (* Lazy-to-lambda *)
   implement_lazy_force_transformation efl' eq_refl eq_refl eq_refl eq_refl eq_refl ▷
