@@ -59,7 +59,7 @@ install: plugin cplugin bootstrap
 	$(MAKE) -C bootstrap install
 
 # Clean generated makefiles
-mrproper: theories/Makefile libraries/Makefile plugins/plugin/Makefile plugins/cplugin/Makefile
+mrproper: 
 	rm -f theories/Makefile
 	rm -f libraries/Makefile
 	rm -f plugins/plugin/Makefile
