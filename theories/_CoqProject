@@ -6,6 +6,7 @@
 -R ../libraries         CertiRocq.Libraries
 -R Codegen              CertiRocq.Codegen
 -R CodegenWasm          CertiRocq.CodegenWasm
+-R CodegenLLVM          CertiRocq.CodegenLLVM
 -R Glue                 CertiRocq.Glue
 -R Extraction           CertiRocq.extraction
 # -R Runtime              CertiRocq.runtime
@@ -121,6 +122,19 @@ CodegenWasm/LambdaANF_to_Wasm_typing.v
 CodegenWasm/LambdaANF_to_Wasm_instantiation.v
 CodegenWasm/toplevel.v
 CodegenWasm/toplevel_theorem.v
+
+# CodegenLLVM — runnable VIR backend
+CodegenLLVM/Flatten.v
+CodegenLLVM/LambdaANF_to_LLVM.v
+CodegenLLVM/Serialize.v
+CodegenLLVM/toplevel.v
+# CodegenLLVM — code-generation correctness proofs
+CodegenLLVM/MemoryLaws.v
+CodegenLLVM/CertiGC_Contract.v
+CodegenLLVM/LambdaANF_to_LLVM_correct_v3.v
+CodegenLLVM/Construct_lemmas.v
+CodegenLLVM/Flatten_correct.v
+CodegenLLVM/Instantiate_compile.v
 
 # Glue
 Glue/glue_utils.v
