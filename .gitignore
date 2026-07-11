@@ -145,3 +145,4 @@ result
 /benchmarks/ffi/.Makefile.d
 bootstrap/certirocqchk/glue.*
 bootstrap/certirocqc/glue.*
+/plugins/
