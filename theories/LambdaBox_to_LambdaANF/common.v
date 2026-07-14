@@ -30,7 +30,7 @@ Definition dcon_of_con (i : inductive) (n : nat) : dcon := (i, N.of_nat n).
 
 (** * Constructor tag mapping *)
 
-Definition conId_map := list (dcon * ctor_tag).
+Definition conId_map := list (dcon * ind_tag * ctor_tag).
 
 Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
 Proof.
@@ -45,13 +45,11 @@ Defined.
 
 Section TagLookup.
 
-  Context (default_tag : positive).
-
   Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
     match sig with
-    | nil => default_tag
-    | ((cId, inf)::sig') => match conId_dec a cId with
-                            | left _ => inf
+    | nil => None
+    | ((cId, _, inf)::sig') => match conId_dec a cId with
+                            | left _ => Some inf
                             | right _ => dcon_to_info a sig'
                             end
     end.
@@ -203,7 +201,7 @@ Section InductiveEnv.
                      (if is_unboxed then boxed else boxed + 1)
                      niT
                      (M.set cn info ce)
-                     (((ind,nCon), cn)::dcm)
+                     (((ind,nCon),niT,cn)::dcm)
     | (_, _) => (ce, dcm)
     end.
 

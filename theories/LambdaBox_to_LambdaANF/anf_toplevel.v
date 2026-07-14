@@ -15,7 +15,7 @@ From CertiRocq.LambdaANF Require Import
   tactics identifiers bounds term_util rename set_util stemctx.
 From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import
-  common anf fuel_sem wf anf_corresp anf_util anf_correct anf_global
+  common anf fuel_sem wf anf_corresp anf_util anf_convert_env anf_correct anf_global
   anf_divergence.
 
 Import ListNotations.
@@ -33,11 +33,9 @@ Section Refinement.
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
 
-  Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
-  Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
+  Context (dcon_to_tag_inj : inj_conIdMap tgm).
+  Context (Htgm : registered_constructors tgm Σ).
+  Context (cenv_tgm_coh : cenv_tgm_coherence cenv tgm).
 
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
@@ -110,7 +108,7 @@ Section Refinement.
     in
     match v1, v2 with
     | fuel_sem.Con_v c1 vs1, Vconstr c2 vs2 =>
-      dcon_to_tag default_tag c1 tgm = c2 /\ Forall2_aux vs1 vs2
+      dcon_to_tag c1 tgm = Some c2 /\ Forall2_aux vs1 vs2
     | fuel_sem.Clos_v _ _ _, Vfun _ _ _ => True
     | fuel_sem.ClosFix_v _ _ _, Vfun _ _ _ => True
     | _, _ => False
@@ -119,7 +117,7 @@ Section Refinement.
   Definition value_ref (v1 : fuel_sem.value) (v2 : val) : Prop :=
     match v1, v2 with
     | fuel_sem.Con_v c1 vs1, Vconstr c2 vs2 =>
-      dcon_to_tag default_tag c1 tgm = c2 /\ Forall2 value_ref' vs1 vs2
+      dcon_to_tag c1 tgm = Some c2 /\ Forall2 value_ref' vs1 vs2
     | fuel_sem.Clos_v _ _ _, Vfun _ _ _ => True
     | fuel_sem.ClosFix_v _ _ _, Vfun _ _ _ => True
     | _, _ => False
@@ -167,7 +165,7 @@ Section Refinement.
     induction v1 using fuel_sem.value_ind'; intros v2 v3 Hval Hpre; inv Hval.
     - rewrite preord_val_eq in Hpre.
       destruct v3; try contradiction. inv Hpre.
-      simpl. split. reflexivity.
+      simpl. split. assumption.
 
       revert l vs' H2 H1.
       induction H; intros.
@@ -213,13 +211,13 @@ Section Refinement.
         _ Σ nat Hf_src Ht_src
         Hglob_term Hwf_glob
         HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
+        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent Htgm).
     destruct (@global_ctx_correct_top
                 func_tag kon_tag default_tag default_itag
                 tgm cmap cenv Σ efl
                 HnoAxioms
-                dcon_to_tag_inj
-                cenv_case_consistent
+                dcon_to_tag_inj Htgm
+                cenv_tgm_coh
                 Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
@@ -233,8 +231,8 @@ Section Refinement.
     pose proof (@anf_cvt_correct
                   func_tag default_tag default_itag
                   tgm cmap cenv Σ efl
-                  dcon_to_tag_inj
-                  cenv_case_consistent Hcmap_eval_coherent
+                  dcon_to_tag_inj 
+                  cenv_tgm_coh Hcmap_eval_coherent
                   Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                   [] e (Val src_v) f t Heval)
       as Hcorr.
@@ -391,13 +389,13 @@ Section Refinement.
         _ Σ nat Hf_src Ht_src
         Hglob_term Hwf_glob
         HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent).
+        no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys Hcmap_eval_coherent Htgm).
     destruct (@global_ctx_correct_top
                 func_tag kon_tag default_tag default_itag
                 tgm cmap cenv Σ efl
                 HnoAxioms
-                dcon_to_tag_inj              
-                cenv_case_consistent
+                dcon_to_tag_inj Htgm         
+                cenv_tgm_coh
                 Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
@@ -443,7 +441,7 @@ Section Refinement.
                     func_tag default_tag default_itag
                     tgm cmap cenv Σ efl
                     dcon_to_tag_inj                    
-                    cenv_case_consistent Hcmap_eval_coherent
+                    cenv_tgm_coh Hcmap_eval_coherent
                     Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                     [] e cin t Hoot)
         as Hcorr_oot.
@@ -526,10 +524,8 @@ Section ComputationalRefinement.
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
 
-  Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
+  Context (dcon_to_tag_inj : inj_conIdMap tgm).
+  Context (Htgm : registered_constructors tgm Σ).
   Context (Hglob_term :
     forall k decl body,
       declared_constant Σ k decl ->
@@ -571,11 +567,10 @@ Section ComputationalRefinement.
     end.
 
   Definition refines_top (ie : ienv) (M : nat) (e_src : EAst.term) (e_tgt : exp) : Prop :=
-    refines default_tag tgm (top_cenv ie) Σ M e_src e_tgt.
+    refines tgm (top_cenv ie) Σ M e_src e_tgt.
 
   Context (ie : ienv).
-  Context (cenv_case_consistent_top :
-    forall P ctag, caseConsistent (top_cenv ie) P ctag).
+  Context (cenv_tgm_coh : cenv_tgm_coherence (top_cenv ie) tgm).
 
   Theorem convert_top_anf_correct next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
@@ -590,15 +585,15 @@ Section ComputationalRefinement.
                  tgm Σ efl HnoAxioms
                  prim_map prims Hwf_glob
                  HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                 no_prims
+                 no_prims Htgm
                  next_id ie e e_tgt comp_d' Hwf Hrun)
       as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
     eapply (@anf_correct_top_explicit
               func_tag kon_tag default_tag default_itag
               tgm cm (top_cenv ie) Σ efl
               HnoAxioms
-              dcon_to_tag_inj              
-              cenv_case_consistent_top
+              dcon_to_tag_inj Htgm             
+              cenv_tgm_coh
               Hglob_term Hglob_fuel_zero Hglob_wf
               prim_map prims Hwf_glob
               HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
@@ -624,15 +619,15 @@ Section ComputationalRefinement.
                  tgm Σ efl HnoAxioms
                  prim_map prims Hwf_glob
                  HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                 no_prims
+                 no_prims Htgm
                  next_id ie e e_tgt comp_d' Hwf Hrun)
       as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
     eapply (@anf_divergence_top_explicit
               func_tag kon_tag default_tag default_itag
               tgm cm (top_cenv ie) Σ efl
               HnoAxioms
-              dcon_to_tag_inj
-              cenv_case_consistent_top
+              dcon_to_tag_inj Htgm
+              cenv_tgm_coh
               Hglob_term Hglob_fuel_zero Hglob_wf
               prim_map prims Hwf_glob
               HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray

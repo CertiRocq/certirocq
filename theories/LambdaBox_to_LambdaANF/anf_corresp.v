@@ -15,13 +15,13 @@ From CertiRocq.LambdaANF Require Import
   term term_util ctx List_util Ensembles_util
   identifiers state set_util tactics
   closure_conversion_corresp.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf fuel_sem wf anf_util.
+  
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf fuel_sem wf anf_util anf_convert_env.
 
 Import ListNotations.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 Open Scope bs_scope.
-
 
 (* [term_ind_fix_body] is now in common.v *)
 
@@ -319,7 +319,7 @@ Section Corresp.
   Context (no_prims : forall s, find_prim prims s = None).
   Context (cmap_complete : forall s d,
     lookup_constant Σ s = Some d -> lookup_const cmap s <> None).
-
+  Context (tgm_complete : registered_constructors tgm Σ).
   (* Helper: args correspondence from per-term IH.
      Given All (per-term correspondence) args, prove the args triple. *)
   Lemma anf_cvt_args_corresp :
@@ -370,16 +370,17 @@ Section Corresp.
            fresh S' (next_var (fst s')) }}) brs)
       (Hwf : forallb (fun br : list name * EAst.term =>
                wellformed Σ (List.length (fst br) + List.length vn) (snd br)) brs = true)
+      (Hwfn : forall i, i < List.length brs -> dcon_to_tag (dcon_of_con ind (N.to_nat n + i)) tgm <> None)               
       (Hvm : var_map_correct vm vn)
       S0,
     {{ fun _ s => fresh S0 (next_var (fst s)) }}
-      convert_anf_branches default_tag tgm convert_anf' ind brs n scrut vm
+      convert_anf_branches tgm convert_anf' ind brs n scrut vm
     {{ fun _ s pats s' =>
        exists S', anf_cvt_rel_branches func_tag default_tag tgm cmap S0 ind brs n vn scrut S' pats /\
        fresh S' (next_var (fst s')) }}.
   Proof.
     induction brs as [| [lnames e_br] brs' IHbrs];
-    intros n scrut vn vm Hall Hwf_brs Hvm S0.
+    intros n scrut vn vm Hall Hwf_brs Hwfn Hvm S0.
     - (* nil *)
       simpl. eapply return_triple. intros _ s Hfr.
       eexists. split; [econstructor | exact Hfr].
@@ -387,8 +388,16 @@ Section Corresp.
       simpl in Hwf_brs. apply Bool.andb_true_iff in Hwf_brs as [Hwf_hd Hwf_tl].
       inversion Hall as [| ? ? IH_hd IH_tl]; subst.
       simpl.
+      destruct dcon_to_tag eqn:hdc.
+      2:{ specialize (Hwfn 0). rewrite Nat.add_0_r in Hwfn. 
+          cbn in Hwfn. specialize (Hwfn ltac:(lia)).
+         congruence. } 
       (* Step 1: recurse on remaining branches *)
-      eapply bind_triple. { eapply IHbrs; eassumption. }
+      eapply bind_triple. { eapply IHbrs; try eassumption. cbn in Hwfn.
+        intros i hl. specialize (Hwfn (i + 1) ltac:(lia)).
+        assert (N.to_nat n + (i + 1) = N.to_nat (n + 1) + i) by lia.
+        now rewrite <- H. }
+
       intros pats' w1. eapply pre_existential; intros S2.
       eapply pre_curry_l; intros Hcvt_rest.
       (* Step 2: proj_ctx for this branch *)
@@ -409,7 +418,7 @@ Section Corresp.
       eapply return_triple. intros _ s Hfr.
       eexists. split; [| exact Hfr].
       eapply anf_Branches_cons;
-        [reflexivity | exact Hcvt_rest | exact Hsub | exact Hnd
+        [assumption | exact Hcvt_rest | exact Hsub | exact Hnd
          | exact Hlen | subst; reflexivity | exact Hcvt_body].
   Qed.
 
@@ -495,6 +504,7 @@ Section Corresp.
       + exact Hfr.
   Qed.
 
+  
   (* Main correspondence *)
   Lemma anf_cvt_exp_corresp :
     forall e vn vm S0
@@ -598,22 +608,25 @@ Section Corresp.
       eexists. split; [econstructor; exact Hlookup | exact Hfr].
 
     - (* tConstruct ind c args *)
-      simpl.
+      simpl. apply Bool.andb_true_iff in Hwf as [Hwf Hwfc].
+      apply Bool.andb_true_iff in Hwf as [_ Hwf].
+      cbn. destruct dcon_to_tag eqn:hdc.
+      2:{ destruct lookup_constructor eqn:hl; cbn in *.
+          apply tgm_complete in hl. congruence. congruence. } 
       eapply bind_triple. eapply get_named_fresh.
       intros x w. eapply pre_curry_l; intros Hx.
       eapply pre_strenghtening. { intros ? ? [_ Hfr]. exact Hfr. }
       eapply bind_triple.
       { eapply anf_cvt_args_corresp; [exact X | | exact Hvm].
         (* Extract forallb (wellformed ...) args from Hwf *)
-        rewrite Hblocks in Hwf.
-        apply Bool.andb_true_iff in Hwf as [_ Hwf_args].
-        apply Bool.andb_true_iff in Hwf_args as [_ Hwf_args].
+        rewrite Hblocks in Hwfc.
+        apply Bool.andb_true_iff in Hwfc as [_ Hwf_args].
         exact Hwf_args. }
       intros [ys C] w'.
       eapply pre_existential; intros S2.
       eapply pre_curry_l; intros Hcvt_args.
       eapply return_triple. intros _ s Hfr.
-      eexists. split; [econstructor; [reflexivity | exact Hx | exact Hcvt_args] | exact Hfr].
+      eexists. split; [econstructor; [assumption | exact Hx | exact Hcvt_args] | exact Hfr].
 
     - (* tCase (ind, npars) mch brs *)
       destruct p as [ind npars]. simpl.
@@ -621,7 +634,7 @@ Section Corresp.
          has_tCase && ((wf_brs && wellformed mch) && forallb brs) = true *)
       apply Bool.andb_true_iff in Hwf as [_ Hwf].
       apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_brs].
-      apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_mch].
+      apply Bool.andb_true_iff in Hwf_lhs as [Hwf_brs' Hwf_mch].
       simpl.
       (* Step 1-2: allocate f and y *)
       eapply bind_triple. eapply get_named_fresh.
@@ -636,7 +649,18 @@ Section Corresp.
       eapply pre_curry_l; intros Hcvt_mch.
       (* Step 4: convert branches *)
       eapply bind_triple.
-      { eapply anf_cvt_branches_corresp; [exact X | exact Hwf_brs | exact Hvm]. }
+      { eapply anf_cvt_branches_corresp; [exact X | exact Hwf_brs | | exact Hvm].
+        cbn. cbn in Hwf_brs'. unfold wf_brs in Hwf_brs'.
+        destruct lookup_inductive eqn:hli; try congruence.
+        destruct p as [mib oib]. apply ReflectEq.eqb_eq in Hwf_brs'.
+        rewrite <- Hwf_brs'.
+        intros i hi. specialize (tgm_complete ind i).
+        revert tgm_complete.
+        unfold lookup_constructor. rewrite hli; cbn.
+        Transparent bind. cbn.
+        eapply nth_error_Some in hi. destruct nth_error; try congruence.
+        cbn. now intros hl; specialize (hl _ eq_refl).
+        Opaque bind. }
       intros pats w'''. eapply pre_existential; intros S3.
       eapply pre_curry_l; intros Hcvt_brs.
       (* Step 5: allocate result variable *)
@@ -653,7 +677,12 @@ Section Corresp.
 
     - (* tProj p c *)
       apply Bool.andb_true_iff in Hwf as [Hwf_rest Hwf_c].
-      apply Bool.andb_true_iff in Hwf_rest as [_ _].
+      apply Bool.andb_true_iff in Hwf_rest as [_ hl].
+      unfold lookup_projection in hl. cbn.
+      destruct dcon_to_tag eqn:hd.
+      2:{ destruct lookup_constructor eqn:hl'.
+          eapply tgm_complete in hl'. congruence.
+          Transparent bind. cbn in hl. congruence. Opaque bind. }
       simpl.
       eapply bind_triple. { eapply IHe; eassumption. }
       intros [x C] w. eapply pre_existential; intros S2.
@@ -661,7 +690,7 @@ Section Corresp.
       eapply bind_triple. eapply get_named_fresh.
       intros y w'. eapply return_triple.
       intros _ s0 [Hy [_ Hfr]].
-      eexists. split; [econstructor; [reflexivity | exact Hcvt | exact Hy] | exact Hfr].
+      eexists. split; [econstructor; [assumption | exact Hcvt | exact Hy] | exact Hfr].
 
     - (* tFix mfix idx *)
       simpl.
@@ -869,7 +898,6 @@ Section Corresp.
 
 End Corresp.
 
-
 Section GlobalCorresp.
 
   Context (func_tag default_tag : positive)
@@ -896,12 +924,23 @@ Section GlobalCorresp.
 
   Local Open Scope list_scope.
 
+  Lemma registered_constructors_weaken Σ_proc gd : Σ = gd ++ Σ_proc ->
+    registered_constructors tgm Σ -> registered_constructors tgm Σ_proc.
+  Proof.
+    unfold registered_constructors.
+    intros -> hl ind c d hl'. eapply hl.
+    eapply extends_lookup_constructor; try eassumption.
+    eapply EExtends.extends_prefix_extends; try assumption.
+    now exists gd.
+  Qed.
+
   Lemma anf_cvt_global_corresp :
     forall (gd : global_context) (cm_acc : const_map)
            (Σ_proc : global_context) (S0 : Ensemble var),
       Σ = List.rev gd ++ Σ_proc ->
       (forall s d, lookup_constant Σ_proc s = Some d ->
                    lookup_const cm_acc s <> None) ->
+      registered_constructors tgm Σ ->
       {{ fun _ s => fresh S0 (next_var (fst s)) }}
         convert_global_decls' gd cm_acc
       {{ fun _ s p s' =>
@@ -913,7 +952,7 @@ Section GlobalCorresp.
                              lookup_const cm k <> None) }}.
   Proof.
     induction gd as [| [k decl] gd' IH];
-      intros cm_acc Σ_proc S0 HΣ_eq Hcm_complete_proc.
+      intros cm_acc Σ_proc S0 HΣ_eq Hcm_complete_proc Htgm_proc.
     - simpl in HΣ_eq.
       eapply return_triple. intros _ s Hfr.
       exists S0. split.
@@ -933,12 +972,16 @@ Section GlobalCorresp.
             rewrite <- HΣ_eq. exact Hwf_glob. }
           assert (Hwf_body : wellformed Σ_proc 0 body = true).
           { eapply wf_glob_head_const_some_wf. exact Hwf_proc1. }
+          assert (Hreg : registered_constructors tgm Σ_proc).
+          { inversion Hwf_proc1. eapply registered_constructors_weaken.
+            rewrite HΣ_eq at 1. now rewrite <- MRList.app_tip_assoc. assumption.
+          }
           eapply bind_triple.
           { eapply (@anf_cvt_exp_corresp
                       func_tag default_tag prim_map tgm prims cm_acc
                       efl Σ_proc
                       HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                      no_prims Hcm_complete_proc
+                      no_prims Hcm_complete_proc Hreg
                       body [] new_var_map S0 Hwf_body var_map_correct_nil). }
           intros [v C] w.
           eapply pre_existential; intros S1.
@@ -1023,6 +1066,7 @@ Section TopLevelCorresp.
           (Hblocks : cstr_as_blocks = true)
           (HnoArray : has_primarray = false).
   Context (no_prims : forall s, find_prim prims s = None).
+  Context (Htgm : registered_constructors tgm Σ).
 
   Lemma convert_top_anf_prog_corresp e Sg :
     wellformed Σ 0 e = true ->
@@ -1053,7 +1097,7 @@ Section TopLevelCorresp.
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                 no_prims
                 (List.rev Σ) [] [] Sg
-                HΣ_top Hcm_empty). }
+                HΣ_top Hcm_empty Htgm). }
     intros [cm C_env] w.
     eapply pre_existential; intros Sg'.
     eapply pre_curry_l; intros Hglob_cvt.
@@ -1066,7 +1110,7 @@ Section TopLevelCorresp.
                 func_tag default_tag prim_map tgm prims cm
                 efl Σ
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-                no_prims Hcm_complete
+                no_prims Hcm_complete Htgm
                 e [] new_var_map Sg'
                 Hwf var_map_correct_nil). }
     intros [r C] w'.
@@ -1075,6 +1119,53 @@ Section TopLevelCorresp.
     eapply return_triple. intros _ s _.
     exists cm, Sg', S', C_env, C, r.
     repeat split; assumption.
+  Qed.
+
+  Lemma convert_top_anf_total next_id ie e :
+    wellformed Σ 0 e = true ->
+    exists e_tgt comp_d', 
+      convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+        (fun _ => None)
+        ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d').
+  Proof.
+    intros Hwf.
+    unfold convert_top_anf.
+    destruct (convert_env default_tag default_itag ie)
+      as [[[[ienv0 cenv0] ctag] itag] dcm].
+    simpl.
+    set (ftag := (func_tag + 1)%positive).
+    set (fenv := M.set func_tag (1%N, (0%N :: nil)) (M.empty _) : fun_env).
+    set (comp_d := state.pack_data next_id ctag itag ftag cenv0 fenv (M.empty _) (M.empty nat) []).
+    set (Sg := fun x => (next_id <= x)%positive).
+    set (prog :=
+      bind (convert_global_decls func_tag default_tag prim_map tgm prims (fun _ => None) (List.rev Σ) []) _).
+    assert (Hprog_corresp :
+      compM.triple
+        (fun _ s => fresh Sg (state.next_var (fst s)))
+        prog
+        (fun _ _ e_out _ =>
+           exists cm Sg' S' C_env C r,
+             anf_cvt_rel_global func_tag default_tag tgm
+               Sg (List.rev Σ) [] cm C_env Sg' /\
+             anf_cvt_rel func_tag default_tag tgm cm
+               Sg' e [] S' C r /\
+             e_out = C_env |[ C |[ Ehalt r ]| ]|)).
+    { unfold prog. eapply convert_top_anf_prog_corresp. exact Hwf. }
+    pose proof Hprog_corresp as Hprog.
+    unfold triple in Hprog.
+    assert (Hfresh : fresh Sg (state.next_var comp_d)).
+    { unfold Sg, comp_d, fresh, Ensembles.In. simpl. lia. }
+    specialize (Hprog tt (comp_d, tt) Hfresh).
+    unfold state.run_compM.
+
+    change
+      (exists e_tgt comp_d', (let '(res_err, (comp_d'', _)) := compM.runState prog tt (comp_d, tt)
+        in (res_err, comp_d'')) = (compM.Ret e_tgt, comp_d')).
+    remember (compM.runState prog tt (comp_d, tt)) as top_run eqn:Htop_run.
+    destruct top_run as [res [comp_d_fin u]].
+    simpl in Hprog.
+    destruct res; try discriminate. elim Hprog.
+    now do 2 eexists.
   Qed.
 
   Lemma convert_top_anf_corresp next_id ie e e_tgt comp_d' :
@@ -1176,7 +1267,6 @@ Section ValRelExists.
           (cmap : const_map)
           {efl : EWellformed.EEnvFlags}
           (Σ : EAst.global_context)
-          (box_dc : dcon)
           {src_trace : Type}
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
@@ -1202,6 +1292,7 @@ Section ValRelExists.
   Context (cmap_nodup_keys : NoDup (map fst cmap)).
   Context (Hcmap_eval_coherent :
     @cmap_eval_coherent cmap _ Hf_src Ht_src Σ).
+  Context (Htgm : registered_constructors tgm Σ).
 
   Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
 
@@ -1242,8 +1333,10 @@ Section ValRelExists.
     intros Hwf_big Hext Hwf_v. revert Hwf_v.
     induction v using value_ind'; intros Hwf_v; inv Hwf_v.
     - (* Con_v *)
-      constructor. clear -H H1.
-      induction H; inv H1; constructor; auto.
+      constructor. clear -H H2.
+      induction H; inv H2; constructor; auto.
+      destruct lookup_constructor eqn:hl; try congruence.
+      eapply extends_lookup_constructor in hl; eauto. now rewrite hl.
     - (* Clos_v *)
       constructor.
       + clear -H H2.
@@ -1318,7 +1411,7 @@ Section ValRelExists.
     { rewrite <- (Forall2_length _ _ _ Hvs'). unfold names. eapply pos_seq_len. }
     (* ANF conversion of body *)
     edestruct (anf_rel_exists func_tag default_tag prim_map tgm prims cmap Σ
-      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete
+      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete Htgm
       e (x :: names) next_id) as [C1 [r1 [S2 Hcvt]]].
     { simpl. subst names. rewrite pos_seq_len. exact Hwf_e. }
     (* Freshness helpers *)
@@ -1430,7 +1523,7 @@ Section ValRelExists.
       unfold fnames, names. rewrite !pos_seq_len. exact (proj2 Hwf_mfix). }
     (* ANF conversion of mfix bodies *)
     edestruct (anf_cvt_rel_mfix_exists func_tag default_tag prim_map tgm prims cmap Σ
-      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete
+      HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray no_prims cmap_complete Htgm
       mfix fnames (List.rev fnames ++ names) next_id) as [fdefs [S' Hcvt_mfix]].
     { unfold fnames. rewrite pos_seq_len. reflexivity. }
     { exact Hlam. }
@@ -1561,13 +1654,15 @@ Section ValRelExists.
       induction v0 using value_ind'; intros; inv Hwf_v0.
       + (* Con_v *)
         assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
-        { clear -H H1. induction vs.
+        { clear -H H2. induction vs.
           + exists []. constructor.
-          + inv H. inv H1. destruct (H3 H2) as [v' Hv'].
+          + inv H. inv H2. destruct (H3 H1) as [v' Hv'].
             destruct (IHvs H4 H5) as [vs' Hvs'].
             exists (v' :: vs'). constructor; assumption. }
         destruct Hvs' as [vs' Hvs'].
-        eexists. eapply anf_rel_Con; [exact Hvs' | reflexivity].
+        Transparent bind. cbn in H3. congruence.
+        (* eexists. eapply anf_rel_Con; [exact Hvs' | ]. *)
+        
       + (* Clos_v *)
         assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
         { clear -H H2. induction vs.
@@ -1617,13 +1712,21 @@ Section ValRelExists.
       induction v0 using value_ind'; intros; inv Hwf_v0.
       + (* Con_v *)
         assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
-        { clear -H H1. induction vs.
+        { clear -H H2. induction vs.
           + exists []. constructor.
-          + inv H. inv H1. destruct (H3 H2) as [v' Hv'].
+          + inv H. inv H2. destruct (H3 H1) as [v' Hv'].
             destruct (IHvs H4 H5) as [vs' Hvs'].
             exists (v' :: vs'). constructor; assumption. }
         destruct Hvs' as [vs' Hvs'].
-        eexists. eapply anf_rel_Con; [exact Hvs' | reflexivity].
+        red in Htgm.
+        destruct lookup_constructor eqn:hl; try congruence.
+        eapply extends_lookup_constructor in hl. 3:exact Hext. 2:eauto.
+        eapply Htgm in hl.
+        specialize (Htgm (fst dc) (N.to_nat (snd dc))).
+        destruct dcon_to_tag eqn:hdc.
+        eexists. eapply anf_rel_Con; [exact Hvs' | ].
+        erewrite <- hdc. f_equal. destruct dc; cbn. unfold dcon_of_con.
+        now rewrite N2Nat.id. congruence.
 
       + (* Clos_v *)
         assert (Hvs' : exists vs', Forall2 anf_val_rel' vs vs').
@@ -1911,7 +2014,7 @@ Section ValRelExists.
             eapply Forall_impl; [| exact Hmfix]; intros d0 [Hlam Hwf_d]; split;
             [exact Hlam | eapply EWellformed.extends_wellformed;
              [exact Hwf_glob | exact Hext | exact Hwf_d]] end.
-  Unshelve. all: exact (M.empty val).
+     Unshelve. all: exact (M.empty val).
   Qed.
 
 End ValRelExists.

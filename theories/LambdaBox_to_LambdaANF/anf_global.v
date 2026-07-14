@@ -25,7 +25,7 @@ From CertiRocq.LambdaANF Require Import
   tactics identifiers bounds term_util rename set_util stemctx.
 From MetaRocq.Utils Require Import All_Forall.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import
-  common anf fuel_sem wf anf_corresp anf_util anf_correct.
+  common anf fuel_sem wf anf_corresp anf_util anf_convert_env anf_correct.
 
 Import ListNotations.
 
@@ -273,10 +273,11 @@ Section ValRelWeaken.
         intros Hwf v' Hrel.
       + (* Con_v *)
         inversion Hwf as [? ? Hwf_vs| |]; subst.
-        inversion Hrel; subst.
+        Transparent bind. cbn in H0. congruence.
+        (* inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           [| reflexivity].
-        eapply (forall2_val_rel_weaken (well_formed_val [])); eassumption.
+        eapply (forall2_val_rel_weaken (well_formed_val [])); eassumption. *)
       + (* Clos_v *)
         inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
         inversion Hrel; subst.
@@ -357,7 +358,7 @@ Section ValRelWeaken.
         inversion Hwf as [? ? Hwf_vs| |]; subst.
         inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
-          [| reflexivity].
+          [| assumption].
         eapply (forall2_val_rel_weaken (well_formed_val ((kn, d) :: Σ'))); eassumption.
       + (* Clos_v *)
         inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
@@ -563,11 +564,8 @@ Section GlobalBindingsCorrect.
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
 
-  Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
-  Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
+  Context (dcon_to_tag_inj : inj_conIdMap tgm).
+  Context (cenv_tgm_coh : cenv_tgm_coherence cenv tgm).
 
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
@@ -637,18 +635,20 @@ Section GlobalBindingsCorrect.
     exists decl body,
       declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
   Context (cmap_nodup_keys : NoDup (map fst cmap)).
+  Context (Htgm : registered_constructors tgm Σ).
+
 
   Let val_rel_exists :=
     @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
       _ Σ nat Hf_src Ht_src
       Hglob_term Hwf_glob
       HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent.
+      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent Htgm.
 
   Let cvt_correct :=
     @anf_cvt_correct func_tag default_tag kon_tag
       tgm cmap cenv Σ _ dcon_to_tag_inj
-      cenv_case_consistent Hcmap_eval_coherent
+      cenv_tgm_coh Hcmap_eval_coherent
       Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists.
 
   Lemma in_map_fst_exists (l : list (kername * EAst.global_decl)) k :
@@ -863,7 +863,7 @@ Section GlobalBindingsCorrect.
     pose proof (@anf_cvt_correct
                   func_tag default_tag kon_tag
                   tgm cm_acc cenv Σ_proc _ dcon_to_tag_inj
-                  cenv_case_consistent Hcoh_acc
+                  cenv_tgm_coh Hcoh_acc
                   Hglob_term_proc Hglob_fuel_zero_proc Hglob_wf_proc Hval_rel_exists_acc
                   [] body (fuel_sem.Val src_v) f t Heval)
       as Hcorrect.
@@ -2302,11 +2302,10 @@ Section GlobalBindingsTopLevel.
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
 
-  Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
-  Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
+  Context (dcon_to_tag_inj : inj_conIdMap tgm).
+  Context (Htgm : registered_constructors tgm Σ).
+  Context (cenv_tgm_coh : cenv_tgm_coherence cenv tgm).
+  
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
 
@@ -2425,14 +2424,13 @@ Section GlobalBindingsTopLevel.
                 func_tag kon_tag default_tag default_itag
                 tgm cmap cenv Σ efl
                 HnoAxioms
-                dcon_to_tag_inj
-               
-                cenv_case_consistent Hcmap_eval_coherent
+                dcon_to_tag_inj               
+                cenv_tgm_coh Hcmap_eval_coherent
                 Hglob_term Hglob_fuel_zero Hglob_wf
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                 no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys
-                [] (List.rev Σ) [] cmap C_env S S'
+                Htgm [] (List.rev Σ) [] cmap C_env S S'
                 Hcvt HΣ_top Hcm_acc_sub (fun s v Hlk => Hlk)
                 Hcm_acc_complete Hcm_acc_sound Hnd_empty Hdis_empty
                 Hcoh_empty rho_init

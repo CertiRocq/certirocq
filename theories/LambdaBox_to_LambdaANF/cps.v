@@ -109,6 +109,12 @@ Section Translate.
              end
            end) mfix nlst.
 
+      Definition get_tag dc tgm : cpsM ctor_tag := 
+        match dcon_to_tag dc tgm with
+        | None => failwith "Internal error: unregistered constructor"
+        | Some tag => ret tag
+        end.
+
       (** Helper: CPS convert case branches *)
       Definition cps_cvt_branches
                  (cvt : EAst.term -> list var -> var -> cpsM term.exp)
@@ -121,7 +127,7 @@ Section Translate.
            | [] => ret nil
            | (lnames, e) :: brs' =>
              let dc := dcon_of_con ind (N.to_nat n) in
-             let tg := dcon_to_tag default_tag dc tgm in
+             tg <- get_tag dc tgm ;;
              cbl <- go brs' (n + 1)%N ;;
              vars <- get_named_lst (names_lst_len (List.rev lnames) (List.length lnames)) ;;
              let ctx_p := ctx_bind_proj tg r vars (List.length vars) in
@@ -140,10 +146,6 @@ Section Translate.
           | Some v => ret (term.Eapp k kon_tag (v::nil))
           | None => failwith "Unknown de Bruijn index"
           end
-
-        | EAst.tBox =>
-          x <- get_named_str "x" ;;
-          ret (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
 
         | EAst.tLambda na e1 =>
           x1 <- get_named_str "x1" ;;
@@ -193,7 +195,7 @@ Section Translate.
           end
 
         | EAst.tConstruct ind c args =>
-          let c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm in
+          c_tag <- get_tag (dcon_of_con ind c) tgm ;;
           x' <- get_named_str "x'" ;;
           xs <- get_named_str_lst (map (fun _ => "x") args) ;;
           ks <- get_named_str_lst (map (fun _ => "k") args) ;;
@@ -217,7 +219,7 @@ Section Translate.
           end
 
         | EAst.tProj p c =>
-          let c_tag := dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm in
+          c_tag <- get_tag (dcon_of_con p.(proj_ind) 0) tgm ;;
           x1 <- get_named_str "x1" ;;
           k1 <- get_named_str "k1" ;;
           y <- get_named_str "y" ;;
@@ -237,6 +239,8 @@ Section Translate.
           end
 
         (* These should not occur *)
+
+        | EAst.tBox => failwith "Box"
         | EAst.tVar _ => failwith "Var"
         | EAst.tEvar _ _ => failwith "Evar"
         | EAst.tCoFix _ _ => failwith "CoFix"

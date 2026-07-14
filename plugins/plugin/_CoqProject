@@ -41,6 +41,8 @@ extraction/all_Forall.ml
 extraction/all_Forall.mli
 extraction/anf.ml
 extraction/anf.mli
+extraction/anf_convert_env.ml
+extraction/anf_convert_env.mli
 extraction/archi.ml
 extraction/archi.mli
 extraction/ascii.ml
