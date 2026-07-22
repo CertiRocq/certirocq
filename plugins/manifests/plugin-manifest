@@ -227,6 +227,9 @@ EReorderCstrs
 ERemapInductives
 EBeta
 ECoInductiveToInductive
+EImplementBox
+EImplementLazyForce
+EConstantsToValues
 ETransform
 Erasure0
 
@@ -322,6 +325,7 @@ LambdaANF_to_Wasm :: plugin
 Toplevel1 :: plugin
 Glue_utils
 Glue
+Metarocq_pipeline
 Pipeline
 Plugin_utils :: cplugin
 Certirocq

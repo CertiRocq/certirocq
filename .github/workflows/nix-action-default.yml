@@ -289,4 +289,4 @@ on:
     - reopened
   push:
     branches:
-    - master
+    - main

@@ -41,20 +41,18 @@ Section Divergence.
     forall dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
-  Context (box_dc : dcon)
-          (box_tag : dcon_to_tag default_tag box_dc tgm = default_tag).
 
   Context (cenv_case_consistent : forall P ctag,
     caseConsistent cenv P ctag).
 
   Context (Hcmap_eval_coherent :
     @cmap_eval_coherent cmap nat
-                        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                        Σ box_dc).
+                        (LambdaBox_resource_fuel)
+                        (LambdaBox_resource_trace)
+                        Σ).
 
-  Context (Hglob_term : globals_terminate_prop default_tag tgm Σ box_dc box_tag).
-  Context (Hglob_fuel_zero : globals_zero_fuel_prop default_tag tgm Σ box_dc box_tag).
+  Context (Hglob_term : globals_terminate_prop Σ).
+  Context (Hglob_fuel_zero : globals_zero_fuel_prop Σ).
 
   Context (Hglob_wf : forall k decl body,
     declared_constant Σ k decl ->
@@ -67,59 +65,59 @@ Section Divergence.
       exists v',
         @anf_val_rel func_tag default_tag tgm cmap
                      nat
-                     (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                     (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                     Σ box_dc v v').
+                     (LambdaBox_resource_fuel)
+                     (LambdaBox_resource_trace)
+                     Σ v v').
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let cmap_consistent' :=
     @cmap_consistent cmap nat
-                     (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                     (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                     Σ box_dc.
+                     (LambdaBox_resource_fuel)
+                     (LambdaBox_resource_trace)
+                     Σ.
   Let anf_val_rel' :=
     @anf_val_rel func_tag default_tag tgm cmap
                  nat
-                 (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                 (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                 Σ box_dc.
+                 (LambdaBox_resource_fuel)
+                 (LambdaBox_resource_trace)
+                 Σ.
   Let anf_env_rel' :=
     @anf_env_rel func_tag default_tag tgm cmap
                  nat
-                 (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                 (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                 Σ box_dc.
+                 (LambdaBox_resource_fuel)
+                 (LambdaBox_resource_trace)
+                 Σ.
   Let global_env_rel' :=
     @global_env_rel func_tag default_tag tgm cmap
                     nat
-                    (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                    (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                    Σ box_dc.
+                    (LambdaBox_resource_fuel)
+                    (LambdaBox_resource_trace)
+                    Σ.
   Let src_eval :=
     @eval_env_fuel nat
-                   (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                   (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                   Σ box_dc.
+                   (LambdaBox_resource_fuel)
+                   (LambdaBox_resource_trace)
+                   Σ.
   Let src_fuel_res : @LambdaBox_resource nat :=
-    LambdaBox_resource_fuel default_tag tgm box_dc box_tag.
+    LambdaBox_resource_fuel.
   #[local] Existing Instance src_fuel_res.
   Let src_trace_res : @LambdaBox_resource nat :=
-    LambdaBox_resource_trace default_tag tgm box_dc box_tag.
+    LambdaBox_resource_trace.
   Let src_one :=
     @one_i EAst.term nat (@HRes _ src_fuel_res).
   Let src_diverge :=
     @fuel_sem.diverge nat
-                      (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                      (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                      Σ box_dc.
+                      (LambdaBox_resource_fuel)
+                      (LambdaBox_resource_trace)
+                      Σ.
   Let src_not_stuck :=
     @fuel_sem.not_stuck nat
-                        (LambdaBox_resource_fuel default_tag tgm box_dc box_tag)
-                        (LambdaBox_resource_trace default_tag tgm box_dc box_tag)
-                        Σ box_dc.
+                        (LambdaBox_resource_fuel)
+                        (LambdaBox_resource_trace)
+                        Σ.
   Let eq_fuel_compat' :=
-    @eq_fuel_compat func_tag default_tag tgm cmap cenv Σ box_dc box_tag.
+    @eq_fuel_compat func_tag default_tag tgm cmap cenv Σ.
 
   Definition anf_cvt_correct_exps'
              (vs_env : fuel_sem.env) (es : list EAst.term)
@@ -160,7 +158,7 @@ Section Divergence.
       | fuel_sem.Val _ =>
         forall f_oot t_oot,
           @eval_env_step _ src_fuel_res src_trace_res
-                         Σ box_dc rho e fuel_sem.OOT f_oot t_oot ->
+                         Σ rho e fuel_sem.OOT f_oot t_oot ->
           f_oot < f
       | fuel_sem.OOT => True
       end).
@@ -169,7 +167,7 @@ Section Divergence.
       forall args_done e args_rest vs_done fs' f_oot t_oot ts',
         es = args_done ++ e :: args_rest ->
         @eval_fuel_many _ src_fuel_res src_trace_res
-                        Σ box_dc rho args_done vs_done fs' ts' ->
+                        Σ rho args_done vs_done fs' ts' ->
         src_eval rho e fuel_sem.OOT f_oot t_oot ->
         fs' + f_oot < fs).
     set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
@@ -184,7 +182,7 @@ Section Divergence.
     enough (Haux : Pfuel rho0 e0 (fuel_sem.Val v0) f_val t_val) by exact Haux.
     eapply (@eval_env_fuel_ind'
               nat src_fuel_res src_trace_res
-              Σ box_dc Pstep Pmany Pfuel); try exact Hval;
+              Σ Pstep Pmany Pfuel); try exact Hval;
       unfold Pstep, Pmany, Pfuel; simpl in *.
     - intros n rho v Hnth f_oot t_oot Hoot.
       remember (EAst.tRel n) as e_rel in Hoot.
@@ -196,10 +194,6 @@ Section Divergence.
       destruct Hoot; try discriminate.
     - intros mfix idx rho f_oot t_oot Hoot.
       remember (EAst.tFix mfix idx) as e_fix in Hoot.
-      remember fuel_sem.OOT as r_oot in Hoot.
-      destruct Hoot; try discriminate.
-    - intros rho f_oot t_oot Hoot.
-      remember EAst.tBox as e_box in Hoot.
       remember fuel_sem.OOT as r_oot in Hoot.
       destruct Hoot; try discriminate.
     - intros e1 e2 body v2 r na rho rho' f1 f2 f3 t1 t2 t3
@@ -514,7 +508,7 @@ Section Divergence.
                       (r : fuel_sem.result) (f : nat) (t : nat) =>
       forall f', f' < f ->
       exists t', @eval_env_step _ src_fuel_res src_trace_res
-                                 Σ box_dc rho e fuel_sem.OOT f' t').
+                                 Σ rho e fuel_sem.OOT f' t').
     set (Pmany := fun (rho : fuel_sem.env) (es : list EAst.term)
                       (vs : list fuel_sem.value) (fs : nat) (ts : nat) =>
       forall f',
@@ -522,7 +516,7 @@ Section Divergence.
         exists args_done e args_rest vs_done fs' f_oot t_oot ts',
           es = args_done ++ e :: args_rest /\
           @eval_fuel_many _ src_fuel_res src_trace_res
-                          Σ box_dc rho args_done vs_done fs' ts' /\
+                          Σ rho args_done vs_done fs' ts' /\
           src_eval rho e fuel_sem.OOT f_oot t_oot /\
           f' = fs' + f_oot).
     set (Pfuel := fun (rho : fuel_sem.env) (e : EAst.term)
@@ -532,13 +526,12 @@ Section Divergence.
     enough (Haux : Pfuel rho0 e0 r0 f0 t0) by exact Haux.
     eapply (@eval_env_fuel_ind'
               nat src_fuel_res src_trace_res
-              Σ box_dc Pstep Pmany Pfuel); try exact Heval;
+              Σ Pstep Pmany Pfuel); try exact Heval;
       unfold Pstep, Pmany, Pfuel;
       simpl in *.
     - intros n rho v Hnth f' Hlt. exfalso. lia.
     - intros body rho na f' Hlt. exfalso. lia.
     - intros mfix idx rho f' Hlt. exfalso. lia.
-    - intros rho f' Hlt. exfalso. lia.
     - intros e1 e2 body v2 r na rho rho' f1 f2 f3 t1 t2 t3
              He1 IH1 He2 IH2 Hbody IH3 f' Hlt.
       destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
@@ -552,7 +545,7 @@ Section Divergence.
           rewrite Heqf.
           exact (@fuel_sem.eval_App_step_OOT2
                    nat src_fuel_res src_trace_res
-                   Σ box_dc e1 e2 (fuel_sem.Clos_v rho' na body) rho
+                   Σ e1 e2 (fuel_sem.Clos_v rho' na body) rho
                    f1 (f' - f1) t1 t_oot He1 Hoot).
         * assert (Hlt3 : f' - f1 - f2 < f3) by lia.
           destruct (IH3 _ Hlt3) as [t_oot Hoot].
@@ -561,7 +554,7 @@ Section Divergence.
           rewrite Heqf.
           exact (@fuel_sem.eval_App_step
                    nat src_fuel_res src_trace_res
-                   Σ box_dc e1 e2 body v2 fuel_sem.OOT na rho rho'
+                   Σ e1 e2 body v2 fuel_sem.OOT na rho rho'
                    f1 f2 (f' - f1 - f2) t1 t2 t_oot
                    He1 He2 Hoot).
     - intros e1 e2 rho f1 t1 He1 IH1 f' Hlt.
@@ -578,7 +571,7 @@ Section Divergence.
         rewrite Heqf.
         exact (@fuel_sem.eval_App_step_OOT2
                  nat src_fuel_res src_trace_res
-                 Σ box_dc e1 e2 v rho f1 (f' - f1) t1 t_oot He1 Hoot).
+                 Σ e1 e2 v rho f1 (f' - f1) t1 t_oot He1 Hoot).
     - intros e1 e2 body rho rho' rho'' idx na mfix v2 r f1 f2 f3 t1 t2 t3
              He1 IH1 Hfix Hrec He2 IH2 Hbody IH3 f' Hlt.
       destruct (Nat.lt_ge_cases f' f1) as [Hlt1 | Hge1].
@@ -592,7 +585,7 @@ Section Divergence.
           rewrite Heqf.
           exact (@fuel_sem.eval_App_step_OOT2
                    nat src_fuel_res src_trace_res
-                   Σ box_dc e1 e2 (fuel_sem.ClosFix_v rho' mfix idx) rho
+                   Σ e1 e2 (fuel_sem.ClosFix_v rho' mfix idx) rho
                    f1 (f' - f1) t1 t_oot He1 Hoot).
         * assert (Hlt3 : f' - f1 - f2 < f3) by lia.
           destruct (IH3 _ Hlt3) as [t_oot Hoot].
@@ -601,7 +594,7 @@ Section Divergence.
           rewrite Heqf.
           exact (@fuel_sem.eval_FixApp_step
                    nat src_fuel_res src_trace_res
-                   Σ box_dc e1 e2 body rho rho' rho'' idx na mfix v2
+                   Σ e1 e2 body rho rho' rho'' idx na mfix v2
                    fuel_sem.OOT f1 f2 (f' - f1 - f2) t1 t2 t_oot
                    He1 Hfix Hrec He2 Hoot).
     - intros na b t v1 r rho f1 f2 t1 t2
@@ -616,7 +609,7 @@ Section Divergence.
         rewrite Heqf.
         exact (@fuel_sem.eval_LetIn_step
                  nat src_fuel_res src_trace_res
-                 Σ box_dc na b t v1 fuel_sem.OOT rho f1 (f' - f1) t1 t_oot
+                 Σ na b t v1 fuel_sem.OOT rho f1 (f' - f1) t1 t_oot
                  Heb Hoot).
     - intros na b t rho f1 t1 Heb IHb f' Hlt.
       destruct (IHb _ Hlt) as [t_oot Hoot].
@@ -629,7 +622,7 @@ Section Divergence.
       exists (ts' + t_oot).
       exact (@fuel_sem.eval_Construct_step_OOT
                nat src_fuel_res src_trace_res
-               Σ box_dc ind c (args_done ++ e :: args_rest)
+               Σ ind c (args_done ++ e :: args_rest)
                args_done args_rest e vs_done rho fs' f_oot t_oot ts'
                eq_refl Hmany_done Hoot).
     - intros ind c args args_done args_rest e vs rho fs f t ts
@@ -645,7 +638,7 @@ Section Divergence.
         rewrite Hfuel.
         exact (@fuel_sem.eval_Construct_step_OOT
                  nat src_fuel_res src_trace_res
-                 Σ box_dc ind c args
+                 Σ ind c args
                  args_done' (args_rest' ++ e :: args_rest) e'
                  vs_done rho fs' f_oot t_oot ts'
                  Hargs_total Hmany_done Hoot').
@@ -656,7 +649,7 @@ Section Divergence.
         rewrite Heqf.
         exact (@fuel_sem.eval_Construct_step_OOT
                  nat src_fuel_res src_trace_res
-                 Σ box_dc ind c args
+                 Σ ind c args
                  args_done args_rest e vs rho fs (f' - fs) t_oot' ts
                  Hargs Hdone Hoot').
     - intros ind npars mch brs rho dc vs body c r f1 f2 t1 t2
@@ -671,7 +664,7 @@ Section Divergence.
         rewrite Heqf.
         exact (@fuel_sem.eval_Case_step
                  nat src_fuel_res src_trace_res
-                 Σ box_dc ind npars mch brs rho dc vs body c fuel_sem.OOT
+                 Σ ind npars mch brs rho dc vs body c fuel_sem.OOT
                  f1 (f' - f1) t1 t_oot
                  Hmch Hdc Hfind Hoot).
     - intros ind npars mch brs rho f1 t1 Hmch IHmch f' Hlt.
@@ -710,7 +703,7 @@ Section Divergence.
         * split.
           -- exact (@fuel_sem.eval_many_cons
                       nat src_fuel_res src_trace_res
-                      Σ box_dc rho e args_done v vs_done f fs' t ts'
+                      Σ rho e args_done v vs_done f fs' t ts'
                       He Hmany_done).
           -- split.
              ++ exact Hoot.
@@ -720,13 +713,13 @@ Section Divergence.
       assert (Hlt0' : (f' < fuel_exp e)%nat) by lia.
       exact (@fuel_sem.eval_OOT
                nat src_fuel_res src_trace_res
-               Σ box_dc rho e f' Hlt0').
+               Σ rho e f' Hlt0').
     - intros rho e r f t Hstep IHstep f' Hlt.
       destruct (Nat.lt_ge_cases f' (fuel_exp e)) as [Hlt0 | Hge0].
       + exists 0%nat.
         exact (@fuel_sem.eval_OOT
                  nat src_fuel_res src_trace_res
-                 Σ box_dc rho e f' Hlt0).
+                 Σ rho e f' Hlt0).
       + assert (Hlt_step : f' - fuel_exp e < f) by lia.
         destruct (IHstep _ Hlt_step) as [t_oot Hoot].
         exists (t_oot + anf_trace_exp e).
@@ -734,7 +727,7 @@ Section Divergence.
         rewrite Heqf.
         exact (@fuel_sem.eval_step
                  nat src_fuel_res src_trace_res
-                 Σ box_dc rho e fuel_sem.OOT (f' - fuel_exp e) t_oot Hoot).
+                 Σ rho e fuel_sem.OOT (f' - fuel_exp e) t_oot Hoot).
   Qed.
 
   Lemma src_eval_lt_OOT rho e v f t f' :
@@ -810,7 +803,7 @@ Section Divergence.
         destruct Happ_val as [src_v [f_app [t_app Happ_val]]].
         destruct (@fuel_sem.src_eval_app_val_body
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho e1 e2 rho' na body v2 src_v
+                    Σ rho e1 e2 rho' na body v2 src_v
                     f1 t1 f2 t2 f_app t_app He1 He2 Happ_val)
           as [f3 [t3 Hbody_val]].
         apply Hnoval. eexists _, _, _. exact Hbody_val.
@@ -888,7 +881,7 @@ Section Divergence.
         destruct Happ_val as [src_v [f_app [t_app Happ_val]]].
         destruct (@fuel_sem.src_eval_fixapp_val_body
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho e1 e2 rho' idx na mfix body v2 src_v
+                    Σ rho e1 e2 rho' idx na mfix body v2 src_v
                     f1 t1 f2 t2 f_app t_app He1 Hfix He2 Happ_val)
           as [f3 [t3 Hbody_val]].
         rewrite Hrec in Hbody_val.
@@ -919,7 +912,7 @@ Section Divergence.
     inversion Hoot_case; subst.
     - simpl in H. lia.
     - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ box_dc rho
+      | [ Hstep : @eval_env_step _ _ _ Σ rho
                      (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT _ _ |- _ ] =>
           remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep;
           remember fuel_sem.OOT as r_oot in Hstep;
@@ -947,7 +940,7 @@ Section Divergence.
         destruct Hcase_val as [src_v [f_case [t_case Hcase_val]]].
         destruct (@fuel_sem.src_eval_case_val_scrut
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho ind npars mch brs src_v f_case t_case Hcase_val)
+                    Σ rho ind npars mch brs src_v f_case t_case Hcase_val)
           as [dc [vs [f1 [t1 Hmch_val]]]].
         apply Hnoval. eexists _, _, _. exact Hmch_val.
       + destruct (Hdiv_case (S f)) as [t_case Hoot_case].
@@ -970,7 +963,7 @@ Section Divergence.
     inversion Hoot_case; subst.
     - simpl in H. lia.
     - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ box_dc rho
+      | [ Hstep : @eval_env_step _ _ _ Σ rho
                      (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT _ _ |- _ ] =>
           remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep;
           remember fuel_sem.OOT as r_oot in Hstep;
@@ -1016,7 +1009,7 @@ Section Divergence.
         destruct Hcase_val as [src_v [f_case [t_case Hcase_val]]].
         destruct (@fuel_sem.src_eval_case_val_body
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho ind npars mch brs dc vs body c src_v
+                    Σ rho ind npars mch brs dc vs body c src_v
                     f1 t1 f_case t_case Hmch Hdc Hfind Hcase_val)
           as [f2 [t2 Hbody_val]].
         apply Hnoval. eexists _, _, _. exact Hbody_val.
@@ -1038,7 +1031,7 @@ Section Divergence.
     inversion Hoot_proj; subst.
     - simpl in H. lia.
     - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ box_dc rho
+      | [ Hstep : @eval_env_step _ _ _ Σ rho
                      (EAst.tProj p c) fuel_sem.OOT _ _ |- _ ] =>
           remember (EAst.tProj p c) as e_proj in Hstep;
           remember fuel_sem.OOT as r_oot in Hstep;
@@ -1064,7 +1057,7 @@ Section Divergence.
         destruct Hproj_val as [src_v [f_proj [t_proj Hproj_val]]].
         destruct (@fuel_sem.src_eval_proj_val_scrut
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho p c src_v f_proj t_proj Hproj_val)
+                    Σ rho p c src_v f_proj t_proj Hproj_val)
           as [vs [f1 [t1 Hc_val]]].
         apply Hnoval. eexists _, _, _. exact Hc_val.
       + destruct (Hdiv_proj (S f)) as [t_proj Hoot_proj].
@@ -1106,7 +1099,7 @@ Section Divergence.
         (args_done : list EAst.term) (e : EAst.term) (args_rest : list EAst.term)
         (vs_done : list fuel_sem.value) (fs ts f t : nat) :
     @fuel_sem.eval_fuel_many nat src_fuel_res src_trace_res
-                             Σ box_dc rho args_done vs_done fs ts ->
+                             Σ rho args_done vs_done fs ts ->
     (forall src_v f' t', ~ src_eval rho e (fuel_sem.Val src_v) f' t') ->
     src_eval rho (EAst.tConstruct ind c (args_done ++ e :: args_rest))
                  fuel_sem.OOT (fs + f + 1) t ->
@@ -1128,13 +1121,13 @@ Section Divergence.
         rewrite Hprefix in Hdone.
         edestruct (@fuel_sem.eval_many_app_inv
                       nat src_fuel_res src_trace_res
-                      Σ box_dc rho args_done0 e0 prefix _ _ _ Hdone)
+                      Σ rho args_done0 e0 prefix _ _ _ Hdone)
           as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
               ts_before & t_val & ts_after &
               _ & Hmany_before & Hval_bad & Hmany_after & Hfs_done & _).
         pose proof (@fuel_sem.eval_many_exact_det
                       nat src_fuel_res src_trace_res
-                      Σ box_dc rho args_done0 _ _ _ _ _ _ H1 Hmany_before)
+                      Σ rho args_done0 _ _ _ _ _ _ H1 Hmany_before)
           as [_ [Hfs_prefix _]].
         pose proof (src_eval_val_gt_oot _ _ _ _ _ Hval_bad _ _ H2) as Hlt_bad.
         rewrite <- Hfs_prefix in Hfs_done.
@@ -1143,7 +1136,7 @@ Section Divergence.
       + destruct Hsame as [-> [-> ->]].
         pose proof (@fuel_sem.eval_many_exact_det
                       nat src_fuel_res src_trace_res
-                      Σ box_dc rho _ _ _ _ _ _ _ H1 Hdone)
+                      Σ rho _ _ _ _ _ _ _ H1 Hdone)
           as [_ [Hfs_eq _]].
         simpl in H. subst fs0.
         assert (Hff : f = f0) by lia.
@@ -1152,7 +1145,7 @@ Section Divergence.
         rewrite Hprefix in H1.
         edestruct (@fuel_sem.eval_many_app_inv
                       nat src_fuel_res src_trace_res
-                      Σ box_dc rho args_done e prefix _ _ _ H1)
+                      Σ rho args_done e prefix _ _ _ H1)
           as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
               ts_before & t_val & ts_after &
               _ & _ & Hval_bad & _ & _ & _).
@@ -1164,7 +1157,7 @@ Section Divergence.
         (args_done : list EAst.term) (e : EAst.term) (args_rest : list EAst.term)
         (vs_done : list fuel_sem.value) (fs ts : nat) :
     @fuel_sem.eval_fuel_many nat src_fuel_res src_trace_res
-                             Σ box_dc rho args_done vs_done fs ts ->
+                             Σ rho args_done vs_done fs ts ->
     src_not_stuck rho (EAst.tConstruct ind c (args_done ++ e :: args_rest)) ->
     src_not_stuck rho e.
   Proof.
@@ -1178,7 +1171,7 @@ Section Divergence.
         destruct Hcon_val as [src_v [f_con [t_con Hcon_val]]].
         destruct (@fuel_sem.src_eval_construct_val_arg
                     nat src_fuel_res src_trace_res
-                    Σ box_dc rho ind c args_done e args_rest src_v
+                    Σ rho ind c args_done e args_rest src_v
                     f_con t_con Hcon_val)
           as [v_e [f_e [t_e Hval_e]]].
         apply Hnoval. eexists _, _, _. exact Hval_e.
@@ -1229,7 +1222,7 @@ Section Divergence.
     well_formed_env Σ rho ->
     Forall (fun e => wellformed Σ (List.length rho) e = true) es ->
     @eval_fuel_many nat src_fuel_res src_trace_res
-                    Σ box_dc rho es vs f t ->
+                    Σ rho es vs f t ->
     Forall (well_formed_val Σ) vs.
   Proof.
     intros Hwf_env Hwf_es Hmany.
@@ -1316,7 +1309,7 @@ Section Divergence.
   Lemma anf_cvt_correct_exps_proof
         vs_env es vs1 f t :
     @eval_fuel_many nat src_fuel_res src_trace_res
-                    Σ box_dc vs_env es vs1 f t ->
+                    Σ vs_env es vs1 f t ->
     anf_cvt_correct_exps' vs_env es vs1 f t.
   Proof.
     intros Hmany.
@@ -1364,7 +1357,7 @@ Section Divergence.
             intros k0 Hk0. unfold kn_deps_list. constructor. exact Hk0. }
           pose proof (anf_cvt_correct
                         func_tag default_tag default_itag tgm cmap cenv Σ
-                        dcon_to_tag_inj box_dc box_tag cenv_case_consistent
+                        dcon_to_tag_inj cenv_case_consistent
                         Hcmap_eval_coherent Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                         rho0 e0 (fuel_sem.Val v0) f0 t0 Heval_e)
             as Hcorr_head.
@@ -1483,7 +1476,7 @@ Section Divergence.
                  [symmetry; eapply eval_fuel_many_length; eassumption
                  | eapply Forall2_length; exact Hrel_tail]. }
              destruct (@anf_correct.set_many_get_in
-                         func_tag default_tag tgm cmap Σ box_dc box_tag
+                         func_tag default_tag tgm cmap Σ
                          x1 xs0 l' (M.set x1 y rho_tgt) Hin_x1 Hlen)
                as [v_sm Hget_sm].
              eexists. split. { exact Hget_sm. }
@@ -1506,7 +1499,7 @@ Section Divergence.
                              func_tag default_tag tgm cmap
                              S2 es0 vnames S' C2 xs0 Hcvt_tail).
                pose proof (@anf_correct.eval_fuel_many_length
-                             default_tag tgm Σ box_dc box_tag
+                             Σ
                              rho0 es0 vs0 fs0 ts0 Hmany).
                lia. }
              destruct Hk0_vs as [v_k0 Hv_k0].
@@ -1516,7 +1509,7 @@ Section Divergence.
                          Hcvt_tail k0 e_k0 x1 He_k0 Hk0_xs)
                as [S_k [S_k' [C_k [Hcvt_k Hsub_k]]]].
              destruct (@anf_correct.eval_fuel_many_nth
-                         default_tag tgm Σ box_dc box_tag
+                         Σ
                          rho0 es0 vs0 fs0 ts0 k0 e_k0 v_k0
                          Hmany He_k0 Hv_k0)
                as [f_k [t_k Heval_k]].
@@ -1593,7 +1586,7 @@ Section Divergence.
                    eapply eval_val_det; eassumption. }
              subst v_k0.
              destruct (@anf_correct.set_many_In_nth
-                         func_tag default_tag tgm cmap Σ box_dc box_tag
+                         func_tag default_tag tgm cmap Σ
                          x1 xs0 l' (M.set x1 y rho_tgt) v_sm Hget_sm Hin_x1 Hlen)
                as [j [Hj_xs Hj_vs]].
              assert (Hj_vs0 : exists v_j, nth_error vs0 j = Some v_j /\ anf_val_rel' v_j v_sm).
@@ -1616,7 +1609,7 @@ Section Divergence.
                            Hcvt_tail j e_j x1 He_j Hj_xs)
                  as [S_j [S_j' [C_j [Hcvt_j Hsub_j]]]].
                destruct (@anf_correct.eval_fuel_many_nth
-                           default_tag tgm Σ box_dc box_tag
+                           Σ
                            rho0 es0 vs0 fs0 ts0 j e_j v_j
                            Hmany He_j Hv_j)
                  as [f_j [t_j Heval_j]].
@@ -1692,7 +1685,7 @@ Section Divergence.
                        _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                        eq_fuel_compat' (fun _ _ H => H)
                        nat src_fuel_res src_trace_res
-                       Σ box_dc Hglob_term func_tag default_tag);
+                       Σ Hglob_term func_tag default_tag);
                [exact Hrel_head | exact Hrel_j].
           -- eexists. split.
             { rewrite (@anf_correct.set_many_get_notin
@@ -1722,7 +1715,7 @@ Section Divergence.
   Lemma anf_env_rel_set_many_args
         rho_src es vs_src f t :
     @eval_fuel_many nat src_fuel_res src_trace_res
-                    Σ box_dc rho_src es vs_src f t ->
+                    Σ rho_src es vs_src f t ->
     forall rho_tgt vnames S S' C xs vs_tgt,
       env_consistent vnames rho_src ->
       cmap_consistent' vnames rho_src ->
@@ -1762,7 +1755,7 @@ Section Divergence.
   Lemma global_env_rel_set_many_args
         rho_src es vs_src f t :
     @eval_fuel_many nat src_fuel_res src_trace_res
-                    Σ box_dc rho_src es vs_src f t ->
+                    Σ rho_src es vs_src f t ->
     forall rho_tgt vnames S S' C xs vs_tgt D,
       env_consistent vnames rho_src ->
       cmap_consistent' vnames rho_src ->
@@ -1803,7 +1796,7 @@ Section Divergence.
   Lemma anf_cvt_correct_exps_oot
         vs_env es vs1 f t rho vnames C xs S S' e_k vs' c :
     @eval_fuel_many nat src_fuel_res src_trace_res
-                    Σ box_dc vs_env es vs1 f t ->
+                    Σ vs_env es vs1 f t ->
     well_formed_env Σ vs_env ->
     Forall (fun e => wellformed Σ (List.length vnames) e = true) es ->
     env_consistent vnames vs_env ->
@@ -1858,7 +1851,7 @@ Section Divergence.
     intros Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel Hdis_ek Heval Hvrel.
     pose proof (anf_cvt_correct
                   func_tag default_tag default_itag tgm cmap cenv Σ
-                  dcon_to_tag_inj box_dc box_tag cenv_case_consistent
+                  dcon_to_tag_inj cenv_case_consistent
                   Hcmap_eval_coherent Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
                   vs e (fuel_sem.Val v) f t Heval)
       as Hcorr.
@@ -2002,7 +1995,7 @@ Section Divergence.
   Proof.
     intros Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel Hoot_src Hval_src.
     assert (Hlen_env : List.length vs = List.length vnames).
-    { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ box_dc box_tag
+    { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                  _ _ _ Henv). }
     assert (Hlt : f_oot < f_val).
     { eapply src_eval_val_gt_oot; eauto. }
@@ -2029,7 +2022,7 @@ Section Divergence.
            Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel
            e_k Hdis_ek _.
     assert (Hlen_env : List.length vs = List.length vnames).
-    { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ box_dc box_tag
+    { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                  _ _ _ Henv). }
     assert (Hlt : f_oot < f_val).
     { eapply src_eval_val_gt_oot; eauto. }
@@ -2263,7 +2256,7 @@ Section Divergence.
           set (rho_bc := M.set x0 v2' (def_funs defs_cc defs_cc rho1 rho1)).
           assert (Hwf_body : wellformed Σ (Datatypes.S (Datatypes.length names)) body_clos = true).
           { inversion Hwf_clos; subst.
-            rewrite <- (@anf_env_rel_length func_tag default_tag tgm cmap Σ box_dc box_tag
+            rewrite <- (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                          _ _ _ Henv_clos).
             exact H3. }
           assert (Hcons_body : env_consistent (x0 :: names) (varg :: rho_clos)).
@@ -2421,7 +2414,7 @@ Section Divergence.
                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                   eq_fuel_compat' (fun _ _ H0 => H0)
                   nat src_fuel_res src_trace_res
-                  Σ box_dc Hglob_term func_tag default_tag).
+                  Σ Hglob_term func_tag default_tag).
                 exact Hrel_clos_saved.
                 exact Hrel_rho.
               - intros m0.
@@ -2429,7 +2422,7 @@ Section Divergence.
                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                   eq_fuel_compat' (fun _ _ H0 => H0)
                   nat src_fuel_res src_trace_res
-                  Σ box_dc Hglob_term func_tag default_tag).
+                  Σ Hglob_term func_tag default_tag).
                 rewrite Heq_varg in Hrel_rho. exact Hrel_rho.
                 exact Hrel_v2. }
             assert (Hpv_inst := Hpv_cv (c3 + 1)%nat).
@@ -3153,7 +3146,7 @@ Section Divergence.
             assert (Hfl : Datatypes.length fnames = Datatypes.length mfix)
               by (eapply anf_fix_rel_fnames_length; exact H17).
             assert (Hle : Datatypes.length names = Datatypes.length rho').
-            { symmetry. exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ box_dc box_tag
+            { symmetry. exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                                _ _ _ H7). }
             rewrite Hfl, Hle.
             inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies].
@@ -3177,7 +3170,7 @@ Section Divergence.
                       x_pc (List.rev fnames ++ names) v2
                       (fuel_sem.make_rec_env mfix rho')).
             - eapply (@anf_correct.env_consistent_make_rec_env
-                        func_tag default_tag tgm cmap Σ box_dc box_tag
+                        func_tag default_tag tgm cmap Σ
                         fnames names mfix rho');
                 [exact H10 | exact H8 | exact H14 |].
               eapply anf_fix_rel_fnames_length. exact H17.
@@ -3188,7 +3181,7 @@ Section Divergence.
                              (v2 :: fuel_sem.make_rec_env mfix rho')).
           { eapply cmap_consistent_extend.
             - eapply (@anf_correct.cmap_consistent_make_rec_env
-                        func_tag default_tag tgm cmap Σ box_dc box_tag
+                        func_tag default_tag tgm cmap Σ
                         fnames names mfix rho');
                 [exact H9 | exact H13 |].
               eapply anf_fix_rel_fnames_length. exact H17.
@@ -3355,7 +3348,7 @@ Section Divergence.
                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                   eq_fuel_compat' (fun _ _ H0 => H0)
                   nat src_fuel_res src_trace_res
-                  Σ box_dc Hglob_term func_tag default_tag).
+                  Σ Hglob_term func_tag default_tag).
                 exact Hrel_fix_saved.
                 exact Hrel_rho.
               - intros m0.
@@ -3363,7 +3356,7 @@ Section Divergence.
                   _ _ _ _ eq_fuel eq_fuel tgm cmap cenv
                   eq_fuel_compat' (fun _ _ H0 => H0)
                   nat src_fuel_res src_trace_res
-                  Σ box_dc Hglob_term func_tag default_tag).
+                  Σ Hglob_term func_tag default_tag).
                 rewrite Heq_v2 in Hrel_rho. exact Hrel_rho.
                 exact Hrel_v2. }
             assert (Hpv_inst := Hpv_cv (c3 + 1)%nat).
@@ -3590,11 +3583,9 @@ Section Divergence.
                   assert (Heq_bind : v1 = v0 /\ f1 = f3 /\ t1 = t4)
                     by (eapply (@fuel_sem.eval_val_exact_det
                                   nat
-                                  (LambdaBox_resource_fuel
-                                     default_tag tgm box_dc box_tag)
-                                  (LambdaBox_resource_trace
-                                     default_tag tgm box_dc box_tag)
-                                  Σ box_dc); eauto).
+                                  (LambdaBox_resource_fuel)
+                                  (LambdaBox_resource_trace)
+                                  Σ); eauto).
                   destruct Heq_bind as [-> [-> ->]].
                   assert (f4 = f') by (simpl in H1; lia).
                   subst f4. rewrite Heqr_oot in H4. exists t5. exact H4.
@@ -3872,7 +3863,7 @@ Section Divergence.
           pose proof (Forall_inv Hwf_tail) as Hwfe1.
           assert (Hlen_env : Datatypes.length rho0 = Datatypes.length vn).
           { exact (@anf_env_rel_length
-                     func_tag default_tag tgm cmap Σ box_dc box_tag
+                     func_tag default_tag tgm cmap Σ
                      vn rho0 rho Henv). }
           assert (Hwf_done_rho :
                     Forall (fun e => wellformed Σ (Datatypes.length rho0) e = true)
@@ -4411,7 +4402,7 @@ Section Divergence.
             apply Bool.andb_true_iff in Hwfe_lhs as [_ Hwfe_m].
             exact Hwfe_m. }
           assert (Hlen_env : Datatypes.length rho0 = Datatypes.length vnames).
-          { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ box_dc box_tag
+          { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                        _ _ _ Henv). }
           assert (Hwf_con : well_formed_val Σ (fuel_sem.Con_v (dcon_of_con ind c) vs0)).
           { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H].
@@ -4431,7 +4422,7 @@ Section Divergence.
                                         (Vconstr c_tag vs_anf)).
           { constructor; [exact HF2_vs | reflexivity]. }
           edestruct (@anf_cvt_rel_branches_find_branch
-                       func_tag default_tag tgm cmap Σ dcon_to_tag_inj box_dc box_tag
+                       func_tag default_tag tgm cmap Σ dcon_to_tag_inj
                        S2 ind brs 0%N vnames y S3 pats c (Datatypes.length vs0) body
                        Hcvt_brs H1)
             as (br_vars & S_br & S_br_out & C_br & r_br & ctx_br & m_br &
@@ -4509,13 +4500,13 @@ Section Divergence.
               with (Datatypes.length vnames + Datatypes.length vs0)
               by (rewrite Hbr_len; lia).
             eapply (@anf_correct.find_branch_wellformed
-                      default_tag tgm efl box_dc box_tag
+                      efl
                       Σ (Datatypes.length vnames) ind npars mch brs
                       c (Datatypes.length vs0) body);
               [exact Hwfe | exact H1]. }
           assert (Hcons_body : env_consistent (br_vars ++ vnames) (rev vs0 ++ rho0)).
           { eapply (@env_consistent_app
-                      func_tag default_tag tgm cmap Σ box_dc box_tag
+                      func_tag default_tag tgm cmap Σ
                       br_vars vnames (rev vs0) rho0).
             - exact Hbr_nd.
             - exact Hcons.
@@ -4528,7 +4519,7 @@ Section Divergence.
             - rewrite Hbr_len. rewrite length_rev. reflexivity. }
           assert (Hcmap_body : cmap_consistent' (br_vars ++ vnames) (rev vs0 ++ rho0)).
           { eapply (@cmap_consistent_app
-                      func_tag default_tag tgm cmap Σ box_dc box_tag
+                      func_tag default_tag tgm cmap Σ
                       br_vars vnames (rev vs0) rho0).
             - exact Hcmap.
             - eapply Disjoint_Included_r; [| exact Hdis_cmap].
@@ -4677,7 +4668,7 @@ Section Divergence.
                      (ctx_br |[ C_br |[ Ehalt r_br ]| ]|, rho_match)).
           { subst ctx_br.
             eapply (@anf_correct.ctx_bind_proj_preord_exp
-                      func_tag default_tag tgm cmap cenv Σ box_dc box_tag
+                      func_tag default_tag tgm cmap cenv Σ
                       br_vars
                       (ctx_bind_proj c_tag y br_vars (Datatypes.length br_vars))
                       c3 y (Datatypes.length br_vars)
@@ -4703,7 +4694,7 @@ Section Divergence.
                      (ctx_br |[ C_br |[ Ehalt r_br ]| ]|, rho_match)
                      (Ecase y pats, rho_match)).
           { eapply (@preord_exp_Ecase_red
-                      func_tag default_tag tgm cmap cenv Σ box_dc box_tag
+                      func_tag default_tag tgm cmap cenv Σ
                       cenv_case_consistent c_ctx rho_match c_tag vs_anf pats
                       (ctx_br |[ C_br |[ Ehalt r_br ]| ]|) m_br y).
             - unfold rho_match. rewrite M.gss. reflexivity.

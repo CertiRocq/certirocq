@@ -34,7 +34,7 @@
     };
   };
 
-  bundles."default".push-branches = ["master"];
+  bundles."default".push-branches = ["main"];
 
   ## Cachix caches to use in CI
   ## Below we list some standard ones

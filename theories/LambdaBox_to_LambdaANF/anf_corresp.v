@@ -1181,7 +1181,7 @@ Section ValRelExists.
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
 
-  Context (Hglob_term : globals_terminate Σ box_dc).
+  Context (Hglob_term : globals_terminate Σ).
   Context (Hwf_glob : EWellformed.wf_glob Σ).
 
   (* Pipeline flags needed for anf_rel_exists *)
@@ -1201,9 +1201,9 @@ Section ValRelExists.
       declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
   Context (cmap_nodup_keys : NoDup (map fst cmap)).
   Context (Hcmap_eval_coherent :
-    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ box_dc).
+    @cmap_eval_coherent cmap _ Hf_src Ht_src Σ).
 
-  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
 
   (* Convert anf_cvt_rel_mfix to anf_fix_rel.
      Proved here since anf_correct.v (which has this lemma) imports anf_corresp.v. *)
@@ -1301,7 +1301,7 @@ Section ValRelExists.
   Lemma anf_val_rel_clos_exists vs vs' na e rho_g :
     Forall2 anf_val_rel' vs vs' ->
     wellformed Σ (S (List.length vs)) e = true ->
-    global_env_rel func_tag default_tag tgm cmap Σ box_dc (kn_deps e) rho_g ->
+    global_env_rel func_tag default_tag tgm cmap Σ (kn_deps e) rho_g ->
     exists v', anf_val_rel' (Clos_v vs na e) v'.
   Proof.
     intros Hvs' Hwf_e Hglob_rel.
@@ -1403,7 +1403,7 @@ Section ValRelExists.
     Forall (fun d =>
       EAst.isLambda (EAst.dbody d) = true /\
       wellformed Σ (List.length mfix + List.length vs) (EAst.dbody d) = true) mfix ->
-    global_env_rel func_tag default_tag tgm cmap Σ box_dc (kn_deps_mfix mfix) rho_g ->
+    global_env_rel func_tag default_tag tgm cmap Σ (kn_deps_mfix mfix) rho_g ->
     exists v', anf_val_rel' (ClosFix_v vs mfix n) v'.
   Proof.
     intros Hvs' Hn_lt Hwf_mfix Hglob_rel.
@@ -1635,7 +1635,7 @@ Section ValRelExists.
         destruct Hvs' as [vs' Hvs'].
         (* Build global target env using wf_glob IH *)
         assert (Hglob : exists rho_g,
-          global_env_rel func_tag default_tag tgm cmap Σ box_dc
+          global_env_rel func_tag default_tag tgm cmap Σ
             (kn_deps e) rho_g).
         { (* Build rho_g by iterating over cmap.
              For each (k0, v0) in cmap: if k0 is declared in Σ0 with body,
@@ -1651,7 +1651,7 @@ Section ValRelExists.
               EAst.cst_body decl = Some body /\
               M.get v_g rho_g = Some anf_v /\
               (forall src_v f0 t0,
-                eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
+                eval_env_fuel Σ [] body (Val src_v) f0 t0 ->
                 anf_val_rel' src_v anf_v)).
           { induction cm as [| [k0 v0] cm' IHcm]; intros Hcm_nodup Hcm_sub.
             - (* cm = [] *) exists (M.empty val). intros. discriminate.
@@ -1788,7 +1788,7 @@ Section ValRelExists.
         destruct Hvs' as [vs' Hvs'].
         (* Build global target env — same iteration as Clos_v *)
         assert (Hglob : exists rho_g,
-          global_env_rel func_tag default_tag tgm cmap Σ box_dc
+          global_env_rel func_tag default_tag tgm cmap Σ
             (kn_deps_mfix mfix) rho_g).
         { unfold global_env_rel, global_env_rel'.
           assert (Hbuild : forall cm,
@@ -1801,7 +1801,7 @@ Section ValRelExists.
               EAst.cst_body decl = Some body /\
               M.get v_g rho_g = Some anf_v /\
               (forall src_v f0 t0,
-                eval_env_fuel Σ box_dc [] body (Val src_v) f0 t0 ->
+                eval_env_fuel Σ [] body (Val src_v) f0 t0 ->
                 anf_val_rel' src_v anf_v)).
           { induction cm as [| [k0 v0] cm' IHcm]; intros Hcm_nodup Hcm_sub.
             - exists (M.empty val). intros. discriminate.

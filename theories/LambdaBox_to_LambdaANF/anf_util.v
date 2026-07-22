@@ -29,8 +29,7 @@ Section ANF_Val.
           {Hf_src : @LambdaBox_resource nat}
           {Ht_src : @LambdaBox_resource src_trace}.
 
-  Context (Σ : EAst.global_context)
-          (box_dc : dcon).
+  Context (Σ : EAst.global_context).
 
   Let anf_cvt_rel' := anf_cvt_rel func_tag default_tag tgm cmap.
 
@@ -57,7 +56,7 @@ Section ANF_Val.
         decl.(EAst.cst_body) = Some body /\
         M.get v rho = Some anf_v /\
         (forall src_v f t,
-           @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t ->
+           @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t ->
            val_rel src_v anf_v).
 
   Inductive anf_fix_rel (fnames : list var) (names : list var)
@@ -96,7 +95,7 @@ Section ANF_Val.
       decl.(EAst.cst_body) = Some body ->
       exists v_i f t,
         nth_error rho i = Some v_i /\
-        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val v_i) f t.
+        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val v_i) f t.
 
   Definition cmap_eval_coherent : Prop :=
     forall k1 k2 x decl1 body1 decl2 body2 src_v f t,
@@ -106,9 +105,9 @@ Section ANF_Val.
       decl1.(EAst.cst_body) = Some body1 ->
       declared_constant Σ k2 decl2 ->
       decl2.(EAst.cst_body) = Some body2 ->
-      @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body1 (fuel_sem.Val src_v) f t ->
+      @eval_env_fuel _ Hf_src Ht_src Σ [] body1 (fuel_sem.Val src_v) f t ->
       exists f' t',
-        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body2 (fuel_sem.Val src_v) f' t'.
+        @eval_env_fuel _ Hf_src Ht_src Σ [] body2 (fuel_sem.Val src_v) f' t'.
 
   Inductive anf_val_rel : fuel_sem.value -> val -> Prop :=
   | anf_rel_Con :
@@ -885,7 +884,7 @@ Section AlphaEquiv.
       declared_constant Σ k decl ->
       decl.(EAst.cst_body) = Some body ->
       exists src_v f t,
-        @eval_env_fuel _ Hf_src Ht_src Σ box_dc [] body (fuel_sem.Val src_v) f t).
+        @eval_env_fuel _ Hf_src Ht_src Σ [] body (fuel_sem.Val src_v) f t).
 
   Context (func_tag default_tag : positive).
 
@@ -893,7 +892,7 @@ Section AlphaEquiv.
   Let anf_cvt_rel_args' := anf_cvt_rel_args func_tag default_tag tgm cmap.
   Let anf_cvt_rel_mfix' := anf_cvt_rel_mfix func_tag default_tag tgm cmap.
   Let anf_cvt_rel_branches' := anf_cvt_rel_branches func_tag default_tag tgm cmap.
-  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ box_dc.
+  Let anf_val_rel' := anf_val_rel func_tag default_tag tgm cmap Σ.
 
 
 (* ----------------------------------------------------------------- *)
@@ -2296,9 +2295,9 @@ Section AlphaEquiv.
           assert (Hv0_cmap : v0 \in cmap_vars cmap)
             by (exists k0; exact Hlk0).
           (* Extract from both global_env_rel' hypotheses *)
-          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg1_ex; clear H end.
-          match goal with H : global_env_rel' _ _ _ _ _ _ |- _ =>
+          match goal with H : global_env_rel' _ _ _ _ _ |- _ =>
             pose proof (H k0 v0 Hk0 Hlk0) as Hg2_ex; clear H end.
           destruct Hg1_ex as (decl1 & body1 & anf_v1 & Hdecl1 & Hbody1 & Hget1 & Hvrel1).
           destruct Hg2_ex as (decl2 & body2 & anf_v2 & Hdecl2 & Hbody2 & Hget2 & Hvrel2).
@@ -2346,9 +2345,9 @@ Section AlphaEquiv.
 
       (* Save hypotheses before they get confused/cleared by inv.
          Both closures share the same source, so some hyps are identical. *)
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
-      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ _ |- _ =>
+      match goal with H : @global_env_rel' _ _ _ _ _ _ _ _ |- _ =>
         revert H end.
       (* Save Disjoint (cmap_vars cmap) S1 — both identical *)
       match goal with H : Disjoint _ (cmap_vars cmap) _ |- _ =>
