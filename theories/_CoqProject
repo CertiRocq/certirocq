@@ -23,6 +23,7 @@ LambdaBox_to_LambdaANF/common.v
 LambdaBox_to_LambdaANF/anf.v
 LambdaBox_to_LambdaANF/cps.v
 LambdaBox_to_LambdaANF/fuel_sem.v
+LambdaBox_to_LambdaANF/eval_SI_to_fuel_sem.v
 LambdaBox_to_LambdaANF/anf_corresp.v
 LambdaBox_to_LambdaANF/anf_util.v
 LambdaBox_to_LambdaANF/wf.v

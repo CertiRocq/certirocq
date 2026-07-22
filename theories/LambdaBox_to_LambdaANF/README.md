@@ -20,6 +20,8 @@ The CPS conversion is not yet proved correct.
 - **fuel_sem.v** — Source fuel-based semantics for source terms and semantic
   facts used by the correctness proofs.
 
+- **eval_SI_to_fuel_sem.v** — Transformation from MetaRocq's step-indexed evaluation relation to the one defined in fuel_sem.v.
+
 - **wf.v** — Source-side well-formedness infrastructure used by the ANF proofs.
 
 - **anf_util.v** — Shared ANF proof utilities:
