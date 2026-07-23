@@ -140,6 +140,13 @@ Section ConvertVals.
   Qed.
 
 
+  Lemma convert_list_cong l1 l2 h1 h2 :
+    l1 = l2 ->
+    convert_list l1 h1 = convert_list l2 h2.
+  Proof.
+    now intros ->.
+  Qed.
+
   Lemma nth_error_convert_list l h n v h' :
     nth_error l n = Some v ->
     nth_error (convert_list l h) n = Some (convert_vals v h').
@@ -158,13 +165,42 @@ Section ConvertVals.
     now rewrite IHn, seq_S, rev_unit.
   Qed.
 
-
-  Lemma convert_list_cong l1 l2 h1 h2 :
-    l1 = l2 ->
-    convert_list l1 h1 = convert_list l2 h2.
+  Lemma fix_env_make_rec_env mfix Γ h1 h2 :
+    convert_list (fix_env mfix Γ ++ Γ) h1 = make_rec_env mfix (convert_list Γ h2).
   Proof.
-    now intros ->.
+      assert (forallb (wellformed_val Σ) (fix_env mfix Γ) = true) as wf_fix_env.
+      { rewrite forallb_app in h1. ok. }
+      unshelve erewrite <-convert_list_app; tea.
+      rewrite make_rec_env_map.
+      do 2 f_equal; ok.
+      pose proof eq_sym (fix_env_map mfix Γ) as h.
+      destruct h. clear.
+      induction (length mfix); first reflexivity.
+      rewrite seq_S at 2.
+      rewrite rev_app_distr. simpl.
+      assert (forallb (wellformed_val Σ) (map (λ n0 : nat, vRecClos mfix n0 Γ) (rev (seq 0 n))) = true) as h.
+      { rewrite seq_S, rev_app_distr in wf_fix_env. ok. }
+      unshelve erewrite <-IHn; ok.
+      assert (wellformed_val Σ (vRecClos mfix n Γ) = true) as h'.
+      { rewrite seq_S, rev_app_distr in wf_fix_env; ok. }
+      match goal with 
+      | |- _ = ?a :: _ => 
+          replace a with (convert_vals (vRecClos mfix n Γ) h'); last first
+      end.
+      { simpl in *. repeat f_equal. ok. }
+      change (convert_vals (vRecClos mfix n Γ) h' :: convert_list (map (λ n0 : nat, vRecClos mfix n0 Γ) (rev (seq 0 n))) h)
+      with ([convert_vals (vRecClos mfix n Γ) h'] ++ convert_list (map (λ n0 : nat, vRecClos mfix n0 Γ) (rev (seq 0 n))) h).
+      assert (forallb (wellformed_val Σ) (map (λ n, vRecClos mfix n Γ) [n]) = true) as h'' by ok.
+      replace [convert_vals (vRecClos mfix n Γ) h'] 
+      with (convert_list (map (λ n, vRecClos mfix n Γ) [n]) h''); last first.
+      { cbn. do 3 f_equal. ok. }
+      unshelve erewrite convert_list_app.
+      { now rewrite forallb_app, h, h''. }
+      apply convert_list_cong.
+      rewrite <-map_app.
+      now rewrite <-(rev_app_distr _ [n]), <-(rev_app_distr [0]), <-seq_S.
   Qed.
+
 End ConvertVals.
 
 Section exist_fuel.
@@ -309,36 +345,7 @@ Section exist_fuel.
       apply eval_step.
       assumption_upto_prf.
       f_equal; ok.
-      unshelve erewrite <-convert_list_app; tea.
-      rewrite make_rec_env_map.
-      fold cvt_list.
-      do 2 f_equal; ok.
-      pose proof eq_sym (fix_env_map mfix Γ') as h.
-      destruct h. clear.
-      induction (length mfix); first reflexivity.
-      rewrite seq_S at 2.
-      rewrite rev_app_distr. simpl.
-      assert (forallb (wellformed_val Σ) (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) = true) as h.
-      { rewrite seq_S, rev_app_distr in H. ok. }
-      unshelve erewrite <-IHn; ok.
-      assert (wellformed_val Σ (vRecClos mfix n Γ') = true) as h'.
-      { rewrite seq_S, rev_app_distr in H; ok. }
-      match goal with 
-      | |- _ = ?a :: _ => 
-          replace a with (cvt_vals (vRecClos mfix n Γ') h'); last first
-      end.
-      { simpl in *. fold cvt_list. repeat f_equal. ok. }
-      change (cvt_vals (vRecClos mfix n Γ') h' :: cvt_list (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) h)
-      with ([cvt_vals (vRecClos mfix n Γ') h'] ++ cvt_list (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) h).
-      assert (forallb (wellformed_val Σ) (map (λ n, vRecClos mfix n Γ') [n]) = true) as h'' by ok.
-      replace [cvt_vals (vRecClos mfix n Γ') h'] 
-      with (cvt_list (map (λ n, vRecClos mfix n Γ') [n]) h''); last first.
-      { cbn. do 3 f_equal. ok. }
-      unshelve erewrite convert_list_app.
-      { now rewrite forallb_app, h, h''. }
-      apply convert_list_cong.
-      rewrite <-map_app.
-      now rewrite <-(rev_app_distr _ [n]), <-(rev_app_distr [0]), <-seq_S.
+      apply fix_env_make_rec_env.
     - do 2 eexists. simpl.
       rewrite (MRUtils.uip_bool _ _ (extract_andb_right _) wf_Γ).
       constructor.
@@ -556,38 +563,7 @@ Section nat_fuel.
       { simpl.
         apply eval_step. assumption_upto_prf.
         f_equal; first ok.
-        unshelve erewrite <-convert_list_app; tea.
-        rewrite make_rec_env_map.
-        fold cvt_list.
-        do 2 f_equal; last ok.
-        pose proof eq_sym (fix_env_map mfix Γ') as h'.
-        destruct h'.
-        clear.
-        induction (length mfix); first reflexivity.
-        rewrite seq_S at 2.
-        rewrite rev_app_distr.
-        simpl.
-        assert (forallb (wellformed_val Σ) (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) = true) as h.
-        { rewrite seq_S, rev_app_distr in H1. now simpl in H1. }
-        unshelve erewrite <-IHn; first assumption.
-        assert (wellformed_val Σ (vRecClos mfix n Γ') = true) as h'.
-        { now rewrite seq_S, rev_app_distr in H1; simpl in *. }
-        match goal with 
-        | |- _ = ?a :: _ => 
-            replace a with (cvt_vals (vRecClos mfix n Γ') h'); last first
-        end.
-        { simpl in *. fold cvt_list. repeat f_equal. ok. }
-        change (cvt_vals (vRecClos mfix n Γ') h' :: cvt_list (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) h)
-        with ([cvt_vals (vRecClos mfix n Γ') h'] ++ cvt_list (map (λ n0 : nat, vRecClos mfix n0 Γ') (rev (seq 0 n))) h).
-        assert (forallb (wellformed_val Σ) (map (λ n, vRecClos mfix n Γ') [n]) = true) as h'' by ok.
-        replace [cvt_vals (vRecClos mfix n Γ') h'] 
-        with (cvt_list (map (λ n, vRecClos mfix n Γ') [n]) h''); last first.
-        { cbn. do 3 f_equal. ok. }
-        unshelve erewrite convert_list_app.
-        { now rewrite forallb_app, h, h''. }
-        apply convert_list_cong.
-        rewrite <-map_app.
-        now rewrite <-(rev_app_distr _ [n]), <-(rev_app_distr [0]), <-seq_S. }
+        apply fix_env_make_rec_env. }
       repeat rewrite ?Heq0, ?Heq1, ?Heqadd in h.
       now eexists.
     - eexists. simpl.
