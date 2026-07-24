@@ -115,8 +115,43 @@ Section Assumptions.
 
   Notation refines_top Σ := (@refines_top default_tag default_itag tgm Σ).
 
+
+  (** To prove the correctness of connecting the MetaRocq pipeline and CertiRocq's ANF, we
+      need a stronger well-formedness property. This formalizes the remaining mismatch 
+      between metarocq's pipeline and certirocq's LambdaANF: 
+
+    - primitives are not supported in fuel_sem, and primitive arrays are forbidden in ANF conversion.
+    - the environment must be axiom free, as usual *)
+
+  Definition switch_off_primitives (fl : ETermFlags) :=
+  {| has_tBox := fl.(has_tBox)
+    ; has_tRel := fl.(has_tRel)
+    ; has_tVar := fl.(has_tVar)
+    ; has_tEvar := fl.(has_tEvar)
+    ; has_tLambda := fl.(has_tLambda)
+    ; has_tLetIn := fl.(has_tLetIn)
+    ; has_tApp := fl.(has_tApp)
+    ; has_tConst := fl.(has_tConst)
+    ; has_tConstruct := fl.(has_tConstruct)
+    ; has_tCase := fl.(has_tCase)
+    ; has_tProj := fl.(has_tProj)
+    ; has_tFix := fl.(has_tFix)
+    ; has_tCoFix := fl.(has_tCoFix)
+    ; has_tPrim := no_primitive_flags
+    ; has_tLazy_Force := fl.(has_tLazy_Force)
+  |}.
+  
+  Definition certirocq_flags (efl : EEnvFlags) := 
+    {| has_axioms := false; 
+       has_cstr_params := efl.(has_cstr_params); 
+       term_switches := switch_off_primitives efl.(term_switches);
+       cstr_as_blocks := efl.(cstr_as_blocks) |}.
+
   Theorem correctness_from_erasure (p : EProgram.eprogram) : 
+    (* The postcondition on MetaRocq's pipeline *)
     Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
+    (* Stronger invariant: no axioms, no primitives *)
+    EProgram.wf_eprogram (certirocq_flags (switch_off_box env_flags)) p ->
     let ie := inductive_env_east (fst p) in
     forall (casecon : forall (P : list (ctor_tag × exp)) (ctag : ctor_tag), term_util.caseConsistent (top_cenv default_tag default_itag ie) P ctag),
     forall e_tgt comp_d',  
@@ -125,14 +160,14 @@ Section Assumptions.
       ie (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') ->
     exists M, refines_top (fst p) ie M (snd p) e_tgt.
   Proof.
-    intros hp ie case_con e_tgt comp_d' cvt.
+    intros hp wf' ie case_con e_tgt comp_d' cvt.
     cbn in hp.
     match goal with
     | [ _ : EProgram.wf_eprogram ?fl p /\ _ |- _ ] => set (efl := fl) in *
     end.
     destruct hp as [wfp [vg]].
-    eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag tgm (fst p) (efl:=efl)); trea.
-    - (* No axioms *) cbn. admit.
+    eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag tgm (fst p) 
+      (efl:=certirocq_flags (switch_off_box env_flags))); trea.
     - (* If tgm came from convert_env, wouldn't that be true? *)
       admit.
     - (* The environment entries evaluate to values *)
@@ -146,17 +181,17 @@ Section Assumptions.
       eapply eval_val_exact_det in hev; tea. destruct hev as [eq [eq' eq'']].
       now subst f' srcv' t' f.
     - (* Wellformed declarations in the global environment *) 
-      destruct wfp as [wfΣ wf].      
+      clear wfp. destruct wf' as [wfΣ wf].       
       intros kn decl body hdecl hb.
-      eapply lookup_env_wellformed  in hdecl; tea. destruct decl; trivial. cbn in hdecl. cbn in hb. now subst cst_body.
-    - apply wfp.
-    - (* No Var! *) admit.
-    - (* No EVar! *) admit.
-    - (* No PrimArray! *) admit.
+      Set Printing All.
+      eapply (lookup_env_wellformed (efl := certirocq_flags (switch_off_box env_flags))) in hdecl; tea.
+      destruct decl; trivial. cbn in hdecl. cbn in hb.
+      now subst cst_body.
+    - apply wf'.
     - (* No prims *)
       intros s. cbn. reflexivity.
-    - apply wfp.
-  Admitted.
+    - apply wf'.
+  Qed.
 
 (*
 Section Assumptions.
