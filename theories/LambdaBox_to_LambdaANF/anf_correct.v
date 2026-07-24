@@ -66,6 +66,7 @@ Section Correct.
     | EAst.tRel _ => 0  (* variables translate to [Hole_c], so no target step *)
     | EAst.tLetIn _ _ _ => 0
     | EAst.tConst _ => 0  (* globals are values: no fuel overhead *)
+    | EAst.tLambda _ _ => 0 (* lambdas are values *)
     | _ => 1
     end.
 

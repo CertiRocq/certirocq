@@ -3940,7 +3940,7 @@ Section Divergence.
                         _).
               assert (Datatypes.S f1 < f0).
               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                simpl in H3. lia. }
+                simpl in H3. revert H3. lia. }
               exact H. }
           set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *.
           set (e_k_inner :=
