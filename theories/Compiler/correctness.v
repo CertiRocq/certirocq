@@ -76,33 +76,31 @@ About extends.
       econstructor. econstructor; tea. }
   Qed.
 
-  Lemma value_glob_lookup {fl : WcbvFlags} {efl : EEnvFlags} Σ : 
-    wf_glob Σ -> values_glob Σ -> 
+  Lemma lambda_glob_lookup Σ : 
+    lambda_glob Σ -> 
     forall kn v, EGlobalEnv.lookup_env Σ kn = Some (ConstantDecl {| cst_body := Some v |}) -> 
-    value Σ v.
+    lambda_value_pred Σ v.
   Proof.
-    intros hwf. induction 1.
+    induction 1.
     - intros kn v; cbn => //.
-    - intros kn' v' hl. forward IHX. now depelim hwf.
+    - intros kn' v' hl. 
       cbn in hl. 
       destruct (eqb_specT kn' kn). subst kn'. noconf hl.
-      eapply value_weaken with Σ.
-      eapply EGenericMapEnv.extends_cons_wf; tea. tea.
-      now cbn in v. eapply IHX in hl.
-      eapply value_weaken; tea. now eapply EGenericMapEnv.extends_cons_wf.
+      destruct d0 as [na [t ->]]. now do 2 eexists.
+      now cbn in d0.
   Qed.
 
-  Lemma values_glob_declared Σ {efl : EEnvFlags} : 
+  Lemma lambda_glob_declared Σ {efl : EEnvFlags} : 
     wf_glob Σ ->
-    EWcbvEval.values_glob (wfl := final_wcbv_flags) Σ ->
+    EWcbvEval.lambda_glob Σ ->
     forall (k : kername) (decl : constant_body),
     declared_constant Σ k decl ->
-    value_decl (wfl := final_wcbv_flags) Σ (ConstantDecl decl).
+    decl_pred (lambda_value_pred Σ) (ConstantDecl decl).
   Proof.
     unfold EGlobalEnv.declared_constant.
     intros hwf hv kn decl hl. destruct decl as [] => //.
     destruct cst_body => //.
-    eapply value_glob_lookup in hl; tea.
+    eapply lambda_glob_lookup in hl; tea.
   Qed.
   Import ETransform EImplementLazyForce EImplementBox.
   
@@ -119,9 +117,9 @@ About extends.
     has_primstring := false;
     has_primarray := false; |}.
 
-  Lemma values_glob_eval_env_fuel (p : EProgram.eprogram) (efl := env_flags) :
+  Lemma lambda_glob_eval_env_fuel (p : EProgram.eprogram) (efl := env_flags) :
     wf_glob p.1 ->
-    EWcbvEval.values_glob (wfl := final_wcbv_flags) p.1 ->
+    EWcbvEval.lambda_glob p.1 ->
     forall (k : kername) (decl : constant_body) (body : term),
     EGlobalEnv.declared_constant p.1 k decl ->
     cst_body decl = Some body -> exists (src_v : fuel_sem.value) (f t : nat), 
@@ -130,54 +128,15 @@ About extends.
     destruct p as [Σ p]; cbn; clear p.
     intros hwf hv kn decl body hd hb.
     have hwfd := wf.wf_glob_globals_wf _ hwf _ _ _ hd hb.
-    eapply (values_glob_declared _ hwf hv) in hd; tea.
+    eapply (lambda_glob_declared _ hwf hv) in hd; tea.
     destruct decl as [[|]]=> //. noconf hb. cbn in hd.
-    revert t hd hwfd.
-    apply: value_values_ind.
-    { move=> t a wf. destruct t; cbn in a, wf => //.
-      do 3 eexists. split. econstructor. 2:cbn. constructor. reflexivity.
-      destruct args => //.
-      do 3 eexists. econstructor. econstructor. constructor. cbn. reflexivity. }
-    { move=> p h ih wf. cbn in wf. admit. (* no primitives supported in fuel_sem yet *) }
-    { move=> ind c mdecl idecl cdecl args wcb hlc hargs h ih.
-      cbn. move=>/andP => -[] hlc' /andP[] hlpa wfa.
-      eapply forallb_All in wfa. eapply All_mix in ih; tea.
-      assert (exists vals, Forall2 (fun t v => 
-        exists tr, eval_env_step (Hf:=anf_correct.LambdaBox_resource_fuel)
-          (Ht:=anf_correct.LambdaBox_resource_trace) Σ [] t (Val v) 0 tr) args vals).
-      { clear -ih. induction ih.
-        * exists []. constructor.
-        * destruct p as [wfx ev].
-          specialize (ev wfx). destruct ev as [srcv [f [t [ev heq]]]].
-          subst f. destruct IHih as [vals ih'].
-          exists (srcv :: vals). constructor. now exists t.
-          exact ih'. }
-      destruct H as [vals hvals].
-      assert (exists f t, eval_fuel_many (Hf := anf_correct.LambdaBox_resource_fuel) Σ [] args vals f t /\ f = 0).
-      { clear - vals hvals.
-        induction hvals.
-        - do 2 eexists. split. econstructor. reflexivity.
-        - destruct IHhvals as [f [t [ihev heq]]].
-          destruct H as [tr hv].
-          do 2 eexists. split. constructor; tea. constructor. eexact hv. cbn. subst f.
-          Print anf_correct.fuel_exp.
-
-        Print  anf_correct.fuel_resource_LambdaBox.
-        Print anf_correct.fuel_exp.
-
-      do 3 eexists. split. econstructor. reflexivity.
-      Print eval_fuel_many.
-      (* by induction *) admit. }
-    { depelim v. now cbn in e.
-      rewrite wellformed_mkApps in hwfd. now cbn in hwfd. 
-      now cbn. now cbn in y. }
-  Admitted.
+    destruct hd as [na [b ->]]. do 3 eexists. split. constructor. constructor. now cbn.
+  Qed.
 
   Context (func_tag kon_tag default_tag default_itag : positive)
           (tgm : conId_map).
 
   Notation refines_top Σ := (@refines_top default_tag default_itag tgm Σ).
-Print value_decl.
 
   Theorem correctness_from_erasure (p : EProgram.eprogram) : 
     Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
@@ -200,21 +159,27 @@ Print value_decl.
     - (* No axioms *) cbn. admit.
     - (* If tgm came from convert_env, wouldn't that be true? *)
       admit.
-    - intros kn decl hl hb. (* The environment entries should be evaluable to values *)
-      eapply values_glob_eval_env_fuel; tea. apply wfp.
-    - intros kn decl hl hb. (* Constants to values should carry its post-condition, for immediate values *)
-      admit.
+    - (* The environment entries evaluate to values *)
+      intros kn decl hl hb hbody.
+      eapply lambda_glob_eval_env_fuel in hb; tea.
+      destruct hb as [srcv [f [t [ev eq]]]]. now exists srcv, f, t. apply wfp.
+    - (* The environment entries should evaluate to values with 0 fuel (they're lambdas) *)
+      intros kn decl b srcv f t hd hbody hev.
+      eapply lambda_glob_eval_env_fuel in hd; tea. 2:apply wfp.
+      destruct hd as [srcv' [f' [t' [ev eqf]]]].
+      eapply eval_val_exact_det in hev; tea. destruct hev as [eq [eq' eq'']].
+      now subst f' srcv' t' f.
     - (* Wellformed declarations in the global environment *) 
-      destruct hp as [wfg wfp].
+      destruct wfp as [wfΣ wf].      
       intros kn decl body hdecl hb.
       eapply lookup_env_wellformed  in hdecl; tea. destruct decl; trivial. cbn in hdecl. cbn in hb. now subst cst_body.
-    - apply hp.
+    - apply wfp.
     - (* No Var! *) admit.
     - (* No EVar! *) admit.
     - (* No PrimArray! *) admit.
     - (* No prims *)
       intros s. cbn. reflexivity.
-    - apply hp.
+    - apply wfp.
   Admitted.
 
 (*
