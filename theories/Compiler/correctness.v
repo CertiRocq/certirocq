@@ -46,35 +46,12 @@ Definition run_pipeline p pre :=
   | Err s => None
   end.
 Import EEnvMap.
+
 From MetaRocq.Erasure Require Import EWcbvEval.
-(* Require Import LambdaBox_to_LambdaANF.anf_correct.
-Import LambdaBox_to_LambdaANF.anf.
-Import LambdaBox_to_LambdaANF.anf_correct.
-Require Import LambdaBox_to_LambdaANF.anf_toplevel. *)
 Section lambdabox_anf_pipeline_correct.
 Import EGlobalEnv.
 
 Section Assumptions.
-  Print final_wcbv_flags.
-About extends.
-  Lemma value_weaken {wfl : WcbvFlags} {efl : EEnvFlags} Σ Σ' v : extends Σ Σ' -> wf_glob Σ' -> value Σ v -> value Σ' v.
-  Proof.
-    intros hl hwf.
-    revert v. eapply value_values_ind.
-    { intros t ato; constructor 1. constructor.
-      destruct t; cbn in * => //.
-      * destruct args => //.
-        move/andP: ato => [] ->; rewrite /lookup_constructor /lookup_inductive /lookup_minductive.
-        destruct lookup_env eqn:heq => //.
-        now rewrite (hl _ _ heq). }
-    { intros p hp hp'; depelim hp. 1-4:constructor. 1-4:now constructor 2. }
-    { intros ind c mdecl idecl cdecl args wcb hl' har hargs IH.
-      eapply extends_lookup_constructor in hl'; eauto. econstructor 2; tea. }
-    { intros f args vh argsn H IH.
-      econstructor 3; tea. depelim vh.
-      eapply extends_lookup_constructor in e0; tea. econstructor; eauto.
-      econstructor. econstructor; tea. }
-  Qed.
 
   Lemma lambda_glob_lookup Σ : 
     lambda_glob Σ -> 
@@ -153,7 +130,6 @@ About extends.
     match goal with
     | [ _ : EProgram.wf_eprogram ?fl p /\ _ |- _ ] => set (efl := fl) in *
     end.
-    unfold refines_top. unfold refines.
     destruct hp as [wfp [vg]].
     eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag tgm (fst p) (efl:=efl)); trea.
     - (* No axioms *) cbn. admit.

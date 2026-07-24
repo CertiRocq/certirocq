@@ -25,14 +25,14 @@ Import TemplateProgram.
     - Transformation of constants to values (verified, simplifies the ANF proof)
     - Transformation of lazy/force to lambda abstractions and applications (verified)
     - Unboxing of single argument constructors (verified)
-    - Implementation of "box" as a fixpoint expression (verified)
-    
-    *)
+    - Implementation of "box" as a fixpoint expression (verified) *)
+
 Program Definition certirocq_post_metarocq_pipeline econf : Transform.t global_context global_context term term term term
   (eval_eprogram final_wcbv_flags)
   (eval_eprogram final_wcbv_flags) :=
   let efl := EConstructorsAsBlocks.switch_cstr_as_blocks
-  (EInlineProjections.disable_projections_env_flag (ERemoveParams.switch_no_params EWellformed.all_env_flags)) in
+  (EInlineProjections.disable_projections_env_flag
+   (ERemoveParams.switch_no_params EWellformed.all_env_flags)) in
   let efl' := efl_coind_to_ind efl in
   (* Rebuild the efficient lookup table *)
   rebuild_wf_env_transform (efl := efl) false false ▷
