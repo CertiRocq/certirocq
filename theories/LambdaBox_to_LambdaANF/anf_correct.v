@@ -87,7 +87,7 @@ Section Correct.
       + destruct (Nat.eqb (Datatypes.length names) nargs) eqn:Hlen;
           [apply Nat.eqb_eq in Hlen; lia | discriminate].
       + specialize (IH _ Hfind). lia.
-  Admitted.
+  Qed.
 
   Lemma find_branch_In ind c nargs brs body :
     find_branch ind c nargs brs = Some body ->
