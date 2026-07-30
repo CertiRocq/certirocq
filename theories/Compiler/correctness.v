@@ -114,12 +114,125 @@ Proof.
   destruct hd as [na [b ->]]. do 3 eexists. split. constructor. constructor. now cbn.
 Qed.
 
+Definition inj_conIdMap tgm :=
+  (forall dc dc' tg, dcon_to_tag dc tgm = Some tg ->
+     dcon_to_tag dc' tgm = Some tg -> dc = dc').
+
+Definition bounded_conIdMap (tgm : conId_map) p :=
+  Forall (fun '(ind', nCon', tg) => tg < p)%positive tgm.
+Inductive fromNP p : nat -> list positive -> positive -> Prop :=
+| fromN0 : fromNP p 0 [] p
+| fromNS n l p' : fromNP (p + 1)%positive n l p' -> fromNP p (S n) (Tcons p l) p'.
+
+Lemma fromN_spec p n : fromNP p n (fromN p n).1 (fromN p n).2.
+Proof.
+  induction n in p |- *; cbn.
+  - constructor.
+  - destruct fromN eqn:hf.
+    constructor. specialize (IHn (p + 1)%positive).
+    rewrite hf in IHn. apply IHn.
+Qed.
+
+Lemma dcon_to_info_all_lt {dc tgm tg P} : dcon_to_info dc tgm = Some tg -> Forall (fun '(_, _, tg) => P tg) tgm -> P tg.
+Proof.
+  induction tgm; cbn; auto.
+  - intros [=].
+  - destruct a. destruct conId_dec.
+    + intros [= <-].
+      intros hf; depelim hf. now destruct d as [].
+      move/IHtgm.
+      intros ih hf; depelim hf. apply ih, hf.
+Qed.
+
+Lemma convert_cnstrs_tgm itypNm l cstrs ncstrs ind nCon unboxed boxed i0 c tgm cenv' tgm' p p' : 
+  fromNP p ncstrs l p' ->
+  ncstrs = #|cstrs| ->
+  convert_cnstrs itypNm l cstrs ind nCon unboxed boxed i0 c tgm = (cenv', tgm') ->
+  inj_conIdMap tgm ->
+  bounded_conIdMap tgm p -> 
+  inj_conIdMap tgm' /\ bounded_conIdMap tgm' p'.
+Proof.
+  induction 1 in cstrs, nCon, unboxed, boxed, i0, c, tgm |- *.
+   (* in cstrs, ind, nCon, unboxed, boxed, i0, c, tgm |- *. *)
+  - cbn. now intros ? [= <- <-].
+  - cbn. destruct cstrs => //.
+    cbn. intros [= ->]. 
+    destruct c0 as [cname ccn].
+    move/IHfromNP => IH. specialize (IH eq_refl).
+    intros injm hlt.
+    apply IH.
+    clear -injm hlt.
+    { intros dc dc' tg; cbn.
+      destruct conId_dec; subst.
+      intros [=]. subst p.
+      destruct conId_dec; subst.
+      intros [=]. reflexivity.
+      have h := (dcon_to_info_all_lt _ hlt).
+      move/h. lia.
+      destruct conId_dec. subst.
+      intros hd [= <-].
+      have h := (dcon_to_info_all_lt hd hlt). lia.
+      apply injm. }
+    constructor. lia.
+    eapply Forall_impl; tea. intros [[] ?]. lia.
+Qed.
+
+Lemma convert_typack_tgm ty id n acc acc' : convert_typack ty id n acc = acc' -> 
+  inj_conIdMap acc.2 -> bounded_conIdMap acc.2 acc.1.1.2 -> 
+  inj_conIdMap acc'.2 /\ bounded_conIdMap acc'.2 acc'.1.1.2.
+Proof.
+  induction ty in n, acc, acc' |- *.
+  - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
+    intros <-. now cbn.
+  - destruct acc as ((((? & ?) & cn) & ?) & tgm); cbn.
+    destruct acc' as ((((? & ?) & cn') & ?) & tgm'); cbn.
+    destruct a as [itypNm cstrs].
+    destruct fromN eqn:hfr.
+    destruct convert_cnstrs eqn:eqcs.
+    move/IHty. cbn.
+    intros h2 inj0 hb.
+    eapply convert_cnstrs_tgm in eqcs. apply h2. apply eqcs. apply eqcs.
+    have he := fromN_spec cn #|cstrs|. rewrite hfr //= in he. exact he. 
+    reflexivity. exact inj0. exact hb.
+Qed.
+
+Lemma convert_env'_tgm ie acc acc' : convert_env' ie acc = acc' -> 
+  inj_conIdMap acc.2 -> bounded_conIdMap acc.2 acc.1.1.2 -> 
+  inj_conIdMap acc'.2 /\ bounded_conIdMap acc'.2 acc'.1.1.2.
+Proof.
+  induction ie in acc, acc' |- *.
+  - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
+    intros <-. now cbn.
+  - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
+  - destruct acc' as ((((? & ?) & ?) & ?) & tgm'); cbn.
+    destruct a as [id ty].
+    intros ce' injtgm btgm.
+    have hc := convert_typack_tgm ty id 0 (i, c, c0, i0, tgm) _ eq_refl injtgm btgm.
+    eapply IHie in ce'; auto. apply hc. apply hc.
+Qed.
+
+Lemma convert_env_inj default_tag default_itag ie : 
+  let tgm := (convert_env default_tag default_itag ie).2 in
+  inj_conIdMap tgm.
+Proof.
+  unfold convert_env. cbn.
+  have he := convert_env'_tgm ie _ _ eq_refl.
+  apply he. cbn. red. cbn => //.
+  cbn. red. constructor.
+Qed.
+
+Import anf_corresp.
+
+Lemma convert_env_reg default_tag default_itag Σ : 
+  let ie := inductive_env_east Σ in
+  let tgm := (convert_env default_tag default_itag ie).2 in
+  registered_constructors tgm Σ.
+Proof.
+Admitted.
+
 Section Assumptions.
 
-  Context (func_tag kon_tag default_tag default_itag : positive)
-          (tgm : conId_map).
-  (* The conId_map must be injective *)          
-  Context (Htgm : forall dc dc' : dcon, dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+  Context (func_tag kon_tag default_tag default_itag : positive).
   
   (* This property should come from the well-formedness of terms w.r.t. their global environment, 
     currently missing in the ANF proof. 
@@ -131,7 +244,7 @@ Section Assumptions.
     term_util.caseConsistent (top_cenv default_tag default_itag ie) 
       P ctag).
 
-  Notation refines_top Σ := (@refines_top default_tag default_itag tgm Σ).
+  Notation refines_top Σ ie tgm := (@refines_top default_tag default_itag tgm Σ ie).
 
   (** To prove the correctness of connecting the MetaRocq pipeline and CertiRocq's ANF, we
       need a stronger well-formedness property. This formalizes the remaining mismatch 
@@ -147,9 +260,9 @@ Section Assumptions.
        term_switches := disable_box_term_flags (switch_off_primitives efl.(term_switches));
        cstr_as_blocks := efl.(cstr_as_blocks) |}.
 
-  Definition anf_convert := 
+  Definition anf_convert ie tgm := 
     convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
-      (fun _ => None).
+      (fun _ => None) ie.
   
   Theorem correctness_from_erasure (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
@@ -157,11 +270,12 @@ Section Assumptions.
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
+    let tgm := (convert_env default_tag default_itag ie).2 in
     forall e_tgt comp_d', 
-      anf_convert ie (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') ->
-      exists M, refines_top (fst p) ie M (snd p) e_tgt.
+      anf_convert ie tgm (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') ->
+      exists M, refines_top (fst p) ie tgm M (snd p) e_tgt.
   Proof.
-    intros hp wf' ie e_tgt comp_d' cvt.
+    intros hp wf' ie tgm e_tgt comp_d' cvt.
     cbn in hp.
     match goal with
     | [ _ : EProgram.wf_eprogram ?fl p /\ _ |- _ ] => set (efl := fl) in *
@@ -169,6 +283,10 @@ Section Assumptions.
     destruct hp as [wfp [vg]].
     eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag tgm (fst p) 
       (efl:=certirocq_flags (switch_off_box env_flags))); trea.
+    - (* The conId_map is injective *)
+      apply convert_env_inj.
+    - (* The constructors are registered *)
+      apply convert_env_reg.
     - (* The environment entries evaluate to values *)
       intros kn decl hl hb hbody.
       eapply lambda_glob_eval_env_fuel in hb; tea.
@@ -193,3 +311,4 @@ Section Assumptions.
   Qed.
 
 End Assumptions.
+About correctness_from_erasure.

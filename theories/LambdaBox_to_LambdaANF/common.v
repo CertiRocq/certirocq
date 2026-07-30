@@ -45,13 +45,11 @@ Defined.
 
 Section TagLookup.
 
-  Context (default_tag : positive).
-
   Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
     match sig with
-    | nil => default_tag
+    | nil => None
     | ((cId, inf)::sig') => match conId_dec a cId with
-                            | left _ => inf
+                            | left _ => Some inf
                             | right _ => dcon_to_info a sig'
                             end
     end.

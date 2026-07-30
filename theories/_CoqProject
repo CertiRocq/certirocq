@@ -116,6 +116,7 @@ Glue/glue.v
 
 # Compiler
 Compiler/metarocq_pipeline.v
+Compiler/correctness.v
 Compiler/pipeline.v
 
 # Extraction

@@ -273,10 +273,11 @@ Section ValRelWeaken.
         intros Hwf v' Hrel.
       + (* Con_v *)
         inversion Hwf as [? ? Hwf_vs| |]; subst.
-        inversion Hrel; subst.
+        Transparent bind. cbn in H0. congruence.
+        (* inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           [| reflexivity].
-        eapply (forall2_val_rel_weaken (well_formed_val [])); eassumption.
+        eapply (forall2_val_rel_weaken (well_formed_val [])); eassumption. *)
       + (* Clos_v *)
         inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
         inversion Hrel; subst.
@@ -357,7 +358,7 @@ Section ValRelWeaken.
         inversion Hwf as [? ? Hwf_vs| |]; subst.
         inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
-          [| reflexivity].
+          [| assumption].
         eapply (forall2_val_rel_weaken (well_formed_val ((kn, d) :: Σ'))); eassumption.
       + (* Clos_v *)
         inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
@@ -564,8 +565,9 @@ Section GlobalBindingsCorrect.
   Context (HnoAxioms : has_axioms = false).
 
   Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+    forall dc dc' tg,
+      dcon_to_tag dc tgm = Some tg ->
+      dcon_to_tag dc' tgm = Some tg -> dc = dc').
 
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
 
@@ -637,13 +639,15 @@ Section GlobalBindingsCorrect.
     exists decl body,
       declared_constant Σ k decl /\ decl.(EAst.cst_body) = Some body).
   Context (cmap_nodup_keys : NoDup (map fst cmap)).
+  Context (Htgm : registered_constructors tgm Σ).
+
 
   Let val_rel_exists :=
     @anf_val_rel_exists func_tag default_tag prim_map tgm prims cmap
       _ Σ nat Hf_src Ht_src
       Hglob_term Hwf_glob
       HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
-      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent.
+      no_prims cmap_complete cmap_sound cmap_nodup_keys Hcmap_eval_coherent Htgm.
 
   Let cvt_correct :=
     @anf_cvt_correct func_tag default_tag kon_tag
@@ -2303,9 +2307,11 @@ Section GlobalBindingsTopLevel.
   Context (HnoAxioms : has_axioms = false).
 
   Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
-
+    forall dc dc' tg,
+      dcon_to_tag dc tgm = Some tg ->
+      dcon_to_tag dc' tgm = Some tg -> dc = dc').
+  Context (Htgm : registered_constructors tgm Σ).
+  
   Context (cenv_case_consistent : forall P ctag, caseConsistent cenv P ctag).
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
@@ -2432,7 +2438,7 @@ Section GlobalBindingsTopLevel.
                 prim_map prims Hwf_glob
                 HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                 no_prims Hcmap_complete Hcmap_sound Hcmap_nodup_keys
-                [] (List.rev Σ) [] cmap C_env S S'
+                Htgm [] (List.rev Σ) [] cmap C_env S S'
                 Hcvt HΣ_top Hcm_acc_sub (fun s v Hlk => Hlk)
                 Hcm_acc_complete Hcm_acc_sound Hnd_empty Hdis_empty
                 Hcoh_empty rho_init

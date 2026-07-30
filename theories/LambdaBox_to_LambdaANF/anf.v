@@ -165,12 +165,15 @@ Section ANF.
          | [] => ret []
          | (lnames, e) :: brs' =>
            let dc := dcon_of_con ind (N.to_nat n) in
-           let ctag := dcon_to_tag default_tag dc tgm in
-           pats' <- go brs' (n + 1)%N ;;
-           cm <- proj_ctx (List.rev lnames) (List.length lnames) scrut vm ctag ;;
-           let (Cproj, vm') := cm in
-           '(r, C) <- convert e vm' ;;
-           ret ((ctag, app_ctx_f Cproj (C |[ Ehalt r ]|)) :: pats')
+           match dcon_to_tag dc tgm with
+           | None => failwith "Unregistered constructor"
+           | Some ctag =>
+            pats' <- go brs' (n + 1)%N ;;
+            cm <- proj_ctx (List.rev lnames) (List.length lnames) scrut vm ctag ;;
+            let (Cproj, vm') := cm in
+            '(r, C) <- convert e vm' ;;
+            ret ((ctag, app_ctx_f Cproj (C |[ Ehalt r ]|)) :: pats')
+            end
          end) brs n.
 
     (** Main ANF conversion *)
@@ -186,7 +189,7 @@ Section ANF.
       | EAst.tBox =>
         x <- get_named_or_reserve rname (nNamed "y"%bs) ;;
         ret (x, Econstr_c x default_tag [] Hole_c)
-
+      
       | EAst.tLambda na body =>
         x <- get_named na ;;
         f <- get_named_or_reserve rname def_name ;;
@@ -219,10 +222,13 @@ Section ANF.
         end
 
       | EAst.tConstruct ind c args =>
-        let c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm in
-        x <- get_named_or_reserve rname def_name ;;
-        '(ys, C) <- convert_anf_args (fun t vm => convert_anf t vm None) args vm ;;
-        ret (x, comp_ctx_f C (Econstr_c x c_tag ys Hole_c))
+        match dcon_to_tag (dcon_of_con ind c) tgm with
+        | Some c_tag => 
+          x <- get_named_or_reserve rname def_name ;;
+          '(ys, C) <- convert_anf_args (fun t vm => convert_anf t vm None) args vm ;;
+          ret (x, comp_ctx_f C (Econstr_c x c_tag ys Hole_c))
+        | None => failwith ("Internal error: unregistered constructor tag")
+        end
 
       | EAst.tCase (ind, npars) mch brs =>
         f <- get_named_str "f_case"%bs ;;
@@ -240,7 +246,9 @@ Section ANF.
         ret (x, Efun1_c defs Hole_c)
 
       | EAst.tProj p c =>
-        let c_tag := dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm in
+        match dcon_to_tag (dcon_of_con p.(proj_ind) 0) tgm with
+        | None => failwith "Internal error: unregistered constructor"
+        | Some c_tag => 
         match rname with
         | Some _ =>
           y <- get_named_or_reserve rname def_name ;;
@@ -250,6 +258,7 @@ Section ANF.
           '(x, C) <- convert_anf c vm None ;;
           y <- get_named def_name ;;
           ret (y, comp_ctx_f C (Eproj_c y c_tag (N.of_nat p.(proj_arg)) x Hole_c))
+        end
         end
 
       | EAst.tPrim p =>
@@ -366,7 +375,7 @@ Section ANF.
                       r
     | anf_Construct :
         forall S1 S2 c_tag ind c args C xs x vn,
-          c_tag = dcon_to_tag default_tag (dcon_of_con ind c) tgm ->
+          dcon_to_tag (dcon_of_con ind c) tgm = Some c_tag ->
           x \in S1 ->
           anf_cvt_rel_args (S1 \\ [set x]) args vn S2 C xs ->
           anf_cvt_rel S1
@@ -419,7 +428,7 @@ Section ANF.
           anf_cvt_rel S (EAst.tConst s) vn S Hole_c v
     | anf_Proj :
         forall S1 S2 p c C x y vn c_tag,
-          c_tag = dcon_to_tag default_tag (dcon_of_con p.(proj_ind) 0) tgm ->
+          dcon_to_tag (dcon_of_con p.(proj_ind) 0) tgm = Some c_tag ->
           anf_cvt_rel S1 c vn S2 C x ->
           y \in S2 ->
           anf_cvt_rel S1
@@ -474,7 +483,7 @@ Section ANF.
           anf_cvt_rel_branches S ind [] n vn r S []
     | anf_Branches_cons :
         forall S1 S2 S3 ind vn r lnames e brs' pats' C1 r1 vars ctx_p tg n,
-          tg = dcon_to_tag default_tag (dcon_of_con ind (N.to_nat n)) tgm ->
+          dcon_to_tag (dcon_of_con ind (N.to_nat n)) tgm = Some tg ->
           anf_cvt_rel_branches S1 ind brs' (n + 1)%N vn r S2 pats' ->
           FromList vars \subset S2 ->
           NoDup vars ->
