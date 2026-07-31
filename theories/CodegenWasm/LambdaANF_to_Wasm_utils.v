@@ -1039,22 +1039,18 @@ Lemma enough_space_to_store m k off bs :
   (k + off + N.of_nat (length bs) <= mem_length m)%N ->
   store m k off bs (length bs) <> None.
 Proof.
-  intros. unfold store, write_bytes_meminst, bytes_takefill.
-  apply N.leb_le in H. rewrite H.
-  intro Hcontra.
-  destruct (write_bytes _ _ _) eqn:Hby=>//. clear Hcontra.
-  destruct (length bs <? length bs) eqn:Hcontra; first lia. clear Hcontra.
-  generalize dependent k. revert off m.
-  induction bs; intros=>//.
-  cbn in Hby, H.
-  destruct (mem_update _ _ _) eqn:Hupd.
-  2:{ eapply mem_update_ib; eauto. unfold mem_length in H. lia. }
-  assert ((k + (N.succ off) + N.of_nat (Datatypes.length bs) <=? mem_length m)%N = true)
-      as Hlen by lia.
-  clear H.
-  eapply (IHbs _ (Build_meminst (meminst_type m) m0)); last eassumption.
-  apply mem_update_length in Hupd.
-  unfold mem_length in *. rewrite Hupd. lia.
+  intros H. unfold store.
+  assert ((k + off + N.of_nat (length bs) <=? mem_length m)%N = true) as Hleb
+      by now apply N.leb_le.
+  rewrite Hleb.
+  assert (bytes_takefill #00 (length bs) bs = bs) as Hfill.
+  { unfold bytes_takefill. rewrite Nat.ltb_irrefl. apply List.firstn_all. }
+  rewrite Hfill.
+  unfold write_bytes_meminst, write_bytes.
+  destruct (write_bytes_gen _ _ _ _) eqn:Hby=>//.
+  exfalso. revert Hby. unfold write_bytes_gen.
+  apply mem_update_gen_ib.
+  unfold mem_length in H. exact H.
 Qed.
 
 Definition load_i32 m addr : option value_num :=
