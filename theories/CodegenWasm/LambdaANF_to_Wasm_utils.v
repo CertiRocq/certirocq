@@ -1030,7 +1030,7 @@ Proof.
   unfold store, write_bytes_meminst. intros.
   destruct ((n + off + N.of_nat (Datatypes.length bs) <=? mem_length m)%N) eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hb=>//. inv H.
-  apply write_bytes_preserve_length in Hb.
+  apply write_bytes_gen_preserve_length in Hb.
   unfold mem_length.
   now rewrite Hb.
 Qed.
