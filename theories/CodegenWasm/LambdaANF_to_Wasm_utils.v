@@ -1133,7 +1133,7 @@ Proof.
   destruct (addr + 0 + N.of_nat 4 <=? mem_length m)%N eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hby=>//. inv H0.
   unfold load. cbn.
-  have Hlen' := (write_bytes_preserve_length Hby). unfold mem_length in *. cbn.
+  have Hlen' := (write_bytes_gen_preserve_length Hby). unfold mem_length in *. cbn.
   destruct (addr + 4 <=? memory.mem_length m0)%N eqn:Hlen''; try lia.
   cbn.
   now erewrite write_bytes_read_bytes_i32.
@@ -1200,7 +1200,7 @@ Proof.
   destruct (addr + 0 + N.of_nat 8 <=? mem_length m)%N eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hby=>//. inv H0.
   unfold load. cbn.
-  have Hlen' := (write_bytes_preserve_length Hby). unfold mem_length in *. cbn.
+  have Hlen' := (write_bytes_gen_preserve_length Hby). unfold mem_length in *. cbn.
   destruct (addr + 8 <=? memory.mem_length m0)%N eqn:Hlen''; try lia.
   now erewrite write_bytes_read_bytes_i64.
 Qed.
@@ -1387,7 +1387,7 @@ Proof.
   destruct (a1 + (0 + 4) <=? mem_length m)%N eqn:Hlen'=>//.
   destruct (read_bytes _ _ _) eqn:Hread=>//.
   destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
+  have Hlen'' := write_bytes_gen_preserve_length Hwrite.
   unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
   unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
   cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
@@ -1435,7 +1435,7 @@ Proof.
   destruct (a1 + (0 + 4) <=? mem_length m)%N eqn:Hlen'=>//.
   destruct (read_bytes _ _ _) eqn:Hread=>//.
   destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
+  have Hlen'' := write_bytes_gen_preserve_length Hwrite.
   unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
   unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
   cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
@@ -1480,7 +1480,7 @@ Proof.
   destruct (a1 + (0 + 8) <=? mem_length m)%N eqn:Hlen'=>//.
   destruct (read_bytes _ _ _) eqn:Hread=>//.
   destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
+  have Hlen'' := write_bytes_gen_preserve_length Hwrite.
   unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
   unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
   cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
@@ -1532,7 +1532,7 @@ Proof.
   destruct (a1 + (0 + 8) <=? mem_length m)%N eqn:Hlen'=>//.
   destruct (read_bytes _ _ _) eqn:Hread=>//.
   destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
+  have Hlen'' := write_bytes_gen_preserve_length Hwrite.
   unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
   unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
   cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
