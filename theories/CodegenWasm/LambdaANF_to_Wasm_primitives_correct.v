@@ -2967,17 +2967,17 @@ Proof.
     rewrite Haddr1 in Hload1'.
     rewrite H4 in Hload2'.
     replace 8 with (N.to_nat (tnum_length T_i64)) in Hload1', Hload2' by now cbn.
-    assert (Hbsx : wasm_deserialise b0 T_i64 = Z_to_VAL_i64 φ (n1)%uint63) by congruence.
-    assert (Hbsy : wasm_deserialise b1 T_i64 = Z_to_VAL_i64 φ (n2)%uint63) by congruence.
+    assert (Hbsx : wasm_deserialise b0 T_i64 = Z_to_VAL_i64 (to_Z n1)) by congruence.
+    assert (Hbsy : wasm_deserialise b1 T_i64 = Z_to_VAL_i64 (to_Z n2)) by congruence.
     assert (HgmpBounds: (Z.of_N gmp_v + Z.of_N 52 <= Z.of_N (mem_length m) < Int32.modulus)%Z). {
       apply mem_length_upper_bound in Hmem5. cbn in Hmem5.
       simpl_modulus. cbn. cbn in HenoughM. lia. }
     remember {|f_locs := set_nth (VAL_num (VAL_int32 (wasm_value_to_i32 (Val_ptr (gmp_v + 8)%N)))) (f_locs f) (N.to_nat x0') (VAL_num (VAL_int32 (wasm_value_to_i32 (Val_ptr (gmp_v + 8)%N))));
                f_inst := f_inst f|} as fr_carry_ops.
 
-    assert (local_holds_address_to_i64 s f x' (N_to_i32 addr1) (Z_to_i64 φ (n1)%uint63) m b0) as Hlocalx.
+    assert (local_holds_address_to_i64 s f x' (N_to_i32 addr1) (Z_to_i64 (to_Z n1)) m b0) as Hlocalx.
     by unfold local_holds_address_to_i64; auto.
-    assert (local_holds_address_to_i64 s f y' (N_to_i32 addr2) (Z_to_i64 φ (n2)%uint63) m b1) as Hlocaly.
+    assert (local_holds_address_to_i64 s f y' (N_to_i32 addr2) (Z_to_i64 (to_Z n2)) m b1) as Hlocaly.
     by unfold local_holds_address_to_i64; auto.
 
     rewrite Hvs in Hres.
