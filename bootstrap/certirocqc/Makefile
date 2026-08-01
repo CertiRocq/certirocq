@@ -102,6 +102,7 @@ theories/CertiRocqC.vo: theories/CertiRocqC.v $(CERTIROCQ_PIPELINE_DEPS)
 theories/compile.v: theories/CertiRocqC.vo
 
 theories/compile.vo CertiRocq.CertiRocqC.compile.certirocqc.c &: theories/compile.v theories/CertiRocqC.vo $(CERTIROCQ_PIPELINE_DEPS)
+	ulimit -Ss unlimited 2>/dev/null || ulimit -Ss "$$(ulimit -Hs)" 2>/dev/null || true; \
 	coqc $(COQOPTS) $<
 
 g_certirocqc.ml: g_certirocqc.mlg certirocqc.cmx certirocqc_plugin_wrapper.cmx
