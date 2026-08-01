@@ -26,11 +26,12 @@ Section WF.
   (** Well-formedness of source values.
       Closure bodies must be well-formed w.r.t. their captured environment.
       Fix bodies must be lambdas, well-formed in an environment extended
-      by all mutual functions. *)
+      by all mutual functions. *)      
   Inductive well_formed_val : value -> Prop :=
   | Wf_Con :
       forall dc vs,
         Forall well_formed_val vs ->
+        lookup_constructor Σ (fst dc) (BinNatDef.N.to_nat (snd dc)) <> None ->
         well_formed_val (Con_v dc vs)
   | Wf_Clos :
       forall vs na body,
@@ -131,16 +132,19 @@ Section WF.
 
   Lemma wellformed_tConstruct n ind c args :
     wellformed Σ n (EAst.tConstruct ind c args) = true ->
+    lookup_constructor Σ ind c <> None /\
     Forall (fun e => wellformed Σ n e = true) args.
   Proof.
-    unfold wellformed. simpl. fold (@wellformed efl).
-    intro H. apply List.Forall_forall. intros e He.
+    cbn [wellformed].
+    intro H.
+    apply andb_true_iff in H as [Hl Hwf_args].
+    apply andb_true_iff in Hl as [_ Hl].
+    split. destruct lookup_constructor; cbn in Hl; auto; congruence.
+    apply List.Forall_forall. intros e He.
     destruct cstr_as_blocks.
-    - apply andb_true_iff in H as [_ Hwf_args].
-      apply andb_true_iff in Hwf_args as [_ Hwf_args].
+    - apply andb_true_iff in Hwf_args as [_ Hwf_args].
       rewrite forallb_forall in Hwf_args. exact (Hwf_args e He).
-    - apply andb_true_iff in H as [_ Hnil].
-      destruct args; [inv He | simpl in Hnil; discriminate].
+    - destruct args; [inv He | simpl in Hwf_args; discriminate].
   Qed.
 
   Lemma find_branch_wellformed n ind npars mch brs c nargs body :
@@ -291,9 +295,11 @@ Section WF_EVAL.
       + constructor; assumption.
       + simpl. exact Hwft0.
     (* eval_Construct_step *)
-    - intros ind c args vs dc rho0 fs ts Hdc _ IHmany Hwfe Hwft.
-      apply wellformed_tConstruct in Hwft.
-      constructor. exact (IHmany Hwfe Hwft).
+    - intros ind c args vs rho0 dc fs ts Hdc _ IHmany Hwfe Hwft.
+      subst dc; cbn.
+      apply wellformed_tConstruct in Hwft as [hl hargs].
+      constructor. exact (IHmany Hwfe hargs). cbn.
+      now rewrite Nnat.Nat2N.id.
     (* eval_Case_step *)
     - intros ind npars mch brs rho0 dc vs body c r f1 f2 t1 t2
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
@@ -446,8 +452,9 @@ Section WF_EVAL.
       + simpl. exact Hwft0.
     (* eval_Construct_step *)
     - intros ind c args vs dc rho0 fs ts Hdc _ IHmany Hwfe Hwft.
-      apply (wellformed_tConstruct Σ_tail) in Hwft.
+      apply (wellformed_tConstruct Σ_tail) in Hwft as [hl Hwft].
       constructor. exact (IHmany Hwfe Hwft).
+      subst rho0; cbn. now rewrite Nnat.Nat2N.id.
     (* eval_Case_step *)
     - intros ind npars mch brs rho0 dc vs body c r f1 f2 t1 t2
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
@@ -625,15 +632,15 @@ Section EVAL_RESTRICT.
       eapply fuel_sem.eval_LetIn_step_OOT; eassumption.
     (* eval_Construct_step *)
     - intros ind c args vs dc rho0 fs ts Hdc _ IHmany Hwfe Hwft.
-      apply (wellformed_tConstruct Σ_tail) in Hwft.
+      apply (wellformed_tConstruct Σ_tail) in Hwft as [hl Hwft].
       destruct (IHmany Hwfe Hwft) as [Hmany' Hwf_vs].
       split.
       + eapply fuel_sem.eval_Construct_step; eassumption.
-      + constructor. exact Hwf_vs.
+      + constructor. exact Hwf_vs. subst rho0; cbn; now rewrite Nnat.Nat2N.id.
     (* eval_Construct_step_OOT *)
     - intros ind c args args_done args_rest e0 vs rho0 fs f0 t0 ts
              Hargs _ IHmany _ IHe Hwfe Hwft.
-      apply (wellformed_tConstruct Σ_tail) in Hwft.
+      apply (wellformed_tConstruct Σ_tail) in Hwft as [hl Hwft].
       pose proof Hargs as Hargs'.
       rewrite Hargs in Hwft. apply Forall_app in Hwft as [Hwf_done Hwf_rest].
       inversion Hwf_rest as [| ? ? Hwf_e0 _]. subst.

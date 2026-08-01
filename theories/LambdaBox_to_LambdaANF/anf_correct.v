@@ -52,8 +52,9 @@ Section Correct.
   Context {efl : EEnvFlags}.
 
   Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+    forall dc dc' tg,
+      dcon_to_tag dc tgm = Some tg ->
+      dcon_to_tag dc' tgm = Some tg -> dc = dc').
 
   Context (cenv_case_consistent : forall P ctag,
     caseConsistent cenv P ctag).
@@ -66,6 +67,7 @@ Section Correct.
     | EAst.tRel _ => 0  (* variables translate to [Hole_c], so no target step *)
     | EAst.tLetIn _ _ _ => 0
     | EAst.tConst _ => 0  (* globals are values: no fuel overhead *)
+    | EAst.tLambda _ _ => 0 (* lambdas are values *)
     | _ => 1
     end.
 
@@ -86,7 +88,7 @@ Section Correct.
       + destruct (Nat.eqb (Datatypes.length names) nargs) eqn:Hlen;
           [apply Nat.eqb_eq in Hlen; lia | discriminate].
       + specialize (IH _ Hfind). lia.
-  Admitted.
+  Qed.
 
   Lemma find_branch_In ind c nargs brs body :
     find_branch ind c nargs brs = Some body ->
@@ -3030,13 +3032,12 @@ Section Correct.
           repeat match goal with [ X : _ * _ |- _ ] => destruct X end.
           unfold one_step in *. lia. }
   Qed.
-
   (* Connecting source find_branch to target find_tag_nth via anf_cvt_rel_branches *)
   Lemma anf_cvt_rel_branches_find_branch S1 ind brs n vn r S2 pats c nargs body :
     anf_cvt_rel_branches func_tag default_tag tgm cmap S1 ind brs n vn r S2 pats ->
     find_branch ind c nargs brs = Some body ->
-    let tg := dcon_to_tag default_tag (dcon_of_con ind (c + N.to_nat n)) tgm in
-    exists vars S_mid S_out C_br r_br ctx_p m,
+    exists tg vars S_mid S_out C_br r_br ctx_p m,
+      dcon_to_tag (dcon_of_con ind (c + N.to_nat n)) tgm = Some tg /\    
       FromList vars \subset S_mid /\
       Datatypes.length vars = nargs /\
       NoDup vars /\
@@ -3060,11 +3061,10 @@ Section Correct.
          H5 : NoDup vars
          H8 : Datatypes.length vars = Datatypes.length lnames
          H15 : anf_cvt_rel ... (S3 \\ FromList vars) body (vars ++ vn) S2 C1 r1 *)
-      eexists vars, S3, S2, C1, r1,
-        (ctx_bind_proj (dcon_to_tag default_tag (dcon_of_con ind (N.to_nat n)) tgm)
-                       r vars (Datatypes.length vars)),
+      eexists tg, vars, S3, S2, C1, r1,
+        (ctx_bind_proj tg r vars (Datatypes.length vars)),
         1.
-      split; [| split; [| split; [| split; [| split; [| split]]]]].
+      split; [assumption|]. split; [| split; [| split; [| split; [| split; [| split]]]]].
       + exact H4.
       + exact H8.
       + exact H5.
@@ -3082,13 +3082,16 @@ Section Correct.
       (* H3 : anf_cvt_rel_branches ... S1 ind brs' (n+1) vn r S3 pats' *)
       replace (c' - 0)%nat with c' in Hfind by lia.
       edestruct (IH brs' S1 S3 pats' (n + 1)%N) as
-        (vars' & S_mid & S_out & C_br & r_br & ctx_p_f & m_f &
+        (tg' & vars' & S_mid & S_out & C_br & r_br & ctx_p_f & m_f & Htg' &
          Hvars_sub & Hvars_len & Hvars_nd & Hctx_p & Hfind_tag &
          Hcvt_br & HS_sub).
       { exact H3. }
       { exact Hfind. }
+      exists tg'.
       do 7 eexists.
-      split; [| split; [| split; [| split; [| split; [| split]]]]].
+      split; [| split; [| split; [| split; [| split; [| split; [| split]]]]]].
+      + replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
+        exact Htg'.
       + exact Hvars_sub.
       + exact Hvars_len.
       + exact Hvars_nd.
@@ -3097,9 +3100,8 @@ Section Correct.
       + apply find_tag_lt.
         * replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
           exact Hfind_tag.
-        * intros Hceq.
-          apply dcon_to_tag_inj in Hceq.
-          unfold dcon_of_con in Hceq. injection Hceq as Hceq. lia.
+        * intros <-. eapply dcon_to_tag_inj in Htg'; [| eexact H2].
+          injection Htg'. lia.
       + replace (S c' + N.to_nat n)%nat with (c' + N.to_nat (n + 1))%nat by lia.
         exact Hcvt_br.
       + exact HS_sub.
@@ -5059,6 +5061,7 @@ Section Correct.
               subst. rewrite M.gss in Hget. inv Hget.
               eexists. split. rewrite M.gss. reflexivity.
               rewrite preord_val_eq. simpl. split; eauto.
+              { congruence. }
               { (* Forall2 (preord_val cenv eq_fuel i) vs'0 vs_new *)
                 assert (Hcons_xs : list_consistent (preord_val cenv eq_fuel i) xs vs'0).
                 { eapply anf_cvt_args_consistent; try eassumption.
@@ -5269,20 +5272,21 @@ Section Correct.
         (* Invert constructor value relation *)
         remember (Con_v (dcon_of_con ind c0) vs0) as cv.
         destruct Hcon_rel_saved; try discriminate.
+        rename H0 into Hc_tag.
         injection Heqcv as Heq_dc Heq_vs. subst.
         match goal with
         | [ HF : Forall2 _ _ ?vs_tgt |- _ ] =>
           rename HF into HF2_vs;
           set (vs_anf := vs_tgt) in *
         end.
-        set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c0) tgm) in *.
+        (* set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c0) tgm) in *. *)
         assert (Hcon_rel : anf_val_rel' (Con_v (dcon_of_con ind c0) vs0) (Vconstr c_tag vs_anf)).
-        { constructor; [exact HF2_vs | reflexivity]. }
+        { constructor; [exact HF2_vs | assumption]. }
         (* Get branch conversion data *)
         edestruct (anf_cvt_rel_branches_find_branch
                      _ _ _ _ _ _ _ _ c0 _ _ Hcvt_brs Hbranch)
-          as (br_vars & S_br & S_br_out & C_br & r_br & ctx_br &
-              m_br & Hbr_sub & Hbr_len & Hbr_nd & Hctx_br_eq &
+          as (c_tag' & br_vars & S_br & S_br_out & C_br & r_br & ctx_br &
+              m_br & Hbr_tag' & Hbr_sub & Hbr_len & Hbr_nd & Hctx_br_eq &
               Hfind_tag & Hcvt_body & HS_br_sub).
         simpl in Hfind_tag, Hcvt_body, Hctx_br_eq.
         (* set up defs and rho_efun *)
@@ -5542,7 +5546,8 @@ Section Correct.
               - exact Hdis_ehalt. }
               eapply IH_body_val'; [reflexivity | exact Hrel']. }
             (* Compose: IH_body + ctx_bind_proj + Ecase_red *)
-            replace (c0 + 0)%nat with c0 in * by lia.
+            cbn in Hbr_tag'. replace (c0 + 0)%nat with c0 in * by lia.
+            assert (c_tag = c_tag') by congruence. subst c_tag'.
             assert (Hpre_ecase : preord_exp cenv
               (comp (comp (anf_bound f2 t2) (eq_fuel_n (Datatypes.length br_vars))) one_step)
               eq_fuel (i + 1)
@@ -5786,6 +5791,7 @@ Section Correct.
         { eapply Forall2_nthN; [exact Hf2_vs |].
           rewrite nthN_nth_error. exact Hnth_proj. }
         destruct Hnth_anf as [v_proj [Hnth_vs_anf Hrel_proj]].
+        assert (c_tag = c_tag0) by congruence. subst c_tag0.
         (* Chain: post_monotonic + trans(IH_c, trans(Eproj_red, env bridge)) *)
         eapply preord_exp_post_monotonic.
         2:{ eapply preord_exp_trans; [tci | exact eq_fuel_idemp | | ].
@@ -5797,11 +5803,10 @@ Section Correct.
                     anf_val_rel' v0 v0' ->
                     preord_exp cenv (anf_bound f1 t1) eq_fuel m
                       (Eproj x_res
-                         (dcon_to_tag default_tag (dcon_of_con (proj_ind p0) 0) tgm)
+                         c_tag
                          (N.of_nat (proj_arg p0)) x e_k,
                        M.set x v0' rho)
-                      (C0 |[ Eproj x_res
-                                 (dcon_to_tag default_tag (dcon_of_con (proj_ind p0) 0) tgm)
+                      (C0 |[ Eproj x_res c_tag                                 
                                  (N.of_nat (proj_arg p0)) x e_k ]|, rho)).
                 { eapply (IH_c rho vnames C0 x S S2 m).
                 - exact Hwf.

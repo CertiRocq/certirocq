@@ -38,8 +38,9 @@ Section Divergence.
   Context {efl : EEnvFlags}.
 
   Context (dcon_to_tag_inj :
-    forall dc dc',
-      dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
+    forall dc dc' tg,
+      dcon_to_tag dc tgm = Some tg ->
+      dcon_to_tag dc' tgm = Some tg -> dc = dc').
 
 
   Context (cenv_case_consistent : forall P ctag,
@@ -3940,9 +3941,9 @@ Section Divergence.
                         _).
               assert (Datatypes.S f1 < f0).
               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                simpl in H3. lia. }
+                simpl in H3. revert H3. lia. }
               exact H. }
-          set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *.
+          (* set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *. *)
           set (e_k_inner :=
                  C2 |[ Econstr x c_tag (xs_done ++ x1 :: xs) e_k ]|) in *.
           set (e_k_done := C1 |[ e_k_inner ]|) in *.
@@ -4417,18 +4418,20 @@ Section Divergence.
               rename HF into HF2_vs;
               set (vs_anf := vs_tgt) in *
           end.
-          set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *.
+          (* set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *. *)
           assert (Hcon_rel : anf_val_rel' (fuel_sem.Con_v (dcon_of_con ind c) vs0)
                                         (Vconstr c_tag vs_anf)).
-          { constructor; [exact HF2_vs | reflexivity]. }
+          { constructor; [exact HF2_vs | assumption]. }
           edestruct (@anf_cvt_rel_branches_find_branch
                        func_tag default_tag tgm cmap Σ dcon_to_tag_inj
                        S2 ind brs 0%N vnames y S3 pats c (Datatypes.length vs0) body
                        Hcvt_brs H1)
-            as (br_vars & S_br & S_br_out & C_br & r_br & ctx_br & m_br &
-                Hbr_sub & Hbr_len & Hbr_nd & Hctx_br_eq &
+            as (c_tag' & br_vars & S_br & S_br_out & C_br & r_br & ctx_br & m_br &
+                Hc_tag' & Hbr_sub & Hbr_len & Hbr_nd & Hctx_br_eq &
                 Hfind_tag & Hcvt_body & HS_br_sub).
-          simpl in Hfind_tag, Hcvt_body, Hctx_br_eq.
+          simpl in Hc_tag', Hfind_tag, Hcvt_body, Hctx_br_eq.
+          replace (c + 0) with c in Hc_tag' by lia.
+          assert (c_tag = c_tag') by congruence. subst c_tag'.
           replace (c + 0) with c in Hfind_tag by lia.
           replace (c + 0) with c in Hctx_br_eq by lia.
           set (f_fun := f3).
@@ -5006,8 +5009,7 @@ Section Divergence.
           assert (Hdis_eproj :
             Disjoint _
                      (occurs_free
-                        (Eproj x
-                           (dcon_to_tag default_tag (dcon_of_con (proj_ind p) 0) tgm)
+                        (Eproj x c_tag
                            (N.of_nat (proj_arg p)) x0 e_k))
                      ((S \\ S2) \\ [set x0])).
           { eapply Disjoint_Included_l;
@@ -5055,7 +5057,7 @@ Section Divergence.
                            rho0 c src_v (Datatypes.S f1) tv
                            rho vnames C0 x0 S S2 0
                            (Eproj x
-                              (dcon_to_tag default_tag (dcon_of_con (proj_ind p) 0) tgm)
+                              c_tag
                               (N.of_nat (proj_arg p)) x0 e_k)
                            src_v' 0
                            (le_n _)
@@ -5074,7 +5076,7 @@ Section Divergence.
                            (bstep_fuel_zero_OOT cenv
                               (M.set x0 src_v' rho)
                               (Eproj x
-                                 (dcon_to_tag default_tag (dcon_of_con (proj_ind p) 0) tgm)
+                                 c_tag
                                  (N.of_nat (proj_arg p)) x0 e_k)))
                  as [c0 [Hlb Hoot_tgt]].
                exists c0. split.
@@ -5098,7 +5100,7 @@ Section Divergence.
                             Hglob_c
                             H5
                             (Eproj x
-                               (dcon_to_tag default_tag (dcon_of_con (proj_ind p) 0) tgm)
+                               c_tag
                                (N.of_nat (proj_arg p)) x0 e_k)
                             Hdis_eproj
                             (or_introl
@@ -5127,7 +5129,7 @@ Section Divergence.
                           Hglob_c
                           H5
                           (Eproj x
-                             (dcon_to_tag default_tag (dcon_of_con (proj_ind p) 0) tgm)
+                             c_tag
                              (N.of_nat (proj_arg p)) x0 e_k)
                           Hdis_eproj
                           Hns_c')
