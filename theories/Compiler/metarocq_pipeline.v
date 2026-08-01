@@ -43,10 +43,10 @@ Program Definition certirocq_post_metarocq_pipeline econf : Transform.t global_c
       (has_app := eq_refl) (has_rel := eq_refl) (has_pars := eq_refl) (has_cstrblocks := eq_refl) ▷
   consts_to_values_transformation efl' final_wcbv_flags eq_refl eq_refl eq_refl ▷
   (* Lazy-to-lambda *)
-  implement_lazy_force_transformation efl' eq_refl eq_refl eq_refl eq_refl eq_refl ▷
+  implement_lazy_force_transformation efl' eq_refl eq_refl eq_refl eq_refl eq_refl false ▷
   rebuild_wf_env_transform (efl := efl'') false false ▷
   unbox_transformation efl'' final_wcbv_flags (has_app := _) (has_cofix := _) (has_prop_case := eq_refl) (has_letin := eq_refl) (has_cstrparams := eq_refl) (has_cstr_block := eq_refl) ▷
-  implement_box_transformation efl'' eq_refl eq_refl eq_refl eq_refl eq_refl ▷
+  implement_box_transformation efl'' eq_refl eq_refl eq_refl eq_refl eq_refl false ▷
   ETransform.optional_self_transform econf.(enable_unsafe).(inductives_extraction)
     (rebuild_wf_env_transform (efl := efl''') false false ▷
        extract_inductive_transformation efl''' final_wcbv_flags econf.(extracted_inductives) ▷

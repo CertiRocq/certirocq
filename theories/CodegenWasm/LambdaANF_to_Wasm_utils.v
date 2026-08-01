@@ -1030,7 +1030,7 @@ Proof.
   unfold store, write_bytes_meminst. intros.
   destruct ((n + off + N.of_nat (Datatypes.length bs) <=? mem_length m)%N) eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hb=>//. inv H.
-  apply write_bytes_preserve_length in Hb.
+  apply write_bytes_gen_preserve_length in Hb.
   unfold mem_length.
   now rewrite Hb.
 Qed.
@@ -1039,22 +1039,18 @@ Lemma enough_space_to_store m k off bs :
   (k + off + N.of_nat (length bs) <= mem_length m)%N ->
   store m k off bs (length bs) <> None.
 Proof.
-  intros. unfold store, write_bytes_meminst, bytes_takefill.
-  apply N.leb_le in H. rewrite H.
-  intro Hcontra.
-  destruct (write_bytes _ _ _) eqn:Hby=>//. clear Hcontra.
-  destruct (length bs <? length bs) eqn:Hcontra; first lia. clear Hcontra.
-  generalize dependent k. revert off m.
-  induction bs; intros=>//.
-  cbn in Hby, H.
-  destruct (mem_update _ _ _) eqn:Hupd.
-  2:{ eapply mem_update_ib; eauto. unfold mem_length in H. lia. }
-  assert ((k + (N.succ off) + N.of_nat (Datatypes.length bs) <=? mem_length m)%N = true)
-      as Hlen by lia.
-  clear H.
-  eapply (IHbs _ (Build_meminst (meminst_type m) m0)); last eassumption.
-  apply mem_update_length in Hupd.
-  unfold mem_length in *. rewrite Hupd. lia.
+  intros H. unfold store.
+  assert ((k + off + N.of_nat (length bs) <=? mem_length m)%N = true) as Hleb
+      by now apply N.leb_le.
+  rewrite Hleb.
+  assert (bytes_takefill #00 (length bs) bs = bs) as Hfill.
+  { unfold bytes_takefill. rewrite Nat.ltb_irrefl. apply List.firstn_all. }
+  rewrite Hfill.
+  unfold write_bytes_meminst, write_bytes.
+  destruct (write_bytes_gen _ _ _ _) eqn:Hby=>//.
+  exfalso. revert Hby. unfold write_bytes_gen.
+  apply mem_update_gen_ib.
+  unfold mem_length in H. exact H.
 Qed.
 
 Definition load_i32 m addr : option value_num :=
@@ -1098,34 +1094,74 @@ Definition wasm_value_to_i32 (v : wasm_value) :=
 (* memory TODO cleanup/automate *)
 
 
+Lemma nth_error_iota : forall len m n,
+  Nat.lt n len -> List.nth_error (iota m len) n = Some (Nat.add m n).
+Proof.
+  induction len; intros m n Hlt; first lia.
+  destruct n; cbn.
+  - by rewrite Nat.add_0_r.
+  - rewrite IHlen; last lia. f_equal. lia.
+Qed.
+
+Lemma write_bytes_read_bytes : forall mt md addr bs m0,
+  write_bytes md addr bs = Some m0 ->
+  read_bytes {| meminst_type := mt; meminst_data := m0 |} addr (length bs) = Some bs.
+Proof.
+  intros mt md addr bs m0 Hw.
+  unfold read_bytes. cbn.
+  apply those_spec.
+  { rewrite length_map. apply (size_iota 0 (length bs)). }
+  intros n x Hnth.
+  assert (Nat.lt n (length bs)) as Hlt by (apply nth_error_Some; congruence).
+  erewrite map_nth_error; last first.
+  { apply nth_error_iota. exact Hlt. }
+  cbn. do 2 f_equal.
+  unfold write_bytes, write_bytes_gen in Hw.
+  erewrite mem_update_gen_lookup; [ | exact Hw | lia ].
+  unfold lookup_N. rewrite Nnat.Nat2N.id. by rewrite Hnth.
+Qed.
+
+Lemma bytes_takefill_id : forall n bs, length bs = n -> bytes_takefill #00 n bs = bs.
+Proof.
+  intros n bs Hlen. unfold bytes_takefill.
+  rewrite Hlen Nat.ltb_irrefl -Hlen. apply List.firstn_all.
+Qed.
+
+Lemma in_iota_lt : forall len m n,
+  List.In n (iota m len) -> Nat.lt n (Nat.add m len).
+Proof.
+  induction len; intros m n Hin; cbn in Hin; first by [].
+  destruct Hin as [->|Hin]; first lia.
+  apply IHlen in Hin. lia.
+Qed.
+
+(* A write that lies entirely above the read range doesn't affect the read. *)
+Lemma write_bytes_read_bytes_ne : forall mt md addr bs m0 a len,
+  write_bytes md addr bs = Some m0 ->
+  (a + N.of_nat len <= addr)%N ->
+  read_bytes {| meminst_type := mt; meminst_data := m0 |} a len
+  = read_bytes {| meminst_type := mt; meminst_data := md |} a len.
+Proof.
+  intros mt md addr bs m0 a len Hw Hdisj.
+  unfold read_bytes. cbn. f_equal.
+  apply map_ext_in. intros off Hin.
+  apply in_iota_lt in Hin. cbn in Hin.
+  unfold write_bytes, write_bytes_gen in Hw.
+  apply: mem_update_gen_lookup_lt; first exact Hw.
+  lia.
+Qed.
+
 Lemma write_bytes_read_bytes_i32 : forall m addr v m0,
   length v = 4 ->
   write_bytes (meminst_data m) addr (bytes_takefill #00 4 v) = Some m0 ->
   read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |} addr 4 = Some v.
 Proof.
-  intros. do 5 destruct v=>//. cbn in H0.
-  rewrite -!N.add_assoc in H0. cbn in H0.
-  destruct (mem_update addr _ _) eqn:Hu1=>//.
-  destruct (mem_update (addr + 1) _ _) eqn:Hu2=>//.
-  destruct (mem_update (addr + 2) _ _) eqn:Hu3=>//.
-  destruct (mem_update (addr + 3) _ _) eqn:Hu4=>//. inv H0.
-  unfold read_bytes, those. cbn.
-  replace (mem_lookup (addr + 3) m0) with (Some b2).
-  2:{ now apply mem_update_lookup in Hu4. }
-
-  replace (mem_lookup (addr + 2) m0) with (Some b1).
-  2:{ apply mem_update_lookup in Hu3.
-      erewrite mem_update_lookup_ne; eauto. lia. }
-
-  replace (mem_lookup (addr + 1) m0) with (Some b0).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 1)%N) in Hu4, Hu3; try lia.
-      rewrite Hu4 Hu3. now erewrite mem_update_lookup. }
-
-  replace (addr + 0)%N with addr by lia.
-  replace (mem_lookup addr m0) with (Some b).
-  2: { apply mem_update_lookup_ne with (i:=addr) in Hu4, Hu3, Hu2; try lia.
-       rewrite Hu4 Hu3 Hu2. now erewrite mem_update_lookup. }
-  reflexivity.
+  intros m addr v m0 Hlen Hw.
+  rewrite (bytes_takefill_id _ _ Hlen) in Hw.
+  have Hres : read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |}
+                addr (length v) = Some v
+    by apply: write_bytes_read_bytes; exact Hw.
+  by rewrite Hlen in Hres.
 Qed.
 
 Lemma store_load_i32 : forall m m' addr v,
@@ -1137,7 +1173,7 @@ Proof.
   destruct (addr + 0 + N.of_nat 4 <=? mem_length m)%N eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hby=>//. inv H0.
   unfold load. cbn.
-  have Hlen' := (write_bytes_preserve_length Hby). unfold mem_length in *. cbn.
+  have Hlen' := (write_bytes_gen_preserve_length Hby). unfold mem_length in *. cbn.
   destruct (addr + 4 <=? memory.mem_length m0)%N eqn:Hlen''; try lia.
   cbn.
   now erewrite write_bytes_read_bytes_i32.
@@ -1149,50 +1185,12 @@ Lemma write_bytes_read_bytes_i64 : forall m addr v m0,
   write_bytes (meminst_data m) addr (bytes_takefill #00 8 v) = Some m0 ->
   read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |} addr 8 = Some v.
 Proof.
-  intros. do 9 destruct v=>//. cbn in H0.
-  rewrite -!N.add_assoc in H0. cbn in H0.
-  destruct (mem_update addr _ _) eqn:Hu1=>//.
-  destruct (mem_update (addr + 1) _ _) eqn:Hu2=>//.
-  destruct (mem_update (addr + 2) _ _) eqn:Hu3=>//.
-  destruct (mem_update (addr + 3) _ _) eqn:Hu4=>//.
-  destruct (mem_update (addr + 4) _ _) eqn:Hu5=>//.
-  destruct (mem_update (addr + 5) _ _) eqn:Hu6=>//.
-  destruct (mem_update (addr + 6) _ _) eqn:Hu7=>//.
-  destruct (mem_update (addr + 7) _ _) eqn:Hu8=>//. inv H0.
-  unfold read_bytes, those. cbn.
-  replace (mem_lookup (addr + 7) m0) with (Some b6).
-  2:{ now eapply mem_update_lookup in Hu8. }
-
-  replace (mem_lookup (addr + 6) m0) with (Some b5).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 6)%N) in Hu8.
-      rewrite Hu8. now erewrite mem_update_lookup. lia. }
-
-  replace (mem_lookup (addr + 5) m0) with (Some b4).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 5)%N) in Hu8, Hu7; try lia.
-      rewrite Hu8 Hu7. now erewrite mem_update_lookup. }
-
-  replace (mem_lookup (addr + 4) m0) with (Some b3).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 4)%N) in Hu8, Hu7, Hu6; try lia.
-      rewrite Hu8 Hu7 Hu6. now erewrite mem_update_lookup. }
-
-  replace (mem_lookup (addr + 3) m0) with (Some b2).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 3)%N) in Hu8, Hu7, Hu6, Hu5; try lia.
-      rewrite Hu8 Hu7 Hu6 Hu5. now erewrite mem_update_lookup. }
-
-  replace (mem_lookup (addr + 2) m0) with (Some b1).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 2)%N) in Hu8, Hu7, Hu6, Hu5, Hu4;
-        try lia.
-      rewrite Hu8 Hu7 Hu6 Hu5 Hu4. now erewrite mem_update_lookup. }
-
-  replace (mem_lookup (addr + 1) m0) with (Some b0).
-  2:{ apply mem_update_lookup_ne with (i:=(addr + 1)%N) in Hu8, Hu7, Hu6, Hu5, Hu4, Hu3; try lia.
-      rewrite Hu8 Hu7 Hu6 Hu5 Hu4 Hu3. now erewrite mem_update_lookup. }
-
-  replace (addr + 0)%N with addr by lia.
-  replace (mem_lookup addr m0) with (Some b).
-  2: { apply mem_update_lookup_ne with (i:=addr) in Hu8, Hu7, Hu6, Hu5, Hu4, Hu3, Hu2; try lia.
-       rewrite Hu8 Hu7 Hu6 Hu5 Hu4 Hu3 Hu2. now erewrite mem_update_lookup. }
-  reflexivity.
+  intros m addr v m0 Hlen Hw.
+  rewrite (bytes_takefill_id _ _ Hlen) in Hw.
+  have Hres : read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |}
+                addr (length v) = Some v
+    by apply: write_bytes_read_bytes; exact Hw.
+  by rewrite Hlen in Hres.
 Qed.
 
 Lemma store_load_i64 : forall m m' addr v,
@@ -1204,7 +1202,7 @@ Proof.
   destruct (addr + 0 + N.of_nat 8 <=? mem_length m)%N eqn:Hlen=>//.
   destruct (write_bytes _ _ _) eqn:Hby=>//. inv H0.
   unfold load. cbn.
-  have Hlen' := (write_bytes_preserve_length Hby). unfold mem_length in *. cbn.
+  have Hlen' := (write_bytes_gen_preserve_length Hby). unfold mem_length in *. cbn.
   destruct (addr + 8 <=? memory.mem_length m0)%N eqn:Hlen''; try lia.
   now erewrite write_bytes_read_bytes_i64.
 Qed.
@@ -1385,40 +1383,17 @@ Lemma load_store_load_i32 : forall m m' a1 a2 v w,
   store m a2 0%N w 4 = Some m' ->
   load_i32 m' a1 = Some v.
 Proof.
-  unfold store, load_i32, load, write_bytes_meminst. intros.
-  do 5 destruct w=>//.
-  destruct (a2 + 0 + N.of_nat 4 <=? mem_length m)%N eqn:Hlen=>//.
-  destruct (a1 + (0 + 4) <=? mem_length m)%N eqn:Hlen'=>//.
-  destruct (read_bytes _ _ _) eqn:Hread=>//.
-  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
-  unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
-  unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
-  cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
-  destruct (mem_lookup (a1 + 0) _) eqn:Hl0=>//.
-  destruct (mem_lookup (a1 + 1) _) eqn:Hl1=>//.
-  destruct (mem_lookup (a1 + 2) _) eqn:Hl2=>//.
-  destruct (mem_lookup (a1 + 3) _) eqn:Hl3=>//. inv Hread.
-
-  cbn in Hwrite. rewrite -!N.add_assoc in Hwrite. cbn in Hwrite.
-  destruct (mem_update (a2 + 0) _ _) eqn:Hu0=>//.
-  destruct (mem_update (a2 + 1) _ _) eqn:Hu1=>//.
-  destruct (mem_update (a2 + 2) _ _) eqn:Hu2=>//.
-  destruct (mem_update (a2 + 3) _ _) eqn:Hu3=>//. inv Hwrite.
-
-  replace (mem_lookup (a1 + 0) m0) with (Some b4).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+0)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-
-  replace (mem_lookup (a1 + 1) m0) with (Some b5).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+1)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-
-  replace (mem_lookup (a1 + 2) m0) with (Some b6).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+2)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-
-  replace (mem_lookup (a1 + 3) m0) with (Some b7).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+3)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-
-  reflexivity.
+  intros m m' a1 a2 v w Hlw Hdisj Hload Hstore.
+  unfold store, write_bytes_meminst in Hstore.
+  destruct (_ <=? _)%N eqn:Hlen=>//.
+  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv Hstore.
+  have Hlen' := write_bytes_gen_preserve_length Hwrite.
+  unfold load_i32, load in *.
+  replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
+     with (mem_length m) by (unfold mem_length; cbn; congruence).
+  destruct (_ <=? _)%N eqn:Hlen2=>//.
+  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  exact Hload.
 Qed.
 
 
@@ -1433,41 +1408,17 @@ Lemma load_store_load_i32' : forall m m' a1 a2 v w,
   store m a2 0%N w 8 = Some m' ->
   load_i32 m' a1 = Some v.
 Proof.
-  unfold store, load_i32, load, write_bytes_meminst. intros.
-  do 9 destruct w=>//.
-  destruct (a2 + 0 + N.of_nat 8 <=? mem_length m)%N eqn:Hlen=>//.
-  destruct (a1 + (0 + 4) <=? mem_length m)%N eqn:Hlen'=>//.
-  destruct (read_bytes _ _ _) eqn:Hread=>//.
-  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
-  unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
-  unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
-  cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
-  destruct (mem_lookup (a1 + 0) _) eqn:Hl0=>//.
-  destruct (mem_lookup (a1 + 1) _) eqn:Hl1=>//.
-  destruct (mem_lookup (a1 + 2) _) eqn:Hl2=>//.
-  destruct (mem_lookup (a1 + 3) _) eqn:Hl3=>//. inv Hread.
-
-  cbn in Hwrite. rewrite -!N.add_assoc in Hwrite. cbn in Hwrite.
-  destruct (mem_update (a2 + 0) _ _) eqn:Hu0=>//.
-  destruct (mem_update (a2 + 1) _ _) eqn:Hu1=>//.
-  destruct (mem_update (a2 + 2) _ _) eqn:Hu2=>//.
-  destruct (mem_update (a2 + 3) _ _) eqn:Hu3=>//.
-  destruct (mem_update (a2 + 4) _ _) eqn:Hu4=>//.
-  destruct (mem_update (a2 + 5) _ _) eqn:Hu5=>//.
-  destruct (mem_update (a2 + 6) _ _) eqn:Hu6=>//.
-  destruct (mem_update (a2 + 7) _ _) eqn:Hu7=>//. inv Hwrite.
-
-  replace (mem_lookup (a1 + 0) m0) with (Some b8).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+0)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 1) m0) with (Some b9).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+1)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 2) m0) with (Some b10).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+2)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 3) m0) with (Some b11).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+3)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-
-  reflexivity.
+  intros m m' a1 a2 v w Hlw Hdisj Hload Hstore.
+  unfold store, write_bytes_meminst in Hstore.
+  destruct (_ <=? _)%N eqn:Hlen=>//.
+  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv Hstore.
+  have Hlen' := write_bytes_gen_preserve_length Hwrite.
+  unfold load_i32, load in *.
+  replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
+     with (mem_length m) by (unfold mem_length; cbn; congruence).
+  destruct (_ <=? _)%N eqn:Hlen2=>//.
+  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  exact Hload.
 Qed.
 
 
@@ -1478,49 +1429,17 @@ Lemma load_store_load_i64 : forall m m' a1 a2 v w,
   store m a2 0%N w 4 = Some m' ->
   load_i64 m' a1 = Some v.
 Proof.
-  unfold store, load_i32, load_i64, load, write_bytes_meminst. intros.
-  do 5 destruct w=>//.
-  destruct (a2 + 0 + N.of_nat 4 <=? mem_length m)%N eqn:Hlen=>//.
-  destruct (a1 + (0 + 8) <=? mem_length m)%N eqn:Hlen'=>//.
-  destruct (read_bytes _ _ _) eqn:Hread=>//.
-  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
-  unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
-  unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
-  cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
-  destruct (mem_lookup (a1 + 0) _) eqn:Hl0=>//.
-  destruct (mem_lookup (a1 + 1) _) eqn:Hl1=>//.
-  destruct (mem_lookup (a1 + 2) _) eqn:Hl2=>//.
-  destruct (mem_lookup (a1 + 3) _) eqn:Hl3=>//.
-  destruct (mem_lookup (a1 + 4) _) eqn:Hl4=>//.
-  destruct (mem_lookup (a1 + 5) _) eqn:Hl5=>//.
-  destruct (mem_lookup (a1 + 6) _) eqn:Hl6=>//.
-  destruct (mem_lookup (a1 + 7) _) eqn:Hl7=>//. inv Hread.
-
-  cbn in Hwrite. rewrite -!N.add_assoc in Hwrite. cbn in Hwrite.
-  destruct (mem_update (a2 + 0) _ _) eqn:Hu0=>//.
-  destruct (mem_update (a2 + 1) _ _) eqn:Hu1=>//.
-  destruct (mem_update (a2 + 2) _ _) eqn:Hu2=>//.
-  destruct (mem_update (a2 + 3) _ _) eqn:Hu3=>//. inv Hwrite.
-
-  replace (mem_lookup (a1 + 0) m0) with (Some b4).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+0)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 1) m0) with (Some b5).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+1)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 2) m0) with (Some b6).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+2)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 3) m0) with (Some b7).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+3)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 4) m0) with (Some b8).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+4)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 5) m0) with (Some b9).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+5)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 6) m0) with (Some b10).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+6)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-  replace (mem_lookup (a1 + 7) m0) with (Some b11).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+7)%N) in Hu0, Hu1, Hu2, Hu3; try lia. congruence. }
-
-  reflexivity.
+  intros m m' a1 a2 v w Hlw Hdisj Hload Hstore.
+  unfold store, write_bytes_meminst in Hstore.
+  destruct (_ <=? _)%N eqn:Hlen=>//.
+  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv Hstore.
+  have Hlen' := write_bytes_gen_preserve_length Hwrite.
+  unfold load_i64, load in *.
+  replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
+     with (mem_length m) by (unfold mem_length; cbn; congruence).
+  destruct (_ <=? _)%N eqn:Hlen2=>//.
+  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  exact Hload.
 Qed.
 
 Lemma load_store_load_i64' : forall m m' a1 a2 v w,
@@ -1530,53 +1449,17 @@ Lemma load_store_load_i64' : forall m m' a1 a2 v w,
   store m a2 0%N w 8 = Some m' ->
   load_i64 m' a1 = Some v.
 Proof.
-  unfold store, load_i32, load_i64, load, write_bytes_meminst. intros.
-  do 9 destruct w=>//.
-  destruct (a2 + 0 + N.of_nat 8 <=? mem_length m)%N eqn:Hlen=>//.
-  destruct (a1 + (0 + 8) <=? mem_length m)%N eqn:Hlen'=>//.
-  destruct (read_bytes _ _ _) eqn:Hread=>//.
-  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv H2. inv H1.
-  have Hlen'' := write_bytes_preserve_length Hwrite.
-  unfold mem_length. cbn. rewrite -Hlen'' Hlen'.
-  unfold read_bytes, those in *. cbn. rewrite -!N.add_assoc. cbn.
-  cbn in Hread. rewrite -!N.add_assoc in Hread. cbn in Hread.
-  destruct (mem_lookup (a1 + 0) _) eqn:Hl0=>//.
-  destruct (mem_lookup (a1 + 1) _) eqn:Hl1=>//.
-  destruct (mem_lookup (a1 + 2) _) eqn:Hl2=>//.
-  destruct (mem_lookup (a1 + 3) _) eqn:Hl3=>//.
-  destruct (mem_lookup (a1 + 4) _) eqn:Hl4=>//.
-  destruct (mem_lookup (a1 + 5) _) eqn:Hl5=>//.
-  destruct (mem_lookup (a1 + 6) _) eqn:Hl6=>//.
-  destruct (mem_lookup (a1 + 7) _) eqn:Hl7=>//. inv Hread.
-
-  cbn in Hwrite. rewrite -!N.add_assoc in Hwrite. cbn in Hwrite.
-  destruct (mem_update (a2 + 0) _ _) eqn:Hu0=>//.
-  destruct (mem_update (a2 + 1) _ _) eqn:Hu1=>//.
-  destruct (mem_update (a2 + 2) _ _) eqn:Hu2=>//.
-  destruct (mem_update (a2 + 3) _ _) eqn:Hu3=>//.
-  destruct (mem_update (a2 + 4) _ _) eqn:Hu4=>//.
-  destruct (mem_update (a2 + 5) _ _) eqn:Hu5=>//.
-  destruct (mem_update (a2 + 6) _ _) eqn:Hu6=>//.
-  destruct (mem_update (a2 + 7) _ _) eqn:Hu7=>//. inv Hwrite.
-
-  replace (mem_lookup (a1 + 0) m0) with (Some b8).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+0)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 1) m0) with (Some b9).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+1)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 2) m0) with (Some b10).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+2)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 3) m0) with (Some b11).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+3)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 4) m0) with (Some b12).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+4)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 5) m0) with (Some b13).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+5)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 6) m0) with (Some b14).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+6)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-  replace (mem_lookup (a1 + 7) m0) with (Some b15).
-  2:{ apply mem_update_lookup_ne with (i:=(a1+7)%N) in Hu0, Hu1, Hu2, Hu3, Hu4, Hu5, Hu6, Hu7; try lia. congruence. }
-
-  reflexivity.
+  intros m m' a1 a2 v w Hlw Hdisj Hload Hstore.
+  unfold store, write_bytes_meminst in Hstore.
+  destruct (_ <=? _)%N eqn:Hlen=>//.
+  destruct (write_bytes _ _ _) eqn:Hwrite=>//. inv Hstore.
+  have Hlen' := write_bytes_gen_preserve_length Hwrite.
+  unfold load_i64, load in *.
+  replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
+     with (mem_length m) by (unfold mem_length; cbn; congruence).
+  destruct (_ <=? _)%N eqn:Hlen2=>//.
+  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  exact Hload.
 Qed.
 
 
@@ -1945,6 +1828,12 @@ Proof. now unfold Int64.modulus, Int64.half_modulus, two_power_nat. Qed.
 
 Hint Resolve int64_modulus_eq_pow64 : core.
 
+(* WasmCert defines the shift operations as [shl i1 (modu i2 iwordsize)];
+   normalise the shift amount to a literal modulus. *)
+Lemma int64_modu_iwordsize : forall i,
+  Int64.modu i Int64.iwordsize = Int64.repr (Int64.unsigned i mod 64).
+Proof. intros. unfold Int64.modu. now do 2 f_equal. Qed.
+
 Lemma uint63_lt_pow64 : forall (x : uint63), (0 <= to_Z x < 2^64)%Z.
 Proof.
   intros; have H := (to_Z_bounded x).
@@ -2161,10 +2050,10 @@ Lemma uint63_lsl_i64_shl : forall x y,
 Proof.
   intros.
   have H' := to_Z_bounded y.
-  unfold Int64.ishl, Int64.shl, Int64.wordsize, Integers.Wordsize_64.wordsize.
+  unfold Int64.ishl, Int64.shl. rewrite int64_modu_iwordsize.
   replace (to_Z 63) with 63%Z in H by now cbn.
   do 2 rewrite uint63_unsigned_id.
-  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64%nat))) with (to_Z y). 2: now rewrite Z.mod_small; [rewrite uint63_unsigned_id|].
+  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64))) with (to_Z y). 2: now rewrite Z.mod_small; [rewrite uint63_unsigned_id|].
   rewrite Z.shiftl_mul_pow2. 2: lia.
   now rewrite lsl_spec; rewrite int64_bitmask_modulo.
 Qed.
@@ -2184,10 +2073,10 @@ Lemma uint63_lsr_i64_shr : forall x y,
 Proof.
   intros.
   have H' := to_Z_bounded y.
-  unfold Int64.ishr_u, Int64.shru, Int64.wordsize, Integers.Wordsize_64.wordsize.
+  unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
   replace (to_Z 63) with 63%Z in H by now cbn.
   do 2 rewrite uint63_unsigned_id.
-  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64%nat))) with (to_Z y).
+  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64))) with (to_Z y).
   2: now rewrite Z.mod_small; [rewrite uint63_unsigned_id|].
   rewrite Z.shiftr_div_pow2. 2: lia.
   now rewrite lsr_spec.
@@ -2276,8 +2165,8 @@ Lemma int64_high32 : forall x,
   Int64.ishr_u x 32 = (x / 2^32)%Z.
 Proof.
 intros.
-unfold Int64.ishr_u, Int64.shru.
-replace (Int64.unsigned (Z_to_i64 (Int64.unsigned 32 mod Int64.wordsize))) with (Int64.unsigned 32%Z) by now cbn.
+unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
+replace (Int64.unsigned (Z_to_i64 (Int64.unsigned 32 mod 64))) with (Int64.unsigned 32%Z) by now cbn.
 replace (Int64.unsigned x) with x; auto.
 replace (Int64.unsigned 32%Z) with 32%Z; auto.
 now rewrite Z.shiftr_div_pow2; auto.
@@ -2485,9 +2374,9 @@ Lemma upper_shifted_i64 : forall x y,
   Int64.ishl (Int64.repr (upper x y)) (Int64.repr 1) = Int64.repr (upper x y * 2)%Z.
 Proof.
   intros ?? Hx Hy. have H := upper_range x y Hx Hy.
-  unfold Int64.ishl, Int64.shl.
+  unfold Int64.ishl, Int64.shl. rewrite int64_modu_iwordsize.
   repeat rewrite lt_pow64_unsigned_id.
-  replace (1 mod Int64.wordsize)%Z with 1%Z by now cbn.
+  replace (1 mod 64)%Z with 1%Z by now cbn.
   rewrite Z.shiftl_mul_pow2. f_equal. lia.
   all: cbn; lia.
 Qed.
@@ -2522,10 +2411,10 @@ Lemma lower_shifted_i64 : forall x y,
     Int64.repr ((lower x y) mod 2^64 / 2^63).
 Proof.
   intros ?? Hx Hy.
-  unfold Int64.ishr_u, Int64.shru.
+  unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
   replace (Int64.unsigned (Int64.repr (lower x y))) with ((lower x y) mod 2^64)%Z.
   repeat rewrite lt_pow64_unsigned_id.
-  replace (63 mod Int64.wordsize)%Z with 63%Z by now cbn.
+  replace (63 mod 64)%Z with 63%Z by now cbn.
   rewrite Z.shiftr_div_pow2. reflexivity.
   lia. lia. cbn; lia. lia.
   cbn. rewrite Int64.Z_mod_modulus_eq. now rewrite int64_modulus_eq_pow64.
@@ -2659,7 +2548,7 @@ Qed.
 (* head0 related *)
 
 Lemma head0_spec_alt: forall x : uint63,
-  (0 < φ (x)%uint63)%Z ->
+  (0 < to_Z x)%Z ->
   (to_Z (head0 x) = 62 - Z.log2 (to_Z x))%Z.
 Proof.
   intros.
@@ -3172,7 +3061,7 @@ Proof.
   intros.
   unfold Int64.unsigned.
   rewrite clz_spec_alt.
-  replace (63 - Z.log2 (Int64.intval (Z_to_i64 φ (x)%uint63)) - 1)%Z with (62 - Z.log2 (Int64.intval (Z_to_i64 φ (x)%uint63)))%Z by lia.
+  replace (63 - Z.log2 (Int64.intval (Z_to_i64 (to_Z x))) - 1)%Z with (62 - Z.log2 (Int64.intval (Z_to_i64 (to_Z x))))%Z by lia.
   replace (Int64.intval (Z_to_i64 (to_Z x))) with (to_Z  x). rewrite head0_spec_alt; auto.
   simpl. rewrite uint63_mod_modulus_id.
   reflexivity. auto.
@@ -3471,7 +3360,7 @@ Proof.
   assert (to_Z (tail0 x) = Int64.unsigned (Int64.ctz (Int64.repr (to_Z x)))). {
     apply unique_greatest_power_of_two_divisor with (x:=to_Z x); auto.
     destruct (to_Z_bounded (tail0 x)). lia.
-    destruct (Int64.unsigned_range (Int64.ctz (Z_to_i64 φ (x)%uint63))). lia.
+    destruct (Int64.unsigned_range (Int64.ctz (Z_to_i64 (to_Z x)))). lia.
     destruct Htail0 as [y [_ Hy]]. exists y. auto.
     destruct Hctz as [y Hy]. rewrite - [(y * 2)%Z] Z.mul_comm in Hy.
     exists y; auto. }
