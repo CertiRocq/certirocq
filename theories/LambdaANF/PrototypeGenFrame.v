@@ -607,7 +607,7 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
     mind_entry_finite := Finite;
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
-    mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
+    mind_entry_universes := Monomorphic_entry;
     mind_entry_template := false;
     mind_entry_variance := None;
     mind_entry_private := None |}, ty_ns, (qual, snd typename +++ "_univD"), body).
@@ -683,7 +683,7 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
     mind_entry_finite := Finite;
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
-    mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
+    mind_entry_universes := Monomorphic_entry;
     mind_entry_template := false;
     mind_entry_variance := None;
     mind_entry_private := None |}.
