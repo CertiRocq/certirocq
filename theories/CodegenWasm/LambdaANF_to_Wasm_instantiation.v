@@ -211,7 +211,7 @@ Proof.
       end) as f.
     have Hindep := nth_indep _ _ (f def).
     rewrite Hindep; try lia.
-       cbn. subst f. rewrite map_nth.
+       cbn. subst f. rewrite List.map_nth.
     rewrite IHm; auto.
 Qed.
 

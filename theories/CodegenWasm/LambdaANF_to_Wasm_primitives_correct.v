@@ -22,7 +22,7 @@ From compcert Require Import
   Coqlib common.Memory.
 
 From Wasm Require Import
-  datatypes operations host memory_list opsem
+  datatypes operations host opsem
   type_preservation properties common numerics.
 
 Import ssreflect eqtype ssrbool eqtype.
@@ -2311,7 +2311,7 @@ Proof.
       unfold Int64.isub, Int64.sub. replace (Int64.unsigned (Int64.repr 1)) with 1%Z by now cbn.
       rewrite Heq0. replace (Int64.clz (Int64.repr (to_Z 0))) with (Int64.repr 64). simpl.
       replace (Int64.repr 63) with (Int64.repr (to_Z (head0 0))). reflexivity.
-      rewrite head00_spec. unfold digits. reflexivity. reflexivity.
+      rewrite (head00_spec 0). unfold digits. reflexivity. reflexivity.
       rewrite to_Z_0. unfold Int64.clz. reflexivity. apply to_Z_inj in Heq0. rewrite Heq0.
       apply rt_refl.
       dostep_nary 2. apply r_simple. apply rs_binop_success; first done. simpl.
@@ -5016,10 +5016,10 @@ Proof.
       destruct (Z_le_dec (to_Z n1) 63) as [Hle | Hgt].
       { have Hn1bounded := to_Z_bounded n1.
         assert (0 <= to_Z 63 - to_Z n1 <= 63)%Z. replace (to_Z 63) with 63%Z by now cbn. split. lia. lia.
-        assert ((to_Z n1) mod Int64.wordsize = to_Z n1)%Z.
-        rewrite Z.mod_small. reflexivity. unfold Int64.wordsize, Integers.Wordsize_64.wordsize. lia.
-        assert (((to_Z 63) - (to_Z n1)) mod Int64.wordsize = 63 - (to_Z n1))%Z.
-        rewrite Z.mod_small. reflexivity. unfold Int64.wordsize, Integers.Wordsize_64.wordsize. lia.
+        assert ((to_Z n1) mod 64 = to_Z n1)%Z.
+        rewrite Z.mod_small. reflexivity. lia.
+        assert (((to_Z 63) - (to_Z n1)) mod 64 = 63 - (to_Z n1))%Z.
+        rewrite Z.mod_small. reflexivity. lia.
         assert (Int64.unsigned (Int64.repr ((to_Z 63) - (to_Z n1))) = (to_Z 63) - (to_Z n1))%Z.
         cbn. rewrite Int64.Z_mod_modulus_id. reflexivity. rewrite int64_modulus_eq_pow64. lia.
         have Hn3bounded := to_Z_bounded n3. unfold wB in Hn3bounded. cbn in Hn3bounded.
@@ -5063,10 +5063,12 @@ Proof.
         rewrite uint63_unsigned_id. rewrite uint63_unsigned_id. reflexivity.
         dostep_nary_eliml 2 1. apply r_simple. apply rs_binop_success; first done.
         simpl. unfold Int64.ishr_u. unfold Int64.shru.
+        rewrite int64_modu_iwordsize.
         rewrite H6. rewrite H5. rewrite H6. rewrite uint63_unsigned_id.
         rewrite Z.shiftr_div_pow2. reflexivity. lia.
         dostep_nary' 2. apply r_simple. apply rs_binop_success; first done. cbn.
-        unfold Int64.ishl. rewrite uint63_unsigned_id. rewrite H4.
+        unfold Int64.ishl. rewrite int64_modu_iwordsize.
+        rewrite uint63_unsigned_id. rewrite H4.
         unfold Int64.ior. rewrite Int64.shifted_or_is_add.
         reflexivity. unfold Int64.zwordsize. unfold Int64.wordsize, Integers.Wordsize_64.wordsize. lia.
         rewrite two_p_equiv.
