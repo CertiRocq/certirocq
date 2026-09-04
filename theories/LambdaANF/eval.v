@@ -110,6 +110,14 @@ Section EVAL.
         (* The definition of a function incur cost proportional to the number of FVs
         (to make the bound of the current cc independent of the term) *)
         bstep rho (Efun B e) cin v cout
+
+ | BStept_prim_val :
+    forall (rho' rho : env) (x : var) (p : primitive_value)
+             (e : exp) v (cin : fuel) (cout : trace),
+        M.set x (Vprim p) rho = rho' ->
+        bstep_fuel rho' e cin v cout ->
+        bstep rho (Eprim_val x p e) cin v cout
+
   (* | BStept_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
         (f' : list val -> option val) (ys : list var) (e : exp)
@@ -610,8 +618,11 @@ Section EVAL.
   | Efun_c_to_rho :
       forall rho rho' C B,
         ctx_to_rho C (def_funs B B rho rho) rho' ->
-        ctx_to_rho (Efun1_c B C) rho rho'.
-
+        ctx_to_rho (Efun1_c B C) rho rho'
+  | Eprimval_c_to_rho :
+      forall rho rho' x p C,
+        ctx_to_rho C (M.set x (Vprim p) rho) rho' ->
+        ctx_to_rho (Eprim_val_c x p C) rho rho'.
 
   (** * Lemmas about [ctx_to_rho] *)
 
@@ -646,6 +657,10 @@ Section EVAL.
       edestruct IHHctx as [rho'' [H1 H2']]. eassumption.
       eexists; split. econstructor; eauto.
       eassumption.
+    - inv Hcomp. eexists; split. econstructor; eauto. econstructor. now eauto.
+      edestruct IHHctx as [rho'' [H1 H2']]. eassumption.
+      eexists; split. econstructor; eauto.
+      eassumption.
   Qed.
 
   Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
@@ -656,6 +671,7 @@ Section EVAL.
     revert C2 rho1 rho2 rho3.
     induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
     - eassumption.
+    - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
@@ -724,6 +740,11 @@ Section EVAL.
         set_lists xs vs (def_funs fl fl rhoc rhoc) = Some rhoc' ->
         bstep_fuel rhoc' e_body cin OOT cout ->
         interpret_ctx (Eletapp_c x f t ys c) rho cin OOT cout
+  | Eprim_val_c_i :
+      forall rho r x v C (cin : fuel) (cout : trace),
+        interpret_ctx_fuel C (M.set x (Vprim v) rho) cin r cout ->
+        interpret_ctx (Eprim_val_c x v C) rho cin r cout
+
   with interpret_ctx_fuel : exp_ctx -> env -> fuel -> @res env -> trace -> Prop :=
   | ctx_hole:
       forall rho,
@@ -767,6 +788,12 @@ Section EVAL.
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
     - simpl in Hb, Hi. inv Hb. inv H.
+      edestruct IHC. eassumption. eassumption. destructAll.
+      do 5 eexists. split; [| split ].
+      3:{ split. econstructor 3. now congruence. Print interpret_ctx. econstructor; eauto. eassumption. }
+      rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
+      rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
+
     - simpl in Hb, Hi. inv Hb. inv H.
     - simpl in Hb, Hi. inv Hb. inv H.
       edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp.
@@ -852,7 +879,7 @@ Section EVAL.
     Unshelve. exact 0%nat.
   Qed.
 
-  Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
+  (*Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
     bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
     interprable C = true ->
     bstep_fuel rho (C |[ Eprim_val x p e2 ]|) cin OOT cout.
@@ -865,8 +892,13 @@ Section EVAL.
                  inv H; unfold one; simpl;
                  constructor 2; econstructor; eauto ]).
 
+    inv Hs. cbn in *. unfold one in H. cbn in H.
+    econstructor. exact H.
+    cbn. cbn in H. inversion H. subst. Pritn bs econstructor.
+                 cbn.
+
     Unshelve. exact 0%nat.
-  Qed.
+  Qed.*)
 
   Lemma eval_ctx_app_OOT_Eapp rho C e cin cout x f t xs :
     bstep_fuel rho (C |[ Eapp f t xs ]|) cin OOT cout ->
@@ -918,7 +950,10 @@ Section EVAL.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
       eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
-    - inv H0.
+    - inv H0. rewrite bound_var_Eprim_val_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0.
     - inv H0. rewrite bound_var_Eletapp_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
@@ -1018,7 +1053,12 @@ Section EVAL.
           rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
-      + inv H.
+      + inv H. eapply IHC in H8; eauto. inv H8.
+        * left. eapply ctx_step; [ congruence | econstructor; eauto ].
+        * destructAll. right. do 5 eexists.
+          split; [| split ]; [| eassumption |]. econstructor. congruence. econstructor; eauto.
+          rewrite (plus_assoc _ _ x1), (plus_comm (one_ctx _) x1), <- plus_assoc.
+          rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
       + inv H.

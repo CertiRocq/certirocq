@@ -1697,8 +1697,24 @@ Section uncurry_correct.
       + do 2 (rewrite M.gso; [|assumption]).
         apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
         apply Henv; auto.
-    - apply preord_exp_prim_val_compat.
+    - (* uncurry_prim_val *) 
+      eapply preord_exp_prim_val_compat.
       now eapply Hpost_prop.
+      now apply Hpost_prop.
+      intros k' v1 v2 Hk' Hv1_v2.
+      apply IH; inv Hunique; inv Hunique1; auto.
+      rewrite used_vars_Eprim_val in Hused.
+      eapply Included_trans; [|eassumption]...
+      rewrite used_vars_Eprim_val in Hused1.
+      eapply Included_trans; [|eassumption]...
+      intros a Ha; split_var_eq a x; subst; unfold preord_var_env.
+      + do 2 rewrite M.gss.
+        intros v0 Hv0; inv Hv0; eauto.
+        exists (Vprim p). split; eauto.
+        now eapply preord_val_eq.
+      + do 2 (rewrite M.gso; [|assumption]).
+        apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
+        apply Henv; auto.
     - (* uncurry_prim *)
       apply preord_exp_prim_compat.
       now eapply Hpost_prop.

@@ -29,7 +29,6 @@ Import ListNotations.
 Import common rel_comp.
 Require Import LambdaANF.term.
 
-Definition econf := Erasure.default_erasure_config.
 Import EEnvMap.
 
 From MetaRocq.Erasure Require Import EWcbvEval.
@@ -44,13 +43,13 @@ Definition env_flags :=
   switch_off_thunk (switch_off_box efl').
 
 (* CertiRocq does not support primitives yet *)
-Definition no_primitive_flags := {|
-  has_primint := false;
-  has_primfloat := false;
-  has_primstring := false;
+Definition no_primitive_array_flags := {|
+  has_primint := true;
+  has_primfloat := true;
+  has_primstring := true;
   has_primarray := false; |}.
   
-Definition switch_off_primitives (fl : ETermFlags) :=
+Definition set_primitives (fl : ETermFlags) p :=
 {| has_tBox := fl.(has_tBox)
   ; has_tRel := fl.(has_tRel)
   ; has_tVar := fl.(has_tVar)
@@ -64,7 +63,7 @@ Definition switch_off_primitives (fl : ETermFlags) :=
   ; has_tProj := fl.(has_tProj)
   ; has_tFix := fl.(has_tFix)
   ; has_tCoFix := fl.(has_tCoFix)
-  ; has_tPrim := no_primitive_flags
+  ; has_tPrim := p
   ; has_tLazy_Force := fl.(has_tLazy_Force)
 |}.
 
@@ -131,14 +130,14 @@ Section Correctness.
   Definition certirocq_flags (efl : EEnvFlags) := 
     {| has_axioms := false; 
        has_cstr_params := efl.(has_cstr_params); 
-       term_switches := switch_off_primitives efl.(term_switches);
+       term_switches := set_primitives efl.(term_switches) no_primitive_array_flags;
        cstr_as_blocks := efl.(cstr_as_blocks) |}.
 
   Definition anf_convert ie tgm := 
     convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
       (fun _ => None) ie.
   
-  Theorem metarocq_to_anf_correct (p : EProgram.eprogram) : 
+  Theorem metarocq_to_anf_correct (econf : erasure_configuration) (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
     Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
@@ -150,7 +149,8 @@ Section Correctness.
       exists M, refines_toplevel (fst p) ie tgm M (snd p) e_tgt.
   Proof.
     intros hp wf' ie tgm e_tgt comp_d' cvt.
-    cbn in hp.
+    cbn in hp. unfold certirocq_flags in wf'. cbn in wf'.
+    unfold all_env_flags in hp. cbn in hp.
     match goal with
     | [ _ : EProgram.wf_eprogram ?fl p /\ _ |- _ ] => set (efl := fl) in *
     end.
@@ -187,7 +187,7 @@ Section Correctness.
     - apply wf'.
   Qed.
 
-  Theorem metarocq_to_anf_total (p : EProgram.eprogram) : 
+  Theorem metarocq_to_anf_total econf (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
     Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
@@ -211,7 +211,7 @@ Section Correctness.
       (convert_env_reg _ _ _) next_id ie _ (proj2 wf')); trea.
     destruct prf as [e_tgt [comp_d' heq]]. exists e_tgt, comp_d'. split.
     unfold anf_convert. exact heq.
-    eapply metarocq_to_anf_correct; tea. split => //.
+    eapply (metarocq_to_anf_correct econf); tea. split => //.
   Qed.
   
   (*

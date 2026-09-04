@@ -970,28 +970,24 @@ Section LogRelCC.
   Qed.
 
   Lemma cc_approx_exp_prim_val_compat k rho1 rho2 x1 x2 p e1 e2 :
+    post_primval_compat' x1 p e1 rho1 x2 p e2 rho2 P1 P2 ->
     post_OOT' (Eprim_val x1 p e1) rho1 (Eprim_val x2 p e2) rho2 P2 ->
+    cc_approx_exp (k - 1) P1 PG (e1, M.set x1 (Vprim p) rho1)
+                       (e2, M.set x2 (Vprim p) rho2) ->
     cc_approx_exp k P2 PG (Eprim_val x1 p e1, rho1) (Eprim_val x2 p e2, rho2).
   Proof.
-    intros Hoot v1 cin cout Hleq1 Hstep1. inv Hstep1.
+    intros Hbase Hoot Hexp v1 cin cout Hleq1 Hstep1. inv Hstep1.
     - (* OOT *)
       exists OOT, cin, <0>. split. constructor; eassumption.
       split; [| now eauto ]. eapply Hoot; eauto.
-   - inv H.
-(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
-     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
-     edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
-     simpl in *; lia. simpl in *; lia.
-     eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
-     econstructor 2; eauto. lia.
-     econstructor; eauto.
-     replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.
-     eassumption.
-     replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
-     2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. }
-     eapply HPost. eassumption.
+   - inv H. eapply Hexp in H8; eauto. destruct H8 as [v2' [c2 [cout2' [Hstepv2' [Hpost2 Hprev2']]]]].
+     eexists; exists (c2 <+> one (Eprim_val x2 p e2)). eexists. split; [| split ].
+     econstructor 2; eauto.
+     econstructor; eauto. eapply Hbase;assumption.
      eapply cc_approx_res_monotonic. eassumption.
-    simpl in *. lia. *)
+     unfold one in *; simpl in *. rewrite to_nat_add in Hleq1 |- *. unfold one in *.
+    simpl in *. rewrite to_nat_one. lia.
+    rewrite to_nat_add in Hleq1. unfold one in *. rewrite to_nat_one in Hleq1. lia.
   Qed.
 
 
@@ -1495,6 +1491,17 @@ Section LogRelCC.
       simpl. eapply H1 with (C := Efun1_c B Hole_c); eauto.
       econstructor; eauto. now econstructor.
       unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
+    - intros v1' c1 Hleq1 Hstep1 Hns.
+      edestruct IHHctx as [v2' [c2 [c3 [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) in Hcc by lia.
+      eassumption.
+
+      eexists. eexists (c2 <+> one (Eprim_val_c x p C |[ e' ]|)). eexists. split; [| split ].
+      constructor 2; eauto. econstructor; eauto.
+      simpl. eapply H1 with (C := Eprim_val_c x p Hole_c); eauto.
+      econstructor; eauto. now econstructor.
+      unfold one_ctx. rewrite to_nat_one. simpl. eassumption. eassumption.
   Qed.
 
   Lemma cc_approx_exp_ctx_to_rho k (P : nat -> @PostT fuel trace) boundG rho1 rho2 rho2' C e e' m :
@@ -1569,7 +1576,24 @@ Section LogRelCC.
         erewrite <- to_nat_one. eapply H1 with (C := Efun1_c B Hole_c); try eassumption.
         econstructor; eauto. now econstructor. simpl.
         eassumption.
+    - simpl exp_ctx_len.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) by lia.
+      eapply IHHctx; eauto.
+      intros v1' c1' c2' Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c3 [c3' [Hstep2 [Hub Hcc2]]]]]; try eassumption.
+      inv Hstep2; simpl in *; repeat subst_exp.
+      + destruct v1'; try contradiction.
+        eexists OOT, c3, <0>. split. econstructor; eauto. unfold one. erewrite one_eq. eassumption.
 
+        split.
+        erewrite <- to_nat_one. eapply H2 with (C := Eprim_val_c x p Hole_c).
+        econstructor; eauto. now econstructor.
+        simpl. eassumption.
+        simpl; eauto.
+      + inv H. repeat subst_exp. do 3 eexists. split. eassumption.
+        split.
+        erewrite <- to_nat_one. eapply H1 with (C := Eprim_val_c x p Hole_c); try eassumption. constructor. constructor.
+        assumption.
   Qed.
 
   Lemma leq_sum_exists A B C:
