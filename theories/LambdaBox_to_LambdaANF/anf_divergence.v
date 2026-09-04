@@ -299,6 +299,8 @@ Section Divergence.
       remember (EAst.tConst k) as e_const in Hoot.
       remember fuel_sem.OOT as r_oot in Hoot.
       destruct Hoot; try discriminate.
+    - intros rho p v ht f_oot t_oot ev.
+      inversion ev.
     - intros rho args_done e args_rest vs_done fs' f_oot t_oot ts'
              Hargs Hdone Hoot.
       destruct args_done; simpl in Hargs; discriminate.
@@ -676,6 +678,7 @@ Section Divergence.
       assert (Hf_zero : f = 0).
       { eapply Hglob_fuel_zero; eauto. }
       exfalso. lia.
+    - intros rho p v ht f' hlt; exfalso; lia.
     - intros rho f' Hlt. exfalso. lia.
     - intros rho e es v vs f fs t ts He IH_e Hes IH_es f' Hlt.
       destruct (Nat.lt_ge_cases f' f) as [Hlt_hd | Hge_hd].
@@ -3145,7 +3148,7 @@ Section Divergence.
             { symmetry. exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                                _ _ _ H7). }
             rewrite Hfl, Hle.
-            inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies].
+            inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies |].
             subst.
             eapply Forall_forall in Hwf_mfix_bodies;
               [| eapply nth_error_In; exact Hnth_d].
@@ -3156,7 +3159,7 @@ Section Divergence.
             exact (proj2 Hwf_bod). }
           assert (Hwf_body_env : well_formed_env Σ (v2 :: fuel_sem.make_rec_env mfix rho')).
           { constructor; [exact Hwf_v2 |].
-            inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies].
+            inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies |].
             subst.
             eapply well_formed_env_make_rec_env; eauto. }
           assert (Hcons_body :

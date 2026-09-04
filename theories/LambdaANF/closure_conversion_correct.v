@@ -1072,12 +1072,48 @@ Section Closure_conversion_correct.
       + eapply Forall2_cc_approx_var_env; eauto.
 
     - (* Case Eprim_val *)
-     inv Hcc.
+     inv Hcc. 
      cbn [app_ctx_f].
      eapply cc_approx_exp_prim_val_compat.
-     eapply HOOT.
+     { eapply HPost_primval. eauto. }
+     { eapply HOOT. }
+     eapply IHe; try eassumption.
+     + intros. eapply IHk; eauto. lia.
+     + eapply cc_approx_env_P_extend.
+       eapply cc_approx_env_P_monotonic with k. lia.
+       eapply cc_approx_env_P_antimon; [ eassumption | ].
+       sets.
+       apply cc_approx_val_eq. constructor; eauto.
+     + sets.
+     + eapply binding_in_map_antimon.
+       2:{ eapply binding_in_map_set; eassumption. }
+       eapply occurs_free_Eprim_val_Included.
+     + now inv Hun.
+     + eapply Disjoint_Included; [| | eapply Hd ]; sets.
+       normalize_bound_var...
+     + eapply Disjoint_Included; [| | eapply Hd' ]; sets.
+       normalize_bound_var...
+     + eapply Fun_inv_set_In_Scope_l. now eauto.
+       eapply Fun_inv_set_In_Scope_r_not_Γ. now eauto.
+       assert (Disjoint var (image genv (Funs \\ (v |: Scope))) [set v]). 
+       eapply Disjoint_Included. 3:exact Hd'.
+       normalize_bound_var... now eauto with Ensembles_DB.
+       eapply Disjoint_sym in H. eapply Disjoint_In_l; try eassumption.
+       sets.
+       eapply Fun_inv_mon. eapply Fun_inv_monotonic; try eassumption. lia.
+     + eapply FV_inv_set_In_Scope_l. now constructor.
+       eapply FV_inv_set_r. intros Hc. eapply Hnin.
+       subst. now eauto. eapply FV_inv_extend_Scope_GFuns.
+       eapply FV_inv_monotonic. eassumption. lia.
+     + assert (~ In var GFuns v).
+       { eapply Disjoint_In_l. eapply Disjoint_sym.
+        eapply Disjoint_Included. 3:eapply Hd. 2:sets. reflexivity.
+        normalize_bound_var... }
+       eapply GFun_inv_set_not_In_GFuns_r; auto.
+       eapply GFun_inv_set_not_In_GFuns_l; auto.
+       eapply GFun_inv_monotonic. eassumption. lia.
 
-    (* Case Eprim *)
+     (* Case Eprim *)
     - inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4 * length l) by (eapply project_vars_sizeOf_ctx_exp; eauto).
       edestruct (@binding_in_map_get_list val) with (xs := l) as [vs Hgetvs]; eauto.
