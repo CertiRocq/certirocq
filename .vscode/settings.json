@@ -15,5 +15,10 @@
         "**/CVS": true,
         "**/.DS_Store": true,
         "**/Thumbs.db": true
-    }
+    },
+    "ocaml.sandbox": {
+        "kind": "opam",
+        "switch": "rocq-9.1"
+    },
+    "vsrocq.path": "_opam/bin/vsrocqtop"
 }

@@ -4,7 +4,7 @@ From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
-From CertiRocq.LambdaBox_to_LambdaANF Require Import common.
+From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
 
@@ -54,16 +54,6 @@ Section IDENT.
 
   Definition make_prim_env (prims : list (primitive * positive)) : prim_env :=
     List.fold_left (fun map '(p, pos) => M.set pos p map) prims (M.empty _).
-
-  Definition inductive_entry_aux_east (x : kername * EAst.global_decl) acc : common.ienv :=
-    match x with
-    | (s, EAst.ConstantDecl _) => acc
-    | (s, EAst.InductiveDecl m) =>
-      (s, ibodies_itypPack m.(ind_bodies)) :: acc
-    end.
-
-  Definition inductive_env_east (e : EAst.global_declarations) : common.ienv :=
-    fold_right inductive_entry_aux_east [] e.
 
   Definition compile_LambdaANF_CPS prims : CertiRocqTrans LambdaBoxEAstTerm LambdaANF_FullTerm :=
     fun src =>
@@ -210,6 +200,8 @@ Section IDENT.
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
             else id_trans e) ;;
       ret e.
+
+      Print LambdaANFenv.
 
 
     Definition run_anf_pipeline (t : LambdaANF_FullTerm) : error LambdaANF_FullTerm * string :=

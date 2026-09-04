@@ -113,7 +113,7 @@ Section ANF_Val.
   | anf_rel_Con :
       forall vs vs' dc c_tag,
         Forall2 (fun v v' => anf_val_rel v v') vs vs' ->
-        dcon_to_tag default_tag dc tgm = c_tag ->
+        dcon_to_tag dc tgm = Some c_tag ->
         anf_val_rel (Con_v dc vs) (Vconstr c_tag vs')
   | anf_rel_Clos :
       forall vs rho names na x f e C1 r1 S1 S2,
@@ -1298,6 +1298,7 @@ Section AlphaEquiv.
     - (* cons *)
       inv Hrel1. inv Hrel2.
       inversion Hall as [| ? ? IH_hd IH_tl]; subst. simpl in IH_hd.
+      assert (tg = tg0) as -> by congruence.
       eapply preord_exp_case_cons_compat.
       + eapply Hprops.
       + eapply Hprops.
@@ -1853,6 +1854,7 @@ Section AlphaEquiv.
         |].
       (* Continuation: after args converted, build constructor *)
       intros j rho1' rho2' Hj Hxs Henvvars Htransfer.
+      assert (c_tag = c_tag0) as -> by congruence.
       eapply preord_exp_constr_compat.
       - eapply Hprops.
       - eapply Hprops.
@@ -2057,6 +2059,7 @@ Section AlphaEquiv.
                   |].
       (* Continuation: after c is converted, project the field *)
       intros j rho1' rho2' Hj Hvar_c Henv' Htransfer.
+      assert (c_tag = c_tag0) as -> by congruence.
       eapply preord_exp_proj_compat.
       - eapply Hprops.
       - eapply Hprops.

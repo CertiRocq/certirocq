@@ -874,7 +874,6 @@ Section Correct.
           constructor. eassumption. eassumption. eassumption.
     Qed.
 
-
     Context
       (dcon_to_tag_inj :
          forall tgm dc dc',

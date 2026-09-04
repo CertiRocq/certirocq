@@ -23,6 +23,7 @@ LambdaBox_to_LambdaANF/common.v
 LambdaBox_to_LambdaANF/anf.v
 LambdaBox_to_LambdaANF/cps.v
 LambdaBox_to_LambdaANF/fuel_sem.v
+LambdaBox_to_LambdaANF/anf_convert_env.v
 LambdaBox_to_LambdaANF/anf_corresp.v
 LambdaBox_to_LambdaANF/anf_util.v
 LambdaBox_to_LambdaANF/wf.v
@@ -117,6 +118,7 @@ Glue/glue.v
 # Compiler
 Compiler/metarocq_pipeline.v
 Compiler/pipeline.v
+Compiler/correctness.v
 
 # Extraction
 Extraction/extraction.v
