@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "dev+9.0"
+version: "dev"
 maintainer: "The CertiRocq Team"
 homepage: "https://certirocq.org/"
 dev-repo: "git+https://github.com/CertiRocq/certirocq"
@@ -30,17 +30,22 @@ install: [
 depends: [
   "ocaml" {>= "4.13"}
   "conf-clang"
+  # "make plugins" runs plugins/manifests/generate.py
+  "conf-python-3" {build}
   "stdlib-shims"
-  "coq" {>= "9.1" & < "9.2~"}
-  "coq-compcert" {= "3.17"}
-  "rocq-equations" {= "1.3.1+9.1"}
+  "rocq-core" {>= "9.1"}
+  "rocq-stdlib" {>= "9.1"}
+  # coq-core provides the coq_makefile binary that the Makefiles invoke
+  "coq-core" {>= "9.1"}
+  "coq-compcert" {>= "3.17"}
+  "rocq-equations" {>= "1.3.1+9.1"}
   "rocq-metarocq-erasure-plugin" {>= "1.5.1"}
   "rocq-metarocq-safechecker-plugin" {>= "1.5.1"}
   "coq-ext-lib" {>= "0.12"}
-  "coq-wasm" {= "2.2.0"}
+  "coq-wasm" {>= "2.2.0"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "
 url {
-  git: "https://github.com/CertiRocq/certirocq.git"
+  src: "git+https://github.com/CertiRocq/certirocq.git"
 }
