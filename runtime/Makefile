@@ -9,7 +9,7 @@ DST ?= ${COQLIB}/user-contrib/CertiRocq/Plugin/runtime
 all: ${TARGETS}
 
 %.o: %.c
-	gcc -I /opt/homebrew/include -I . -I `ocamlc -where` -fPIC -O2 -g -c -o $@ $+
+	$(CC) -I /opt/homebrew/include -I . -I `ocamlc -where` -fPIC -O2 -g -c -o $@ $+
 
 install: all
 	install -d ${DST}
