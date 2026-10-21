@@ -42,7 +42,7 @@ Definition num_custom_funs := 1.
 
 (* global vars *)
 Definition glob_mem_ptr    : globalidx := 0%N. (* ptr to next free memory, increased after allocation, there is no GC *)
-Definition glob_cap        : globalidx := 1%N. (* i32 pointer used during constructor allocation *)
+Definition glob_tmp_i32    : globalidx := 1%N. (* i32 temporary, used as the loop counter of diveucl_21 *)
 Definition glob_result     : globalidx := 2%N. (* final result *)
 Definition glob_out_of_mem : globalidx := 3%N. (* ran out of memory *)
 
@@ -167,7 +167,9 @@ Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_
    L, V, R constructors
 *)
 
-(* store argument pointers in memory *)
+(* Store the constructor's fields into the memory block that starts at
+   [glob_mem_ptr], at static offsets. [glob_mem_ptr] is left untouched: the
+   caller advances it past the whole block once all fields are written. *)
 Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : fname_env) (args : list term.var) (current : nat) : error (list basic_instruction) :=
   match args with
   | [] => Ret []
@@ -175,18 +177,10 @@ Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : 
       read_y <- instr_local_var_read nenv lenv fenv y;;
       remaining <- store_constructor_args nenv lenv fenv ys (1 + current);;
 
-      Ret ([ BI_global_get glob_cap
-           ; BI_const_num (nat_to_value (4 * (1 + current))) (* plus 1 : skip tag *)
-           ; BI_binop T_i32 (Binop_i BOI_add)
+      Ret ([ BI_global_get glob_mem_ptr
            ; read_y
-           ; BI_store T_i32 None {| memarg_offset:=0%N; memarg_align:=2%N |}
-
-           (* increase gmp by 4 *)
-           ; BI_global_get glob_mem_ptr
-           ; BI_const_num (nat_to_value 4)
-           ; BI_binop T_i32 (Binop_i BOI_add)
-           ; BI_global_set glob_mem_ptr
-
+             (* plus 1 : skip tag *)
+           ; BI_store T_i32 None {| memarg_offset:=N.of_nat (4 * (1 + current)); memarg_align:=2%N |}
            ] ++ remaining)
   end.
 
@@ -194,19 +188,10 @@ Fixpoint store_constructor_args (nenv : name_env) (lenv : localvar_env) (fenv : 
 Definition store_constructor (nenv : name_env) (cenv : ctor_env) (lenv : localvar_env) (fenv : fname_env) (c : ctor_tag) (ys : list term.var) : error (list basic_instruction) :=
   ord <- get_ctor_ord cenv c ;;
   store_constr_args <- store_constructor_args nenv lenv fenv ys 0;;
-  Ret ([ BI_global_get glob_mem_ptr
-       ; BI_global_set glob_cap
-
-       (* store tag *)
-       ; BI_global_get glob_cap
+  Ret ([ (* store tag *)
+         BI_global_get glob_mem_ptr
        ; BI_const_num (nat_to_value (N.to_nat ord))
        ; BI_store T_i32 None {| memarg_offset:=0%N; memarg_align:=2%N |}
-       (* increase gmp by 4 *)
-       ; BI_global_get glob_mem_ptr
-       ; BI_const_num (nat_to_value 4)
-       ; BI_binop T_i32 (Binop_i BOI_add)
-       ; BI_global_set glob_mem_ptr
-
        ] ++ store_constr_args).
 
 Fixpoint create_case_nested_if_chain (boxed : bool) (v : localidx) (es : list (N * list basic_instruction)) : list basic_instruction :=
@@ -261,7 +246,7 @@ Definition translate_primitive_operation (nenv : name_env) (lenv : localvar_env)
           x_var <- translate_var nenv lenv x "translate primitive ternary operator 1st operand" ;;
           y_var <- translate_var nenv lenv y "translate primitive ternary operator 2nd operand" ;;
           z_var <- translate_var nenv lenv z "translate primitive ternary operator 3rd operand" ;;
-          translate_primitive_ternary_op glob_mem_ptr glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 glob_cap op x_var y_var z_var
+          translate_primitive_ternary_op glob_mem_ptr glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 glob_tmp_i32 op x_var y_var z_var
 
       | _ => Err "Only primitive operations with 1, 2 or 3 arguments are supported"
       end
@@ -326,9 +311,16 @@ Fixpoint translate_body (nenv : name_env) (cenv : ctor_env) (lenv: localvar_env)
           following_instr <- translate_body nenv cenv lenv fenv penv e' mem' ;;
           Ret (grow_mem_instr ++
                store_constr ++
-               [ BI_global_get glob_cap
-               ; BI_local_set x_var
-               ] ++ following_instr)
+                 (* the constructor's value: the base address of the block *)
+               [ BI_global_get glob_mem_ptr ] ++
+                 (* advance glob_mem_ptr past the whole block *)
+               [ BI_global_get glob_mem_ptr
+               ; BI_const_num (N_to_value (N.of_nat (4 * (1 + length ys))))
+               ; BI_binop T_i32 (Binop_i BOI_add)
+               ; BI_global_set glob_mem_ptr
+               ] ++
+               [ BI_local_set x_var ] ++
+               following_instr)
       end
    | Ecase x arms =>
       (* split arms into boxed and unboxed constructors *)
@@ -595,7 +587,7 @@ Definition LambdaANF_to_Wasm (nenv : name_env) (cenv : ctor_env) (penv : prim_en
        ; mod_globals := {| modglob_type := {| tg_mut := MUT_var; tg_t := T_num T_i32 |}  (* glob_mem_ptr *)
                          ; modglob_init := [BI_const_num (nat_to_value 0)]
                          |} ::
-                        {| modglob_type := {| tg_mut := MUT_var; tg_t := T_num T_i32 |}  (* glob_cap *)
+                        {| modglob_type := {| tg_mut := MUT_var; tg_t := T_num T_i32 |}  (* glob_tmp_i32 *)
                          ; modglob_init := [BI_const_num (nat_to_value 0)]
                          |} ::
                         {| modglob_type := {| tg_mut := MUT_var; tg_t := T_num T_i32 |}  (* glob_result *)

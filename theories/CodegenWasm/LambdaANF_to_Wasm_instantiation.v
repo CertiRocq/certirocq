@@ -1164,7 +1164,7 @@ Definition INV_instantiation (s : store_record) (f : frame) (num_funs : nat) :=
  /\ INV_glob_out_of_mem_writable s f
  /\ INV_glob_out_of_mem_is_zero s f
  /\ INV_glob_mem_ptr_writable s f
- /\ INV_glob_cap_writable s f
+ /\ INV_glob_tmp_i32_writable s f
  /\ INV_globals_all_mut s f
  /\ INV_linear_memory s f
  /\ INV_glob_mem_ptr_in_linear_memory s f
@@ -1275,7 +1275,7 @@ Proof.
   split.
   (* INV *)
   unfold INV_glob_result_writable, INV_glob_out_of_mem_writable,
-    INV_glob_mem_ptr_writable, INV_glob_cap_writable, INV_i64_glob_tmps_writable.
+    INV_glob_mem_ptr_writable, INV_glob_tmp_i32_writable, INV_i64_glob_tmps_writable.
   unfold global_var_w, supdate_glob, supdate_glob_s.
   cbn. rewrite F4.
   split. (* res_var_w *)   eexists. rewrite -E3. reflexivity.
@@ -1289,7 +1289,7 @@ Proof.
   unfold INV_globals_all_mut, globals_all_mut, globals_all_mut32, globals_all_mut64.
   split; intros. unfold lookup_N in H1.
   {
-    unfold glob_result, glob_out_of_mem, glob_mem_ptr, glob_cap in *.
+    unfold glob_result, glob_out_of_mem, glob_mem_ptr, glob_tmp_i32 in *.
     cbn in H0; try subst gidx; try rewrite F4 in H0; unfold lookup_N in H0.
     rewrite -E3 in H1. cbn in H1.
     destruct (N.to_nat gidx) eqn:Hgidx. cbn in H0.
@@ -1973,11 +1973,11 @@ Proof.
     destruct (lookup_N (inst_globals (f_inst fr)) glob_mem_ptr)=>//. cbn. cbn in Hs.
     rewrite <- Hglobals in *.
     destruct (lookup_N (s_globals sr) g)=>//. eexists. reflexivity.
-  split. (* glob_cap writable *)
+  split. (* glob_tmp_i32 writable *)
     intro. intros. destruct (H3 val) as [s Hs].
     unfold global_var_w, supdate_glob, supdate_glob_s, sglob, sglob_ind in *.
     repeat rewrite Hglobals in Hs.
-    destruct (lookup_N (inst_globals (f_inst fr)) glob_cap)=>//. cbn. cbn in Hs.
+    destruct (lookup_N (inst_globals (f_inst fr)) glob_tmp_i32)=>//. cbn. cbn in Hs.
     rewrite <- Hglobals in *.
     destruct (lookup_N (s_globals sr) g)=>//. eexists. reflexivity.
   split. (* globals all mut i32s *)
