@@ -36,12 +36,6 @@ correctness proofs.
   `Ensembles_util.v`, `env.v`, `rename.v`, `tactics.v`:
   general-purpose libraries
 
-## Rewriting framework
-
-* `MockExpr.v`, `Prototype.v`, `PrototypeGenFrame.v`, `Rewriting.v`
-* `Frame.v`, `cps_proto.v`, `cps_proto_univ.v`, `uncurry_proto.v`,
-  `proto_util.v`
-
 ## Pipeline entry points
 
 * `toplevel.v`: the λANF pipeline

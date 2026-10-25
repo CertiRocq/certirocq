@@ -33,11 +33,6 @@ LambdaBox_to_LambdaANF/anf_global.v
 LambdaBox_to_LambdaANF/anf_toplevel.v
 
 # LambdaANF
-LambdaANF/Frame.v
-LambdaANF/Rewriting.v
-LambdaANF/PrototypeGenFrame.v
-LambdaANF/Prototype.v
-LambdaANF/MockExpr.v
 LambdaANF/Ensembles_util.v
 LambdaANF/algebra.v
 LambdaANF/tactics.v
@@ -49,9 +44,6 @@ LambdaANF/term.v
 LambdaANF/ctx.v
 LambdaANF/term_util.v
 LambdaANF/identifiers.v
-LambdaANF/cps_proto_univ.v
-LambdaANF/cps_proto.v
-LambdaANF/proto_util.v
 LambdaANF/rename.v
 LambdaANF/size_cps.v
 LambdaANF/eval.v
@@ -77,8 +69,6 @@ LambdaANF/shrink_cps_correct.v
 LambdaANF/shrink_cps_toplevel.v
 LambdaANF/shrink_cps_corresp.v
 LambdaANF/uncurry.v
-LambdaANF/uncurry_rel.v
-LambdaANF/uncurry_proto.v
 LambdaANF/uncurry_correct.v
 LambdaANF/lambda_lifting.v
 LambdaANF/dead_param_elim.v

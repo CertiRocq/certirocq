@@ -2,7 +2,7 @@ From Stdlib Require Import ZArith.
 Require Import Common.
 From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
-     LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
+     LambdaANF.inline LambdaANF.uncurry LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting
      LambdaANF.merge_dup_funs.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.

@@ -200,14 +200,6 @@ Identifiers
 Rename
 Inline_letapp
 Uncurry
-BinNatDef
-Cps_proto_univ
-Cps_proto
-Prototype
-Proto_util
-Frame
-Rewriting
-Uncurry_proto
 Shrink_cps
 Closure_conversion
 Hoisting
