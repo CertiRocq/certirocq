@@ -1,4 +1,4 @@
-.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap plugin-manifests
+.PHONY: all submodules runtime plugins plugin cplugin install install-core install-bootstrap clean bootstrap plugin-manifests
 
 PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-manifest
 PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
@@ -50,12 +50,19 @@ plugins/cplugin/CertiRocq.vo: all plugins/cplugin/Makefile
 bootstrap: plugin cplugin
 	$(MAKE) -C bootstrap all
 
-install: plugin cplugin bootstrap
+install:
+	$(MAKE) install-core
+	$(MAKE) install-bootstrap
+
+# without `bootstrap'
+install-core: plugin cplugin
 	$(MAKE) -C libraries install
 	$(MAKE) -C theories install
 	$(MAKE) -C runtime install
 	$(MAKE) -C plugins/plugin install
 	$(MAKE) -C plugins/cplugin install
+
+install-bootstrap: bootstrap
 	$(MAKE) -C bootstrap install
 
 # Clean generated makefiles
