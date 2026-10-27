@@ -317,6 +317,19 @@ LambdaANF_to_Wasm_restrictions :: plugin
 LambdaANF_to_Wasm_primints :: plugin
 LambdaANF_to_Wasm :: plugin
 Toplevel1 :: plugin
+ListUtil :: plugin
+LLVMAst :: plugin
+AstLib :: plugin
+DList :: plugin
+DecimalString :: plugin
+HexadecimalString :: plugin
+StringUtil :: plugin
+ShowAST :: plugin
+Traversal :: plugin
+Flatten :: plugin
+LambdaANF_to_LLVM :: plugin
+Serialize :: plugin
+Toplevel2 :: plugin
 Glue_utils
 Glue
 Metarocq_pipeline
