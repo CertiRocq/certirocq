@@ -3,6 +3,8 @@
 #include "print.h"
 #include "values.h"
 #include "gc.h"
+/* OCaml 5.2 defines Hd_val as a function, not a macro. */
+#undef Hd_val
 #include <caml/memory.h>
 #include <caml/callback.h>
 

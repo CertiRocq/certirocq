@@ -3,7 +3,7 @@ name: Compile and test
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
       - "**"
@@ -29,8 +29,18 @@ jobs:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
           before_install: | # comment back in if MetaRocq commit changes
+            ulimit -s unlimited
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
+            endGroup
+            startGroup "Pin the MetaRocq 9.1 development snapshot"
+              # The image's 1.5.1 release lacks EImplementLazyForce.
+              opam pin add --yes --no-action \
+                'git+https://github.com/MetaRocq/metarocq.git#c8cd46054518193103c3bb33aa6e15c7f489e72c'
+            endGroup
+            startGroup "Unpin coq-wasm"
+              # The image pins coq-wasm to 2.2.0; main requires >= 2.2.1.
+              opam pin remove --yes --no-action coq-wasm
             endGroup
           before_script: |
             startGroup "Install more dependencies"
@@ -54,7 +64,6 @@ jobs:
               opam list
             endGroup
             startGroup "Run tests"
-              ulimit -s unlimited
               make -C ~/repo plugin && make -C ~/repo/tests all
             endGroup
             startGroup "Test bootstrapped plugins"

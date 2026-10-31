@@ -53,7 +53,7 @@ test: test.vo
 test.vo: test.v
 	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
-clean: 
+clean: Makefile.certirocqchk
 	make -f Makefile.certirocqchk clean
 	rm -f *.cm* *.o *.vo
 

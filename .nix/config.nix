@@ -24,7 +24,7 @@
       compcert.job = false;
       compcert.override.version = "3.17";
       wasmcert.job = false;
-      wasmcert.override.version = "v2.2.0";
+      wasmcert.override.version = "v2.2.1";
       ExtLib.job = false;
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;

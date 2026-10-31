@@ -21,6 +21,7 @@ Open Scope fun_scope.
 Section CC_correct.
 
   Variable (clo_tag : ctor_tag).
+  Variable (env0_tag : ctor_tag).
   Variable (pr : prims).
   Variable (cenv : ctor_env).
 
@@ -202,6 +203,16 @@ Section CC_correct.
     intros; split; eauto.
   Qed.
 
+  Lemma make_env_tag_preserves_prop n P :
+    {{ fun _ s => P (next_var (fst s)) }}
+      make_env_tag env0_tag n
+    {{ fun _ s _ (s' : comp_data * unit) => P (next_var (fst s')) /\ next_var (fst s') = next_var (fst s) }}.
+  Proof.
+    unfold make_env_tag. destruct n as [| p].
+    - eapply return_triple. intros _ s Hp. split; auto.
+    - apply make_record_ctor_tag_preserves_prop.
+  Qed.
+
   (* TODO: move to Ensembles_util *)
   Lemma Disjoint_sym {A} S1 S2 : Disjoint A S1 S2 -> Disjoint A S2 S1.
   Proof. eauto with Ensembles_DB. Qed.
@@ -231,7 +242,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     gfuns_inv gfuns GFuns ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
-      get_var clo_tag x FVmap gfuns c Γ
+      get_var clo_tag env0_tag x FVmap gfuns c Γ
     {{ fun _ s t s' =>
          exists C S',
            (let '(x', f) := t in
@@ -288,15 +299,7 @@ Section CC_correct.
       destruct (gfuns ! x) as [[] |] eqn:Hx_gfuns.
       + eapply bind_triple'.
         { eapply pre_strenghtening.
-          2: eapply post_weakening.
-          3: apply make_record_ctor_tag_preserves_prop with (P := fun x => fresh S x).
-          { auto. }
-          { simpl. intros ? ? ? ? Hfresh [? Heq]; exact (conj Hfresh Heq). } }
-        intros c_env s_c_env.
-        apply pre_curry_l; intros HS_c_env.
-        eapply bind_triple'.
-        { eapply pre_strenghtening.
-          { intros st s H; rewrite <- H in HS_c_env. exact (conj H HS_c_env). }
+          { intros st s H. exact (conj H H). }
           apply frame_rule, get_name_spec. }
         intros y s_y.
         apply pre_curry_l; intros HS_s_y.
@@ -308,7 +311,7 @@ Section CC_correct.
         intros g_env s_g_env.
         apply return_triple.
         intros _ s_final [[Hran_y [Hinc_y Hfresh_y]] [HS_g_env [Hran_g_env [Hinc_g_env Hfresh_g_env]]]].
-        exists (Econstr_c g_env c_env [] (Econstr_c y clo_tag [x; g_env] Hole_c)); eexists; splits; eauto.
+        exists (Econstr_c g_env env0_tag [] (Econstr_c y clo_tag [x; g_env] Hole_c)); eexists; splits; eauto.
         * apply Var_in_GFuns; auto.
           apply Hgfuns. apply Hx_gfuns.
         * unfold is_exp_ctx; reflexivity.
@@ -593,7 +596,7 @@ Section CC_correct.
     gfuns_inv gfuns GFuns ->
     {{ fun _ s => fresh S (next_var (fst s)) /\ S_pre \subset Range s_pre (next_var (fst s))
                /\ (next_var (fst s) >= s_pre)%positive }}
-      get_vars clo_tag xs FVmap gfuns c Γ
+      get_vars clo_tag env0_tag xs FVmap gfuns c Γ
     {{ fun _ s t s' =>
          exists C S',
            (let '(xs', f) := t in
@@ -647,7 +650,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     gfuns_inv gfuns GFuns ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
-      get_vars clo_tag xs FVmap gfuns c Γ
+      get_vars clo_tag env0_tag xs FVmap gfuns c Γ
     {{ fun _ s t s' =>
          exists C S',
            (let '(xs', f) := t in
@@ -910,7 +913,7 @@ Section CC_correct.
     NoDup fv ->
     ~ Γ_n \in S ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
-      make_env clo_tag fv (Maps.PTree.empty VarInfo) FVmap_o c Γ_n Γ_o gfuns
+      make_env clo_tag env0_tag fv (Maps.PTree.empty VarInfo) FVmap_o c Γ_n Γ_o gfuns
     {{ fun _ s t  s' =>
          let '(c', FVmap_n, f) := t in
          exists C S' FVs',
@@ -941,7 +944,7 @@ Section CC_correct.
       eapply pre_existential. intros C1. eapply pre_existential. intros S'.
       eapply pre_curry_l. intros [Hvars [Hctx Huniq]].
       eapply bind_triple.
-      apply make_record_ctor_tag_preserves_prop with (n := n)
+      apply make_env_tag_preserves_prop with (n := n)
         (P := fun x => fresh S' x /\
           bound_var_ctx C1 \subset Range (next_var (fst s1)) x /\
           (x >= next_var (fst s1))%positive).
@@ -1668,7 +1671,7 @@ Section CC_correct.
        (* The current environment argument is fresh *)
        (HD2 : ~ In _ (used_vars e) Γ),
        {{ fun _ s => fresh S (next_var (fst s)) }}
-         exp_closure_conv clo_tag e FVmap gfuns c Γ
+         exp_closure_conv clo_tag env0_tag e FVmap gfuns c Γ
        {{ fun _ s ef s' =>
             fresh S (next_var (fst s')) /\
             exists C, is_exp_ctx (snd ef) C /\
@@ -1689,7 +1692,7 @@ Section CC_correct.
        (HD1 : Disjoint _ S (used_vars_fundefs Bg :|: image (to_env FVmap) Funs :|: GFuns))
        (HD2 : Disjoint _ GFuns (bound_var_fundefs Bg \\ name_in_fundefs Bg)),
        {{ fun _ s => fresh S (next_var (fst s)) }}
-         fundefs_closure_conv clo_tag Bg B FVmap gfuns c
+         fundefs_closure_conv clo_tag env0_tag Bg B FVmap gfuns c
        {{ fun _ s B' s' =>
           fresh S (next_var (fst s')) /\
           Closure_conversion_fundefs clo_tag Bg GFuns c FVs B B' /\
@@ -3280,7 +3283,7 @@ Section CC_correct.
                         (Union _ (bound_var e)
                                (Union _ (occurs_free e) (Singleton _ Γ)))) ->
     {{ fun s => fresh S (next_var s) }}
-      exp_closure_conv clo_tag e FVmap c Γ
+      exp_closure_conv clo_tag env0_tag e FVmap c Γ
     {{ fun s ef s' =>
          let '(e', f) := ef in
          cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) (f e', rho')
@@ -3297,7 +3300,7 @@ Section CC_correct.
 
   Lemma get_var_is_exp_ctx  x FVmap c Γ :
     {{ fun s => True }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (exists C, is_exp_ctx f C)
@@ -3323,7 +3326,7 @@ Section CC_correct.
 
   Lemma get_vars_is_exp_ctx  xs FVmap c Γ :
     {{ fun s => True }}
-      get_vars clo_tag xs FVmap c Γ
+      get_vars clo_tag env0_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (exists C, is_exp_ctx f C)
@@ -3345,7 +3348,7 @@ Section CC_correct.
 
   Lemma make_env_is_exp_ctx FVset FVmap FVmap' c Γ Γ' :
     {{ fun s => True }}
-      make_env clo_tag FVset FVmap FVmap' c Γ Γ'
+      make_env clo_tag env0_tag FVset FVmap FVmap' c Γ Γ'
     {{ fun s t s' =>
          let '(_, _, f) := t in
          (exists C, is_exp_ctx f C)
@@ -3379,7 +3382,7 @@ Section CC_correct.
 
   Lemma exp_closure_conv_is_exp_ctx e c Γ FVmap :
     {{ fun s => True }}
-      exp_closure_conv clo_tag e FVmap c Γ
+      exp_closure_conv clo_tag env0_tag e FVmap c Γ
     {{ fun s ef s' =>
          exists C, is_exp_ctx (snd ef) C
      }}.
@@ -3429,7 +3432,7 @@ Section CC_correct.
   Lemma get_var_bound_var_Included  x FVmap c Γ S S':
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3467,7 +3470,7 @@ Section CC_correct.
   Lemma get_vars_bound_var_Included xs FVmap c Γ S S':
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ
+      get_vars clo_tag env0_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -3537,7 +3540,7 @@ Section CC_correct.
     (forall e c Γ FVmap S
        (HD: Disjoint _ S (Union _ (bound_var e) (occurs_free e))),
        {{ fun s => fresh S (next_var s) }}
-         exp_closure_conv clo_tag e FVmap c Γ
+         exp_closure_conv clo_tag env0_tag e FVmap c Γ
        {{ fun s ef s' =>
             Included _ (bound_var ((snd ef) (fst ef)))
                      (Union _ (bound_var e) S) /\
@@ -3546,7 +3549,7 @@ Section CC_correct.
     (forall B FVmap S c
        (HD : Disjoint _ S (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))),
        {{ fun s => fresh S (next_var s) }}
-         fundefs_closure_conv clo_tag B FVmap c
+         fundefs_closure_conv clo_tag env0_tag B FVmap c
        {{ fun s B' s' =>
             Included _ (bound_var_fundefs B')
                      (Union _ (bound_var_fundefs B)
@@ -3648,7 +3651,7 @@ Section CC_correct.
         eapply Disjoint_Included_r; [| eassumption ].
         apply Included_Union_preserv_r. normalize_occurs_free...
         intros [xs f] s2. apply pre_curry_l. intros He.
-        eapply bind_triple. apply make_record_ctor_tag_preserves_prop.
+        eapply bind_triple. apply make_env_tag_preserves_prop.
         intros c' s3. apply return_triple. intros s4 Hf. split.
         intros e' He'.
         rewrite <- Union_Same_set with (s6 := S),
@@ -3776,7 +3779,7 @@ Section CC_correct.
   Lemma get_var_bound_var_Included' x FVmap c Γ S :
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3809,7 +3812,7 @@ Section CC_correct.
   Lemma get_vars_bound_var_Included' xs FVmap c Γ S:
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ
+      get_vars clo_tag env0_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -3844,7 +3847,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope Funs FVs ->
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3889,7 +3892,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope (Empty_set var) [] ->
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3928,7 +3931,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope (Empty_set var) [] ->
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ
+      get_vars clo_tag env0_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -4009,7 +4012,7 @@ Section CC_correct.
     FVmap_inv m2 Scope (Empty_set var) [] ->
     Disjoint var S (FromList (PS.elements FVs)) ->
     {{ fun s => fresh S (next_var s) }}
-      make_env clo_tag FVs m1 m2 c Γ' Γ
+      make_env clo_tag env0_tag FVs m1 m2 c Γ' Γ
     {{ fun _ t s' =>
          let '(xs, f) := t in
          (forall e : exp,
@@ -4032,7 +4035,7 @@ Section CC_correct.
     eassumption. eassumption.
     intros [xs f] s2. apply pre_curry_l. intros He.
     apply pre_curry_l. intros Heq. subst.
-    eapply bind_triple. apply make_record_ctor_tag_preserves_prop.
+    eapply bind_triple. apply make_env_tag_preserves_prop.
     intros c' s3. apply return_triple. intros s4 Hf. split.
     intros e'.
     eapply Included_trans; [ now apply He |].
@@ -4051,7 +4054,7 @@ Section CC_correct.
     ~ In var (Union var (bound_var e) (occurs_free e)) Γ ->
     fundefs_names_unique e ->
     {{ fun s => fresh S (next_var s) }}
-      exp_closure_conv clo_tag e FVmap c Γ
+      exp_closure_conv clo_tag env0_tag e FVmap c Γ
     {{ fun s ef s' =>
          closed_fundefs_in_exp ((snd ef) (fst ef))
     }}.
@@ -4090,7 +4093,7 @@ Section CC_correct.
 
   Lemma fundefs_closure_conv_in_image_subst_map B map c :
     {{ fun _ => True }}
-      fundefs_closure_conv clo_tag B map c
+      fundefs_closure_conv clo_tag env0_tag B map c
     {{ fun _ B' _ =>
          Same_set _ (name_in_fundefs B') (image (subst map) (name_in_fundefs B)) }}.
   Proof with now eauto with Ensembles_DB.
@@ -4115,7 +4118,7 @@ Section CC_correct.
     ~ In var (Union var (bound_var e) (occurs_free e)) Γ ->
     fundefs_names_unique e ->
     {{ fun s => fresh S (next_var s) }}
-      exp_closure_conv clo_tag e FVmap c Γ
+      exp_closure_conv clo_tag env0_tag e FVmap c Γ
     {{ fun s ef s' =>
          Included _ (occurs_free ((snd ef) (fst ef))) (occurs_free e) /\
          fresh S (next_var s')
@@ -4419,7 +4422,7 @@ Section CC_correct.
   Lemma get_var_unique_bindings x FVmap c Γ S S' :
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ
+      get_var clo_tag env0_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -4460,7 +4463,7 @@ Section CC_correct.
   Lemma get_vars_unique_bindings xs FVmap c Γ S S' :
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ
+      get_vars clo_tag env0_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -4585,7 +4588,7 @@ Section CC_correct.
        (HD: Disjoint _ S (Union _ (bound_var e) (occurs_free e)))
        (Hun : unique_bindings e),
        {{ fun s => fresh S (next_var s) }}
-         exp_closure_conv clo_tag e FVmap c Γ
+         exp_closure_conv clo_tag env0_tag e FVmap c Γ
        {{ fun s ef s' =>
             unique_bindings ((snd ef) (fst ef)) /\
             fresh (Setminus _ S (bound_var ((snd ef) (fst ef)))) (next_var s')
@@ -4597,7 +4600,7 @@ Section CC_correct.
        (Hun : unique_bindings_fundefs B)
        (Hinj : injective_subdomain (name_in_fundefs B) (subst FVmap)),
        {{ fun s => fresh S (next_var s) }}
-         fundefs_closure_conv clo_tag B FVmap c
+         fundefs_closure_conv clo_tag env0_tag B FVmap c
        {{ fun s B' s' =>
             unique_bindings_fundefs B' /\
             Disjoint _ (name_in_fundefs B) (bound_var_fundefs B') /\
@@ -4748,7 +4751,7 @@ Section CC_correct.
       exact (conj (conj Hun1 Hin) Hf).
       apply pre_curry_l; intros [Hun1 Hin1]. inv Hun.
       setoid_rewrite assoc.
-      eapply bind_triple. now apply make_record_ctor_tag_preserves_prop.
+      eapply bind_triple. now apply make_env_tag_preserves_prop.
       intros c1 s3.  eapply bind_triple.
       now eapply return_triple with
       (Post := fun s r s' =>
@@ -5169,7 +5172,7 @@ Section CC_correct.
     Disjoint _ S  (Union _ (bound_var e)
                          (Union _ (occurs_free e) (Singleton _ Γ))) ->
     {{ fun s => fresh S (next_var s) }}
-      exp_closure_conv clo_tag e FVmap c Γ
+      exp_closure_conv clo_tag env0_tag e FVmap c Γ
     {{ fun s ef s' =>
          cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) ((snd ef) (fst ef), rho') /\
          Included _ (occurs_free ((snd ef) (fst ef))) (occurs_free e) /\

@@ -37,7 +37,7 @@ depends: [
   "rocq-metarocq-erasure-plugin" {>= "1.5.1"}
   "rocq-metarocq-safechecker-plugin" {>= "1.5.1"}
   "coq-ext-lib" {>= "0.12"}
-  "coq-wasm" {= "2.2.0"}
+  "coq-wasm" {>= "2.2.1"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "

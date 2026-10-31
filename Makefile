@@ -65,12 +65,14 @@ mrproper:
 	rm -f plugins/plugin/Makefile
 	rm -f plugins/cplugin/Makefile
 
-clean: theories/Makefile libraries/Makefile plugins/plugin/Makefile plugins/cplugin/Makefile
+# Don't require the plugin Makefiles: generating them depends on extraction.vo,
+# which would build the theories before cleaning.
+clean: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries clean
 	$(MAKE) -C theories clean
 	$(MAKE) -C runtime clean
-	$(MAKE) -C plugins/plugin clean
-	$(MAKE) -C plugins/cplugin clean
+	if [ -f plugins/plugin/Makefile ]; then $(MAKE) -C plugins/plugin clean; fi
+	if [ -f plugins/cplugin/Makefile ]; then $(MAKE) -C plugins/cplugin clean; fi
 	$(MAKE) -C bootstrap clean
 	rm -f `find theories -name "*.ml*"`
 	rm -rf plugins/plugin/extraction

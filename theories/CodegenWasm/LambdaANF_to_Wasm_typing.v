@@ -10,7 +10,7 @@ From CertiRocq Require Import
   LambdaANF.term LambdaANF.term_util
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_correct
-  CodegenWasm.LambdaANF_to_Wasm_primitives
+  CodegenWasm.LambdaANF_to_Wasm_primints
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
 From Wasm Require Import
@@ -26,11 +26,9 @@ Import seq ssreflect.
 Section FUNCTION_BODY_TYPING.
 
 Variable cenv   : ctor_env.
-Variable funenv : fun_env.
 Variable fenv   : fname_env.
-Variable nenv   : name_env.
 Variable penv   : prim_env.
-Let repr_expr_LambdaANF_Wasm := @repr_expr_LambdaANF_Wasm cenv fenv nenv penv.
+Let repr_expr_LambdaANF_Wasm := @repr_expr_LambdaANF_Wasm cenv fenv penv.
 
 Ltac separate_instr :=
   cbn;
@@ -42,7 +40,7 @@ Ltac separate_instr :=
 (* for main function, translated fns *)
 Definition context_restr (lenv: localvar_env) (c: t_context) :=
   (* locals in bound, i32 *)
-  (forall x x', @repr_var nenv lenv x x' -> lookup_N (tc_locals c) x' = Some (T_num T_i32)) /\
+  (forall x x', @repr_var lenv x x' -> lookup_N (tc_locals c) x' = Some (T_num T_i32)) /\
   (* globals i32, mut *)
   (forall var, In var [glob_mem_ptr; glob_cap; glob_result; glob_out_of_mem] ->
     lookup_N (tc_globals c) var = Some {| tg_mut:= MUT_var; tg_t:= T_num T_i32|}) /\
@@ -101,8 +99,8 @@ Ltac solve_bet Hcontext :=
           end);
          eapply bet_global_set with (t:=T_num T_i64); [eassumption | now cbn | now cbn]
   (* locals with mapping *)
-  | H: repr_var _ _ ?x' |- be_typing _ [:: BI_local_get ?x'] (Tf [::] _) => apply bet_local_get; eapply Hcontext; eassumption
-  | H: repr_var _ _ ?x' |- be_typing _ [:: BI_local_set ?x'] (Tf [::_] _) => apply bet_local_set; eapply Hcontext; eassumption
+  | H: repr_var _ ?x' |- be_typing _ [:: BI_local_get ?x'] (Tf [::] _) => apply bet_local_get; eapply Hcontext; eassumption
+  | H: repr_var _ ?x' |- be_typing _ [:: BI_local_set ?x'] (Tf [::_] _) => apply bet_local_set; eapply Hcontext; eassumption
   (* locals without mapping (e.g. grow_mem) *)
   | |- be_typing ?context [:: BI_local_set 0%N] _ => apply bet_local_set; eassumption
   | |- be_typing ?context [:: BI_local_get 0%N] _ => apply bet_local_get; eassumption
@@ -192,7 +190,7 @@ Qed.
 
 Lemma constr_args_store_typing {lenv} : forall args n instr c,
   @context_restr lenv c ->
-  Forall_statements_in_seq' (@store_nth_constr_arg fenv nenv lenv) args instr n ->
+  Forall_statements_in_seq' (@store_nth_constr_arg fenv lenv) args instr n ->
   be_typing c instr (Tf [::] [::]).
 Proof.
   induction args; intros ??? Hcontext Hargs.
@@ -213,7 +211,7 @@ Qed.
 
 Lemma fun_args_typing {lenv} : forall l args' c,
   @context_restr lenv c ->
-  @repr_fun_args_Wasm fenv nenv lenv l args' ->
+  @repr_fun_args_Wasm fenv lenv l args' ->
   be_typing c args' (Tf [::] (repeat (T_num T_i32) (length l))).
 Proof.
   induction l; intros ?? Hcontext Hargs =>/=.
@@ -238,8 +236,8 @@ Qed.
 
 Lemma apply_binop_and_store_i64_typing {lenv} : forall c m x x' y y' bop mask,
   context_restr lenv c ->
-  @repr_var nenv lenv x x' ->
-  @repr_var nenv lenv y y' ->
+  @repr_var lenv x x' ->
+  @repr_var lenv y y' ->
   lookup_N (tc_mems c) 0 = Some m ->
   be_typing c (apply_binop_and_store_i64 glob_mem_ptr bop x' y' mask) (Tf [::] [:: T_num T_i32]).
 Proof.
@@ -251,7 +249,7 @@ Qed.
 
 Lemma prim_op_typing {lenv} : forall c ys op instrs,
   @context_restr lenv c ->
-  @repr_primitive_operation nenv lenv op ys instrs ->
+  @repr_primitive_operation lenv op ys instrs ->
   be_typing c instrs (Tf [::] [:: T_num T_i32]).
 Proof.
   intros c ys op instrs Hcontext Hinstrs.
@@ -308,17 +306,17 @@ Theorem repr_expr_LambdaANF_Wasm_typing {lenv} : forall e e' mem c,
   be_typing c e' (Tf [::] [::]).
 Proof.
   intros ???? Hcontext Hrestr Hexpr.
-  have IH := repr_expr_LambdaANF_Wasm_mut cenv fenv nenv penv lenv
+  have IH := repr_expr_LambdaANF_Wasm_mut cenv fenv penv lenv
   (fun (e: exp) (mem : N) (e': list basic_instruction) (H: repr_expr_LambdaANF_Wasm lenv e mem e') =>
     forall c,
       @context_restr lenv c ->
       expression_restricted cenv e ->
       be_typing c e' (Tf [::] [::]))
-  (fun y' cl mem brs1 brs2 (H: repr_branches cenv fenv nenv penv y' cl mem brs1 brs2) =>
+  (fun y' cl mem brs1 brs2 (H: repr_branches cenv fenv penv y' cl mem brs1 brs2) =>
     forall y c brs1' brs2',
       @context_restr lenv c ->
       expression_restricted cenv (Ecase y cl) ->
-      @repr_var nenv lenv y y' ->
+      @repr_var lenv y y' ->
       repr_case_boxed y' brs1 brs1' ->
       repr_case_unboxed y' brs2 brs2' ->
          be_typing c brs1' (Tf [::] [::])

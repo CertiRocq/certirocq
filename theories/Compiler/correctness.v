@@ -139,7 +139,7 @@ Section Correctness.
   
   Theorem metarocq_to_anf_correct (econf : erasure_configuration) (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
-    Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
+    Transform.Transform.post (certirocq_post_metarocq_pipeline [] econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
@@ -189,7 +189,7 @@ Section Correctness.
 
   Theorem metarocq_to_anf_total econf (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
-    Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
+    Transform.Transform.post (certirocq_post_metarocq_pipeline [] econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
@@ -217,7 +217,7 @@ Section Correctness.
   (*
   Lemma metarocq_anf_pipeline (p : EProgram.eprogram) opts : 
     (* The postcondition on MetaRocq's pipeline *)
-    Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
+    Transform.Transform.post (certirocq_post_metarocq_pipeline [] econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
@@ -269,7 +269,7 @@ Section Correctness.
 (* 
   Theorem metarocq_to_anf_eval (p : EProgram.eprogram) : 
     (* The postcondition on MetaRocq's pipeline *)
-    Transform.Transform.post (certirocq_post_metarocq_pipeline econf) p ->
+    Transform.Transform.post (certirocq_post_metarocq_pipeline [] econf) p ->
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in

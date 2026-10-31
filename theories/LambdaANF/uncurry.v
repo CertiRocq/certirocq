@@ -333,4 +333,31 @@ Section UNCURRY.
     let c' := put_inline_map inline_map c' in
     (eerr, c').
 
+  Fixpoint uncurry_passes_exp (e : exp) : nat :=
+    match e with
+    | Econstr _ _ _ e1 => uncurry_passes_exp e1
+    | Eproj _ _ _ _ e1 => uncurry_passes_exp e1
+    | Eletapp _ _ _ _ e1 => uncurry_passes_exp e1
+    | Eprim_val _ _ e1 => uncurry_passes_exp e1
+    | Eprim _ _ _ e1 => uncurry_passes_exp e1
+    | Ecase _ arms =>
+      (fix uncurry_passes_list (arms : list (ctor_tag * exp)) : nat :=
+         match arms with
+         | nil => 0
+         | (_, e1) :: rest => Nat.max (uncurry_passes_exp e1) (uncurry_passes_list rest)
+         end) arms
+    | Efun fds e1 => Nat.max (uncurry_passes_fundefs fds) (uncurry_passes_exp e1)
+    | Eapp _ _ _ => 0
+    | Ehalt _ => 0
+    end
+  with uncurry_passes_fundefs (fds : fundefs) : nat :=
+    match fds with
+    | Fnil => 0
+    | Fcons _ _ _ body rest =>
+      Nat.max (1 + uncurry_passes_exp body) (uncurry_passes_fundefs rest)
+    end.
+
+  Definition uncurry_top cps e c : error exp * comp_data :=
+    uncurry_fuel cps (uncurry_passes_exp e) e c.
+
 End UNCURRY.

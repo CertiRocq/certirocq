@@ -20,5 +20,9 @@
         "kind": "opam",
         "switch": "rocq-9.1"
     },
-    "vsrocq.path": "_opam/bin/vsrocqtop"
+    "vsrocq.path": "_opam/bin/vsrocqtop",
+    "vsrocq.args": [
+        
+
+    ]
 }

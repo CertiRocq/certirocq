@@ -46,7 +46,6 @@ OrderedTypeAlt
 MSetInterface
 MSetFacts
 MSetDecide
-MSetList
 MSetAVL
 MSetProperties
 FMapList
@@ -62,6 +61,7 @@ MRPrelude
 MROption
 MRList
 MRProd
+SemiLattice
 ReflectEq
 MRCompare
 Number0
@@ -83,7 +83,10 @@ Config0
 Kernames
 Reflect
 Transform
+NonEmptyLevelExprSet
+UnivConstraintType
 Universes0
+PCUICGlobalEnv
 All_Forall
 BasicAst
 Primitive
@@ -114,7 +117,17 @@ EtaExpand
 EnvironmentTyping
 
 Ssrbool
-WGraph
+MRInstances
+Common0
+Interfaces
+HornClauses
+InitialSemilattice
+HornSemilatticeEquiv
+Model
+Models
+PartialLoopChecking
+Deciders
+UnivLoopChecking
 UGraph0
 PCUICPrimitive
 PCUICAst
@@ -188,7 +201,7 @@ Maps_util
 Map_util
 CompM
 Term0
-Common0
+Common1
 Term_util
 Cps_show
 State
@@ -200,14 +213,6 @@ Identifiers
 Rename
 Inline_letapp
 Uncurry
-BinNatDef
-Cps_proto_univ
-Cps_proto
-Prototype
-Proto_util
-Frame
-Rewriting
-Uncurry_proto
 Shrink_cps
 Closure_conversion
 Hoisting
@@ -244,6 +249,7 @@ LambdaANF_to_Clight_stack
 Anf
 Anf_convert_env
 Cps
+Merge_dup_funs
 Toplevel
 Toplevel0
 Glue_utils

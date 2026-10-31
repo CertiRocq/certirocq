@@ -4,7 +4,7 @@ From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.M
 
 Require Import LambdaANF.term LambdaANF.eval LambdaANF.term_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.tactics LambdaANF.relations LambdaANF.rel_comp
-        LambdaANF.uncurry LambdaANF.uncurry_proto LambdaANF.bounds LambdaANF.shrink_cps LambdaANF.shrink_cps_toplevel
+        LambdaANF.uncurry LambdaANF.bounds LambdaANF.shrink_cps LambdaANF.shrink_cps_toplevel
         LambdaANF.closure_conversion LambdaANF.closure_conversion_util LambdaANF.hoisting
         LambdaANF.lambda_lifting LambdaANF.lambda_lifting_correct LambdaANF.uncurry_correct
         LambdaANF.dead_param_elim LambdaANF.dead_param_elim_correct.
@@ -382,14 +382,11 @@ End InlineLoop.
 
 Section Uncurry.
 
-  Lemma test : (forall b e c r, uncurry_top b e c = r -> uncurry_top b e c = r).
-  Proof. intros. Abort.
-
-  Lemma uncurry_top_correct e c b :
+  Lemma uncurry_top_correct cps e c :
    well_scoped e ->
    max_var e 1 < state.next_var c ->
    exists (e' : exp) (c' : state.comp_data),
-     uncurry_top b e c = (Ret e', c') /\
+     uncurry_top cps e c = (Ret e', c') /\
      max_var e' 1 < state.next_var c' /\
      wf_pres e e' /\
      well_scoped e'  /\
@@ -398,42 +395,31 @@ Section Uncurry.
          binding_in_map (occurs_free e) rho1 ->
          preord_exp cenv (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
   Proof.
-    intros.
-    edestruct (@uncurry_correct_top cenv nat _ (nat * nat) _ (simple_bound 0)
-                                    (simple_bound 0)) with (cps := b).
-    - intros. eapply simple_bound_compat.
-    - intros. eapply simple_bound_compat.
+    intros [Huniq Hdis] Hmax.
+    specialize (simple_bound_compat cenv 0) as Hprops.
+    destruct (simple_bound_compat cenv 0).
+    edestruct uncurry_top_correct with (Post := simple_bound 0)
+                                        (PostG := simple_bound 0); try eassumption.
     - eapply Hpost_curry.
     - eapply Hpost_idemp.
-    - clear. unfold comp, simple_bound. intro; intros.
-      destructAll.
-      destruct x as [[[? ?] ?] [? ? ]].
-      destruct y as [[[? ?] ?] [? ? ]].
-      destruct x0 as [[[? ?] ?] [? ? ]]. lia.
-    - inv H. eassumption.
-    - inv H. eassumption.
-    - eassumption.
-    - destructAll. exists x, x0.
-      split. assumption.
-      split. eassumption.
-      split. eassumption.
-      split. split; eassumption.
-      now eauto.
+    - eapply Hpost_idemp.
+    - destructAll.
+      do 2 eexists.
+      repeat split; try eassumption.
+      + eapply H1.
+      + intros; eapply H4; assumption.
   Qed.
 
-  Corollary uncurry_top_correct_corr b :
-    correct (uncurry_top b).
+  Corollary uncurry_top_correct_corr cps :
+    correct (uncurry_top cps).
   Proof.
-    intro; intros.
-    edestruct uncurry_top_correct. eassumption. eassumption.
-    destructAll.
-    do 2 eexists. split.
-    eassumption.
-    repeat (split; [ eassumption | ]).
-    eexists. econstructor. now eauto. eassumption. split.
+    intros e c Hscope Hmax.
+    edestruct uncurry_top_correct; eauto. destructAll.
+    do 2 eexists. repeat (split; [ eassumption | ]).
+    eexists.
+    econstructor; try eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
   Qed.
-
 
 End Uncurry.
 
@@ -569,6 +555,11 @@ Section Compose.
 
   Opaque uncurry_top.
 
+  (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
+  Lemma merge_dup_funs_correct :
+    correct cenv merge_dup_funs_trans.
+  Admitted.
+
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
@@ -649,6 +640,10 @@ Section Compose.
     eapply correct_time.
     unfold inline_lifted. now eapply inline_correct_cor.
     now eapply correct_id_trans.
+
+    eapply correct_compose.
+
+    eapply correct_time. now eapply merge_dup_funs_correct.
 
     now eapply correct_id_trans.
   Qed.

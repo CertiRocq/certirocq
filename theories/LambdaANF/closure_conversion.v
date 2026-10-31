@@ -28,6 +28,8 @@ Section CC.
 
   Variable (clo_itag : ind_tag). (* Inductive tag for closure records *)
 
+  Variable (env0_tag : ctor_tag). (* Tag shared by the empty environments of closed functions *)
+
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
     Ensemble var -> (* Names of the functions in the current function block *)
@@ -296,11 +298,10 @@ Section CC.
         (* check if its a "global" function (i.e. one with no fvs) *)
         match M.get x gfuns with
         | Some GFun =>
-          (* if so, construct an empty env *)
-          c_env <- make_record_ctor_tag 0 ;;
+          (* if so, construct an empty env, with the tag shared by all empty envs *)
           y <- get_name x clo_suffix ;;
           g_env <- get_name x "bogus_env" ;;
-          ret (y, fun e => Econstr g_env c_env [] (Econstr y clo_tag [x; g_env] e))
+          ret (y, fun e => Econstr g_env env0_tag [] (Econstr y clo_tag [x; g_env] e))
         | None => ret (x, id) (* should never reach here *)
         end
     end.
@@ -325,6 +326,13 @@ Section CC.
         M.set x BoundVar (add_params xs mapfv)
     end.
 
+  (** Empty environments share [env0_tag]; others get a fresh tag *)
+  Definition make_env_tag (n : N) : ccstate ctor_tag :=
+    match n with
+    | 0%N => ret env0_tag
+    | _ => make_record_ctor_tag n
+    end.
+
   (** Construct the closure environment and the new variable map *)
   Definition make_env (fvs : list var) (mapfv_new : VarInfoMap)
              (mapfv_old : VarInfoMap) (c_old : ctor_tag) (Γ_new Γ_old : var) (gfuns : GFunMap)
@@ -340,7 +348,7 @@ Section CC.
     in
     t1 <- get_vars fvs mapfv_old gfuns c_old Γ_old ;;
     let '(fv', g') :=  t1 in
-    c_new <- make_record_ctor_tag n ;;
+    c_new <- make_env_tag n ;;
     ret (c_new, map_new', fun e => g' (Econstr Γ_new c_new fv' e)).
 
   (** Add closures to VarInfoMap *)
@@ -479,19 +487,23 @@ Section CC.
     let c' := mkCompData (n + 1)%positive c i f e fenv names imap log in
     (n, c').
 
-  Definition closure_conversion_top (e : exp) (c: comp_data) :=
-    let '(Γ, c) := get_name c in
-    let map := populate_map (exp_fv e) (Maps.PTree.empty VarInfo) in
-    let '(ef'_err, (c', _)) :=
-        run_compM (exp_closure_conv e map (Maps.PTree.empty GFunInfo) 1%positive Γ)
-                  c tt in
-    match ef'_err with
-    | Ret (e', f') =>
-      let cenv' := add_closure_tag clo_tag clo_itag (cenv c')  in
-      let c'' := put_ctor_env cenv' c' in
-      (Ret (f' e'), c'')
-    | Err str =>
-      (Err str, c')
-    end.
-
 End CC.
+
+Import MonadNotation.
+
+(** Creates the tag shared by all empty environments, then converts. *)
+Definition closure_conversion_top (clo_tag : ctor_tag) (clo_itag : ind_tag) (e : exp) (c: comp_data) :=
+  let '(Γ, c) := get_name c in
+  let map := populate_map (exp_fv e) (Maps.PTree.empty VarInfo) in
+  let '(ef'_err, (c', _)) :=
+      run_compM (env0_tag <- make_record_ctor_tag 0 ;;
+                 exp_closure_conv clo_tag env0_tag e map (Maps.PTree.empty GFunInfo) 1%positive Γ)
+                c tt in
+  match ef'_err with
+  | Ret (e', f') =>
+    let cenv' := add_closure_tag clo_tag clo_itag (cenv c')  in
+    let c'' := put_ctor_env cenv' c' in
+    (Ret (f' e'), c'')
+  | Err str =>
+    (Err str, c')
+  end.

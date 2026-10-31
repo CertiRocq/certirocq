@@ -94,7 +94,7 @@ Set Extraction Output Directory ".".
 (* Extraction Library SpecFloat. *)
 Separate Extraction FloatOps.Prim2SF.
 
-Cd "Extraction".
+Set Extraction Output Directory "Extraction".
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax
@@ -116,5 +116,3 @@ Separate Extraction
 Recursive Extraction Library Ascii.
 Recursive Extraction Library BinPos.
 Recursive Extraction Library OrdersTac.
-
-Cd "..".

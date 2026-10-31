@@ -1275,6 +1275,16 @@ Section Closure_conversion_correct.
     - intros B HIn. inv HIn. inv H. constructor.
   Qed.
 
+  (* [make_record_ctor_tag] allocates a tag and leaves [next_var] unchanged. *)
+  Lemma runState_make_record_ctor_tag {A} n (k : ctor_tag -> ccstate A) (c : comp_data) :
+    exists t c',
+      runState (ExtLib.Structures.Monad.bind (make_record_ctor_tag n) k) tt (c, tt) =
+      runState (k t) tt (c', tt) /\
+      next_var c' = next_var c.
+  Proof.
+    destruct c. eexists _, _. split; reflexivity.
+  Qed.
+
   Lemma exp_closure_conv_correct e c :
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
@@ -1306,7 +1316,7 @@ Section Closure_conversion_correct.
 
     set (S := (fun x : var => G < x)%positive).
 
-    assert (Hsound := (proj1 (exp_closure_conv_Closure_conv_sound clo_tag)
+    assert (Hsound := fun env0 => (proj1 (exp_closure_conv_Closure_conv_sound clo_tag env0)
                              e (occurs_free e) (Empty_set _) (Empty_set _)
                              (Maps.PTree.empty GFunInfo) 1%positive G [] fvmap S)).
 
@@ -1356,13 +1366,18 @@ Section Closure_conversion_correct.
       - eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. lia. }
 
     unfold triple in *.
-    assert (Hf' : fresh S (next_var (fst (c1, tt)))).
+    unfold run_compM.
+    (* Allocate the tag shared by empty environments; this leaves [next_var] unchanged. *)
+    destruct (runState_make_record_ctor_tag 0
+                (fun t => exp_closure_conv clo_tag t e fvmap (Maps.PTree.empty GFunInfo) 1%positive G) c1)
+      as [env0 [c1' [Hrun Hnv]]].
+    rewrite Hrun.
+    assert (Hf' : fresh S (next_var (fst (c1', tt)))).
     { unfold S, fresh. intros. unfold Ensembles.In in *. simpl in *. zify; lia. }
 
-    specialize (Hsound Hfvmap Hsub Hbnin Hgmap Hun Hdis1 Hdis2 Hdis3 Hnin tt (c1, tt) Hf').
+    specialize (Hsound env0 Hfvmap Hsub Hbnin Hgmap Hun Hdis1 Hdis2 Hdis3 Hnin tt (c1', tt) Hf').
 
-    unfold run_compM.
-    destruct (runState (exp_closure_conv clo_tag e fvmap (PTree.empty GFunInfo) 1%positive G) tt (c1, tt))
+    destruct (runState (exp_closure_conv clo_tag env0 e fvmap (PTree.empty GFunInfo) 1%positive G) tt (c1', tt))
       as [ p [c2 w2]] eqn:Hcc.
     destruct p as [ | [e' f]]. contradiction. simpl in *. destructAll.
 

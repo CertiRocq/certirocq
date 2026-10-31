@@ -2,8 +2,9 @@ From Stdlib Require Import ZArith.
 Require Import Common.
 From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
-     LambdaANF.inline LambdaANF.uncurry_proto LambdaANF.closure_conversion
-     LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting.
+     LambdaANF.inline LambdaANF.uncurry LambdaANF.closure_conversion
+     LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting
+     LambdaANF.merge_dup_funs.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
@@ -167,6 +168,9 @@ Section IDENT.
 
   Definition id_trans : anf_trans := fun e c => (Ret e, c).
 
+  Definition merge_dup_funs_trans : anf_trans :=
+    fun e c => (Ret (merge_dup_funs 10 e), c).
+
   Section Pipeline.
 
     Context (anf_opts : anf_options).
@@ -199,6 +203,7 @@ Section IDENT.
       e <- (if inl_known anf_opts then
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
             else id_trans e) ;;
+      e <- time_anf "Merge duplicate functions" merge_dup_funs_trans e ;;
       ret e.
 
       Print LambdaANFenv.

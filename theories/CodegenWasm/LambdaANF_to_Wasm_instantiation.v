@@ -25,7 +25,7 @@ From CertiRocq Require Import
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_utils
   CodegenWasm.LambdaANF_to_Wasm_correct
-  CodegenWasm.LambdaANF_to_Wasm_primitives
+  CodegenWasm.LambdaANF_to_Wasm_primints
   CodegenWasm.LambdaANF_to_Wasm_typing
   CodegenWasm.LambdaANF_to_Wasm_restrictions.
 
@@ -45,7 +45,6 @@ Import seq.
 
 Section INSTANTIATION.
 Variable cenv   : ctor_env.
-Variable funenv : fun_env.
 Variable nenv   : name_env.
 Variable penv   : prim_env.
 
@@ -211,7 +210,7 @@ Proof.
       end) as f.
     have Hindep := nth_indep _ _ (f def).
     rewrite Hindep; try lia.
-       cbn. subst f. rewrite map_nth.
+       cbn. subst f. rewrite List.map_nth.
     rewrite IHm; auto.
 Qed.
 
@@ -276,44 +275,12 @@ Proof.
     do 3 f_equal. lia.
 Qed.
 
-Lemma translate_fvar_fname_mapping_aux : forall fds e f i n env,
-  (forall x j, env ! x = Some j -> j < N.of_nat (numOf_fundefs fds) + n)%N ->
-  (create_var_mapping n (collect_function_vars (Efun fds e)) env) ! f = Some i ->
-  (i < N.of_nat (numOf_fundefs fds) + n)%N.
-Proof.
-  induction fds; intros.
-  - remember (numOf_fundefs (Fcons v f l e fds)) as len.
-    cbn in Heqlen. destruct len=>//.
-    cbn in H0. rename H0 into Hf.
-    destruct (var_dec f0 v).
-    + (* f0=v *)
-      subst f0. rewrite M.gss in Hf. inv Hf. lia.
-    + (* f0<>v *)
-      cbn in Hf. rewrite M.gso in Hf; auto.
-      apply IHfds in Hf. injection Heqlen as ->. cbn. destruct n; try lia.
-      assumption. intros.
-      apply H in H0. cbn in H0. destruct n; lia.
-  - inv H0. now eapply H.
-Qed.
-
-Lemma translate_fvar_fname_mapping : forall e f errMsg i,
-  translate_var nenv (create_fname_mapping e) f errMsg = Ret i ->
-  match e with Efun fds _ => N.to_nat i < numOf_fundefs fds + num_custom_funs | _ => True end.
-Proof.
-  intros. unfold create_fname_mapping, translate_var in H.
-  destruct ((create_var_mapping (N.of_nat num_custom_funs) (collect_function_vars e)
-         (M.empty _)) ! f) eqn:Hf; rewrite Hf in H; inv H.
-  destruct e; auto. rename f0 into fds.
-  apply translate_fvar_fname_mapping_aux in Hf. lia.
-  intros. inv H.
-Qed.
-
 Lemma translate_functions_exists_original_fun : forall fds fds'' fns wasmFun e eAny fenv,
   NoDup (collect_function_vars (Efun fds e)) ->
   translate_functions nenv cenv fenv penv fds = Ret fns ->
   fenv = create_fname_mapping (Efun fds'' eAny) ->
   In wasmFun fns ->
-  exists f t ys e, find_def f fds = Some (t, ys, e) /\ (type wasmFun) = N.of_nat (length ys) /\ @repr_funvar fenv nenv f (wasmFun.(fidx)).
+  exists f t ys e, find_def f fds = Some (t, ys, e) /\ (type wasmFun) = N.of_nat (length ys) /\ @repr_funvar fenv f (wasmFun.(fidx)).
 Proof.
   induction fds; intros fds'' fns wasmFun e' eAny fenv Hnodup Htrans Hfenv Hin.
   2: { inv Htrans. inv Hin. }
@@ -326,7 +293,8 @@ Proof.
     unfold translate_function in transF.
     destruct (translate_var _ _ _ _) eqn:HtransFvar. inv transF.
     destruct (translate_body _ _ _ _) eqn:HtransE. inv transF.
-    inv transF. cbn.  split=>//. now econstructor.
+    apply translate_var_Ret in HtransFvar.
+    inv transF. cbn. split. reflexivity. now econstructor.
   - (* wasmFun is not first fn *)
     eapply IHfds in H; eauto. 2: { now inv Hnodup. }
     destruct H as [f' [t' [ys' [e'' [Hfdef Hty]]]]].
@@ -425,16 +393,12 @@ Proof.
   symmetry in Hj', Hi'.
   remember (fidx w) as i'. remember (fidx w0) as j'. clear Heqi' Heqj'.
 
-  assert (Hi'': translate_var nenv (create_fname_mapping (Efun fds eAny1)) v ""%bs = Ret i'). {
-    unfold translate_var. now rewrite Hi'. }
-  assert (Hj'': translate_var nenv (create_fname_mapping (Efun fds eAny2)) v' ""%bs = Ret j'). {
-    unfold translate_var. now rewrite Hj'. }
-  unfold create_fname_mapping in Hi'.
+  unfold create_fname_mapping in Hi', Hj'.
   rewrite -(Nat2N.id i) in Hiv. rewrite -(Nat2N.id j) in Hjv'.
-  rewrite (var_mapping_list_lt_length_nth_error_idx _ _ (N.of_nat num_custom_funs) _ _ _ Hiv) in Hi''; auto.
-  rewrite (var_mapping_list_lt_length_nth_error_idx _ _ (N.of_nat num_custom_funs) _ _ _ Hjv') in Hj''; auto.
-  remember (_ + N.of_nat i)%N as i''. injection Hi'' as ->.
-  remember (_ + N.of_nat j)%N as j''. injection Hj'' as ->. lia.
+  rewrite (var_mapping_list_lt_length_nth_error_idx _ _ (N.of_nat num_custom_funs) _ _ Hiv) in Hi'; auto.
+  rewrite (var_mapping_list_lt_length_nth_error_idx _ _ (N.of_nat num_custom_funs) _ _ Hjv') in Hj'; auto.
+  remember (_ + N.of_nat i)%N as i''. injection Hi' as ->.
+  remember (_ + N.of_nat j)%N as j''. injection Hj' as ->. lia.
 Qed.
 
 Lemma increasing_list_fact_trans : forall n l i i' i'n,
@@ -581,10 +545,8 @@ Proof.
     have H' := translate_functions_idx_bounds _ _ _ _ _ _ Hfns _ Hidx. apply H'.
     intros ? ? Hf.
     split. { apply local_variable_mapping_gt_idx in Hf. lia. }
-    assert (HtransF: translate_var nenv (create_fname_mapping (Efun fds eAny1)) f ""%bs = Ret f'). {
-    unfold translate_var. now rewrite Hf. }
-    apply var_mapping_list_lt_length' in HtransF.
-    rewrite collect_function_vars_length in HtransF.
+    apply var_mapping_list_lt_length' in Hf.
+    rewrite collect_function_vars_length in Hf.
     erewrite <- translate_functions_length; eauto. lia.
   }
   assert (Hnth: nth_error fns (N.to_nat (fidx func - N.of_nat num_custom_funs)) = Some func). {
@@ -602,14 +564,14 @@ Lemma translate_functions_find_def : forall fds f fns t ys e eAny fenv,
   translate_functions nenv cenv fenv penv fds = Ret fns ->
   find_def f fds = Some (t, ys, e) ->
   (forall f t ys e, find_def f fds = Some (t, ys, e) -> correct_cenv_of_exp cenv e) ->
-  exists idx e' locs func, repr_funvar fenv nenv f idx /\
+  exists idx e' locs func, repr_funvar fenv f idx /\
     locs = repeat (T_num T_i32) (length (collect_local_variables e)) /\
     In func fns /\
     func.(fidx) = idx /\
     func.(type) = N.of_nat (length ys) /\
     func.(locals) = locs /\
     func.(body) = e' /\
-    repr_expr_LambdaANF_Wasm cenv fenv nenv penv e 0 e'
+    repr_expr_LambdaANF_Wasm cenv fenv penv e 0 e'
      (lenv := create_local_variable_mapping (ys ++ collect_local_variables e)).
 Proof.
   induction fds; intros ??????? Hnodup HtransFns HfDef HcorrCenv; last by inv HfDef.
@@ -622,6 +584,7 @@ Proof.
     unfold translate_function in Hf.
     destruct (translate_var _ _ _ _) eqn:Hvar. inv Hf.
     destruct (translate_body _ _ _ _ _) eqn:Hexp; inv Hf.
+    apply translate_var_Ret in Hvar.
     exists u, l. eexists. eexists. eexists.
     now econstructor.
     do 2! (split; try reflexivity). now left.
@@ -963,9 +926,7 @@ Proof.
         destruct H' as [f' [e' [locs [func [Hvar [-> [Hin' [<- [Hty [Hlocs [<- Hexpr']]]]]]]]]]].
         assert (func = w). {
           assert (Heq: fidx func = fidx w). {
-            inv Hvar. inv Hvarr. unfold translate_var in H, H0.
-            destruct ((create_fname_mapping (Efun fds e)) ! f) eqn:Hf;
-              rewrite Hf in H, H0; congruence.
+            inv Hvar. inv Hvarr. congruence.
           }
           apply In_nth_error in Hin'. destruct Hin' as [j Hj].
           assert (j = N.to_nat (fidx func) - num_custom_funs).
@@ -1045,12 +1006,9 @@ Proof.
           eapply translate_functions_idx_bounds; eauto.
           2:{ apply In_map. now eapply nth_error_In. }
           intros. split; first by apply local_variable_mapping_gt_idx in H; lia.
-          assert (Hvar: translate_var nenv (create_fname_mapping (Efun fds e)) f ""%bs = Ret f')
-            by (unfold translate_var; rewrite H=>//). clear H.
-          have H' := Hvar.
-          apply var_mapping_list_lt_length' in Hvar.
-          rewrite collect_function_vars_length in Hvar.
-          erewrite (translate_functions_length _ fns) in Hvar; eauto. lia.
+          apply var_mapping_list_lt_length' in H.
+          rewrite collect_function_vars_length in H.
+          erewrite (translate_functions_length _ fns) in H; eauto. lia.
         }
         unfold num_custom_funs in *. unfold lookup_N.
         destruct (N.to_nat (fidx w)) eqn:Hidx; first by lia. cbn in Hnth.
@@ -1132,7 +1090,6 @@ Import Lia.
 Import Relations.Relation_Operators.
 
 Variable cenv:LambdaANF.term.ctor_env.
-Variable funenv:LambdaANF.term.fun_env.
 Variable nenv : LambdaANF.cps_show.name_env.
 Variable penv : LambdaANF.toplevel.prim_env.
 
@@ -1240,8 +1197,8 @@ Theorem module_instantiate_INV_and_more_hold : forall eAny e fds num_funs module
   (* value relation holds for all funcs in fds *)
   (forall a, find_def a fds <> None ->
 	   exists fidx : funcidx,
-	     repr_funvar fenv nenv a fidx /\
-	     repr_val_LambdaANF_Wasm cenv fenv nenv penv (Vfun (M.empty _) fds a)
+	     repr_funvar fenv a fidx /\
+	     repr_val_LambdaANF_Wasm cenv fenv penv (Vfun (M.empty _) fds a)
                                             sr (f_inst f) (Val_funidx fidx)) /\
 
   exists main_fn e' fns,
@@ -1450,17 +1407,11 @@ Proof.
     destruct H' as [fidx [e''' [? [func [? [? [? [? [? [? [? ?]]]]]]]]]]].
     subst. eauto.
     exists (fidx func).
-    split. { inv H. unfold translate_var. unfold translate_var in H0.
-      destruct ((create_fname_mapping (Efun fds e)) ! a) eqn:Hmap; rewrite Hmap in H0=>//.
-      injection H0 as ->. econstructor.
-      unfold translate_var. now rewrite Hmap. }
+    split. { inv H. now econstructor. }
     econstructor; eauto. rewrite -E0. cbn.
     unfold lookup_N.
     assert ((N.to_nat (fidx func)) >= num_custom_funs). {
-      inv H. unfold translate_var in H0.
-      destruct ((create_fname_mapping (Efun fds e)) ! a) eqn:Ha;
-        rewrite Ha in H0=>//. injection H0 as ->.
-      apply local_variable_mapping_gt_idx in Ha. lia. }
+      inv H. apply local_variable_mapping_gt_idx in H0. lia. }
 
     assert (nth_error fns ((N.to_nat (fidx func)) - num_custom_funs) = Some func). {
       apply In_nth_error in H1. destruct H1 as [j Hj].
@@ -1935,7 +1886,7 @@ Qed.
 
 (* result about post-instantiation: initialises table with id mapping for i < num_funs *)
 Theorem post_instantiation_reduce {fenv} : forall hs sr fr fr' num_funs,
-  (forall f f' errMsg, translate_var nenv fenv f errMsg = Ret f' -> N.to_nat f' < num_funs) ->
+  (forall f f', M.get f fenv = Some f' -> N.to_nat f' < num_funs) ->
   INV_instantiation sr fr num_funs ->
   f_inst fr = f_inst fr' ->
   exists sr',
@@ -1944,7 +1895,7 @@ Theorem post_instantiation_reduce {fenv} : forall hs sr fr fr' num_funs,
                                    (fun n : nat => get_init_expr_elem n)
                                    (table_element_mapping num_funs 0))])
                  (hs, sr', fr', [::]) /\
-  INV fenv nenv sr' fr /\
+  INV fenv sr' fr /\
   s_funcs sr = s_funcs sr'.
 Proof.
   intros ????? Hfenv Hinv Hfinst.
@@ -2083,7 +2034,7 @@ Theorem instantiation_combined_INV_and_more : forall e fds num_funs module fenv 
 exists sr fr,
   (* instantiate + post-instantiate *)
   instantiate' module hs sr fr /\
-  INV fenv nenv sr fr /\
+  INV fenv sr fr /\
 
   (* conclusions of module_instantiate_INV_and_more_hold *)
 
@@ -2091,8 +2042,8 @@ exists sr fr,
   (* value relation holds for all funcs in fds *)
   (forall a , find_def a fds <> None ->
   	exists fidx : funcidx,
-	    repr_funvar fenv nenv a fidx /\
-	    repr_val_LambdaANF_Wasm cenv fenv nenv penv (Vfun (M.empty _) fds a) sr (f_inst fr) (Val_funidx fidx)) /\
+	    repr_funvar fenv a fidx /\
+	    repr_val_LambdaANF_Wasm cenv fenv penv (Vfun (M.empty _) fds a) sr (f_inst fr) (Val_funidx fidx)) /\
 
   exists main_fn e' fns,
     main_fn = {| modfunc_type := 0%N (* [] -> [] *)
@@ -2128,8 +2079,8 @@ Proof.
   have HINST_INV := module_instantiate_INV_and_more_hold _ _ _ _ module fenv main_lenv sr fr es_post Hnodup HeRestr HcenvCorrect' Hnumfuns HfnsLength LANF2Wasm Hinst.
   destruct HINST_INV as [Hinv_inst [HinstFuncs [HvalRel [main_fn [e' [fns' [H_main [Hfuncs [HesPost [He Hfns]]]]]]]]]].
 
-  assert (HfenvBound: (forall (f0 : var) (f' : u32) (errMsg : string),
-             translate_var nenv fenv f0 errMsg = Ret f' ->
+  assert (HfenvBound: (forall (f0 : var) (f' : u32),
+             M.get f0 fenv = Some f' ->
              N.to_nat f' < num_funs + num_custom_funs)). {
     intros.
     unfold LambdaANF_to_Wasm in LANF2Wasm.
