@@ -50,8 +50,8 @@ cd ../..
 
 # Speciale case for files that are only uppercase!
 cd ${PLUGIN}/extraction
-mv aST.ml AST.ml
-mv aST.mli AST.mli
+mv aST.ml AST.ml.tmp && mv AST.ml.tmp AST.ml
+mv aST.mli AST.mli.tmp && mv AST.mli.tmp AST.mli
 # We compile with -rectypes, so these definitions are badly interepreted
 sed -e "s/type int = int/type nonrec int = int/" integers.mli > integers.mli.tmp && mv -f integers.mli.tmp integers.mli
 sed -e "s/type int = int/type nonrec int = int/" integers.ml > integers.ml.tmp && mv -f integers.ml.tmp integers.ml
