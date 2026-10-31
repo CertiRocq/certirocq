@@ -44,7 +44,6 @@ OrderedTypeAlt
 MSetInterface
 MSetFacts
 MSetDecide
-MSetList
 MSetAVL
 MSetProperties
 FMapList
@@ -60,6 +59,7 @@ MRPrelude
 MROption
 MRList
 MRProd
+SemiLattice
 ReflectEq
 MRCompare
 Number0
@@ -80,7 +80,10 @@ Config0
 Kernames
 Reflect
 Transform
+NonEmptyLevelExprSet
+UnivConstraintType
 Universes0
+PCUICGlobalEnv
 All_Forall
 BasicAst
 Show
@@ -111,7 +114,17 @@ EnvironmentTyping
 MonadExc
 
 Ssrbool
-WGraph
+MRInstances
+Common0
+Interfaces
+HornClauses
+InitialSemilattice
+HornSemilatticeEquiv
+Model
+Models
+PartialLoopChecking
+Deciders
+UnivLoopChecking
 UGraph0
 PCUICPrimitive
 PCUICAst
@@ -185,7 +198,7 @@ Maps_util
 Map_util
 CompM
 Term0
-Common0
+Common1
 Term_util
 Cps_show
 State
@@ -246,7 +259,7 @@ Bytes
 Leb128
 Simd
 Datatypes0
-Common1
+Common2
 Datatypes_properties
 List_extra
 Binary_format_printer

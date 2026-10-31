@@ -56,5 +56,5 @@ mv aST.mli AST.mli
 sed -e "s/type int = int/type nonrec int = int/" integers.mli > integers.mli.tmp && mv -f integers.mli.tmp integers.mli
 sed -e "s/type int = int/type nonrec int = int/" integers.ml > integers.ml.tmp && mv -f integers.ml.tmp integers.ml
 cd ..
-patch -p0 < patch_ints # Fix 'int' definitions in 8.14 clashing with pervarsives' int
+# patch -p0 < patch_ints # Fix 'int' definitions in 8.14 clashing with pervarsives' int
 cd ..
