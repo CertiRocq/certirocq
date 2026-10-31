@@ -1107,7 +1107,8 @@ Section Lambda_lifting_corresp.
             eapply pre_curry_l. intros HDis.
             eapply bind_triple.
             { eapply make_wrappers_sound_Disjoint.
-              - intro. subst. simpl in *. repeat normalize_sets. congruence.
+              - intro. subst. simpl in *. repeat normalize_sets.
+                discriminate Heqb.
               - rewrite Hdom. sets.
               - eassumption. }
             { intros [Bw m'] [c u].
