@@ -194,7 +194,10 @@ Section Shrink_correct.
     - intros; eapply Hless_steps_ctx; eauto.
     - simpl. eapply HPost_OOT.
     - reflexivity.
-    - intros. inv H.
+    - intros. inv H. inv H5.
+      eapply preord_exp_refl; eauto.
+      eapply preord_env_P_set_not_in_P_l in Henv; eauto with Ensembles_DB.
+      rewrite Setminus_Disjoint in Henv. eauto. eauto with Ensembles_DB.
   Qed.
 
   Lemma rm_proj k rho rho' e x t n y :
@@ -887,8 +890,26 @@ Section Shrink_correct.
         eapply preord_env_P_extend; [| assumption ].
         eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; lia.
         simpl. rewrite Setminus_Union_distr. rewrite occurs_free_Eproj. sets.
-    - rewrite bound_stem_Eprim_val_c in Hbv.
+    - rewrite bound_stem_Eprim_val_c in Hbv. cbn.
       eapply preord_exp_prim_val_compat; eauto.
+      intros. 
+      assert (Disjoint _ S (Singleton _ v)).
+        {
+          eauto 10 with Ensembles_DB.
+        }
+      eapply IH'; eauto.
+      {
+        intros.
+        apply Hyp; eauto. lia.
+        eapply eq_env_P_set_not_in_P_l'; eauto.
+        eapply eq_env_P_set_not_in_P_l'; eauto.
+      }
+      eauto with Ensembles_DB.
+      eapply preord_env_P_extend.
+      eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; lia.
+      simpl. rewrite Setminus_Union_distr. rewrite occurs_free_Eprim_val. sets.
+      eapply preord_val_eq; reflexivity.
+
     - simpl.
       rewrite bound_stem_Eprim_c in Hbv.
       eapply preord_exp_prim_compat; eauto.
@@ -1317,6 +1338,18 @@ Section Shrink_correct.
         normalize_occurs_free. sets.
     - (* Eprimval *)
       simpl; eapply preord_exp_prim_val_compat; eauto; intros.
+      eapply IHk; eauto.
+      + eapply Disjoint_Included; [| | eassumption ].
+        normalize_bound_var. now sets.
+        normalize_occurs_free.
+        eapply Included_trans. now eapply image'_get_not_In. reflexivity.
+      + eapply preord_env_P_inj_remove.
+        eapply Disjoint_In_l with [set v]; sets.
+        revert Hdis.
+        normalize_bound_var. normalize_occurs_free. sets.
+        revert Hpre; normalize_occurs_free.
+        now eapply preord_env_P_inj_monotonic.
+        now eapply preord_val_eq.
     - (* Eprim *)
       simpl; eapply preord_exp_prim_compat; eauto; intros.
       eapply Forall2_preord_var_env_map. eassumption.

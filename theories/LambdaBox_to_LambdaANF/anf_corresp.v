@@ -1349,6 +1349,8 @@ Section ValRelExists.
       + assumption.
       + eapply Forall_impl; [| eassumption]. intros d0 [Hlam Hwf_b]. split;
           [exact Hlam | eapply EWellformed.extends_wellformed; eassumption].
+    - (* Prim_v *)
+      constructor.
   Qed.
 
   (* If e is wellformed w.r.t. Σ0 and k ∈ kn_deps e, then k is declared in Σ0.
@@ -1671,7 +1673,8 @@ Section ValRelExists.
             destruct (IHvs H4 H5) as [vs' Hvs'].
             exists (v' :: vs'). constructor; assumption. }
         destruct Hvs' as [vs' Hvs'].
-        eapply anf_val_rel_clos_exists; [exact Hvs' | |].
+        unshelve eapply anf_val_rel_clos_exists; [ | |exact Hvs' | |].
+        exact (M.empty _).
         * eapply EWellformed.extends_wellformed; [exact Hwf_glob | exact Hext | exact H4].
         * intros k v_g Hkdep _. exfalso.
           exact (kn_deps_declared [] _ e k H4 Hkdep).
@@ -1683,7 +1686,8 @@ Section ValRelExists.
             destruct (IHvs H4 H5) as [vs' Hvs'].
             exists (v' :: vs'). constructor; assumption. }
         destruct Hvs' as [vs' Hvs'].
-        eapply anf_val_rel_closfix_exists; [exact Hvs' | | |].
+        unshelve eapply anf_val_rel_closfix_exists; [ | | exact Hvs' | | |].
+        * exact (M.empty _).
         * (* n < length mfix *)
           match goal with H : (_ < List.length _)%nat |- _ => exact H end.
         * (* Forall ... mfix — extend wellformed to Σ *)
@@ -1698,6 +1702,9 @@ Section ValRelExists.
             eapply Forall_forall in Hmfix; [| exact Hd0_in];
             destruct Hmfix as [_ Hwf_d] end.
           exact (@term_global_deps_fresh _ [] _ _ Hwf_d k Hk_dep).
+
+      + exists (Vprim v0).
+        constructor.
 
     (* ---- Step: Σ0 = (kn, d) :: Σ' ---- *)
     - intros Hext v0 Hwf_v0.
@@ -2014,7 +2021,9 @@ Section ValRelExists.
             eapply Forall_impl; [| exact Hmfix]; intros d0 [Hlam Hwf_d]; split;
             [exact Hlam | eapply EWellformed.extends_wellformed;
              [exact Hwf_glob | exact Hext | exact Hwf_d]] end.
-     Unshelve. all: exact (M.empty val).
+      + (* Prim_v *)
+        exists (Vprim v0). 
+        constructor.
   Qed.
 
 End ValRelExists.

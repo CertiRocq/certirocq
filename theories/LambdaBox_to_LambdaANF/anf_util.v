@@ -143,7 +143,10 @@ Section ANF_Val.
         nth_error fnames n = Some f ->
         anf_fix_rel fnames names S1 fnames mfix Bs S2 ->
         global_env_rel' anf_val_rel (kn_deps_mfix mfix) rho ->
-        anf_val_rel (ClosFix_v vs mfix n) (Vfun rho Bs f).
+        anf_val_rel (ClosFix_v vs mfix n) (Vfun rho Bs f)
+  | anf_rel_Prim :
+      forall p,
+        anf_val_rel (Prim_v p) (Vprim p).
 
   Definition anf_env_rel : list var -> list fuel_sem.value -> M.t val -> Prop :=
     anf_env_rel' anf_val_rel.
@@ -2192,7 +2195,25 @@ Section AlphaEquiv.
          H2 : trans_prim_val ?p = Some ?pv2 |- _] =>
         rewrite H1 in H2; inv H2
       end.
-      eapply preord_exp_prim_val_compat. eapply Hprops. }
+      eapply preord_exp_prim_val_compat. 
+      - eapply Hprops.
+      - eapply Hprops.
+      - intros m' hm. eapply Hcont.
+        + lia.
+        + intros v0 Hg1. rewrite M.gss in Hg1. inv Hg1.
+          eexists. split; [rewrite M.gss; reflexivity |].
+          now rewrite preord_val_eq.
+        + eapply Forall2_preord_var_env_set.
+          * eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          * intros Hin. eapply Hdis1. constructor; [exact Hin | eassumption].
+          * intros Hin. eapply Hdis2. constructor; [exact Hin | eassumption].
+        + intros a b0 Hab Ha Hb.
+          eapply preord_var_env_extend_neq.
+          * eapply preord_var_env_monotonic with (k := m).
+            -- exact Hab.
+            -- lia.
+          * intros Heq. subst. apply Ha. eassumption.
+          * intros Heq. subst. apply Hb. eassumption. }
 
     (* tLazy — impossible *) 1: inv Hrel1.
     (* tForce — impossible *) 1: inv Hrel1.
@@ -2559,6 +2580,10 @@ Section AlphaEquiv.
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat;
             [eapply Hprops | eapply Hprops | exact Hvar_cont].
+    - (* Prim_v *)
+      intros pv v1 v2 Hrel1 Hrel2. inv Hrel1. inv Hrel2.
+      now rewrite preord_val_eq; simpl.
   Qed.
 
 End AlphaEquiv.
+

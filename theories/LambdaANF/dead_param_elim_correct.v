@@ -955,6 +955,19 @@ Section Correct.
     - (* Eprim_val *)
       eapply preord_exp_prim_val_compat.
       + eapply HPost.
+      + eapply HPost.
+      + intros. eapply IHk; eauto.
+
+        * repeat normalize_bound_var_in_ctx. sets.
+        * eapply fun_inv_set_Disjoint.
+          eapply fun_inv_monotonic; eauto. lia.
+          repeat normalize_occurs_free_in_ctx. sets.
+        * eapply preord_env_P_extend.
+          eapply preord_env_P_antimon.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
+          normalize_occurs_free. sets. 
+          rewrite !Setminus_Union. now sets.
+          now eapply preord_val_eq.
 
     - (* Eprim *)
       eapply preord_exp_prim_compat.

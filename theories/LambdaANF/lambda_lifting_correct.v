@@ -1646,6 +1646,50 @@ Section Lambda_lifting_correct.
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free...
     - inv Hun. eapply preord_exp_prim_val_compat; eauto.
+      intros m hlt.
+      eapply preord_exp_monotonic.
+      eapply IHk; eauto.
+      * eapply Disjoint_Included_l. now eapply image_extend_Included'.
+        eapply Union_Disjoint_l.
+        rewrite occurs_free_Eprim_val in Him.
+        eapply Disjoint_Included; [ | | now apply Him ].
+        normalize_bound_var...
+        apply image_monotonic.
+        rewrite !Setminus_Union_distr...
+        eapply Union_Disjoint_r.
+        eapply Disjoint_Included_l_sym; [| eassumption ]...
+        eapply Disjoint_Singleton_l. intros Hc. now eauto.
+      * eapply Disjoint_Included_r; [| eassumption ].
+        now apply bound_var_occurs_free_Eprim_val_Included.
+      * repeat normalize_bound_var_in_ctx...
+      * repeat normalize_bound_var_in_ctx...
+      * repeat normalize_bound_var_in_ctx...
+      * eapply Disjoint_Included_r. now apply occurs_free_Eprim_val_Included.
+        eapply Union_Disjoint_r.
+        eapply Disjoint_Included_l ; [| now apply HD].
+        normalize_bound_var... now apply Disjoint_Singleton_r.
+      * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
+        eapply Included_trans. eapply image_extend_Included'.
+        eapply Included_Union_compat; [| reflexivity ].
+        eapply image_monotonic. rewrite !Setminus_Union_distr.
+        normalize_occurs_free...
+      * eapply preord_env_P_inj_set_alt.
+        eapply preord_env_P_inj_antimon.
+        eapply preord_env_P_inj_monotonic; [| eassumption]. lia.
+        normalize_occurs_free...
+        now rewrite preord_val_eq.
+        intros Hc. eapply Him. constructor; eauto.
+        eapply image_monotonic; [| eassumption ].
+        normalize_occurs_free...
+      * eapply Funs_inv_set.
+        intros Hc. eapply Hfun. now constructor; eauto.
+        intros Hc. eapply Hlf. now constructor; eauto.
+        intros Hc. eapply Hfvs. now constructor; eauto.
+        intros Hc. eapply Him. constructor; eauto.
+        eapply image_monotonic; [| eassumption ]...
+        eapply Funs_inv_monotonic. eassumption. lia.
+      * reflexivity.
+
     - inv Hun. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...

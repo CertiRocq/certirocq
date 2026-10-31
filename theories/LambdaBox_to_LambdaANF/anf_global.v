@@ -272,14 +272,14 @@ Section ValRelWeaken.
       induction v using fuel_sem.value_ind';
         intros Hwf v' Hrel.
       + (* Con_v *)
-        inversion Hwf as [? ? Hwf_vs| |]; subst.
+        inversion Hwf as [? ? Hwf_vs| | |]; subst.
         Transparent bind. cbn in H0. congruence.
         (* inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           [| reflexivity].
         eapply (forall2_val_rel_weaken (well_formed_val [])); eassumption. *)
       + (* Clos_v *)
-        inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
+        inversion Hwf as [|? ? ? Hwf_vs Hwf_body| |]; subst.
         inversion Hrel; subst.
         eapply (@anf_rel_Clos func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           try eassumption.
@@ -307,7 +307,7 @@ Section ValRelWeaken.
           exfalso.
           exact (kn_deps_declared [] _ e k Hwf_body Hkdep).
       + (* ClosFix_v *)
-        inversion Hwf as [| |? ? ? Hwf_vs Hidx Hwf_mfix]; subst.
+        inversion Hwf as [| |? ? ? Hwf_vs Hidx Hwf_mfix|]; subst.
         inversion Hrel; subst.
         eapply (@anf_rel_ClosFix func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           try eassumption.
@@ -340,6 +340,8 @@ Section ValRelWeaken.
           eapply Forall_forall in Hwf_mfix; [| exact Hd0_in].
           destruct Hwf_mfix as [_ Hwf_d].
           exact (kn_deps_declared [] _ _ _ Hwf_d Hk_dep).
+      + inversion Hrel; subst.
+        constructor.
 
     (* ============ STEP: Σ0 = (kn, d) :: Σ' ============ *)
     - intros Hext0.
@@ -355,13 +357,13 @@ Section ValRelWeaken.
       induction v using fuel_sem.value_ind';
         intros Hwf v' Hrel.
       + (* Con_v *)
-        inversion Hwf as [? ? Hwf_vs| |]; subst.
+        inversion Hwf as [? ? Hwf_vs| | |]; subst.
         inversion Hrel; subst.
         apply (@anf_rel_Con func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           [| assumption].
         eapply (forall2_val_rel_weaken (well_formed_val ((kn, d) :: Σ'))); eassumption.
       + (* Clos_v *)
-        inversion Hwf as [|? ? ? Hwf_vs Hwf_body|]; subst.
+        inversion Hwf as [|? ? ? Hwf_vs Hwf_body| |]; subst.
         inversion Hrel; subst.
         eapply (@anf_rel_Clos func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           try eassumption.
@@ -445,7 +447,7 @@ Section ValRelWeaken.
           (* Apply outer IH *)
           eapply IH; [exact Hwf_src | exact Hrel_full].
       + (* ClosFix_v *)
-        inversion Hwf as [| |? ? ? Hwf_vs Hidx Hwf_mfix]; subst.
+        inversion Hwf as [| |? ? ? Hwf_vs Hidx Hwf_mfix |]; subst.
         inversion Hrel; subst.
         eapply (@anf_rel_ClosFix func_tag default_tag tgm cm _ Hf_src Ht_src Σ_tail);
           try eassumption.
@@ -527,6 +529,8 @@ Section ValRelWeaken.
           { eapply (@eval_preserves_wf_restricted _ _ Hf_src Ht_src Σ_full Σ');
               [exact Hwf' | exact Hext_full | constructor | exact Hwf_body_Σ' | exact Heval_full]. }
           eapply IH; [exact Hwf_src | exact Hrel_full].
+      + (* Prim_v *)
+        inversion Hrel; subst. constructor.
   Qed.
 
   (** Weakening: anf_val_rel with bigger cmap/Σ implies anf_val_rel with

@@ -2175,8 +2175,24 @@ Section Inline_correct.
           eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
           zify; lia.
         * eauto.
-        * intros r1 r2 k Henv Hfm'. eapply preord_exp_prim_val_compat.
+        * intros r1 r2 k Henv Hfm'. eapply preord_exp_prim_val_compat. eauto.
           now eauto.
+          intros. eapply Hsem.
+          rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
+          { revert Henv; normalize_occurs_free.
+            now eapply preord_env_P_inj_monotonic. }
+          now eapply preord_val_eq.
+          { intros Hc. eapply Hdis3. constructor. eapply Hf'.
+            normalize_occurs_free.
+            rewrite !image_Union. left. eassumption. }
+          { eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. lia.
+               intros Hc. inv Hc.
+               ++ eapply Hdis1. constructor. normalize_bound_var. now right. right; eassumption.
+               ++ eapply Hdis4. constructor. normalize_bound_var. now right. eassumption.
+               ++ intros Hc. eapply Hdis3. constructor. eassumption. rewrite image_Union.
+                  right. eassumption.
+               ++ normalize_occurs_free. rewrite Union_Setminus_Included; sets; tci. }
+
     - (* Eprim *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_fresh_name_spec.
       intros x w1. simpl. eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf'.
