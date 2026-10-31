@@ -790,7 +790,7 @@ Section EVAL.
     - simpl in Hb, Hi. inv Hb. inv H.
       edestruct IHC. eassumption. eassumption. destructAll.
       do 5 eexists. split; [| split ].
-      3:{ split. econstructor 3. now congruence. Print interpret_ctx. econstructor; eauto. eassumption. }
+      3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
 

@@ -337,6 +337,7 @@ Section Uncurry_correct.
     (Hpost_refl_app : post_app_compat Post' Post')
     (Hpost_refl_letapp : post_letapp_compat cenv Post' Post' Post')
     (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post' Post')
+    (Hpost_refl_primval : post_primval_compat Post' Post')
     (Hpost_refl_OOT : post_OOT Post')
     (Hpost_refl_base : post_base Post') :
     preord_env_P cenv Post' (occurs_free_fundefs fds) k rho rho1 ->
@@ -2907,6 +2908,7 @@ Section Uncurry_correct.
     (Hpost_refl_app : post_app_compat Post Post)
     (Hpost_refl_letapp : post_letapp_compat cenv Post Post Post)
     (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post Post)
+    (Hpost_refl_primval : post_primval_compat Post Post)
     (Hpost_refl_OOT : post_OOT Post)
     (Hpost_refl_base : post_base Post).
 
@@ -2925,6 +2927,7 @@ Section Uncurry_correct.
     (HpostG_refl_app : post_app_compat PostG PostG)
     (HpostG_refl_letapp : post_letapp_compat cenv PostG PostG PostG)
     (HpostG_refl_letapp_OOT : post_letapp_compat_OOT PostG PostG)
+    (HpostG_refl_primval : post_primval_compat PostG PostG)
     (HpostG_refl_OOT : post_OOT PostG)
     (HpostG_refl_base : post_base PostG).
 
@@ -3053,24 +3056,6 @@ Section Uncurry_correct.
       + do 2 (rewrite M.gso; [|assumption]).
         apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
         apply Henv; auto.
-    - (* uncurry_prim_val *) 
-      eapply preord_exp_prim_val_compat.
-      now eapply Hpost_prop.
-      now apply Hpost_prop.
-      intros k' v1 v2 Hk' Hv1_v2.
-      apply IH; inv Hunique; inv Hunique1; auto.
-      rewrite used_vars_Eprim_val in Hused.
-      eapply Included_trans; [|eassumption]...
-      rewrite used_vars_Eprim_val in Hused1.
-      eapply Included_trans; [|eassumption]...
-      intros a Ha; split_var_eq a x; subst; unfold preord_var_env.
-      + do 2 rewrite M.gss.
-        intros v0 Hv0; inv Hv0; eauto.
-        exists (Vprim p). split; eauto.
-        now eapply preord_val_eq.
-      + do 2 (rewrite M.gso; [|assumption]).
-        apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
-        apply Henv; auto.
     - (* uncurry_prim *)
       apply preord_exp_prim_compat.
       now eapply Hpost_prop.
@@ -3088,9 +3073,24 @@ Section Uncurry_correct.
         intros a' Ha'; inv Ha'.
         constructor; now right.
         apply Free_Eprim2; assumption.
-    - (* uncurry_prim_val *)
-      apply preord_exp_prim_val_compat.
+    - (* uncurry_prim_val *) 
+      eapply preord_exp_prim_val_compat.
       now eapply Hpost_prop.
+      now apply Hpost_prop.
+      intros k' v1 v2 Hk' Hv1_v2.
+      apply IH; inv Hunique; inv Hunique1; auto.
+      rewrite used_vars_Eprim_val in Hused.
+      eapply Included_trans; [|eassumption]...
+      rewrite used_vars_Eprim_val in Hused1.
+      eapply Included_trans; [|eassumption]...
+      intros a Ha; split_var_eq a v; subst; unfold preord_var_env.
+      + do 2 rewrite M.gss.
+        intros v0 Hv0; inv Hv0; eauto.
+        exists (Vprim p). split; eauto.
+        now eapply preord_val_eq.
+      + do 2 (rewrite M.gso; [|assumption]).
+        apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
+        apply Henv; auto. (* uncurry_prim_val *)
     - (* uncurry_fun_expr *)
       eapply preord_exp_fun_compat; try eassumption.
       now eapply Hpost_prop. now eapply Hpost_prop.
