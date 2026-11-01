@@ -114,6 +114,7 @@ Compiler/metarocq_pipeline.v
 Compiler/pipeline.v
 Compiler/correctness.v
 Compiler/anf_cenv.v
+Compiler/erasure_firstorder.v
 Compiler/pipeline_correctness.v
 
 # Extraction

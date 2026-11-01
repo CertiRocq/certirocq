@@ -47,6 +47,8 @@ From CertiRocq Require Import metarocq_pipeline pipeline correctness anf_cenv.
 From MetaRocq.TemplatePCUIC Require TemplateToPCUIC.
 From MetaRocq.PCUIC Require PCUICTyping PCUICClassification PCUICFirstorder.
 From MetaRocq.ErasurePlugin Require ErasureCorrectness.
+From MetaRocq.Template Require Typing.
+From CertiRocq.Compiler Require erasure_firstorder.
 
 Import Monads.
 Import MonadNotation.
@@ -523,6 +525,7 @@ Qed.
 (** ** First-order results
 
     For programs computing a value of a first-order inductive type (in the sense of
+    [erasure_firstorder.firstorder_ind], the Template version of
     [PCUICFirstorder.firstorder_ind]), the value computed by the LambdaANF program is the value
     computed by the source program: a tree of constructors, with parameters erased (as in
     MetaRocq's [compile_value_box]), singleton constructors unboxed (as in [EUnboxing.unbox])
@@ -531,9 +534,6 @@ Qed.
 (** The PCUIC translation of the source program *)
 Definition pcuic_env (p : Ast.Env.program) : PCUICAst.PCUICEnvironment.global_env :=
   PCUICProgram.trans_env_env (TemplateToPCUIC.trans_global_env p.1).
-
-Definition pcuic_env_ext (p : Ast.Env.program) : PCUICAst.PCUICEnvironment.global_env_ext :=
-  (pcuic_env p, Universes.Monomorphic_ctx).
 
 Definition pcuic_term (p : Ast.Env.program) (t : Ast.term) : PCUICAst.term :=
   TemplateToPCUIC.trans (TemplateToPCUIC.trans_global_env p.1) t.
@@ -797,20 +797,28 @@ Qed.
 Notation erasure_pipeline_mapping econf :=
   (@Erasure.erasure_pipeline_mapping fake_guard_impl econf).
 
-(** MetaRocq's untyped erasure pipeline, without unsafe passes nor inductive mappings, maps a
-    first-order value to its tree of constructors (with parameters erased), in which no
-    constructor belongs to a coinductive type.
-    TODO: prove, from [ErasureCorrectness.verified_erasure_pipeline_theorem] (more precisely
-    [v_t_spec], [firstorder_erases_deterministic] and [obseq_lambdabox]), through the translation
-    from Template to PCUIC and eta-expansion ([pre_erasure_pipeline_mapping]), and the mapping
-    variants of the erasure transformations with an empty mapping. *)
+Lemma constructor_tree_constr_tree (P : inductive -> Prop) t :
+  erasure_firstorder.constructor_tree P t ->
+  constr_tree t /\ forall ind, In ind (tree_inductives t) -> P ind.
+Proof.
+  revert t. fix IH 2. intros t [ind c args hP hargs].
+  have [hargs' hind] : Forall constr_tree args /\
+    forall ind', In ind' (concat (map tree_inductives args)) -> P ind'.
+  { clear -IH hargs. induction hargs as [|x l hx hl [hl' hind]]; cbn.
+    - split; [constructor|done].
+    - destruct (IH x hx) as [hx' hindx].
+      split; [by constructor|]. intros ind' [hin|hin]%in_app_or; eauto. }
+  split; [now constructor|]. intros ind' [<-|hin]; eauto.
+Qed.
+
+(** MetaRocq's untyped erasure pipeline, without inductive mappings, maps a first-order value
+    to its tree of constructors (with parameters erased), in which no constructor belongs to a
+    coinductive type (see [erasure_firstorder.erasure_pipeline_mapping_firstorder]). *)
 Lemma erasure_pipeline_mapping_firstorder econf (p : Ast.Env.program) pr i u args v v1 :
-  enable_unsafe econf = no_unsafe_passes ->
-  PCUICClassification.axiom_free (pcuic_env p) ->
-  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
-      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
-  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
-    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  erasure_firstorder.axiom_free p.1 ->
+  ∥ @Template.Typing.typing config.extraction_checker_flags (Ast.Env.empty_ext p.1) [] p.2
+      (Ast.mkApps (Ast.tInd i u) args) ∥ ->
+  erasure_firstorder.firstorder_ind p.1 (erasure_firstorder.firstorder_env p.1) i ->
   eval_template_program_mapping ([], p) v ->
   Transform.obseq (erasure_pipeline_mapping econf) ([], p) pr
     (Transform.run (erasure_pipeline_mapping econf) ([], p) pr) v v1 ->
@@ -819,7 +827,12 @@ Lemma erasure_pipeline_mapping_firstorder econf (p : Ast.Env.program) pr i u arg
   forall ind, In ind (tree_inductives t) ->
     EGlobalEnv.lookup_inductive_kind (Transform.run (erasure_pipeline_mapping econf) ([], p) pr).1
       (inductive_mind ind) <> Some BasicAst.CoFinite.
-Admitted.
+Proof.
+  intros hax hty hfo hev hobs t.
+  destruct (erasure_firstorder.erasure_pipeline_mapping_firstorder econf p pr i u args v v1
+    (@PCUICSN.normalization _ _ _) hax hty hfo hev hobs) as (-> & _ & htree).
+  split => //. now apply constructor_tree_constr_tree.
+Qed.
 
 (** The erasure pipeline maps first-order values to their trees of constructors, with
     parameters erased and singleton constructors unboxed. We restrict to the verified passes
@@ -830,11 +843,10 @@ Lemma erasure_obseq_firstorder (o : Options) (p : Ast.Env.program) i u args v v_
   enable_typed_erasure (erasure_config o) = false ->
   enable_unsafe (erasure_config o) = no_unsafe_passes ->
   Pipeline_utils.inductives_mapping o = [] ->
-  PCUICClassification.axiom_free (pcuic_env p) ->
-  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
-      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
-  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
-    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  erasure_firstorder.axiom_free p.1 ->
+  ∥ @Template.Typing.typing config.extraction_checker_flags (Ast.Env.empty_ext p.1) [] p.2
+      (Ast.mkApps (Ast.tInd i u) args) ∥ ->
+  erasure_firstorder.firstorder_ind p.1 (erasure_firstorder.firstorder_env p.1) i ->
   eval_template_program_mapping (Pipeline_utils.inductives_mapping o, p) v ->
   erasure_obseq o p v v_er ->
   let t := ErasureCorrectness.compile_value_box (pcuic_env p) (pcuic_term p v) [] in
@@ -844,7 +856,7 @@ Proof.
   rewrite /erased_program (erase_program_run _ _ _ pr) in hobs |- *.
   move: pr hev hobs. rewrite himap /certirocq_erasure_pipeline htyped => pr hev hobs.
   apply obseq_compose_inv in hobs as (v1 & hobs1 & hobs2).
-  destruct (erasure_pipeline_mapping_firstorder _ _ _ _ _ _ _ _ hunsafe hax hty hfo hev hobs1)
+  destruct (erasure_pipeline_mapping_firstorder _ _ _ _ _ _ _ _ hax hty hfo hev hobs1)
     as (-> & htree & hind).
   split => //.
   exact (post_pipeline_firstorder _ _ _ _ _ _ hunsafe htree hind hobs2).
@@ -866,11 +878,10 @@ Theorem CertiRocq_pipeline_firstorder (next_id : positive) (dbg : bool) (o : Opt
   enable_unsafe (erasure_config o) = no_unsafe_passes ->
   Pipeline_utils.inductives_mapping o = [] ->
   (* The source program computes a value of a first-order inductive type *)
-  PCUICClassification.axiom_free (pcuic_env p) ->
-  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
-      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
-  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
-    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  erasure_firstorder.axiom_free p.1 ->
+  ∥ @Template.Typing.typing config.extraction_checker_flags (Ast.Env.empty_ext p.1) [] p.2
+      (Ast.mkApps (Ast.tInd i u) args) ∥ ->
+  erasure_firstorder.firstorder_ind p.1 (erasure_firstorder.firstorder_env p.1) i ->
   exists r w',
     runState (CertiRocq_pipeline next_id [] dbg p) o w = (compM.Ret r, w') /\
     forall v,
