@@ -1,0 +1,34 @@
+opam-version: "2.0"
+version: "dev"
+maintainer: "The CertiRocq Team"
+homepage: "https://certirocq.org/"
+dev-repo: "git+https://github.com/CertiRocq/certirocq"
+bug-reports: "https://github.com/CertiRocq/certirocq/issues"
+authors: ["Andrew Appel"
+          "Yannick Forster"
+          "Anvay Grover"
+          "Joomy Korkut"
+          "John Li"
+          "Zoe Paraskevopoulou"
+          "Matthieu Sozeau"
+          "Matthew Weaver"
+          "Abhishek Anand"
+          "Greg Morrisett"
+          "Randy Pollack"
+          "Olivier Savary Belanger"
+  ]
+license: "MIT"
+build: [
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "dune" {>= "3.23"}
+  "rocq-certirocq" {= version}
+  "rocq-certirocq-vanilla" {= version}
+]
+
+synopsis: "CertiRocq compiled with itself"
+url {
+  git: "https://github.com/CertiRocq/certirocq.git"
+}

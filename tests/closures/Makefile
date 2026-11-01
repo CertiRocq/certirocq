@@ -1,4 +1,4 @@
-COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests
+COQOPTS = -R ./ CertiRocq.Tests
 CCOMPILER ?= $(shell { command -v clang || command -v gcc; } 2>/dev/null)
 INCLUDE = ../../runtime
 WARN_OPTS = -w -Wno-everything

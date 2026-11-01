@@ -1,4 +1,4 @@
-COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
+COQOPTS = -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
 
 # Names of the tests
 TESTS=$(shell cat TESTS)

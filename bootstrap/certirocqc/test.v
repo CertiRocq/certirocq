@@ -3,7 +3,7 @@ From MetaRocq.Utils Require Import bytestring.
 From MetaRocq.Common Require Import Primitive.
 
 From Stdlib Require Import PrimFloat PrimInt63.
-From CertiRocq.CertiRocqC Require Import CertiRocqC.
+From CertiRocq.CertiRocqC.Compiler Require Import CertiRocqC.
 
 (* Set MetaRocq Debug. *)
 Set MetaRocq Timing.
@@ -29,7 +29,7 @@ From Stdlib Require Import ZArith.
 
 From MetaRocq.ErasurePlugin Require Import Loader.
 From CertiRocq.Common Require Import Pipeline_utils.
-From CertiRocq.CertiRocqC Require Import CertiRocqC.
+From CertiRocq.CertiRocqC.Compiler Require Import CertiRocqC.
 From CertiRocq.CertiRocqC Require Import Loader.
 
 Definition certirocqc (opts : Options) (p : Template.Ast.Env.program) :=

@@ -1,0 +1,30 @@
+(rocq.theory
+ (name CertiRocq.CertiRocqC)
+ (package rocq-certirocqc)
+ (plugins rocq-certirocqc.plugin)
+ (theories
+  CertiRocq
+  CertiRocq.Plugin
+  CertiRocq.VanillaPlugin
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))

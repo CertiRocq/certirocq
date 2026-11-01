@@ -4,7 +4,7 @@ Open Scope bs_scope.
 
 Require Import CertiRocq.Compiler.pipeline.
 From CertiRocq.Plugin Require Import CertiRocq.
-From CertiRocq.CertiRocqC Require Import CertiRocqC.
+From CertiRocq.CertiRocqC.Compiler Require Import CertiRocqC.
 
 Set Warnings "-primitive-turned-into-axiom".
 

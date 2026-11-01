@@ -13,7 +13,7 @@
 
 extern value body(struct thread_info *);
 
-extern value *call(struct thread_info *, value, value);
+extern value call(struct thread_info *, value, value);
 
 /* The compiled checker recurses deeply, more than the main thread's stack allows on
    systems where it cannot be raised enough (it is capped at 64MB on macOS). We run it on

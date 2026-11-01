@@ -22,7 +22,7 @@
 
 extern value body(struct thread_info *);
 
-extern value *call(struct thread_info *, value, value);
+extern value call(struct thread_info *, value, value);
 
 /* Besides blocks of the CertiRocq heap, the result of the compiler can point to OCaml values of
    the input, which are kept as they are, and to code: MetaRocq implements erased proofs (boxes)

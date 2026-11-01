@@ -11,7 +11,7 @@ Require compcert.common.AST
         compcert.common.Globalenvs
        (* Int63*).
 
-Require Glue.glue
+From CertiRocq Require Glue.glue
         Compiler.pipeline.
 
 From MetaRocq.ErasurePlugin Require Import Erasure.
@@ -84,7 +84,6 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 Set Warnings "-extraction-reserved-identifier".
 Set Warnings "-extraction-opaque-accessed".
 
-Set Extraction Output Directory ".".
 
 (* Extraction Library Zeven. *)
 (* Extraction Library Zeven. *)
@@ -94,7 +93,6 @@ Set Extraction Output Directory ".".
 (* Extraction Library SpecFloat. *)
 Separate Extraction FloatOps.Prim2SF.
 
-Set Extraction Output Directory "Extraction".
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax

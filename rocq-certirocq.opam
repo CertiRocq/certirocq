@@ -19,17 +19,14 @@ authors: ["Andrew Appel"
   ]
 license: "MIT"
 build: [
-  ["bash" "./configure.sh"]
-  [make "all"]
-  [make "plugins"]
-  [make "bootstrap"]
-]
-install: [
-  [make "install"]
+  ["dune" "subst"] {dev}
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
   "ocaml" {>= "4.13"}
+  "dune" {>= "3.23"}
   "conf-clang"
+  "conf-gmp"
   "stdlib-shims"
   "rocq-core" {= "dev"}
   "rocq-stdlib" {= "dev"}
@@ -41,7 +38,7 @@ depends: [
   "coq-wasm" {= "dev"}
 ]
 
-synopsis: "A Verified Compiler for Gallina, Written in Gallina "
+synopsis: "A Verified Compiler for Gallina, Written in Gallina"
 url {
   git: "https://github.com/CertiRocq/certirocq.git"
 }

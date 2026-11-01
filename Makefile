@@ -1,83 +1,22 @@
-.PHONY: all submodules runtime plugins plugin cplugin install clean bootstrap plugin-manifests
+# CertiRocq is built with dune (see dune-project); these targets are shortcuts.
 
-PLUGIN_MANIFEST_INPUTS=plugins/manifests/generate.py plugins/manifests/plugin-manifest
-PLUGIN_MANIFEST_OUTPUTS=plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
-PYTHON ?= python3
+.PHONY: all install test clean
 
-all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo &: theories/Makefile libraries/Makefile
-	$(MAKE) -C libraries 
-	$(MAKE) -C theories 
+all:
+	dune build
 
-theories/Makefile: theories/_CoqProject
-	cd theories;rocq makefile -f _CoqProject -o Makefile
+install:
+	dune install
 
-libraries/Makefile: libraries/_CoqProject
-	cd libraries;rocq makefile -f _CoqProject -o Makefile
+# The bootstrapped compiler and checker are tested by dune test. The other tests are
+# run with the packages as installed in the build directory.
+INSTALLED = $(CURDIR)/_build/install/default/lib
 
-submodules:
-	git submodule update
-	./make_submodules.sh
+test:
+	dune build @install
+	dune test
+	ROCQPATH=$(INSTALLED)/coq/user-contrib$${ROCQPATH:+:$$ROCQPATH} \
+	  OCAMLPATH=$(INSTALLED)$${OCAMLPATH:+:$$OCAMLPATH} $(MAKE) -C tests
 
-plugins: plugin cplugin
-
-plugin-manifests: $(PLUGIN_MANIFEST_OUTPUTS)
-
-plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack &: $(PLUGIN_MANIFEST_INPUTS) theories/Extraction/extraction.vo
-	bash ./clean_extraction.sh plugins/plugin
-	$(PYTHON) plugins/manifests/generate.py plugin
-
-plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack &: $(PLUGIN_MANIFEST_INPUTS) theories/ExtractionVanilla/extraction.vo
-	bash ./clean_extraction.sh plugins/cplugin
-	$(PYTHON) plugins/manifests/generate.py cplugin
-
-plugin: all runtime plugins/plugin/CertiRocq.vo
-
-plugins/plugin/Makefile: plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack
-	cd plugins/plugin ; rocq makefile -f _CoqProject -o Makefile
-
-plugins/plugin/CertiRocq.vo: all plugins/plugin/Makefile
-	bash ./make_plugin.sh plugins/plugin
-
-
-cplugin: all runtime plugins/cplugin/CertiRocq.vo
-
-plugins/cplugin/Makefile: plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
-	cd plugins/cplugin ; rocq makefile -f _CoqProject -o Makefile
-
-plugins/cplugin/CertiRocq.vo: all plugins/cplugin/Makefile
-	bash ./make_plugin.sh plugins/cplugin
-
-bootstrap: plugin cplugin
-	$(MAKE) -C bootstrap all
-
-install: plugin cplugin bootstrap
-	$(MAKE) -C libraries install
-	$(MAKE) -C theories install
-	$(MAKE) -C runtime install
-	$(MAKE) -C plugins/plugin install
-	$(MAKE) -C plugins/cplugin install
-	$(MAKE) -C bootstrap install
-
-# Clean generated makefiles
-mrproper: 
-	rm -f theories/Makefile
-	rm -f libraries/Makefile
-	rm -f plugins/plugin/Makefile
-	rm -f plugins/cplugin/Makefile
-
-# Don't require the plugin Makefiles: generating them depends on extraction.vo,
-# which would build the theories before cleaning.
-clean: theories/Makefile libraries/Makefile
-	$(MAKE) -C libraries clean
-	$(MAKE) -C theories clean
-	$(MAKE) -C runtime clean
-	if [ -f plugins/plugin/Makefile ]; then $(MAKE) -C plugins/plugin clean; fi
-	if [ -f plugins/cplugin/Makefile ]; then $(MAKE) -C plugins/cplugin clean; fi
-	$(MAKE) -C bootstrap clean
-	rm -f `find theories -name "*.ml*"`
-	rm -rf plugins/plugin/extraction
-	rm -rf plugins/cplugin/extraction
-	$(MAKE) mrproper
-
-runtime: runtime/Makefile
-	$(MAKE) -C runtime
+clean:
+	dune clean

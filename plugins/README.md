@@ -2,24 +2,26 @@
 
 This directory contains the Rocq plugins used to expose CertiRocq commands:
 
-* `plugin/`: the main plugin, built from `theories/Extraction/`. It includes
-  runtime primitive registration, GMP support, and the Wasm compilation path.
-* `cplugin/`: the vanilla-extraction plugin, built from
-  `theories/ExtractionVanilla/`. It is also used by the bootstrapped tools.
+* `plugin/`: the main plugin, built from the extraction of the compiler by
+  `plugin/extraction.v`. It includes runtime primitive registration, GMP
+  support, and the Wasm compilation path.
+* `cplugin/`: the vanilla-extraction plugin, built from the extraction by
+  `cplugin/extraction.v`. It is also used by the bootstrapped tools.
 * `common/`: OCaml code shared by both plugin variants.
-* `manifests/`: the source of truth for generated plugin file lists.
 
 ## Building
 
-From the repository root:
+The plugins are built with dune, from the repository root:
 
 ```console
-$ make plugin
-$ make cplugin
+$ dune build -p rocq-certirocq,rocq-certirocq-vanilla
 ```
 
-`make plugin` builds the main plugin from `plugins/plugin/`. `make cplugin`
-builds the vanilla plugin from `plugins/cplugin/`.
+Each plugin's `dune` file extracts the compiler (`rocq.extraction`), builds the
+OCaml library from the extracted code, the files of `static/` and of `common/`
+and the `get_ordinal.c` stub of the runtime, and builds the Rocq theory that
+loads it. The commands of `common/certirocq_commands.mlg` are included in each
+plugin's `.mlg` file by `cpp`, which sets the name of the plugin.
 
 ## Loading
 
@@ -35,34 +37,14 @@ Load the vanilla plugin with:
 From CertiRocq.VanillaPlugin Require Import CertiRocqVanilla.
 ```
 
-## Maintaining File Lists
+## Maintaining the lists of extracted modules
 
-Do not edit these generated files directly:
-
-* `plugins/plugin/_CoqProject`
-* `plugins/plugin/certirocq_plugin.mlpack`
-* `plugins/cplugin/_CoqProject`
-* `plugins/cplugin/certirocq_vanilla_plugin.mlpack`
-
-Instead, update `plugins/manifests/plugin-manifest` and run:
+dune needs to know the modules produced by each extraction, which are listed in
+the `extracted_modules` field of each plugin's `dune` file. When the extracted
+code changes, for example with a new dependency of the compiler, update the
+lists with:
 
 ```console
-$ make plugin-manifests
+$ dune build theories
+$ plugins/update-extracted-modules.sh
 ```
-
-Use the `[coqproject]` section for hand-written plugin files: Rocq files, static
-OCaml support files, frontend `.ml`/`.mli`/`.mlg` files, and metadata files.
-
-Use the `[mlpack]` section for OCaml modules that must be packed into the plugin.
-Order matters: list each module after the modules it depends on.
-
-Lines without a suffix are shared by both plugins. Add ` :: plugin` or
-` :: cplugin` for variant-specific entries.
-
-Extracted `.ml` and `.mli` files are discovered automatically from each
-variant's `extraction/` directory, so do not list them in `[coqproject]`. If a
-new extracted module must be packed, add only its module name to `[mlpack]`.
-
-Shared OCaml files in `plugins/common/` are not local `_CoqProject` sources. Add
-explicit build rules for them in each affected `Makefile.local-late`, and add
-their module names to `[mlpack]` if they are packed into the plugin.

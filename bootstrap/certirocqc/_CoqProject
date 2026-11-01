@@ -1,8 +1,0 @@
--Q ../../plugins/cplugin CertiRocq.VanillaPlugin
--I ../../plugins/cplugin
--R theories CertiRocq.CertiRocqC
--I .
-
-META.rocq-certirocqc
-
-theories/Loader.v
