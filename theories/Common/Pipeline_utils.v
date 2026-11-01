@@ -7,8 +7,8 @@ From MetaRocq.ErasurePlugin Require Import Erasure.
 #[global] Hint Resolve Bool.absurd_eq_true Bool.trans_eq_bool f_equal2_nat f_equal_nat : core.
 Import MonadNotation ListNotations.
 
-Notation ret := (ExtLib.Structures.Monad.ret).
-Notation bind := (ExtLib.Structures.Monad.bind).
+Abbreviation ret := (ExtLib.Structures.Monad.ret).
+Abbreviation bind := (ExtLib.Structures.Monad.bind).
 
 Open Scope monad_scope.
 Open Scope bs_scope.
