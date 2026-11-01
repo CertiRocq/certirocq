@@ -35,38 +35,6 @@ From MetaRocq.Erasure Require Import EWcbvEval.
 Import EGlobalEnv.
 Import ETransform EImplementLazyForce EImplementBox.
 
-Definition env_flags :=
-  let efl := EConstructorsAsBlocks.switch_cstr_as_blocks
-    (EInlineProjections.disable_projections_env_flag 
-      (ERemoveParams.switch_no_params EWellformed.all_env_flags)) in
-  let efl' := efl_coind_to_ind efl in
-  switch_off_thunk (switch_off_box efl').
-
-(* CertiRocq does not support primitives yet *)
-Definition no_primitive_array_flags := {|
-  has_primint := true;
-  has_primfloat := true;
-  has_primstring := true;
-  has_primarray := false; |}.
-  
-Definition set_primitives (fl : ETermFlags) p :=
-{| has_tBox := fl.(has_tBox)
-  ; has_tRel := fl.(has_tRel)
-  ; has_tVar := fl.(has_tVar)
-  ; has_tEvar := fl.(has_tEvar)
-  ; has_tLambda := fl.(has_tLambda)
-  ; has_tLetIn := fl.(has_tLetIn)
-  ; has_tApp := fl.(has_tApp)
-  ; has_tConst := fl.(has_tConst)
-  ; has_tConstruct := fl.(has_tConstruct)
-  ; has_tCase := fl.(has_tCase)
-  ; has_tProj := fl.(has_tProj)
-  ; has_tFix := fl.(has_tFix)
-  ; has_tCoFix := fl.(has_tCoFix)
-  ; has_tPrim := p
-  ; has_tLazy_Force := fl.(has_tLazy_Force)
-|}.
-
 (* CertiRocq's correctness lemma only supports global environments made of lambda abstractions 
   (not arbitrary expressions or values) *)
 Lemma lambda_glob_lookup Σ :
@@ -126,12 +94,6 @@ Section Correctness.
 
     - primitives are not supported in fuel_sem, and primitive arrays are forbidden in ANF conversion.
     - the environment must be axiom free, as usual *)
-
-  Definition certirocq_flags (efl : EEnvFlags) := 
-    {| has_axioms := false; 
-       has_cstr_params := efl.(has_cstr_params); 
-       term_switches := set_primitives efl.(term_switches) no_primitive_array_flags;
-       cstr_as_blocks := efl.(cstr_as_blocks) |}.
 
   Definition anf_convert ie tgm := 
     convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
