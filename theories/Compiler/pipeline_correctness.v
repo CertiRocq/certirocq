@@ -59,11 +59,6 @@ Import Transform.
 
 (** [cenv_extends], [fresh_ctor_tags]: see [anf_cenv.v] *)
 
-Lemma top_cenv_proj default_tag default_itag ie :
-  top_cenv default_tag default_itag ie =
-  snd (fst (fst (fst (convert_env default_tag default_itag ie)))).
-Proof. unfold top_cenv. now destruct convert_env as [[[[]]]]. Qed.
-
 Lemma caseConsistent_extends cenv cenv' cl t :
   cenv_extends cenv cenv' -> caseConsistent cenv cl t -> caseConsistent cenv' cl t.
 Proof.
@@ -200,8 +195,7 @@ Lemma convert_top_anf_closed_unique_bindings func_tag default_tag default_itag n
   (Σ : EAst.global_context) e e_tgt comp_d :
   wf_eprogram (certirocq_flags env_flags) (Σ, e) ->
   let ie := inductive_env_east Σ in
-  let tgm := (convert_env default_tag default_itag ie).2 in
-  anf.convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
+  anf.convert_top_anf func_tag default_tag (M.empty _) default_itag next_id []
     (fun _ => None) ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d) ->
   closed_exp e_tgt /\ unique_bindings e_tgt.
 Admitted.
@@ -225,11 +219,10 @@ Lemma CertiRocq_pipeline_inv nid dbg p o w r w' :
   runState (CertiRocq_pipeline nid [] dbg p) o w = (compM.Ret r, w') ->
   let p_er := erase_program [] (erasure_config o) (Pipeline_utils.inductives_mapping o) p in
   let ie := inductive_env_east p_er.1 in
-  let tgm := (convert_env default_ctor_tag default_ind_tag ie).2 in
   find_axioms [] [] p_er.1 = [] /\
   check_wf_eprogram (certirocq_check_flags false) p_er /\
   exists e_anf data log,
-    anf.convert_top_anf fun_fun_tag default_ctor_tag (M.empty _) default_ind_tag nid tgm []
+    anf.convert_top_anf fun_fun_tag default_ctor_tag (M.empty _) default_ind_tag nid []
       (fun _ => None) ie (List.rev p_er.1) p_er.2 = (compM.Ret e_anf, data) /\
     run_anf_pipeline nid (make_anf_options o) (anf_program_of e_anf data) = (compM.Ret r, log).
 Proof.
@@ -241,12 +234,11 @@ Proof.
     Pipeline_utils.timePhase_opt, AstCommon.timePhase in heq.
   set (p_er := erase_program _ _ _ _) in *.
   set (ie := inductive_env_east p_er.1).
-  destruct (convert_env default_ctor_tag default_ind_tag ie) as [[[[? ?] ?] ?] dcm] eqn:hce.
   cbv beta iota zeta delta [Monad.bind Monad.ret compM.MonadErrorT compM.MonadState compM.ask
     compM.get compM.put compM.failwith Pipeline_utils.ret compM.runState compM.compM compM.errorT
     debug_msg get_options] in heq.
   rewrite hdirect in heq. destruct w.
-  repeat (cbv beta iota zeta in heq; fold p_er ie in heq; rewrite ?hce in heq;
+  repeat (cbv beta iota zeta in heq; fold p_er ie in heq;
     match type of heq with
     | context [if dbg then _ else _] => destruct dbg
     | context [debug o] => destruct (debug o)
@@ -254,15 +246,14 @@ Proof.
     | context [find_axioms ?a ?b ?c] => destruct (find_axioms a b c) eqn:hax; [|discriminate heq]
     | context [check_wf_eprogram ?f ?p] =>
       destruct (check_wf_eprogram f p) eqn:hwf; [|discriminate heq]
-    | context [anf.convert_top_anf ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k] =>
-      destruct (anf.convert_top_anf a b c d e f g h i j k) as [[|e_anf] []] eqn:hcvt;
+    | context [anf.convert_top_anf ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j] =>
+      destruct (anf.convert_top_anf a b c d e f g h i j) as [[|e_anf] []] eqn:hcvt;
         [discriminate heq|]
     | context [run_anf_pipeline ?a ?b ?c] =>
       destruct (run_anf_pipeline a b c) as [[|r'] log'] eqn:hrun; [discriminate heq|]
     end).
   all:cbv beta iota zeta in heq; injection heq as h1 _; subst r.
   all:split; [exact hax|split; [exact hwf|]].
-  all:rewrite -/ie hce; cbn [snd].
   all:do 3 eexists; split; [exact hcvt|exact hrun].
 Qed.
 
@@ -322,7 +313,7 @@ Definition erased_program (o : Options) (p : Ast.Env.program) : eprogram :=
 
 (** The map from (erased) constructors to LambdaANF constructor tags *)
 Definition erased_tag_map (o : Options) (p : Ast.Env.program) : conId_map :=
-  (convert_env default_ctor_tag default_ind_tag (inductive_env_east (erased_program o p).1)).2.
+  top_tgm default_ctor_tag default_ind_tag (inductive_env_east (erased_program o p).1).
 
 (** The observational relation of the erasure pipeline, relating the values of the source
     and erased programs *)
@@ -352,7 +343,7 @@ Proof.
   have pre := erasure_pipeline_pre (erasure_config o) _ _ hmap hwt.
   (* Inversion of the pipeline *)
   move: (CertiRocq_pipeline_inv _ _ _ _ _ _ _ hdirect hrun).
-  rewrite -/(erased_program o p) -/(erased_tag_map o p).
+  rewrite -/(erased_program o p).
   set (p_er := erased_program o p). set (tgm := erased_tag_map o p).
   intros (_ & hwf & e_anf & data & log & hcvt & hrun').
   apply check_wf_eprogram_spec in hwf. rewrite certirocq_check_flags_false in hwf.
@@ -379,7 +370,7 @@ Proof.
   apply run_anf_pipeline_inv in hrun'
     as (c & e' & c' & hnv & hc & hctag & hanf & -> & -> & ->).
   cbn in hnv, hc, hctag, hanf.
-  destruct (convert_top_anf_cenv _ _ _ _ _ _ _ _ _ _ _ _ _ hcvt) as (hcenv0 & htags & hlt).
+  destruct (convert_top_anf_cenv _ _ _ _ _ _ _ _ _ _ _ _ hcvt) as (hcenv0 & htags & hlt).
   rewrite -hc -hctag in htags hlt. rewrite -hc in hcenv0.
   have hok := cenv_ok_init c htags hlt.
   have hws : identifiers.well_scoped e_anf.
@@ -395,7 +386,7 @@ Proof.
   destruct (hterm _ _ _ hev_anf) as (v_tgt & c_tgt & t_tgt & hev_tgt & hv_tgt).
   have hext : cenv_extends (top_cenv default_ctor_tag default_ind_tag (inductive_env_east p_er.1))
     (state.cenv c').
-  { rewrite top_cenv_proj -hcenv0. exact (anf_pipeline_cenv_extends _ _ _ _ _ _ hok hanf). }
+  { rewrite -hcenv0. exact (anf_pipeline_cenv_extends _ _ _ _ _ _ hok hanf). }
   apply (bstep_fuel_transfer (trace' := nat * nat) hext) in hev_tgt as [t' hev_tgt].
   exists v_tgt, c_tgt, t'. split; [now exists pre|]. split => //. split => //.
   eapply obs_val_compose; eauto.
@@ -432,17 +423,16 @@ Lemma CertiRocq_pipeline_succeeds nid dbg p o w :
   direct o = true ->
   let p_er := erase_program [] (erasure_config o) (Pipeline_utils.inductives_mapping o) p in
   let ie := inductive_env_east p_er.1 in
-  let tgm := (convert_env default_ctor_tag default_ind_tag ie).2 in
   find_axioms [] [] p_er.1 = [] ->
   check_wf_eprogram (certirocq_check_flags false) p_er ->
   forall e_anf data,
-    anf.convert_top_anf fun_fun_tag default_ctor_tag (M.empty _) default_ind_tag nid tgm []
+    anf.convert_top_anf fun_fun_tag default_ctor_tag (M.empty _) default_ind_tag nid []
       (fun _ => None) ie (List.rev p_er.1) p_er.2 = (compM.Ret e_anf, data) ->
   forall r log,
     run_anf_pipeline nid (make_anf_options o) (anf_program_of e_anf data) = (compM.Ret r, log) ->
     exists w', runState (CertiRocq_pipeline nid [] dbg p) o w = (compM.Ret r, w').
 Proof.
-  intros hdirect p_er ie tgm hax hwf e_anf data hcvt r log hrun.
+  intros hdirect p_er ie hax hwf e_anf data hcvt r log hrun.
   destruct data. unfold anf_program_of in hrun; cbn -[run_anf_pipeline] in hrun.
   unfold CertiRocq_pipeline, compile_LambdaBoxEAst, check_axioms, check_wellformed,
     Pipeline_utils.LiftCertiRocqTrans, Pipeline_utils.debug_msg, Pipeline_utils.get_options,
@@ -450,20 +440,17 @@ Proof.
     Pipeline_utils.LiftErrorCertiRocqTrans, Pipeline_utils.LiftErrorLogCertiRocqTrans,
     Pipeline_utils.timePhase_opt, AstCommon.timePhase.
   fold p_er. fold ie.
-  move: hcvt. rewrite /tgm.
-  destruct (convert_env default_ctor_tag default_ind_tag ie) as [[[[? ?] ?] ?] dcm] eqn:hce.
-  cbn [snd]. intros hcvt.
   cbv beta iota zeta delta [Monad.bind Monad.ret compM.MonadErrorT compM.MonadState compM.ask
     compM.get compM.put compM.failwith Pipeline_utils.ret compM.runState compM.compM compM.errorT
     debug_msg get_options].
   rewrite hdirect. destruct w.
-  repeat (cbv beta iota zeta; fold p_er ie; rewrite ?hce ?hax ?hwf ?hcvt ?hrun;
+  repeat (cbv beta iota zeta; fold p_er ie; rewrite ?hax ?hwf ?hcvt ?hrun;
     match goal with
     | |- context [if dbg then _ else _] => destruct dbg
     | |- context [debug o] => destruct (debug o)
     | |- context [Pipeline_utils.time o] => destruct (Pipeline_utils.time o)
     end).
-  all:cbv beta iota zeta; rewrite ?hce ?hcvt ?hrun; cbv beta iota zeta.
+  all:cbv beta iota zeta; rewrite ?hcvt ?hrun; cbv beta iota zeta.
   all:now eexists.
 Qed.
 
