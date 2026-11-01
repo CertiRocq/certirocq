@@ -38,6 +38,15 @@ depends: [
   "rocq-metarocq-safechecker-plugin" {>= "1.5.1"}
   "coq-ext-lib" {>= "0.12"}
   "coq-wasm" {>= "2.2.1"}
+  "rocq-vellvm" {> "3.0.20260707"}
+]
+# The LLVM backend (theories/CodegenLLVM) needs Vellvm's current AST
+# (CONV_Impure), which no Vellvm release contains yet. This pin, the
+# vellvm/ submodule and .nix/coq-overlays/vellvm name the same commit;
+# replace them by a version constraint once Vellvm tags a release that
+# includes it.
+pin-depends: [
+  ["rocq-vellvm.dev" "git+https://github.com/vellvm/vellvm.git#b63a28a0a36cbae73a454d99a97bb8171568343e"]
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "
