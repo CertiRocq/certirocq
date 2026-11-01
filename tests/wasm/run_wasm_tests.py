@@ -19,7 +19,6 @@ for f in files:
     r = subprocess.run(
         [
             "node",
-            "--stack-size=10000000",
             "js/run_wasm.js",
             "./",
             f,

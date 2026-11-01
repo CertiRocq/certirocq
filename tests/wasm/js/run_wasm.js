@@ -19,6 +19,7 @@ const pp_map = {
 };
 
 import { readFileSync } from 'fs';
+import { Worker, isMainThread } from 'worker_threads';
 
 var args = process.argv.slice(2);
 if (args.length != 2) {
@@ -35,7 +36,12 @@ const program = args[1];
 
 let importObject = { env: {} };
 
-(async () => {
+// The programs can recurse more deeply than the main thread's stack allows, and it
+// cannot be raised enough everywhere (it is capped at 64MB on macOS). We run them on a
+// worker thread with a stack of WASM_STACK_SIZE megabytes instead (4GB by default).
+const stack_size_mb = Number(process.env.WASM_STACK_SIZE) || 4096;
+
+const main = async () => {
     const start_startup = Date.now();
     const bytes = readFileSync(path + `CertiRocq.Tests.tests.${program}.wasm`);
 
@@ -91,4 +97,15 @@ let importObject = { env: {} };
     } catch (error) {
 	console.log(error);
 	process.exit(1);
-    }})();
+    }};
+
+if (isMainThread) {
+    const worker = new Worker(new URL(import.meta.url), {
+        argv: args,
+        resourceLimits: { stackSizeMb: stack_size_mb },
+    });
+    worker.on('error', (error) => { console.log(error); process.exitCode = 1; });
+    worker.on('exit', (code) => { if (code != 0) process.exitCode = code; });
+} else {
+    main();
+}
