@@ -37,6 +37,7 @@ From MetaRocq.PCUIC Require PCUICAst PCUICTyping PCUICFirstorder PCUICClassifica
   PCUICWcbvEval PCUICProgram.
 From MetaRocq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl.
 From MetaRocq.Erasure Require EAst EGlobalEnv ErasureFunctionProperties EReorderCstrs.
+From MetaRocq.Erasure Require Import EFirstorder.
 From MetaRocq.ErasurePlugin Require Import ETransform Erasure ErasureCorrectness.
 
 Import PCUICProgram Common.Transform.Transform.
@@ -694,7 +695,7 @@ Section pipeline_obseq.
     clear hl'.
     destruct PCUICAst.PCUICEnvironment.lookup_global as [[|mi]|]; cbn; intros heq;
       try discriminate; injection heq as ->; cbn in hd; try contradiction; subst m; cbn.
-    move/andP => [hfin _] [=] heq; rewrite heq in hfin; discriminate.
+    move=> _. by case: (PCUICAst.PCUICEnvironment.ind_finite mi).
   Qed.
 
   Lemma verified_erasure_pipeline_obseq_firstorder pr v' :
@@ -750,9 +751,29 @@ Section pipeline_obseq.
         eapply PCUICExpandLetsCorrectness.trans_firstorder_mutind.
         eapply PCUICExpandLetsCorrectness.trans_firstorder_env. }
     rewrite b0 in obs.
-    symmetry. eapply obseq_lambdabox; revgoals.
+    (* The erased value and its inductives are first-order, as required to observe it through
+       the cofixpoint translation *)
+    destruct (erase_v_firstorder Σ HΣ expΣ t expt axfree v i u args Normalisation typing fo Heval
+      econf (conj (sq (w, s)) a)) as [fov E hpres].
+    destruct (v_t_firstorder_ind Σ HΣ t v i u args typing fo Heval _ hpres) as [foiv].
+    rewrite -E in foiv.
+    match type of obs with
+    | obseq _ ?P _ _ _ _ => pose proof (v_t_firstorder_ind Σ HΣ t v i u args typing fo Heval
+        (EEnvMap.GlobalContextMap.global_decls P.1)) as foit
+    end.
+    forward foit.
+    { apply (erase_transform_preserves_inductives (PCUICExpandLets.expand_lets_program (Σ, t))). }
+    destruct foit as [foit]. rewrite -E in foit.
+    symmetry. eapply obseq_lambdabox_firstorder; revgoals.
+    1: exact foit. 1: exact foiv. 1: exact fov.
     unfold erase_pcuic_program. cbn [fst snd]. exact obs.
-    eapply extends_erase_pcuic_program. cbn.
+    have [hexpΣ hexpt] :=
+      PCUICExpandLetsCorrectness.expanded_expand_lets_program
+        (cf := extraction_checker_flags) (Σ, t) (HΣ, (_; typing''))
+        (conj expΣ expt).
+    eapply extends_erase_pcuic_program;
+      [exact (ErasureFunction.expanded_global_env_cofix_lambdas _ hexpΣ)
+      |exact (ErasureFunction.expanded_cofix_lambdas _ _ _ hexpt)|..]. cbn.
     unshelve eapply (PCUICExpandLetsCorrectness.trans_wcbveval (cf := extraction_checker_flags)
       (Σ := (Σ.1, Σ.2))).
     { now eapply PCUICExpandLetsCorrectness.trans_wf. }
