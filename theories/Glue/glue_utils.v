@@ -35,15 +35,17 @@ Definition main_ident : positive := 1.
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
 
+(* Left associative, as sequences have always been nested to the left *)
 Notation " p ';;;' q " := (Ssequence p q)
-                          (at level 100, format " p ';;;' '//' q ").
+                          (at level 101, left associativity, format " p ';;;' '//' q ").
 
 Notation "'*' p " := (Ederef p val) (at level 40).
 
+(* Casts are written [[t] e], with the prefix of list notations, which are still
+   parsed as expected *)
+#[warning="-notation-incompatible-prefix"]
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
-Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
 Definition multiple (xs : list statement) : statement :=
   fold_right Ssequence Sskip xs.
@@ -253,6 +255,7 @@ Section L1Constructors.
     end.
 
 
+  #[warning="-notation-incompatible-prefix"]
   Import Template.Ast
          ListNotations.
 
@@ -332,6 +335,7 @@ Section Ctor_Info.
 End Ctor_Info.
 
 Module MetaRocqNotations.
+  #[warning="-notation-incompatible-prefix"]
   Import MetaRocq.Template.All.
 
   (* Recursive quoting *)
