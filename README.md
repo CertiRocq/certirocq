@@ -6,7 +6,7 @@
 
 ## Overview
 
-[![build](https://github.com/CertiRocq/certirocq/actions/workflows/build.yml/badge.svg)](https://github.com/CertiRocq/certirocq/actions/workflows/build.yml)
+[![Nix CI](https://github.com/CertiRocq/certirocq/actions/workflows/nix-action-default.yml/badge.svg?branch=rocq-master)](https://github.com/CertiRocq/certirocq/actions/workflows/nix-action-default.yml?query=branch%3Arocq-master)
 
 ![GitHub](https://img.shields.io/github/license/CertiRocq/certirocq)
 
