@@ -84,6 +84,7 @@ Module MakeHashMap (D: UsualOrderedType) <:
   Lemma get_hash_other:
     forall i m x i' m',
       get i m = Some x -> hash x m = (i',m') -> get i m' = Some x.
+  Proof.
   Admitted.
 
   Fixpoint elements' (i: index) (el: list Domain.t) : list (index * Domain.t) :=
@@ -97,5 +98,6 @@ Module MakeHashMap (D: UsualOrderedType) <:
   Lemma elements_spec: forall i m v,
                          get i m = Some v <->
                          nth_error (elements m) (pred (Pos.to_nat i)) = Some (i,v).
+  Proof.
   Admitted.
 End MakeHashMap.

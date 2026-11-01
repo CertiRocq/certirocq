@@ -134,20 +134,20 @@ let rec print_stmt p s =
       fprintf p "@[<hv 2>%a =@ %a;@]" print_expr e1 print_expr e2
   | Sset(id, e2) ->
       fprintf p "@[<hv 2>%s =@ %a;@]" (temp_name id) print_expr e2
-  | Scall(None, e1, el) ->
+  | Scall(Datatypes.None, e1, el) ->
       fprintf p "@[<hv 2>%a@,(@[<hov 0>%a@]);@]"
                 expr (15, e1)
                 print_expr_list (true, el)
-  | Scall(Some id, e1, el) ->
+  | Scall(Datatypes.Some id, e1, el) ->
       fprintf p "@[<hv 2>%s =@ %a@,(@[<hov 0>%a@]);@]"
                 (temp_name id)
                 expr (15, e1)
                 print_expr_list (true, el)
-  | Sbuiltin(None, ef, tyargs, el) ->
+  | Sbuiltin(Datatypes.None, ef, tyargs, el) ->
       fprintf p "@[<hv 2>builtin %s@,(@[<hov 0>%a@]);@]"
                 (name_of_external ef)
                 print_expr_list (true, el)
-  | Sbuiltin(Some id, ef, tyargs, el) ->
+  | Sbuiltin(Datatypes.Some id, ef, tyargs, el) ->
       fprintf p "@[<hv 2>%s =@ builtin %s@,(@[<hov 0>%a@]);@]"
                 (temp_name id)
                 (name_of_external ef)
@@ -186,9 +186,9 @@ let rec print_stmt p s =
       fprintf p "@[<v 2>switch (%a) {@ %a@;<0 -2>}@]"
               print_expr e
               print_cases cases
-  | Sreturn None ->
+  | Sreturn Datatypes.None ->
       fprintf p "return;"
-  | Sreturn (Some e) ->
+  | Sreturn (Datatypes.Some e) ->
       fprintf p "return %a;" print_expr e
   | Slabel(lbl, s1) ->
       fprintf p "%s:@ %a" (extern_atom lbl) print_stmt s1
@@ -210,8 +210,8 @@ and print_cases p cases =
               print_cases rem
 
 and print_case_label p = function
-  | None -> fprintf p "default"
-  | Some lbl -> fprintf p "case %s" (Z.to_string lbl)
+  | Datatypes.None -> fprintf p "default"
+  | Datatypes.Some lbl -> fprintf p "case %s" (Z.to_string lbl)
 
 and print_stmt_for p s =
   match s with
@@ -225,20 +225,20 @@ and print_stmt_for p s =
       print_stmt_for p s2
   | Ssequence(s1, s2) ->
       fprintf p "%a, %a" print_stmt_for s1 print_stmt_for s2
-  | Scall(None, e1, el) ->
+  | Scall(Datatypes.None, e1, el) ->
       fprintf p "@[<hv 2>%a@,(@[<hov 0>%a@])@]"
                 expr (15, e1)
                 print_expr_list (true, el)
-  | Scall(Some id, e1, el) ->
+  | Scall(Datatypes.Some id, e1, el) ->
       fprintf p "@[<hv 2>%s =@ %a@,(@[<hov 0>%a@])@]"
                 (temp_name id)
                 expr (15, e1)
                 print_expr_list (true, el)
-  | Sbuiltin(None, ef, tyargs, el) ->
+  | Sbuiltin(Datatypes.None, ef, tyargs, el) ->
       fprintf p "@[<hv 2>builtin %s@,(@[<hov 0>%a@]);@]"
                 (name_of_external ef)
                 print_expr_list (true, el)
-  | Sbuiltin(Some id, ef, tyargs, el) ->
+  | Sbuiltin(Datatypes.Some id, ef, tyargs, el) ->
       fprintf p "@[<hv 2>%s =@ builtin %s@,(@[<hov 0>%a@]);@]"
                 (temp_name id)
                 (name_of_external ef)

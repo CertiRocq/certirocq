@@ -338,20 +338,20 @@ Definition make_ctor_rep (cenv : ctor_env) (ct : ctor_tag) : error ctor_rep :=
   | None => Err ("make_ctor_rep: unknown constructor with tag " ++ show_pos ct)
   end.
 
-Notation threadStructInf := (Tstruct threadInfIdent noattr).
-Notation threadInf := (Tpointer threadStructInf noattr).
+Abbreviation threadStructInf := (Tstruct threadInfIdent noattr).
+Abbreviation threadInf := (Tpointer threadStructInf noattr).
 
 
-Notation intTy := (Tint I32 Signed
+Abbreviation intTy := (Tint I32 Signed
                         {| attr_volatile := false; attr_alignas := None |}).
 
-Notation uintTy := (Tint I32 Unsigned
+Abbreviation uintTy := (Tint I32 Unsigned
                          {| attr_volatile := false; attr_alignas := None |}).
 
-Notation longTy := (Tlong Signed
+Abbreviation longTy := (Tlong Signed
                           {| attr_volatile := false; attr_alignas := None |}).
 
-Notation ulongTy := (Tlong Unsigned
+Abbreviation ulongTy := (Tlong Unsigned
                            {| attr_volatile := false; attr_alignas := None |}).
 
 
@@ -373,27 +373,27 @@ Transparent Init_int.
 Transparent make_vint.
 Transparent make_cint.
 
-Notation Tcons := cons.
-Notation Tnil := nil.
-Notation typelist := (list type).
+Abbreviation Tcons := cons.
+Abbreviation Tnil := nil.
+Abbreviation typelist := (list type).
 
-Notation funTy := (Tfunction (threadInf :: nil) val cc_default).
+Abbreviation funTy := (Tfunction (threadInf :: nil) val cc_default).
 
-Notation pfunTy := (Tpointer funTy noattr).
+Abbreviation pfunTy := (Tpointer funTy noattr).
 
-Notation gcTy := (Tfunction ((Tpointer val noattr) :: threadInf :: nil) Tvoid cc_default).
+Abbreviation gcTy := (Tfunction ((Tpointer val noattr) :: threadInf :: nil) Tvoid cc_default).
 
-Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr) cc_default).
+Abbreviation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr) cc_default).
 
-Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
-Notation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
+Abbreviation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
+Abbreviation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
 
-Notation argvTy := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
+Abbreviation argvTy := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 
 Definition floatType := Tfloat F64 noattr.
-Notation floatPtr := (Tpointer floatType {| attr_volatile := false; attr_alignas := None |}).
+Abbreviation floatPtr := (Tpointer floatType {| attr_volatile := false; attr_alignas := None |}).
 
-Notation boolTy := (Tint IBool Unsigned noattr).
+Abbreviation boolTy := (Tint IBool Unsigned noattr).
 
 Fixpoint mkFunTyList (n : nat) : typelist :=
   match n with
@@ -418,17 +418,17 @@ Notation "'ptrptrVar' x" := (Etempvar x valPtrPtr) (at level 20).
 Notation "'bvar' x" := (Etempvar x boolTy) (at level 20).
 Notation "'funVar' x" := (Evar x funTy) (at level 20).
 
-Notation allocPtr := (Etempvar allocIdent valPtr).
-Notation limitPtr := (Etempvar limitIdent valPtr).
-Notation args := (Etempvar argsIdent valPtr).
-Notation gc := (Evar gcIdent gcTy).
-Notation ptr := (Evar isptrIdent isptrTy).
+Abbreviation allocPtr := (Etempvar allocIdent valPtr).
+Abbreviation limitPtr := (Etempvar limitIdent valPtr).
+Abbreviation args := (Etempvar argsIdent valPtr).
+Abbreviation gc := (Evar gcIdent gcTy).
+Abbreviation ptr := (Evar isptrIdent isptrTy).
 
 (* changed tinf to be tempvar and have type Tstruct rather than Tptr Tstruct *)
-Notation tinf := (Etempvar tinfIdent threadInf).
-Notation tinfd := (Ederef tinf threadStructInf).
+Abbreviation tinf := (Etempvar tinfIdent threadInf).
+Abbreviation tinfd := (Ederef tinf threadStructInf).
 
-Notation heapInf := (Tstruct heapInfIdent noattr).
+Abbreviation heapInf := (Tstruct heapInfIdent noattr).
 
 Definition add (a b : expr) := Ebinop Oadd a b valPtr.
 Notation " a '+'' b " := (add a b) (at level 30).
@@ -442,10 +442,11 @@ Notation " a '='' b " := (int_eq a b) (at level 35).
 Definition not (a : expr) := Eunop Onotbool a type_bool.
 Notation "'!' a " := (not a) (at level 40).
 
-Notation seq := Ssequence.
+Abbreviation seq := Ssequence.
 
+(* Left associative, as sequences have always been nested to the left *)
 Notation " p ';' q " := (seq p q)
-                         (at level 100, format " p ';' '//' q ").
+                         (at level 101, left associativity, format " p ';' '//' q ").
 
 Notation " a '::=' b " := (Sset a b) (at level 50).
 Notation " a ':::=' b " := (Sassign a b) (at level 50).
@@ -456,20 +457,23 @@ Notation "'&' p " := (Eaddrof p valPtr) (at level 40).
 
 Definition c_int' n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t.
 
-Notation c_int := c_int'.
+Abbreviation c_int := c_int'.
 
 Notation "'while(' a ')' '{' b '}'" :=
-  (Swhile a b) (at level 60).
+  (Swhile a b) (at level 0).
 
 Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 
+(* Casts are written [[t] e], with the prefix of list notations, which are still
+   parsed as expected *)
+#[warning="-notation-incompatible-prefix"]
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 0). (* what is the type of int being added? *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z val))) (at level 0).
 
 
 (** * Shadow stack definitions *)
@@ -500,8 +504,8 @@ Definition stack_decl size : list (ident * type)  :=
   (rootIdent, rootT size) :: nil. (* local variable for the live array *)
 
 (* Notation for handling the roots array *)
-Notation roots := (Evar rootIdent valPtr).
-Notation "'roots[' n ']'" := ( *(add roots (c_int n%Z val))) (at level 36).
+Abbreviation roots := (Evar rootIdent valPtr).
+Notation "'roots[' n ']'" := ( *(add roots (c_int n%Z val))) (at level 0).
 
 (* Initialize local stack frame. Called before the first function call that uses the current stack *)
 Definition init_stack : statement :=
@@ -832,6 +836,7 @@ Definition make_case_switch
 (* The program returns the translated code and the set of live vars at the next call *)
 
 Definition to_int64 (i : PrimInt63.int) : int64.
+Proof.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.

@@ -3599,16 +3599,16 @@ Section Correct.
             (* Step 2: Extract body bstep from IH3 via Ehalt witness *)
             (* Ehalt r1 in (M.set r1 v' rho_bc) steps in 1 fuel to (Res v') *)
             assert (Hehalt : bstep_fuel cenv (M.set r1 v' rho_bc)
-                               (Ehalt r1) (<0> <+> <1> (Ehalt r1)) (eval.Res v') (<0> <+> <1> (Ehalt r1))).
+                               (Ehalt r1) (<0> <+> (<1> (Ehalt r1))) (eval.Res v') (<0> <+> (<1> (Ehalt r1)))).
             { apply BStepf_run. apply BStept_halt. rewrite M.gss. reflexivity. }
             (* Introduce source reduction.
                Do NOT destruct v_ek into OOT/Res — handle uniformly.
                The body bstep from IH3 and env bridge both work for any v_ek. *)
             intros v_ek cin_ek cout_ek Hle_ek Hbstep_ek.
             (* Extract body bstep from IH3 *)
-            assert (H1_le_Si : to_nat (<0> <+> <1> (Ehalt r1)) <= i + 1).
+            assert (H1_le_Si : to_nat (<0> <+> (<1> (Ehalt r1))) <= i + 1).
             { unfold_all. simpl. lia. }
-            destruct (IH3_val (eval.Res v') (<0> <+> <1> (Ehalt r1)) (<0> <+> <1> (Ehalt r1))
+            destruct (IH3_val (eval.Res v') (<0> <+> (<1> (Ehalt r1))) (<0> <+> (<1> (Ehalt r1)))
                         H1_le_Si Hehalt)
               as [v_bc [cin_bc [cout_bc [Hbstep_bc [Hpost_bc Hres_bc]]]]].
             destruct v_bc as [| v_bc_val].
@@ -4337,12 +4337,12 @@ Section Correct.
             specialize (IH3_val v v' eq_refl Hrel').
             (* Ehalt bstep witness *)
             assert (Hehalt : bstep_fuel cenv (M.set r_bc v' rho_bc)
-                               (Ehalt r_bc) (<0> <+> <1> (Ehalt r_bc)) (eval.Res v') (<0> <+> <1> (Ehalt r_bc))).
+                               (Ehalt r_bc) (<0> <+> (<1> (Ehalt r_bc))) (eval.Res v') (<0> <+> (<1> (Ehalt r_bc)))).
             { apply BStepf_run. apply BStept_halt. rewrite M.gss. reflexivity. }
             intros v_ek cin_ek cout_ek Hle_ek Hbstep_ek.
-            assert (H1_le_Si : to_nat (<0> <+> <1> (Ehalt r_bc)) <= i + 1).
+            assert (H1_le_Si : to_nat (<0> <+> (<1> (Ehalt r_bc))) <= i + 1).
             { unfold_all. simpl. lia. }
-            destruct (IH3_val (eval.Res v') (<0> <+> <1> (Ehalt r_bc)) (<0> <+> <1> (Ehalt r_bc))
+            destruct (IH3_val (eval.Res v') (<0> <+> (<1> (Ehalt r_bc))) (<0> <+> (<1> (Ehalt r_bc)))
                         H1_le_Si Hehalt)
               as [v_bc [cin_bc [cout_bc [Hbstep_bc [Hpost_bc Hres_bc]]]]].
             destruct v_bc as [| v_bc_val].

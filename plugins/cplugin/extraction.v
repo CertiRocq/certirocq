@@ -15,6 +15,8 @@ From CertiRocq Require Glue.glue
         Compiler.pipeline.
 
 From Stdlib Require Import extraction.Extraction.
+(* dune expects the extracted files next to this file, where they are put by default *)
+Set Warnings "-extraction-default-directory".
 From CertiRocq.ExtractionVanilla Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats.
 From Stdlib Require Import ExtrOCamlPString.
 (* Standard lib *)

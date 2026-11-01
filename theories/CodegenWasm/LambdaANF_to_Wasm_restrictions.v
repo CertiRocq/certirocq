@@ -247,7 +247,7 @@ Proof.
     cbn in H2. destruct (check_restrictions cenv e) eqn:Hrestr=>//.
     destruct (sequence _ ) eqn:Hseq; inv H2. destruct u.
     assert (check_restrictions cenv (Ecase v l) = Ret ()). {
-      unfold check_restrictions. simpl. now rewrite Hseq. }
+      unfold check_restrictions. simpl. now rw Hseq. }
     assert (expression_restricted cenv (Ecase v l)). {
        apply IHe0; auto. apply rt_refl. }
     apply clos_rt_rtn1 in Hsub. inv Hsub.

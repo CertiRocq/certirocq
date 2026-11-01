@@ -34,7 +34,7 @@ Ltac separate_instr :=
   cbn;
   repeat match goal with
   |- context C [?x :: ?l] =>
-     lazymatch l with [::] => fail | _ => rewrite -(cat1s x l) end
+     lazymatch l with [::] => fail | _ => rw -(cat1s x l) end
   end.
 
 (* for main function, translated fns *)
@@ -65,7 +65,7 @@ Proof. auto. Qed.
 (* Prove that a list of basic instructions is well-typed, context_restr is required to hold *)
 Ltac solve_bet Hcontext :=
   let Hglob := fresh "Hglob" in
-  simpl; try rewrite List.app_nil_r;
+  simpl; try rw List.app_nil_r;
   match goal with
   | |- be_typing _ [::] (Tf [::] _) => by apply bet_empty
   | |- be_typing _ [:: BI_return] _ => apply bet_return with (t1s:=[::]); by apply Hcontext
@@ -130,13 +130,13 @@ Ltac solve_bet Hcontext :=
   | |- be_typing _ [:: BI_load _ None _] (Tf [:: T_num _] _) => by eapply bet_load; first eassumption; cbn=>//
   (* simple if statement *)
   | |- be_typing _ [:: BI_if (BT_valtype None) _ _] _ =>
-         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rewrite catA; repeat eapply bet_composition'; try solve_bet Hcontext
+         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rw catA; repeat eapply bet_composition'; try solve_bet Hcontext
   | |- be_typing _ [:: BI_if (BT_valtype (Some (T_num T_i32))) [:: BI_const_num (nat_to_value _)] [:: BI_const_num (nat_to_value _)]] _ =>
          apply bet_if_wasm with (tn:=[])=>//; try solve_bet Hcontext
   | H: context_restr ?lenv ?context |- be_typing _ [:: BI_if (BT_valtype (Some (T_num T_i32))) _ _] (Tf [:: T_num T_i32] _) =>
       let Hcontext' := fresh "Hcontext" in
       (assert (Hcontext': context_restr lenv (upd_label context ([:: [:: T_num T_i32]] ++ tc_labels context))) by now inv Hcontext);
-         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rewrite catA; repeat eapply bet_composition'; try solve_bet Hcontext'
+         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rw catA; repeat eapply bet_composition'; try solve_bet Hcontext'
   | H: context_restr ?lenv ?context |- be_typing _ [:: BI_if (BT_valtype (Some (T_num T_i64))) _ _] (Tf ?tin _) =>
       let Hcontext' := fresh "Hcontext" in
       (match tin with
@@ -144,7 +144,7 @@ Ltac solve_bet Hcontext :=
        | [:: T_num T_i32; T_num T_i32 ] => apply bet_weakening with (ts:=[::T_num T_i32])
        end);
       (assert (Hcontext': context_restr lenv (upd_label context ([:: [:: T_num T_i64]] ++ tc_labels context))) by now inv Hcontext);
-         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rewrite catA; repeat eapply bet_composition'; try solve_bet Hcontext'
+         apply bet_if_wasm with (tn:=[])=>//; separate_instr; repeat rw catA; repeat eapply bet_composition'; try solve_bet Hcontext'
   (* if above failed, try to frame the leading const *)
   | |- be_typing _ _ (Tf [:: T_num T_i64; T_num T_i64; T_num T_i64; T_num T_i64] _) => apply bet_weakening with (ts:=[::T_num T_i64; T_num T_i64; T_num T_i64; T_num T_i64]); by solve_bet Hcontext
   | |- be_typing _ _ (Tf [:: T_num T_i64; T_num T_i64; T_num T_i64] _) => apply bet_weakening with (ts:=[::T_num T_i64; T_num T_i64; T_num T_i64]); by solve_bet Hcontext
@@ -164,7 +164,7 @@ Ltac solve_bet Hcontext :=
   end.
 
 Ltac prepare_solve_bet :=
-  separate_instr; repeat rewrite catA; repeat eapply bet_composition'.
+  separate_instr; repeat rw catA; repeat eapply bet_composition'.
 
 (* Translated expressions (all functions bodies other than the first few) have type (Tf [::] [::]) *)
 
@@ -283,9 +283,9 @@ Proof.
       (* Avoid unfolding too much to avoid slowdown *)
 
       repeat match goal with
-             | |- context C [?x :: ?l] => lazymatch l with [::] => fail | _ => rewrite -(cat1s x l) end
+             | |- context C [?x :: ?l] => lazymatch l with [::] => fail | _ => rw -(cat1s x l) end
              end;
-        repeat rewrite catA; repeat eapply bet_composition';
+        repeat rw catA; repeat eapply bet_composition';
         try solve_bet Hcontext'; eauto.
       1,3: now eapply increment_glob_mem_ptr_typing.
 
@@ -352,7 +352,7 @@ Proof.
     assert (be_typing c0 [::instr] (Tf [::] [::T_num T_i32])) as Ht. { inv Hv; solve_bet Hcontext'. }
     prepare_solve_bet. inv Hrestr'. now eapply fun_args_typing.
     apply bet_weakening with (ts:=(repeat (T_num T_i32) (Datatypes.length args))) in Ht.
-    now rewrite cats0 in Ht. inv Hrestr'.
+    now rw cats0 in Ht. inv Hrestr'.
     assert (exists t, lookup_N (tc_tables c0) 0%N = Some t /\ tt_elem_type t = T_funcref) as [t' [Ht1' Ht2']] by apply Hcontext'.
     eapply bet_return_call_indirect with (t3s:=[::]); try apply Hcontext'; eauto.
   - (* Eletapp *)
@@ -360,7 +360,7 @@ Proof.
     assert (be_typing c0 [::instr] (Tf [::] [::T_num T_i32])) as Ht. { inv Hv; solve_bet Hcontext'. }
     prepare_solve_bet; try solve_bet Hcontext'. now eapply fun_args_typing.
     apply bet_weakening with (ts:=(repeat (T_num T_i32) (Datatypes.length args))) in Ht.
-    now rewrite cats0 in Ht. inv Hrestr'.
+    now rw cats0 in Ht. inv Hrestr'.
     assert (exists t, lookup_N (tc_tables c0) 0%N = Some t /\ tt_elem_type t = T_funcref) as [t' [Ht1' Ht2']] by apply Hcontext'.
     eapply bet_call_indirect; (try by apply Hcontext'); eauto.
     inv Hrestr'. now eapply IH.

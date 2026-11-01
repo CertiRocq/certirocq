@@ -162,7 +162,7 @@ Section LogRelCC.
 
   Global Opaque cc_approx_val.
 
-  Notation cc_approx_exp := (cc_approx_exp' cc_approx_val).
+  Abbreviation cc_approx_exp := (cc_approx_exp' cc_approx_val).
 
   (** Environment relation for a single point (i.e. variable) :
    * ρ1 ~_k^x ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
@@ -1909,4 +1909,4 @@ Section LogRelCC.
 
 End LogRelCC.
 
-Notation cc_approx_exp := (fun cenv ct => (cc_approx_exp' cenv (cc_approx_val cenv ct))).
+Abbreviation cc_approx_exp := (fun cenv ct => (cc_approx_exp' cenv (cc_approx_val cenv ct))).

@@ -18,6 +18,8 @@ From MetaRocq.ErasurePlugin Require Import Erasure.
 (* Standard lib *)
 From Stdlib Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63 ExtrOCamlPString.
 From Stdlib Require Import extraction.Extraction.
+(* dune expects the extracted files next to this file, where they are put by default *)
+Set Warnings "-extraction-default-directory".
 From Stdlib Require Import ZArith NArith.
 
 Extraction Inline Program.Wf.Fix_F_sub.

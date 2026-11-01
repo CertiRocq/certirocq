@@ -85,8 +85,9 @@ TACTIC EXTEND CertiRocqc_eval
       let env = Proofview.Goal.env gl in
       let sigma = Proofview.Goal.sigma gl in
       let opts = Certirocq.make_options l [] "goal" in
-      let opts = Certirocq.{ opts with toplevel_name = "goal" } in
-      let c' = Certirocq.eval ~opaque_access:Library.indirect_accessor opts env sigma c [] in
+      let opts = Certirocq_options.{ opts with toplevel_name = "goal" } in
+      (* Tactics have no "opaque_access" state specifier, unlike the vernacular commands *)
+      let c' = Certirocq.eval ~opaque_access:(Library.indirect_accessor [@ocaml.warning "-3"]) opts env sigma c [] in
       ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
   end }
 END

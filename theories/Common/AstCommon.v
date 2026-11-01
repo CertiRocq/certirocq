@@ -74,6 +74,7 @@ Definition print_projection (p:projection) : string :=
   end.
 
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
+Proof.
   apply Classes.eq_dec.
 Defined.
 
@@ -88,6 +89,7 @@ Proof.
 Defined.
 
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
+Proof.
   apply Classes.eq_dec.
 Defined.
 
@@ -260,6 +262,7 @@ Inductive fresh (nm:kername) : environ -> Prop :=
 Hint Constructors fresh : core.
 
 Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
+Proof.
 induction p.
 - left. auto.
 - destruct a. destruct IHp. destruct (Classes.eq_dec nm k).
@@ -269,6 +272,7 @@ induction p.
 Qed.
 
 Lemma fresh_tl: forall nm p, fresh nm p -> fresh nm (tl p).
+Proof.
 induction 1.
 - simpl. assumption.
 - auto.
@@ -276,6 +280,7 @@ Qed.
 
 Lemma fresh_strengthen:
   forall rs qs nm, fresh nm (rs++qs)%list -> fresh nm qs.
+Proof.
 induction rs; intros qs nm h.
 - assumption.
 - inversion h. subst. auto.
@@ -283,6 +288,7 @@ Qed.
 
 Lemma fresh_not_head:
   forall nm t p nmtp, fresh nm nmtp -> nmtp = ((nm,t)::p) -> False.
+Proof.
 induction 1; intros h.
 - inversion h. subst. auto.
 - discriminate h.
@@ -338,6 +344,7 @@ Qed.
 
 Lemma Lookup_lookup:
   forall nm p t, Lookup nm p t -> lookup nm p = Some t.
+Proof.
 induction 1; intros; subst.
 - simpl. rewrite (eq_kername_refl s). reflexivity.
 - simpl. rewrite (eq_kername_bool_neq H). destruct t; assumption.
@@ -345,6 +352,7 @@ Qed.
 
 Lemma lookup_Lookup:
   forall nm p t, lookup nm p = Some t -> Lookup nm p t.
+Proof.
 induction p; intros t h. inversion h.
 destruct a. destruct (Classes.eq_dec nm k); simpl in h.
 - subst. rewrite (eq_kername_refl k) in h.
@@ -356,6 +364,7 @@ Qed.
 Lemma not_lookup_not_Lookup:
  forall (nm:kername) (p:environ) (ec:envClass),
    ~(lookup nm p = Some ec) <-> ~(Lookup nm p ec).
+Proof.
 split; eapply deMorgan_impl.
 - apply (Lookup_lookup).
 - apply (lookup_Lookup).
@@ -364,6 +373,7 @@ Qed.
 Lemma LookupDfn_lookupDfn:
   forall nm p t, Lookup nm p t ->
                  forall te, t = (ecTrm te) -> lookupDfn nm p = Ret te.
+Proof.
   induction 1; intros; subst; unfold lookupDfn, lookup.
 - rewrite (eq_kername_refl s). reflexivity.
 - rewrite (eq_kername_bool_neq H).
@@ -400,6 +410,7 @@ Qed.
 
 Lemma Lookup_fresh_neq:
   forall nm2 p t, Lookup nm2 p t -> forall nm1, fresh nm1 p -> nm1 <> nm2.
+Proof.
 induction 1; intros.
 - inversion H. assumption.
 - apply IHLookup. apply (fresh_tl H1).
@@ -407,10 +418,12 @@ Qed.
 
 Lemma fresh_Lookup_fails:
   forall nm p ec, fresh nm p -> ~(Lookup nm p ec).
+Proof.
 induction 1; intro h; inversion h; subst; auto.
 Qed.
 
 Lemma fresh_lookup_None: forall nm p, fresh nm p <-> lookup nm p = None.
+Proof.
 split.
 - induction 1; simpl; try reflexivity.
   + rewrite eq_kername_bool_neq; assumption.
@@ -457,6 +470,7 @@ Qed.
 Lemma Lookup_weaken:
   forall s p t, Lookup s p t ->
       forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
+Proof.
 intros s p t h1 nm ec h2.
 assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
 assumption.
@@ -465,6 +479,7 @@ Qed.
 Lemma Lookup_weaken':
   forall s p t, Lookup s p t ->
       forall nm ec, s <> nm -> Lookup s ((nm, ec) :: p) t.
+Proof.
 intros s p t h1 nm ec h2. apply LMiss; assumption.
 Qed.
 

@@ -20,16 +20,18 @@ Definition bind
 
 Notation "A >>= F" := (bind A F).
 Notation "'do' X <- A ; B" := (bind A (fun X => B))
-    (at level 200, X name, A at level 100, B at level 200).
+    (at level 10, X name, A at level 100, B at level 200).
 
 Lemma mon_left_id: forall (A B: Type) (a: A) (f: A -> exception B),
   ret a >>= f = f a.
+Proof.
 intros.
 reflexivity.
 Qed.
 
 Lemma mon_right_id: forall (A: Type) (a: exception A),
   a >>= ret = a.
+Proof.
 intros.
 induction a; repeat reflexivity.
 Qed.
@@ -38,6 +40,7 @@ Lemma mon_assoc :
   forall (A B C: Type) (a: exception A)
          (f: A -> exception B) (g: B -> exception C),
     (a >>= f) >>= g = a >>= (fun x => f x >>= g).
+Proof.
 intros.
 induction a; repeat reflexivity.
 Qed.

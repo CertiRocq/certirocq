@@ -8,6 +8,8 @@
  *)
 
 From Stdlib Require Import Eqdep List Lia.
+(* Declares the core rewrite database, which must not be declared implicitly below *)
+From Stdlib Require Program.Combinators.
 
 Set Implicit Arguments.
 

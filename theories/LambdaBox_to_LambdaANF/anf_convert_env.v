@@ -60,7 +60,7 @@ Proof.
   - constructor.
   - destruct fromN eqn:hf.
     constructor. specialize (IHn (p + 1)%positive).
-    rewrite hf in IHn. apply IHn.
+    rw hf in IHn. apply IHn.
 Qed.
 
 Lemma dcon_to_info_all_lt {dc tgm tg P} : dcon_to_info dc tgm = Some tg -> Forall (fun '(_, _, tg) => P tg) tgm -> P tg.
@@ -110,9 +110,9 @@ Proof.
   induction Σ.
   - unfold declared_minductive; cbn => //.
   - unfold declared_minductive; destruct a as [kn []].
-    rewrite inductive_env_east_eq_const.
+    rw inductive_env_east_eq_const.
     intros hl; apply IHΣ. cbn in hl. destruct (eqb_spec mind kn). congruence. exact hl.
-    rewrite inductive_env_east_eq_ind. cbn.
+    rw inductive_env_east_eq_ind. cbn.
     destruct (eqb_spec mind kn).
     + now intros [= <-].
     + apply IHΣ.
@@ -128,9 +128,9 @@ Proof.
   destruct hl as [[declm decli] declc].
   cbn in *.
   eapply declared_minductive_ienv in declm.
-  unfold declared_constructor_ienv. rewrite declm.
+  unfold declared_constructor_ienv. rw declm.
   unfold declared_constructor_ityp, ibodies_itypPack.
-  rewrite nth_error_map decli /= length_map. eapply nth_error_Some_length in declc.
+  rw nth_error_map decli /= length_map. eapply nth_error_Some_length in declc.
   now eapply Nat.ltb_lt.
 Qed.
 
@@ -150,14 +150,14 @@ Proof.
   induction 1 in cstrs, nCon, unboxed, boxed, i0, c, tgm |- *.
    (* in cstrs, ind, nCon, unboxed, boxed, i0, c, tgm |- *. *)
   - cbn. intros ? [= <- <-]; auto.
-  - rewrite rev_mapi. cbn -[mapi]. destruct cstrs => //.
+  - rw rev_mapi. cbn -[mapi]. destruct cstrs => //.
     cbn -[mapi]. intros [= ->]. 
     destruct c0 as [cname ccn].
     move/IHfromNP => IH. specialize (IH eq_refl).
     subst tgm'.
-    rewrite rev_mapi mapi_app //=. cbn.
-    rewrite List.length_rev Nat.add_0_r Nat.sub_diag.
-    rewrite -app_assoc. cbn. rewrite N.add_0_r. f_equal.
+    rw rev_mapi mapi_app //=. cbn.
+    rw List.length_rev Nat.add_0_r Nat.sub_diag.
+    rw -app_assoc. cbn. rw N.add_0_r. f_equal.
     destruct l; cbn -[mapi] => //.
     apply mapi_ext_size. len. intros n x hlt. f_equal. f_equal. cbn. f_equal. lia.
 Qed.
@@ -198,8 +198,8 @@ Proof.
     { constructor. lia.
       eapply Forall_impl; tea. intros [[] ?]. lia. }
     { split. intros ind' n i_tag c_tag [hin'|hin'].
-      * noconf hin'. eexists. split. rewrite PTree.gss; reflexivity. reflexivity.
-      * rewrite M.gso.
+      * noconf hin'. eexists. split. rw PTree.gss; reflexivity. reflexivity.
+      * rw M.gso.
         red in hlt. eapply Forall_forall in hlt; tea. cbn in hlt. lia.
         red in coh. eapply coh; tea.
       * intros ind' n n' itag itag' ctag ctag' H0 H1.
@@ -222,9 +222,9 @@ Lemma In_mapi_rec {A B} (x : B) f (l : list A) n : In x (mapi_rec f l n) ->
 Proof.
   induction l in n |- *; cbn => //.
   intros [<-|hin].
-  exists 0. exists a; cbn. now rewrite Nat.add_0_r.
+  exists 0. exists a; cbn. now rw Nat.add_0_r.
   eapply IHl in hin as [i [v [hnth heq]]].
-  exists (S i), v. cbn. split => //. rewrite -heq; lia_f_equal.
+  exists (S i), v. cbn. split => //. rw -heq; lia_f_equal.
 Qed.
 
 Lemma In_mapi {A B} (x : B) f (l : list A) : In x (mapi f l) -> exists i v, nth_error l i = Some v /\ f i v = x.
@@ -247,9 +247,9 @@ Proof.
     move/IHty. cbn.
     intros h2 ind n' itag ctag.
     move/h2.
-    have he := fromN_spec cn #|cstrs|. rewrite hfr //= in he.
+    have he := fromN_spec cn #|cstrs|. rw hfr //= in he.
     eapply convert_cnstrs_tgm_l in eqcs; tea. 2:reflexivity.
-    rewrite eqcs Coqlib.in_app.
+    rw eqcs Coqlib.in_app.
     firstorder. eapply In_rev in H.
     eapply In_mapi in H as [i' [v [hnth heq]]].
     noconf heq. cbn. now left. 
@@ -274,15 +274,15 @@ Proof.
     move/IHty. cbn.
     intros h2 inj0 hb fr coh.
     have eqcs' := eqcs.
-    have he := fromN_spec cn #|cstrs|. rewrite hfr //= in he.
+    have he := fromN_spec cn #|cstrs|. rw hfr //= in he.
     eapply convert_cnstrs_tgm_l in eqcs'; tea. 2:reflexivity.
     eapply convert_cnstrs_tgm in eqcs.
     apply h2. apply eqcs. apply eqcs.
     clear -fr eqcs'.
     { intros [j [k [itag [ctag hin]]]].
       apply fr. exists (j + 1), k, itag, ctag.
-      rewrite -Nat.add_assoc (Nat.add_comm 1).
-      rewrite eqcs' Coqlib.in_app in hin.
+      rw -Nat.add_assoc (Nat.add_comm 1).
+      rw eqcs' Coqlib.in_app in hin.
       destruct hin.
       { eapply In_rev in H. apply In_mapi in H as [i [v [hnth heq]]].
         noconf heq. lia. } 
@@ -343,7 +343,7 @@ Proof.
     eapply IHie in ce'; auto.
     { intros ind n itag ctag hin. cbn in fr. cbn in hin.
       eapply In_convert_typack in hin; trea. cbn in hin.
-      destruct hin. rewrite H0. apply H.
+      destruct hin. rw H0. apply H.
       apply fr in H0. now depelim H0. }
     apply hc. 
     apply coh. apply hc. cbn. apply coh. apply hc. apply coh.
@@ -390,7 +390,7 @@ Proof.
     destruct c0 as [cname ccn].
     move/IHfromNP => IH. specialize (IH eq_refl).
     intros dcon.
-    specialize (IH dcon). rewrite IH.
+    specialize (IH dcon). rw IH.
     destruct IH as [IH IH']. split.
     intros [[itag [ctag [hin|hin]]]|].
     + noconf hin. right. exists nCon. split => //. split; try lia.
@@ -420,7 +420,7 @@ Proof.
   unfold declared_cstrs.
   induction ty in n, acc, acc' |- *.
   - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
-    intros <-. cbn. firstorder auto. now rewrite nth_error_nil in H1.
+    intros <-. cbn. firstorder auto. now rw nth_error_nil in H1.
   - destruct acc as ((((? & ?) & cn) & ?) & tgm); cbn.
     destruct acc' as ((((? & ?) & cn') & ?) & tgm'); cbn.
     destruct a as [itypNm cstrs].
@@ -429,17 +429,17 @@ Proof.
     move/IHty. cbn.
     intros ih dcon.
     eapply convert_cnstrs_tgm_In in eqcs; trea. 2:{
-    have he := fromN_spec cn #|cstrs|. rewrite hfr //= in he. exact he. }
+    have he := fromN_spec cn #|cstrs|. rw hfr //= in he. exact he. }
     Unshelve. 2:{ exact dcon. }
-    specialize (ih dcon). rewrite eqcs in ih.
-    rewrite ih.
+    specialize (ih dcon). rw eqcs in ih.
+    rw ih.
     split.
     move=> -[].
     move=> -[] [tag hin].
     { now left. }
     { move: hin => -[-> hlt].
       right. exists n, {|itypNm := itypNm; itypCnstrs := cstrs |}, tag.
-      split => //. split => //. lia. rewrite Nat.sub_diag //=. split => //. lia. }
+      split => //. split => //. lia. rw Nat.sub_diag //=. split => //. lia. }
     { move=> -[] x [cstrs' [c3 []]] -> -[] hlt [] hnth hlt'.
       right. exists x, cstrs', c3.
       split => //. split => //. lia. cbn.
@@ -450,7 +450,7 @@ Proof.
       right. exists x, cstrs', c3.
       split => //. split => //. lia.
       move: hnth. have->: x - n = S (x - (n + 1)) by lia. cbn. split => //.
-      assert (x = n) by lia. rewrite H Nat.sub_diag in hnth. cbn in hnth. noconf hnth.
+      assert (x = n) by lia. rw H Nat.sub_diag in hnth. cbn in hnth. noconf hnth.
       subst x.
       left; right. exists c3. split => //. now cbn in hlt'. }
 Qed.
@@ -464,9 +464,9 @@ Proof.
   intros dcon.
   induction ie in acc |- *.
   - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
-    firstorder. now rewrite nth_error_nil in H.
+    firstorder. now rw nth_error_nil in H.
   - destruct acc as ((((? & ?) & ?) & ?) & tgm); cbn.
-    destruct a. rewrite IHie.
+    destruct a. rw IHie.
     split.
     intros [].
     have := convert_typack_tgm_In i1 k 0 (i, c, c0, i0, tgm) _ eq_refl dcon.
@@ -476,12 +476,12 @@ Proof.
     destruct H as [i' [id [ty []]]].
     exists (S i'), id, ty. cbn. split => //.
     intros []. left. 
-    rewrite (convert_typack_tgm_In i1 k 0 (i, c, c0, i0, tgm) _ eq_refl dcon).
+    rw (convert_typack_tgm_In i1 k 0 (i, c, c0, i0, tgm) _ eq_refl dcon).
     now left.
     destruct H as [i' [id [ty []]]].
     destruct i'.
     cbn in H. noconf H. left.
-    rewrite (convert_typack_tgm_In i1 k 0 (i, c, c0, i0, tgm) _ eq_refl dcon). now right.
+    rw (convert_typack_tgm_In i1 k 0 (i, c, c0, i0, tgm) _ eq_refl dcon). now right.
     cbn in H.
     right. exists i', id, ty. split => //.
 Qed.
@@ -500,7 +500,7 @@ Proof.
   eapply In_nth_error in e as [n hnth'].
   exists n, kn, pack; split => //.
   red. exists i, ityp, (N.of_nat c). cbn. split => //.
-  split => //. lia. rewrite Nat.sub_0_r. split => //. lia.
+  split => //. lia. rw Nat.sub_0_r. split => //. lia.
 Qed.
 
 Lemma dcon_to_tag_ok tag tgm : (exists it ct, In (tag, it, ct) tgm) -> dcon_to_tag tag tgm <> None.

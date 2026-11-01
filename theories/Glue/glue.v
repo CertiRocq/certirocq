@@ -21,6 +21,8 @@ Require Import compcert.common.AST
                compcert.common.Values
                compcert.export.Clightdefs.
 
+(* Brings list notations next to the cast notation [[t] e] *)
+#[warning="-notation-incompatible-prefix"]
 Require Import LambdaANF.term
                LambdaANF.identifiers
                LambdaANF.cps_show
@@ -30,10 +32,11 @@ Require Import LambdaANF.term
 
 From MetaRocq.Utils Require Import bytestring MRString.
 
-Notation Tcons := cons.
-Notation Tnil := nil.
-Notation typelist := (list type).
+Abbreviation Tcons := cons.
+Abbreviation Tnil := nil.
+Abbreviation typelist := (list type).
 
+#[warning="-notation-incompatible-prefix"]
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 Local Open Scope bs_scope.
@@ -42,8 +45,10 @@ Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition argvTy : type := tptr val.
 
+(* The fields of the glue code are accessed without the cast of LambdaANF_to_Clight *)
+#[warning="-notation-overridden"]
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add t (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add t (c_int n%Z val))) (at level 0). (* what is the type of int being added? *)
 
 (* from LambdaANF_to_Clight *)
 Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
@@ -951,7 +956,7 @@ Section CtorEnumTag.
     match ctors with
     | nil => (nil, nil)
     | ctor :: ctors' =>
-        if unbox_check ctor
+        if unbox_check ctor is unboxed
         then
           let (bs, us) := match_ordinals_with_tag ctors' boxed (S unboxed) (S total) in
           (bs, (unboxed, total) :: us)

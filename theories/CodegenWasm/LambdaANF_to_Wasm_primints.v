@@ -6,14 +6,14 @@ From MetaRocq Require Import Common.Kernames Utils.bytestring Utils.MRString.
 Import ListNotations SigTNotations Wasm_int.
 
 
-Notation "'primInt' x" := (AstCommon.primInt ; x) (at level 0).
+Notation "'primInt' x" := (AstCommon.primInt ; x) (at level 10, x at level 9).
 
 (* Define convenience wrappers as notations to allow easy unfolding during proofs *)
-Notation uint63 := Uint63.int.
-Notation Z_to_i64 z := (Int64.repr z).
-Notation Z_to_VAL_i64 z := (VAL_int64 (Int64.repr z)).
-Notation nat_to_VAL_i32 n := (VAL_int32 (Wasm_int.Int32.repr (BinInt.Z.of_nat n))).
-Notation N_to_VAL_i32 n := (VAL_int32 (Wasm_int.Int32.repr (BinInt.Z.of_N n))).
+Abbreviation uint63 := Uint63.int.
+Abbreviation Z_to_i64 z := (Int64.repr z).
+Abbreviation Z_to_VAL_i64 z := (VAL_int64 (Int64.repr z)).
+Abbreviation nat_to_VAL_i32 n := (VAL_int32 (Wasm_int.Int32.repr (BinInt.Z.of_nat n))).
+Abbreviation N_to_VAL_i32 n := (VAL_int32 (Wasm_int.Int32.repr (BinInt.Z.of_N n))).
 
 Local Coercion Z_to_i64_co z := Z_to_i64 z.
 Local Coercion Z_to_i64val_co z := Z_to_VAL_i64 z.

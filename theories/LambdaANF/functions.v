@@ -39,6 +39,8 @@ Definition extend {A} (f: positive -> A) (x : positive) (x' : A) : (positive -> 
 
 Declare Scope fun_scope.
 
+(* Postfix, but at the level of the arguments it is applied to *)
+#[warning="-postfix-notation-not-level-1"]
 Notation " f '{' x '~>' y '}' " := (extend f x y) (at level 10, no associativity)
                                    : fun_scope.
 
@@ -57,6 +59,7 @@ Fixpoint extend_lst {A} (f: positive -> A) (xs : list positive) (xs' : list A)
   end.
 
 
+#[warning="-postfix-notation-not-level-1"]
 Notation " f '<{' xs '~>' xs' '}>' " := (extend_lst f xs xs') (at level 10, no associativity)
                                         : fun_scope.
 
@@ -520,6 +523,11 @@ Proof.
     eapply In_image. constructor; eauto.
     intros Hc. eapply H0. eapply In_image. eassumption.
 Qed.
+
+Create HintDb functions_BD.
+#[global] Hint Constants Opaque : functions_BD.
+#[global] Hint Projections Opaque : functions_BD.
+#[global] Hint Variables Opaque : functions_BD.
 
 #[global] Hint Resolve In_image Included_image_extend : functions_BD.
 

@@ -155,9 +155,13 @@ Section Hoare.
       | _ , _ => False
       end.
 
+  (* Not at level 0: application arguments are parsed at level 0, so the {{ after e
+     would be read as the start of another triple. *)
+  #[warning="-closed-notation-not-level-0"]
   Notation "{{ p }} e {{ q }}" :=
     (triple p e q) (at level 90, e at next level).
 
+  #[warning="-closed-notation-not-level-0"]
   Notation "{{{ p }}} e1 | e2 {{{ q }}}" :=
     (bitriple p e1 e2 q) (at level 90, e1 at next level, e2 at next level).
 
@@ -479,7 +483,7 @@ Section Hoare.
     forall (r1 : R) (w1 : W),
       P r1 w1 ->
       exists (x : A) (w2 : W),
-        {{ fun r w => r1 = r /\ w1 = w }} e {{ fun r w x' w' => r = r1 /\ w = w1 /\ x' = x /\ w' = w2 }} /\
+        ({{ fun r w => r1 = r /\ w1 = w }} e {{ fun r w x' w' => r = r1 /\ w = w1 /\ x' = x /\ w' = w2 }}) /\
         Q r1 w1 x w2.
   Proof.
     intros H r1 w1 HP.
@@ -494,7 +498,7 @@ Section Hoare.
     forall (r1 : R) (w1 : W),
       P r1 ->
       exists (x : A) (w2 : W),
-        {{ fun r w => r1 = r }} e {{ fun r w x' w' => r = r1 /\ x' = x /\ w' = w2 }} /\
+        ({{ fun r w => r1 = r }} e {{ fun r w x' w' => r = r1 /\ x' = x /\ w' = w2 }}) /\
         Q r1 x.
   Proof.
   (*   intros H r1 HP. *)
@@ -627,9 +631,13 @@ Section Hoare.
 
 End Hoare.
 
+(* Not at level 0: application arguments are parsed at level 0, so the {{ after e
+   would be read as the start of another triple. *)
+#[warning="-closed-notation-not-level-0"]
 Notation "{{ p }} e {{ q }}" :=
   (triple p e q) (at level 90, e at next level).
 
 
+#[warning="-closed-notation-not-level-0"]
 Notation "{{{ p }}} e1 | e2 {{{ q }}}" :=
   (bitriple p e1 e2 q) (at level 90, e1 at next level, e2 at next level).

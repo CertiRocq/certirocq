@@ -801,7 +801,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hnf = Reductionops.whd_all env sigma ty in
       let hd, args = EConstr.decompose_app sigma hnf in
       match EConstr.kind sigma hd with
-      | Const (c, u) when Environ.is_primitive_type env c ->
+      | Constr.Const (c, u) when Environ.is_primitive_type env c ->
         IsPrimitive (c, EConstr.EInstance.kind sigma u, CArray.map_to_list EConstr.Unsafe.to_constr args)
       | _ -> CErrors.user_err
         Pp.(str"Cannot reify values of non-inductive or non-primitive type: " ++
@@ -866,7 +866,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | IsInductive (hd, u, args) ->
       let open Inductive in
       let open Inductiveops in
-      let qhd = match Metarocq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metarocq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
+      let qhd = match Metarocq_template_plugin.Ast_quoter.quote_global_reference (Names.GlobRef.IndRef hd) with Metarocq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in

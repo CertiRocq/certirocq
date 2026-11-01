@@ -53,11 +53,8 @@ char* print_gmp_int(gmp_int x) {
 
 
 gmp_int mk_gmp_int (struct thread_info *tinfo, mpz_ptr x) {
-  char* str = NULL;
   trace("mk_gmp_int called with %p\n", x);
-  str = mpz_get_str(NULL, 10, x);
-  trace("Calling mk_gmp_int with %s\n", str);
-  /* free(str); */
+  trace("Calling mk_gmp_int with %s\n", mpz_get_str(NULL, 10, x));
   register value *$alloc;
   register value *$limit;
   $limit = (*tinfo).limit;

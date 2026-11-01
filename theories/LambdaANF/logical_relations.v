@@ -171,7 +171,7 @@ Section Log_rel.
 
   End Val_rel.
 
-  Notation preord_exp := (preord_exp' preord_val).
+  Abbreviation preord_exp := (preord_exp' preord_val).
 
   (** Environment relation for a single point (i.e. variable) :
     * ρ1 ~_k^(x, y) ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
@@ -2905,4 +2905,4 @@ Section Log_rel.
 
 End Log_rel.
 
-Notation preord_exp := (fun cenv => (preord_exp' cenv (preord_val cenv))).
+Abbreviation preord_exp := (fun cenv => (preord_exp' cenv (preord_val cenv))).

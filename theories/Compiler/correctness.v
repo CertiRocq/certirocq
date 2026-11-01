@@ -118,7 +118,7 @@ Section Correctness.
   Context (func_tag kon_tag default_tag default_itag : positive).
   Context (next_id : positive).
 
-  Notation refines_toplevel Σ ie tgm := (@refines_top default_tag default_itag tgm Σ ie).
+  Abbreviation refines_toplevel Σ ie tgm := (@refines_top default_tag default_itag tgm Σ ie).
 
   (** To prove the correctness of connecting the MetaRocq pipeline and CertiRocq's ANF, we
       need a stronger well-formedness property. This formalizes the remaining mismatch 

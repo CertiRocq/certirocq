@@ -1929,11 +1929,11 @@ Section Divergence.
                   Hdis_ehalt Heval Hvrel)
       as Hval.
     assert (Hehalt : bstep_fuel cenv (M.set x v' rho) (Ehalt x)
-                    (<0> <+> <1> (Ehalt x))
+                    (<0> <+> (<1> (Ehalt x)))
                     (eval.Res v')
-                    (<0> <+> <1> (Ehalt x))).
+                    (<0> <+> (<1> (Ehalt x)))).
     { apply BStepf_run. apply BStept_halt. rewrite M.gss. reflexivity. }
-    assert (H1_le_i : to_nat (<0> <+> <1> (Ehalt x)) <= i).
+    assert (H1_le_i : to_nat (<0> <+> (<1> (Ehalt x))) <= i).
     { rewrite plus_zero. unfold one. rewrite to_nat_one. lia. }
     destruct (Hval (eval.Res v') _ _ H1_le_i Hehalt)
       as [vres [c [cout [Hbstep [Hpost Hres]]]]].

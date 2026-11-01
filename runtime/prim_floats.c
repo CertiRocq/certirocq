@@ -42,9 +42,7 @@ primfloat mk_float (struct thread_info *tinfo, double x) {
 #define FNotComparable 7U
 
 primfloat_comparison prim_float_compare(primfloat x, primfloat y) {
-  double xv = Double_val(x);
-  double yv = Double_val(y);
-  trace ("Comparing floats: %f and %f\n", xv, yv);
+  trace ("Comparing floats: %f and %f\n", Double_val(x), Double_val(y));
   if (x < y) return FLt;
   else if (x > y) return FGt;
   else if (x == y) return FEq;

@@ -558,6 +558,7 @@ Section Compose.
   (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
   Lemma merge_dup_funs_correct :
     correct cenv merge_dup_funs_trans.
+  Proof.
   Admitted.
 
   Lemma correct_id_trans :
