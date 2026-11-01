@@ -3,6 +3,8 @@
 (rocq.theory
  (name CertiRocq)
  (package rocq-certirocq)
+ ; Nested inductive types do not need All schemes, as in MetaRocq
+ (flags (:standard -w -register-all))
  ; Unfinished developments, not built
  (modules
   :standard
