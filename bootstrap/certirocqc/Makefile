@@ -1,5 +1,5 @@
 # clang compiler 
-CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
+CCOMPILER := $(shell { command -v clang || command -v clang-11 || command -v gcc; } 2>/dev/null)
 # clang options
 CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
 UNAME=$(shell uname -s)
@@ -55,10 +55,10 @@ else
 endif
 
 PKGS = -package rocq-runtime,rocq-runtime.clib,rocq-runtime.config,rocq-runtime.engine,rocq-runtime.gramlib,rocq-runtime.interp,rocq-runtime.kernel,rocq-runtime.lib,rocq-runtime.library,rocq-runtime.toplevel,rocq-runtime.vernac,rocq-runtime.plugins.ltac
-COQLIB = $(shell coqc -where)
+COQLIB = $(shell rocq c -where)
 COQLIBINSTALL = $(COQLIB)/user-contrib/CertiRocq/CertiRocqC
 OCAMLLIB = $(shell ocamlc -where)
-OCAMLOPTS = -package rocq-metarocq-template-ocaml.plugin -open Metarocq_template_plugin -package rocq-certirocq-vanilla.plugin -open Certirocq_vanilla_plugin \
+OCAMLOPTS = -package rocq-metarocq-template.extractable -open Metarocq_template_plugin -package rocq-certirocq-vanilla.plugin -open Certirocq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  
 GENCFILES = glue.c CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
 CFILES = certirocqc_wrapper.c $(GENCFILES)
@@ -78,7 +78,7 @@ runtime: $(RUNTIME_FILES:.o=.c)
 	cd $(RUNTIME_DIR) && $(MAKE)
 
 Makefile.certirocqc: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.certirocqc
+	rocq makefile -f _CoqProject -o Makefile.certirocqc
 
 certirocqc: runtime Makefile.certirocqc certirocqc_plugin.cmxs
 	$(MAKE) -f Makefile.certirocqc
@@ -89,23 +89,23 @@ test.vo: test.v
 	mkdir -p tests
 	ulimit -a
 	ulimit -H -a
-	echo coqc $(TESTCOQOPTS) test.v
-	ulimit -Ss unlimited && ulimit -s unlimited && coqc $(TESTCOQOPTS) test.v
+	echo rocq c $(TESTCOQOPTS) test.v
+	ulimit -Ss unlimited 2>/dev/null || true; rocq c $(TESTCOQOPTS) test.v
 
 clean: Makefile.certirocqc
 	make -f Makefile.certirocqc clean
 	rm -f *.cm* *.o *.vo theories/*.vo
 
 theories/CertiRocqC.vo: theories/CertiRocqC.v $(CERTIROCQ_PIPELINE_DEPS)
-	coqc $(COQOPTS) $<
+	rocq c $(COQOPTS) $<
 
 theories/compile.v: theories/CertiRocqC.vo
 
 theories/compile.vo CertiRocq.CertiRocqC.compile.certirocqc.c &: theories/compile.v theories/CertiRocqC.vo $(CERTIROCQ_PIPELINE_DEPS)
-	coqc $(COQOPTS) $<
+	rocq c $(COQOPTS) $<
 
 g_certirocqc.ml: g_certirocqc.mlg certirocqc.cmx certirocqc_plugin_wrapper.cmx
-	coqpp $<
+	rocq pp-mlg $<
 
 certirocqc.cmx: certirocqc_plugin_wrapper.cmx
 

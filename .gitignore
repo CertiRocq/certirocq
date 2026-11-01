@@ -79,6 +79,7 @@ bootstrap/certirocqchk/META
 plugins/plugin/.merlin
 _build
 .vscode/CertiRocq.code-workspace
+.vscode/settings.json
 bootstrap/certirocqc/CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
 bootstrap/certirocqc/CertiRocq.CertiRocqC.CertiRocqC.certirocqc.h
 bootstrap/certirocqc/tests/test.demo1.c

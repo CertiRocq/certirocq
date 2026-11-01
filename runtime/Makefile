@@ -3,7 +3,7 @@ HEADERS = m.h config.h values.h gc_stack.h certirocq_run_main.h rocq_c_ffi.h roc
 LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 
 TARGETS = ${SRC:.c=.o}
-COQLIB = `coqc -where`
+COQLIB = `rocq c -where`
 DST ?= ${COQLIB}/user-contrib/CertiRocq/Plugin/runtime
 
 all: ${TARGETS}

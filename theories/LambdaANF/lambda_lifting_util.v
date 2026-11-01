@@ -323,7 +323,7 @@ Proof.
     inv H0; eauto.
     eapply Disjoint_Included; [| | now apply IHHadd ].
     rewrite lifted_name_extend. rewrite image_extend_not_In_S; eauto.
-    apply image_monotonic...
+    apply image_monotonic.
     now eauto with Ensembles_DB.
     rewrite lifted_name_extend. rewrite image_extend_not_In_S; eauto.
     reflexivity. intros Hc. eapply H6.

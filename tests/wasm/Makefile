@@ -18,7 +18,7 @@ all: run_tests run_primitive_unit_tests
 $(WASMFILES): tests
 
 lib/Makefile:
-	cd ../lib; coq_makefile -f _CoqProject -o Makefile
+	cd ../lib; rocq makefile -f _CoqProject -o Makefile
 
 lib: lib/Makefile
 	$(MAKE) -C ../lib

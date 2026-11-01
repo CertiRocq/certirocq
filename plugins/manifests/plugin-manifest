@@ -100,6 +100,7 @@ MSetInterface
 MSetFacts
 MSetDecide
 MSetAVL
+MSetList
 MSetProperties
 FMapList
 DecidableType
@@ -114,6 +115,7 @@ MRPrelude
 MROption
 MRList
 MRProd
+MRClasses
 SemiLattice
 ReflectEq
 MRCompare

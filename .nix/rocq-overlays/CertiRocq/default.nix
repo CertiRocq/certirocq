@@ -1,38 +1,46 @@
 {
   lib,
   pkgs,
-  mkCoqDerivation,
-  coq,
+  mkRocqDerivation,
+  rocq-core,
   wasmcert,
-  coqprime,
   compcert,
-  metarocq,
+  metarocq-erasure-plugin,
+  metarocq-safechecker-plugin,
   ExtLib,
   version ? null,
 }:
 
 with lib;
-mkCoqDerivation {
+mkRocqDerivation {
   pname = "CertiRocq";
+  owner = "CertiRocq";
+  repo = "certirocq";
+  opam-name = "rocq-certirocq";
   mlPlugin = true;
 
   inherit version;
   releaseRev = v: "v${v}";
 
   nativeBuildInputs = [
-    pkgs.clang
     pkgs.python3
+  ];
+
+  # The plugin invokes a C compiler to build the code it generates,
+  # so dependents need one too.
+  propagatedNativeBuildInputs = [
+    pkgs.clang
   ];
 
   propagatedBuildInputs = [
     wasmcert
-    coqprime
     compcert
     ExtLib
-    metarocq
+    metarocq-erasure-plugin
+    metarocq-safechecker-plugin
   ];
 
-  patchPhase = ''
+  postPatch = ''
     patchShebangs ./configure.sh
     patchShebangs ./clean_extraction.sh
     patchShebangs ./make_plugin.sh
@@ -45,9 +53,8 @@ mkCoqDerivation {
   buildPhase = ''
     runHook preBuild
 
-    make
-    make plugin
-    make cplugin
+    make all
+    make plugins
 
     runHook postBuild
   '';
@@ -55,7 +62,7 @@ mkCoqDerivation {
   installPhase = ''
     runHook preInstall
 
-    OUTDIR=$out/lib/coq/${coq.coq-version}/user-contrib
+    OUTDIR=$out/lib/coq/${rocq-core.rocq-version}/user-contrib
 
     DST=$OUTDIR/CertiRocq/Plugin/runtime make -C runtime install
     COQLIBINSTALL=$OUTDIR make -C theories install

@@ -6,7 +6,7 @@ open Ast0
 open Toplevel0
 open Pipeline_utils
 
-external certirocq_pipeline : coq_Options -> Ast0.Env.program -> coq_Cprogram CompM.error * Bytestring.String.t = "certirocq_pipeline_wrapper"
+external certirocq_pipeline : rocq_Options -> Ast0.Env.program -> rocq_Cprogram CompM.error * Bytestring.String.t = "certirocq_pipeline_wrapper"
 let info s = Feedback.msg_info (Pp.str s)
 
 let msg_info s =
@@ -40,49 +40,70 @@ let fix_set u =
   Obj.set_field block 1 proof_obj;
   block
 
+(* A universe is a non-empty set of level expressions *)
+let fix_neues neues : Obj.t =
+  let proof_obj = Obj.magic 1 in
+  let block = Obj.new_block 0 2 in
+  Obj.set_field block 0 (fix_set neues);
+  Obj.set_field block 1 proof_obj;
+  block
+
 let fix_universe u =
   let open Universes0.Sort in
-  let proof_obj = Obj.magic 1 in
-  let fix_ues ues : Obj.t = 
-    let block = Obj.new_block 0 2 in
-    Obj.set_field block 0 (Obj.magic ues);
-    Obj.set_field block 1 proof_obj;
+  match u with
+  | Rocq_sProp -> Rocq_sProp
+  | Rocq_sSProp -> Rocq_sSProp
+  | Rocq_sType neues -> Rocq_sType (Obj.magic (fix_neues neues))
+
+(* Instances are lists of universes *)
+let fix_instance u =
+  Obj.magic (List.map fix_neues (Obj.magic u))
+
+(* Raw AVL trees: Leaf | Node of height * tree * elt * tree *)
+let rec fix_tree fix_elt (t : Obj.t) : Obj.t =
+  if Obj.is_int t then t
+  else begin
+    let block = Obj.new_block (Obj.tag t) 4 in
+    Obj.set_field block 0 (Obj.field t 0);
+    Obj.set_field block 1 (fix_tree fix_elt (Obj.field t 1));
+    Obj.set_field block 2 (fix_elt (Obj.field t 2));
+    Obj.set_field block 3 (fix_tree fix_elt (Obj.field t 3));
     block
-  in
-  let fix_neues neues : Obj.t = 
-    let ues = fix_ues neues in
-    let block = Obj.new_block 0 2 in
-    Obj.set_field block 0 ues;
-    Obj.set_field block 1 proof_obj;
-    block
-  in
-  match u with 
-  | Coq_sProp -> Coq_sProp
-  | Coq_sSProp -> Coq_sSProp
-  | Coq_sType neues -> Coq_sType (Obj.magic (fix_neues neues))
+  end
+
+(* Constraints relate two universes: ((l, d), r) *)
+let fix_constraint (c : Obj.t) : Obj.t =
+  let ld = Obj.field c 0 in
+  Obj.repr ((fix_neues (Obj.field ld 0), Obj.field ld 1), fix_neues (Obj.field c 1))
+
+let fix_constraint_set cstrs =
+  fix_set (fix_tree fix_constraint (Obj.repr cstrs))
 
 let fix_term (p : Ast0.term) : Ast0.term =
   let open List in
-  let rec aux p = 
+  let rec aux p =
   match p with
-  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ -> p
-  | Coq_tEvar (k, l) -> Coq_tEvar (k, map aux l)
-  | Coq_tSort u -> Coq_tSort (fix_universe u)
-  | Coq_tCast (t, k, t') -> Coq_tCast (aux t, k, aux t')
-  | Coq_tProd (na, t, t') -> Coq_tProd (na, aux t, aux t')
-  | Coq_tLambda (na, t, t') -> Coq_tLambda (na, aux t, aux t')
-  | Coq_tLetIn (na, t, b, t') -> Coq_tLetIn (na, aux t, aux b, aux t')
-  | Coq_tApp (t, l) -> Coq_tApp (aux t, map aux l)
-  | Coq_tCase (ci, p, c, brs) -> Coq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
-  | Coq_tProj (p, t) -> Coq_tProj (p, aux t)
-  | Coq_tFix (mfix, i) -> Coq_tFix (map aux_def mfix, i)
-  | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
-  | Coq_tInt i -> Coq_tInt i
-  | Coq_tFloat f -> Coq_tFloat f
-  | Coq_tString f -> Coq_tString f
-  | Coq_tArray (u, v, def, ty) -> Coq_tArray (u, map aux v, aux def, aux ty)
+  | Rocq_tRel _ | Rocq_tVar _ -> p
+  | Rocq_tConst (kn, u) -> Rocq_tConst (kn, fix_instance u)
+  | Rocq_tInd (ind, u) -> Rocq_tInd (ind, fix_instance u)
+  | Rocq_tConstruct (ind, k, u) -> Rocq_tConstruct (ind, k, fix_instance u)
+  | Rocq_tEvar (k, l) -> Rocq_tEvar (k, map aux l)
+  | Rocq_tSort u -> Rocq_tSort (fix_universe u)
+  | Rocq_tCast (t, k, t') -> Rocq_tCast (aux t, k, aux t')
+  | Rocq_tProd (na, t, t') -> Rocq_tProd (na, aux t, aux t')
+  | Rocq_tLambda (na, t, t') -> Rocq_tLambda (na, aux t, aux t')
+  | Rocq_tLetIn (na, t, b, t') -> Rocq_tLetIn (na, aux t, aux b, aux t')
+  | Rocq_tApp (t, l) -> Rocq_tApp (aux t, map aux l)
+  | Rocq_tCase (ci, p, c, brs) -> Rocq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
+  | Rocq_tProj (p, t) -> Rocq_tProj (p, aux t)
+  | Rocq_tFix (mfix, i) -> Rocq_tFix (map aux_def mfix, i)
+  | Rocq_tCoFix (mfix, i) -> Rocq_tCoFix (map aux_def mfix, i)
+  | Rocq_tInt i -> Rocq_tInt i
+  | Rocq_tFloat f -> Rocq_tFloat f
+  | Rocq_tString f -> Rocq_tString f
+  | Rocq_tArray (u, v, def, ty) -> Rocq_tArray (Obj.magic (fix_neues u), map aux v, aux def, aux ty)
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
-    { puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
+    { puinst = fix_instance puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
   and aux_branch { bcontext = bcontext; bbody = bbody } =
     { bcontext; bbody = aux bbody }
   and aux_def { dname = dname; dtype = dtype; dbody = dbody; rarg = rarg } =
@@ -103,10 +124,10 @@ let fix_rel_context ctx =
   
 let fix_universes_decl = function
   | Monomorphic_ctx -> Monomorphic_ctx
-  | Polymorphic_ctx (names, set) -> Polymorphic_ctx (names, Obj.magic (fix_set set))
-  
-let fix_universes (levels, cstrs) = 
-  (Obj.magic (fix_set levels), Obj.magic (fix_set cstrs))
+  | Polymorphic_ctx (names, cstrs) -> Polymorphic_ctx (names, Obj.magic (fix_constraint_set cstrs))
+
+let fix_universes (levels, cstrs) =
+  (Obj.magic (fix_set levels), Obj.magic (fix_constraint_set cstrs))
 
 let fix_declarations decls = 
   let open Ast0.Env in
@@ -162,8 +183,14 @@ let rec print_obj depth x =
                             Printf.printf ")")
   else Printf.printf ("%i %!") x
   
+(* The inlined constants are a kername set in MetaRocq's representation *)
+let fix_opts opts =
+  Pipeline_utils.{ opts with erasure_config =
+    { opts.erasure_config with Erasure0.inlined_constants = Obj.magic (fix_set opts.erasure_config.Erasure0.inlined_constants) } }
+
 let compile opts prog =
   info "Calling certirocq-compiled certirocq";
+  let opts = fix_opts opts in
   (* let pretty= Pretty.print_program false (Obj.magic (Caml_nat.nat_of_caml_int 100)) (Obj.magic prog) in *)
   (* let _ = info (Caml_bytestring.caml_string_of_bytestring (Obj.magic pretty)) in *)
   let prog = fix_quoted_program prog in

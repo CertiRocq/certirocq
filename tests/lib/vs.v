@@ -795,7 +795,7 @@ Module M1 : MSetInterface_S_Ext
     (min_elt s = Some k /\ Equal (remove k s) s').
  Proof. intros.
  destruct (remove_min_spec1x s k s') as [? _].
- destruct (H0 H); clear H0 H. split; auto. rewrite H2; intuition.
+ destruct (H0 H); clear H0 H. split; auto. rewrite H2; intro; reflexivity.
  Qed.
  Lemma remove_min_spec2x: forall s, remove_min s = None <-> Empty s.
  Proof. unfold remove_min; intros.

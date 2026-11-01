@@ -6,7 +6,7 @@ CLEAN_DIRS=$(addprefix clean,$(DIRS))
 all: $(DIRS)
 
 lib/Makefile:
-	cd lib; coq_makefile -f _CoqProject -o Makefile
+	cd lib; rocq makefile -f _CoqProject -o Makefile
 
 lib: lib/Makefile
 	$(MAKE) -C $@

@@ -52,16 +52,16 @@ end
 module P = struct
 
   let rec to_int = function
-  | Coq_xI p -> let n = to_int p in n + n + 1
-  | Coq_xO p -> let n = to_int p in n + n
-  | Coq_xH -> 1
+  | Rocq_xI p -> let n = to_int p in n + n + 1
+  | Rocq_xO p -> let n = to_int p in n + n
+  | Rocq_xH -> 1
 
   let rec to_int64 = function
-  | Coq_xI p -> let n = to_int64 p in Int64.add n (Int64.add n Int64.one)
-  | Coq_xO p -> let n = to_int64 p in Int64.add n n
-  | Coq_xH -> Int64.one
+  | Rocq_xI p -> let n = to_int64 p in Int64.add n (Int64.add n Int64.one)
+  | Rocq_xO p -> let n = to_int64 p in Int64.add n n
+  | Rocq_xH -> Int64.one
   let rec of_int x =
-    if x = 0 then Coq_xH
+    if x = 0 then Rocq_xH
     else BinPos.Pos.succ (of_int (pred x))
 end
 module Z = struct
@@ -79,22 +79,22 @@ module Z = struct
   let to_string x = string_of_int (to_int x)
 end
   (*
- *   type t = positive = Coq_xI of t | Coq_xO of t | Coq_xH
+ *   type t = positive = Rocq_xI of t | Rocq_xO of t | Rocq_xH
  *
- *   let one = Coq_xH
+ *   let one = Rocq_xH
  *   let succ = Pos.succ
  *
  *   let rec pred_helper n =
  *   match n with
- *   | Coq_xI n' -> Coq_xI (Coq_xO n')
- *   | Coq_xO n' -> Coq_xI (pred_helper n')
- *   | Coq_xH -> Coq_xH
+ *   | Rocq_xI n' -> Rocq_xI (Rocq_xO n')
+ *   | Rocq_xO n' -> Rocq_xI (pred_helper n')
+ *   | Rocq_xH -> Rocq_xH
  *
  *   let pred n =
  *   match n with
- *   | Coq_xI n' -> Coq_xO n'
- *   | Coq_xO n' -> pred_helper n'
- *   | Coq_xH -> Coq_xH
+ *   | Rocq_xI n' -> Rocq_xO n'
+ *   | Rocq_xO n' -> pred_helper n'
+ *   | Rocq_xH -> Rocq_xH
  *
  *   let add = Pos.add
  *   let sub = Pos.sub_mask
@@ -106,45 +106,45 @@ end
  *   let compare x y = match Pos.compare x y with Lt -> -1 | Eq -> 0 | Gt -> 1
  *
  *   let rec to_int = function
- *   | Coq_xI p -> let n = to_int p in n + n + 1
- *   | Coq_xO p -> let n = to_int p in n + n
- *   | Coq_xH -> 1
+ *   | Rocq_xI p -> let n = to_int p in n + n + 1
+ *   | Rocq_xO p -> let n = to_int p in n + n
+ *   | Rocq_xH -> 1
  *
  *   let rec of_int n =
  *     if n land 1 = 0 then
- *       if n = 0 then assert false else Coq_xO (of_int (n lsr 1))
+ *       if n = 0 then assert false else Rocq_xO (of_int (n lsr 1))
  *     else
- *       if n = 1 then Coq_xH else Coq_xI (of_int (n lsr 1))
+ *       if n = 1 then Rocq_xH else Rocq_xI (of_int (n lsr 1))
  *
  *   let rec to_int32 = function
- *   | Coq_xI p -> Int32.add (Int32.shift_left (to_int32 p) 1) 1l
- *   | Coq_xO p -> Int32.shift_left (to_int32 p) 1
- *   | Coq_xH -> 1l
+ *   | Rocq_xI p -> Int32.add (Int32.shift_left (to_int32 p) 1) 1l
+ *   | Rocq_xO p -> Int32.shift_left (to_int32 p) 1
+ *   | Rocq_xH -> 1l
  *
  *   let rec of_int32 n =
  *     if Int32.logand n 1l = 0l then
  *       if n = 0l
  *       then assert false
- *       else Coq_xO (of_int32 (Int32.shift_right_logical n 1))
+ *       else Rocq_xO (of_int32 (Int32.shift_right_logical n 1))
  *     else
  *       if n = 1l
- *       then Coq_xH
- *       else Coq_xI (of_int32 (Int32.shift_right_logical n 1))
+ *       then Rocq_xH
+ *       else Rocq_xI (of_int32 (Int32.shift_right_logical n 1))
  *
  *   let rec to_int64 = function
- *   | Coq_xI p -> Int64.add (Int64.shift_left (to_int64 p) 1) 1L
- *   | Coq_xO p -> Int64.shift_left (to_int64 p) 1
- *   | Coq_xH -> 1L
+ *   | Rocq_xI p -> Int64.add (Int64.shift_left (to_int64 p) 1) 1L
+ *   | Rocq_xO p -> Int64.shift_left (to_int64 p) 1
+ *   | Rocq_xH -> 1L
  *
  *   let rec of_int64 n =
  *     if Int64.logand n 1L = 0L then
  *       if n = 0L
  *       then assert false
- *       else Coq_xO (of_int64 (Int64.shift_right_logical n 1))
+ *       else Rocq_xO (of_int64 (Int64.shift_right_logical n 1))
  *     else
  *       if n = 1L
- *       then Coq_xH
- *       else Coq_xI (of_int64 (Int64.shift_right_logical n 1))
+ *       then Rocq_xH
+ *       else Rocq_xI (of_int64 (Int64.shift_right_logical n 1))
  *
  *   let (+) = add
  *   let (-) = sub
@@ -167,10 +167,10 @@ end
       if i = 0 then N0
       else Npos (P.of_int i)
 end
-(*   type t = coq_N = N0 | Npos of positive
+(*   type t = rocq_N = N0 | Npos of positive
  *
  *   let zero = N0
- *   let one = Npos Coq_xH
+ *   let one = Npos Rocq_xH
  *   let succ = N.succ_pos
  *   let pred = N.sub one
  *
@@ -237,20 +237,20 @@ end
 
 (* module Z = struct
  *
- *   type t = coq_Z = Z0 | Zpos of positive | Zneg of positive
+ *   type t = rocq_Z = Z0 | Zpos of positive | Zneg of positive
  *
  *   let zero = Z0
- *   let one = Zpos Coq_xH
- *   let mone = Zneg Coq_xH
+ *   let one = Zpos Rocq_xH
+ *   let mone = Zneg Rocq_xH
  *
  *   let succ x =
  *     match x with
  *     | Z0 -> one
  *     | Zneg n ->
  *       (match n with
- *        | Coq_xH -> zero
- *        | Coq_xI n' -> Zneg (P.pred n)
- *        | Coq_xO n' -> Zneg (P.pred n))
+ *        | Rocq_xH -> zero
+ *        | Rocq_xI n' -> Zneg (P.pred n)
+ *        | Rocq_xO n' -> Zneg (P.pred n))
  *     | Zpos n -> Zpos (P.succ n)
  *
  *   let pred = Z.pred
@@ -386,7 +386,7 @@ let first_unused_ident () = !next_atom
 (* Strings *)
 
 let char_of_ascii a =
-  let code = Ascii.coq_N_of_ascii a in
+  let code = Ascii.rocq_N_of_ascii a in
   Char.chr (N.to_int code)
 
 let ascii_of_char a =

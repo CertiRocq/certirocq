@@ -29,10 +29,10 @@ else
 endif
 
 PKGS = -package rocq-runtime,rocq-runtime.clib,rocq-runtime.config,rocq-runtime.engine,rocq-runtime.gramlib,rocq-runtime.interp,rocq-runtime.kernel,rocq-runtime.lib,rocq-runtime.library,rocq-runtime.toplevel,rocq-runtime.vernac,rocq-runtime.plugins.ltac
-COQLIB = $(shell coqc -where)
+COQLIB = $(shell rocq c -where)
 COQLIBINSTALL = $(COQLIB)/user-contrib/CertiRocq/CertiRocqCheck
 OCAMLLIB = $(shell ocamlc -where)
-OCAMLOPTS = -package rocq-metarocq-template-ocaml.plugin -open Metarocq_template_plugin -package rocq-certirocq-vanilla.plugin -open Certirocq_vanilla_plugin \
+OCAMLOPTS = -package rocq-metarocq-template.extractable -open Metarocq_template_plugin -package rocq-certirocq-vanilla.plugin -open Certirocq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.c CertiRocq.CertiRocqCheck.compile.certirocqchk.c
 CFILES = certirocqchk_wrapper.c ${GENCFILES}
@@ -51,20 +51,20 @@ plugin: compile.vo certirocqchk
 test: test.vo
 
 test.vo: test.v
-	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
+	ulimit -Ss 65500 && rocq c ${TESTCOQOPTS} test.v
 
 clean: Makefile.certirocqchk
 	make -f Makefile.certirocqchk clean
 	rm -f *.cm* *.o *.vo
 
 Makefile.certirocqchk: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.certirocqchk
+	rocq makefile -f _CoqProject -o Makefile.certirocqchk
 
 certirocqchk: Makefile.certirocqchk certirocqchk_plugin.cmxs
 	$(MAKE) -f Makefile.certirocqchk
 
 compile.vo ${GENCFILES} &: compile.v
-	coqc ${COQOPTS} $<
+	rocq c ${COQOPTS} $<
 
 %.o: %.c
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
@@ -79,7 +79,7 @@ certirocqchk_plugin.cmxa: certirocqchk_plugin.cmx
 	ocamlfind opt -linkall ${OCAMLOPTS} -a -o $@ $<
 
 g_certirocqchk.ml: g_certirocqchk.mlg certirocqchk.cmx certirocqchk_plugin_wrapper.cmx
-	coqpp $<
+	rocq pp-mlg $<
 
 certirocqchk_wrapper.c: compile.vo
 

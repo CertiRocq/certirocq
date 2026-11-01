@@ -11,6 +11,8 @@
 #include <caml/minor_gc.h>
 #include <time.h>
 #include <caml/callback.h>
+#include <caml/threads.h>
+#include <pthread.h>
 #if defined(__APPLE__)
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
@@ -97,8 +99,74 @@ value copy_value(value v) {
   CAMLreturn (result);
 }
 
+/* The compiled compiler recurses deeply, more than the main thread's stack allows on
+   systems where it cannot be raised enough (it is capped at 64MB on macOS). We run it on
+   a thread with a stack of CERTIROCQC_STACK_SIZE megabytes instead (4GB by default). */
+#define DEFAULT_STACK_SIZE_MB 4096
+
+struct pipeline_call {
+  value opts, prog, res;
+  int ran;
+};
+
+static value run_pipeline(value opts, value prog);
+
+static void *pipeline_thread(void *arg) {
+  struct pipeline_call *c = arg;
+  if (!caml_c_thread_register()) return NULL;
+  caml_acquire_runtime_system();
+  caml_modify_generational_global_root(&c->res, run_pipeline(c->opts, c->prog));
+  c->ran = 1;
+  caml_release_runtime_system();
+  caml_c_thread_unregister();
+  return NULL;
+}
+
+static size_t pipeline_stack_size(void) {
+  const char *s = getenv("CERTIROCQC_STACK_SIZE");
+  size_t mb = s != NULL ? strtoul(s, NULL, 10) : 0;
+  return (mb > 0 ? mb : DEFAULT_STACK_SIZE_MB) * 1024 * 1024;
+}
+
 // external certirocq_pipeline : (coq_Options × ExtractedASTBaseQuoter.quoted_program) -> coq_Cprogram error * Bytestring.String.t = "certirocq_pipeline"
 CAMLprim value certirocq_pipeline_wrapper(value opts, value prog) {
+  CAMLparam2 (opts, prog);
+  CAMLlocal1 (res);
+  struct pipeline_call c;
+  pthread_attr_t attr;
+  pthread_t thread;
+  int created;
+
+  // The result can point to the input, which must not move while the result is copied
+  caml_minor_collection();
+
+  // Only now that they have been promoted can the arguments be read without the roots
+  c.opts = opts;
+  c.prog = prog;
+  c.res = Val_unit;
+  c.ran = 0;
+
+  caml_register_generational_global_root(&c.res);
+  pthread_attr_init(&attr);
+  created = pthread_attr_setstacksize(&attr, pipeline_stack_size()) == 0;
+  caml_release_runtime_system();
+  created = created && pthread_create(&thread, &attr, pipeline_thread, &c) == 0;
+  if (created) pthread_join(thread, NULL);
+  caml_acquire_runtime_system();
+  pthread_attr_destroy(&attr);
+
+  if (c.ran)
+    res = c.res;
+  else {
+    printf("could not run the compiler on a large stack, using the current one\n");
+    res = run_pipeline(opts, prog);
+  }
+  caml_remove_generational_global_root(&c.res);
+
+  CAMLreturn(res);
+}
+
+static value run_pipeline(value opts, value prog) {
   CAMLparam2 (opts, prog);
   CAMLlocal1 (res);
   value closure;
@@ -107,29 +175,26 @@ CAMLprim value certirocq_pipeline_wrapper(value opts, value prog) {
   clock_t start, end;
   double msec, sec;
   start = clock();
-  
-  // The result can point to the input, which must not move while the result is copied
-  caml_minor_collection();
 
   // Run Coq program
   tinfo = make_tinfo();
-  printf("about to call compiler\n");
+  // printf("about to call compiler\n");
   closure = body(tinfo);
   closure = call(tinfo, closure, opts);
   restemp = call(tinfo, closure, prog);
-  printf("compiler returned a value\n");
+  // printf("compiler returned a value\n");
   end = clock();
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;
   msec = 1000*sec;
   printf("Time taken %f seconds %f milliseconds\n", sec, msec);
 
-  printf("Copying value to OCaml heap\n");
+  // printf("Copying value to OCaml heap\n");
   certirocq_heap = tinfo->heap;
   find_code();
   res = copy_value(restemp);
   free_heap(tinfo->heap);
-  printf("Value copied to OCaml heap\n");
+  // printf("Value copied to OCaml heap\n");
   
   CAMLreturn(res);
 }

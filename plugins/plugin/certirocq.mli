@@ -31,10 +31,10 @@ val run_certirocq_run : string -> certirocq_run_function
 
 module type CompilerInterface = sig
   type name_env
-  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
+  val compile : Pipeline_utils.rocq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
   val printProg : Clight.program -> name_env -> string -> import list -> unit
 
-  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
+  val generate_glue : Pipeline_utils.rocq_Options -> Ast0.Env.global_declarations -> 
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
 end
 

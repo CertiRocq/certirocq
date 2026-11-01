@@ -1,4 +1,5 @@
-PKGS = -package rocq-runtime,rocq-runtime.plugins.ltac,rocq-metarocq-template-ocaml,rocq-certirocqc
+CCOMPILER ?= $(shell { command -v clang || command -v gcc; } 2>/dev/null)
+PKGS = -package rocq-runtime,rocq-runtime.plugins.ltac,rocq-metarocq-template.extractable,rocq-certirocqc
 LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 OCAMLOPTS = -open Metarocq_template_plugin -I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiRocq.Tests.metacoq_erasure.metacoq_erasure.metacoq_erasure.c \
@@ -32,7 +33,7 @@ metarocq_erasure.vo: metarocq_erasure.v
 	rocq c ${COQOPTS} $<
 
 %.o: %.c
-	gcc ${COPTS} -c -Wno-everything -O2 -fomit-frame-pointer -o $@ $<
+	$(CCOMPILER) ${COPTS} -c -Wno-everything -O2 -fomit-frame-pointer -o $@ $<
 
 certirocq_erasure_plugin.cmxs: certirocq_erasure_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
 	ocamlfind opt ${OCAMLOPTS} ${LINKOPTS} -shared -linkall -o $@ $+
@@ -44,7 +45,7 @@ certirocq_erasure_plugin.cmxa: certirocq_erasure_plugin.cmx
 	ocamlfind opt ${OCAMLOPTS} -a -o $@ $<
 
 g_safe_erasure.ml: g_safe_erasure.mlg certiRocqErase.cmx
-	coqpp $<
+	rocq pp-mlg $<
 
 # g_safe_erasure.mli: g_safe_erasure.ml
 # ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certirocq_erasure_plugin -i $< > $@

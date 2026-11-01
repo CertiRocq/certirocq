@@ -9,8 +9,8 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/_opam/bin/coqc",
-            "args": [ "test.v"],
+            "program": "${workspaceFolder}/_opam/bin/rocq",
+            "args": [ "c", "test.v"],
             "cwd": "${workspaceFolder}/bootstrap/certirocqc"
         },
         {

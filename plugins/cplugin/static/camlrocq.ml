@@ -52,9 +52,9 @@ end
 
 module P = struct
 
-  type t = positive = Coq_xI of t | Coq_xO of t | Coq_xH
+  type t = positive = Rocq_xI of t | Rocq_xO of t | Rocq_xH
 
-  let one = Coq_xH
+  let one = Rocq_xH
   let succ = Pos.succ
   let pred = Pos.pred
   let eq x y = (Pos.compare x y = Eq)
@@ -65,45 +65,45 @@ module P = struct
   let compare x y = match Pos.compare x y with Lt -> -1 | Eq -> 0 | Gt -> 1
 
   let rec to_int = function
-  | Coq_xI p -> let n = to_int p in n + n + 1
-  | Coq_xO p -> let n = to_int p in n + n
-  | Coq_xH -> 1
+  | Rocq_xI p -> let n = to_int p in n + n + 1
+  | Rocq_xO p -> let n = to_int p in n + n
+  | Rocq_xH -> 1
 
   let rec of_int n =
     if n land 1 = 0 then
-      if n = 0 then assert false else Coq_xO (of_int (n lsr 1))
+      if n = 0 then assert false else Rocq_xO (of_int (n lsr 1))
     else
-      if n = 1 then Coq_xH else Coq_xI (of_int (n lsr 1))
+      if n = 1 then Rocq_xH else Rocq_xI (of_int (n lsr 1))
 
   let rec to_int32 = function
-  | Coq_xI p -> Int32.add (Int32.shift_left (to_int32 p) 1) 1l
-  | Coq_xO p -> Int32.shift_left (to_int32 p) 1
-  | Coq_xH -> 1l
+  | Rocq_xI p -> Int32.add (Int32.shift_left (to_int32 p) 1) 1l
+  | Rocq_xO p -> Int32.shift_left (to_int32 p) 1
+  | Rocq_xH -> 1l
 
   let rec of_int32 n =
     if Int32.logand n 1l = 0l then
       if n = 0l
       then assert false
-      else Coq_xO (of_int32 (Int32.shift_right_logical n 1))
+      else Rocq_xO (of_int32 (Int32.shift_right_logical n 1))
     else
       if n = 1l
-      then Coq_xH
-      else Coq_xI (of_int32 (Int32.shift_right_logical n 1))
+      then Rocq_xH
+      else Rocq_xI (of_int32 (Int32.shift_right_logical n 1))
 
   let rec to_int64 = function
-  | Coq_xI p -> Int64.add (Int64.shift_left (to_int64 p) 1) 1L
-  | Coq_xO p -> Int64.shift_left (to_int64 p) 1
-  | Coq_xH -> 1L
+  | Rocq_xI p -> Int64.add (Int64.shift_left (to_int64 p) 1) 1L
+  | Rocq_xO p -> Int64.shift_left (to_int64 p) 1
+  | Rocq_xH -> 1L
 
   let rec of_int64 n =
     if Int64.logand n 1L = 0L then
       if n = 0L
       then assert false
-      else Coq_xO (of_int64 (Int64.shift_right_logical n 1))
+      else Rocq_xO (of_int64 (Int64.shift_right_logical n 1))
     else
       if n = 1L
-      then Coq_xH
-      else Coq_xI (of_int64 (Int64.shift_right_logical n 1))
+      then Rocq_xH
+      else Rocq_xI (of_int64 (Int64.shift_right_logical n 1))
 
   let (=) = eq
   let (<) = lt
@@ -117,10 +117,10 @@ end
 
 module N = struct
 
-  type t = coq_N = N0 | Npos of positive
+  type t = rocq_N = N0 | Npos of positive
 
   let zero = N0
-  let one = Npos Coq_xH
+  let one = Npos Rocq_xH
   let eq x y = (N.compare x y = Eq)
   let lt x y = (N.compare x y = Lt)
   let gt x y = (N.compare x y = Gt)
@@ -160,11 +160,11 @@ end
 
 module Z = struct
 
-  type t = coq_Z = Z0 | Zpos of positive | Zneg of positive
+  type t = rocq_Z = Z0 | Zpos of positive | Zneg of positive
 
   let zero = Z0
-  let one = Zpos Coq_xH
-  let mone = Zneg Coq_xH
+  let one = Zpos Rocq_xH
+  let mone = Zneg Rocq_xH
   let succ = Z.succ
   let pred = Z.pred
   let neg = Z.opp
@@ -251,7 +251,7 @@ module Z = struct
   let to_string = dec
 
   let is_power2 x =
-    gt x zero && eq (Z.coq_land x (pred x)) zero
+    gt x zero && eq (Z.rocq_land x (pred x)) zero
 
   let (+) = add
   let (-) = sub

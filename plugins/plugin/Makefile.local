@@ -12,12 +12,12 @@ CAMLFLAGS+=-w -60 # Unused functor arguments
 CAMLFLAGS+=-w -8 # Non-exhaustive matches produced by extraction
 CAMLFLAGS+=-w -37 # Unused constructor
 CAMLFLAGS+=-rectypes
-CAMLPKGS += -package rocq-metarocq-template-ocaml.plugin,stdlib-shims 
+CAMLPKGS += -package rocq-metarocq-template.extractable,stdlib-shims 
 
-CC=$(shell which gcc || which clang-11)
+CC=$(shell command -v clang || command -v clang-11 || command -v gcc)
 
 merlin-hook::
-		$(HIDE)echo 'PKG rocq-metarocq-template-ocaml.plugin' >> .merlin
+		$(HIDE)echo 'PKG rocq-metarocq-template.extractable' >> .merlin
 		$(HIDE)echo 'PKG stdlib-shims' >> .merlin
 
 archclean::

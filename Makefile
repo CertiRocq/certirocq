@@ -9,10 +9,10 @@ all theories/Extraction/extraction.vo theories/ExtractionVanilla/extraction.vo &
 	$(MAKE) -C theories 
 
 theories/Makefile: theories/_CoqProject
-	cd theories;coq_makefile -f _CoqProject -o Makefile
+	cd theories;rocq makefile -f _CoqProject -o Makefile
 
 libraries/Makefile: libraries/_CoqProject
-	cd libraries;coq_makefile -f _CoqProject -o Makefile
+	cd libraries;rocq makefile -f _CoqProject -o Makefile
 
 submodules:
 	git submodule update
@@ -33,7 +33,7 @@ plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack &: $
 plugin: all runtime plugins/plugin/CertiRocq.vo
 
 plugins/plugin/Makefile: plugins/plugin/_CoqProject plugins/plugin/certirocq_plugin.mlpack
-	cd plugins/plugin ; coq_makefile -f _CoqProject -o Makefile
+	cd plugins/plugin ; rocq makefile -f _CoqProject -o Makefile
 
 plugins/plugin/CertiRocq.vo: all plugins/plugin/Makefile
 	bash ./make_plugin.sh plugins/plugin
@@ -42,7 +42,7 @@ plugins/plugin/CertiRocq.vo: all plugins/plugin/Makefile
 cplugin: all runtime plugins/cplugin/CertiRocq.vo
 
 plugins/cplugin/Makefile: plugins/cplugin/_CoqProject plugins/cplugin/certirocq_vanilla_plugin.mlpack
-	cd plugins/cplugin ; coq_makefile -f _CoqProject -o Makefile
+	cd plugins/cplugin ; rocq makefile -f _CoqProject -o Makefile
 
 plugins/cplugin/CertiRocq.vo: all plugins/cplugin/Makefile
 	bash ./make_plugin.sh plugins/cplugin

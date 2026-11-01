@@ -96,8 +96,8 @@ let global_registers =
 let global_registers_name = "certirocq-registration"
 
 let cache_registers (prims, imports) =
-  let (prims', imports') = !global_registers in
-  global_registers := (prims @ prims', imports @ imports')
+  let (prims', imports') = Summary.Ref.get global_registers in
+  Summary.Ref.set global_registers (prims @ prims', imports @ imports')
 let global_registers_input =
   let open Libobject in
   declare_object
@@ -114,8 +114,8 @@ let register (prims : prim list) (imports : import list) : unit =
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
   Lib.add_leaf (global_registers_input newr)
 
-let get_global_prims () = fst !global_registers
-let get_global_includes () = snd !global_registers
+let get_global_prims () = fst (Summary.Ref.get global_registers)
+let get_global_includes () = snd (Summary.Ref.get global_registers)
 
 (* Extract Inductive *)
 
@@ -125,8 +125,8 @@ let global_inductive_registers =
 let global_inductive_registers_name = "certirocq-extract-inductive-registration"
 
 let cache_inductive_registers inds =
-  let inds' = !global_inductive_registers in
-  global_inductive_registers := inds @ inds'
+  let inds' = Summary.Ref.get global_inductive_registers in
+  Summary.Ref.set global_inductive_registers (inds @ inds')
 
 let global_inductive_registers_input =
   let open Libobject in
@@ -138,18 +138,22 @@ let global_inductive_registers_input =
 let register_inductives (inds : inductives_mapping) : unit =
   Lib.add_leaf (global_inductive_registers_input inds)
 
-let get_global_inductives_mapping () = !global_inductive_registers
+let get_global_inductives_mapping () = Summary.Ref.get global_inductive_registers
 
 (* Extract Inline *)
 
+(* The registered constants are kept in MetaRocq's representation of kername sets, which
+   [fix_opts] converts to the one expected by the pipeline. *)
 let global_inlining_registers =
-  Summary.ref ~name:"CertiRocq Extraction Inlining Registration" Kernames.KernameSet.empty
+  Summary.ref ~name:"CertiRocq Extraction Inlining Registration"
+    Metarocq_template_plugin.Kernames.KernameSet.empty
 
 let global_inlining_registers_name = "certirocq-inlining-registration"
 
 let cache_inlining_registers csts =
-  let csts' = !global_inlining_registers in
-  global_inlining_registers := Kernames.KernameSet.union csts csts'
+  let csts' = Summary.Ref.get global_inlining_registers in
+  Summary.Ref.set global_inlining_registers
+    (Metarocq_template_plugin.Kernames.KernameSet.union csts csts')
 
 let global_inlining_registers_input =
   let open Libobject in
@@ -159,9 +163,9 @@ let global_inlining_registers_input =
     ~subst:None)
 
 let register_inlines (csts : Kernames.kername list) : unit =
-  Lib.add_leaf (global_inlining_registers_input (Obj.magic (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts))))
+  Lib.add_leaf (global_inlining_registers_input (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts)))
 
-let get_global_inlinings_mapping () = !global_inlining_registers
+let get_global_inlinings_mapping () = Summary.Ref.get global_inlining_registers
 
 (* Extract Inductive to Constants *)
 
@@ -171,8 +175,8 @@ let global_inductive_constant_registers =
 let global_inductive_constant_registers_name = "certirocq-inductive-constants-registration"
 
 let cache_inductive_constant_registers inds =
-  let inds' = !global_inductive_constant_registers in
-  global_inductive_constant_registers := inds @ inds'
+  let inds' = Summary.Ref.get global_inductive_constant_registers in
+  Summary.Ref.set global_inductive_constant_registers (inds @ inds')
 
 let global_inductive_constant_registers_input =
   let open Libobject in
@@ -184,13 +188,13 @@ let global_inductive_constant_registers_input =
 let register_constant_inductives (extr : extract_inductives) : unit =
   Lib.add_leaf (global_inductive_constant_registers_input extr)
 
-let get_global_inductives_constant_mapping () = !global_inductive_constant_registers
+let get_global_inductives_constant_mapping () = Summary.Ref.get global_inductive_constant_registers
 
 (* Support for dynamically-linked certirocq-compiled programs *)
 type certirocq_run_function = unit -> Obj.t
 
 let certirocq_run_functions =
-  Summary.ref ~local:true ~name:"CertiRocq Run Functions Table"
+  Summary.local_ref ~name:"CertiRocq Run Functions Table"
     (CString.Map.empty : certirocq_run_function CString.Map.t)
 
 let certirocq_run_functions_name = "certirocq-run-functions-registration"
@@ -290,7 +294,7 @@ let make_pipeline_options (opts : options) =
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         dearging_config = default_dearging_config;
         inlining = not (opts.no_inlining);
-        inlined_constants = get_global_inlinings_mapping ();
+        inlined_constants = Obj.magic (get_global_inlinings_mapping ());
         extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)
         })
   in
@@ -338,10 +342,10 @@ let quote ~opaque_access opts gr =
 
 module type CompilerInterface = sig
   type name_env
-  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
+  val compile : Pipeline_utils.rocq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
   val printProg : Clight.program -> name_env -> string -> import list -> unit
 
-  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations ->
+  val generate_glue : Pipeline_utils.rocq_Options -> Ast0.Env.global_declarations ->
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
 
 end
@@ -363,23 +367,42 @@ let fix_set u =
   Obj.set_field block 0 (Obj.magic u);
   block
 
+(* A universe is a non-empty set of level expressions *)
+let fix_neues neues : Obj.t =
+  let block = Obj.new_block 0 1 in
+  Obj.set_field block 0 (fix_set neues);
+  block
+
 let fix_universe u =
   let open Universes0.Sort in
-  let fix_ues ues : Obj.t =
-    let block = Obj.new_block 0 1 in
-    Obj.set_field block 0 (Obj.magic ues);
-    block
-  in
-  let fix_neues neues : Obj.t =
-    let ues = fix_ues neues in
-    let block = Obj.new_block 0 1 in
-    Obj.set_field block 0 ues;
-    block
-  in
   match u with
-  | Coq_sProp -> Coq_sProp
-  | Coq_sSProp -> Coq_sSProp
-  | Coq_sType neues -> Coq_sType (Obj.magic (fix_neues neues))
+  | Rocq_sProp -> Rocq_sProp
+  | Rocq_sSProp -> Rocq_sSProp
+  | Rocq_sType neues -> Rocq_sType (Obj.magic (fix_neues neues))
+
+(* Instances are lists of universes *)
+let fix_instance u =
+  Obj.magic (List.map fix_neues (Obj.magic u))
+
+(* Raw AVL trees: Leaf | Node of height * tree * elt * tree *)
+let rec fix_tree fix_elt (t : Obj.t) : Obj.t =
+  if Obj.is_int t then t
+  else begin
+    let block = Obj.new_block (Obj.tag t) 4 in
+    Obj.set_field block 0 (Obj.field t 0);
+    Obj.set_field block 1 (fix_tree fix_elt (Obj.field t 1));
+    Obj.set_field block 2 (fix_elt (Obj.field t 2));
+    Obj.set_field block 3 (fix_tree fix_elt (Obj.field t 3));
+    block
+  end
+
+(* Constraints relate two universes: ((l, d), r) *)
+let fix_constraint (c : Obj.t) : Obj.t =
+  let ld = Obj.field c 0 in
+  Obj.repr ((fix_neues (Obj.field ld 0), Obj.field ld 1), fix_neues (Obj.field c 1))
+
+let fix_constraint_set cstrs =
+  fix_set (fix_tree fix_constraint (Obj.repr cstrs))
 
 let fix_term (p : Ast0.term) : Ast0.term =
   let open Ast0 in
@@ -387,24 +410,27 @@ let fix_term (p : Ast0.term) : Ast0.term =
   let open List in
   let rec aux p =
   match p with
-  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ -> p
-  | Coq_tEvar (k, l) -> Coq_tEvar (k, map aux l)
-  | Coq_tSort u -> Coq_tSort (fix_universe u)
-  | Coq_tCast (t, k, t') -> Coq_tCast (aux t, k, aux t')
-  | Coq_tProd (na, t, t') -> Coq_tProd (na, aux t, aux t')
-  | Coq_tLambda (na, t, t') -> Coq_tLambda (na, aux t, aux t')
-  | Coq_tLetIn (na, t, b, t') -> Coq_tLetIn (na, aux t, aux b, aux t')
-  | Coq_tApp (t, l) -> Coq_tApp (aux t, map aux l)
-  | Coq_tCase (ci, p, c, brs) -> Coq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
-  | Coq_tProj (p, t) -> Coq_tProj (p, aux t)
-  | Coq_tFix (mfix, i) -> Coq_tFix (map aux_def mfix, i)
-  | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
-  | Coq_tInt i -> p
-  | Coq_tFloat f -> p
-  | Coq_tString s -> p
-  | Coq_tArray (u, v, def, ty) -> Coq_tArray (u, map aux v, aux def, aux ty)
+  | Rocq_tRel _ | Rocq_tVar _ -> p
+  | Rocq_tConst (kn, u) -> Rocq_tConst (kn, fix_instance u)
+  | Rocq_tInd (ind, u) -> Rocq_tInd (ind, fix_instance u)
+  | Rocq_tConstruct (ind, k, u) -> Rocq_tConstruct (ind, k, fix_instance u)
+  | Rocq_tEvar (k, l) -> Rocq_tEvar (k, map aux l)
+  | Rocq_tSort u -> Rocq_tSort (fix_universe u)
+  | Rocq_tCast (t, k, t') -> Rocq_tCast (aux t, k, aux t')
+  | Rocq_tProd (na, t, t') -> Rocq_tProd (na, aux t, aux t')
+  | Rocq_tLambda (na, t, t') -> Rocq_tLambda (na, aux t, aux t')
+  | Rocq_tLetIn (na, t, b, t') -> Rocq_tLetIn (na, aux t, aux b, aux t')
+  | Rocq_tApp (t, l) -> Rocq_tApp (aux t, map aux l)
+  | Rocq_tCase (ci, p, c, brs) -> Rocq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
+  | Rocq_tProj (p, t) -> Rocq_tProj (p, aux t)
+  | Rocq_tFix (mfix, i) -> Rocq_tFix (map aux_def mfix, i)
+  | Rocq_tCoFix (mfix, i) -> Rocq_tCoFix (map aux_def mfix, i)
+  | Rocq_tInt i -> p
+  | Rocq_tFloat f -> p
+  | Rocq_tString s -> p
+  | Rocq_tArray (u, v, def, ty) -> Rocq_tArray (Obj.magic (fix_neues u), map aux v, aux def, aux ty)
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
-    { puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
+    { puinst = fix_instance puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
   and aux_branch { bcontext = bcontext; bbody = bbody } =
     { bcontext; bbody = aux bbody }
   and aux_def { dname = dname; dtype = dtype; dbody = dbody; rarg = rarg } =
@@ -428,10 +454,10 @@ open Universes0
 
 let fix_universes_decl = function
   | Monomorphic_ctx -> Monomorphic_ctx
-  | Polymorphic_ctx (names, set) -> Polymorphic_ctx (names, Obj.magic (fix_set set))
+  | Polymorphic_ctx (names, cstrs) -> Polymorphic_ctx (names, Obj.magic (fix_constraint_set cstrs))
 
 let fix_universes (levels, cstrs) =
-  (Obj.magic (fix_set levels), Obj.magic (fix_set cstrs))
+  (Obj.magic (fix_set levels), Obj.magic (fix_constraint_set cstrs))
 
 let fix_declarations decls =
   let open Ast0.Env in
@@ -645,7 +671,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let compiler_executable debug =
     match get_c_compiler () with
-    | None -> find_executable debug "which gcc || which clang-11"
+    | None -> find_executable debug "command -v clang || command -v clang-11 || command -v gcc"
     | Some s -> s
 
   let ocamlfind_executable debug =
@@ -670,13 +696,23 @@ module CompileFunctor (CI : CompilerInterface) = struct
     done;
     ignore (Unix.close_process_full (stdout, stdin, stderr))
 
+  (* The runtime is installed next to the CertiRocq.Plugin library, which need not be in
+     Rocq's own user-contrib (e.g. with Nix, where each package has its own prefix). *)
   let runtime_dir () =
-    let open Boot in
-    let env = Env.init_with ~coqlib:None in
-    Path.relative (Path.relative (Path.relative (Env.user_contrib env) "CertiRocq") "Plugin") "runtime"
+    let plugin_dir = Libnames.dirpath_of_string "CertiRocq.Plugin" in
+    let in_load_path =
+      List.map (fun lp -> Filename.concat (Loadpath.physical lp) "runtime")
+        (Loadpath.find_with_logical_path plugin_dir)
+    in
+    match List.find_opt Sys.file_exists in_load_path with
+    | Some dir -> dir
+    | None ->
+      let open Boot in
+      let env = Env.init_with ~coqlib:None in
+      Path.(to_string (relative (relative (relative (Env.user_contrib env) "CertiRocq") "Plugin") "runtime"))
 
   let make_rt_file na =
-    Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
+    Filename.concat (runtime_dir ()) na
 
   let c_flags = "-O2 -fomit-frame-pointer"
 
@@ -691,7 +727,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let rt_dir = runtime_dir () in
     let cmd =
         Printf.sprintf "%s -fPIC -Wno-everything %s -g -I %s -I %s -c -o %s %s"
-          compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
+          compiler c_flags opts.build_dir rt_dir (name ^ ".o") (name ^ ".c")
     in
     let importso =
       let oname s =
@@ -714,7 +750,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | Unix.WEXITED 0 ->
       let linkcmd =
         Printf.sprintf "%s -fPIC -Wno-everything -g -L %s -L %s -o %s %s %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
+          compiler opts.build_dir rt_dir name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
@@ -924,7 +960,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let rt_dir = runtime_dir () in
     let cmd =
         Printf.sprintf "%s -fPIC -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
+          compiler opts.build_dir rt_dir (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
       let oname s =
@@ -944,7 +980,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
-    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
+    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template.extractable";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"; "rocq-certirocq-vanilla.plugin"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp,rocq-certirocq-vanilla.plugin" in

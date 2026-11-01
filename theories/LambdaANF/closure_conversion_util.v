@@ -1298,7 +1298,7 @@ Section Closure_conversion_util.
       eapply Union_Included; [| now xsets ].
       eapply Union_Included; [| now xsets ]. xsets.
     - eapply project_var_occurs_free_ctx_Included_no_env; eauto.
-      normalize_occurs_free... now sets. now sets.
+      normalize_occurs_free. now sets. now sets.
 
       Unshelve. exact (Empty_set _).
   Qed.

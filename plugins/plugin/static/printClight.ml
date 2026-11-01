@@ -330,8 +330,8 @@ let print_if_2 prog = print_if_gen Clight2 prog
 let add_name (a, n) =
   let i = P.to_int a in
   match n with
-  | BasicAst.Coq_nAnon -> ()
-  | BasicAst.Coq_nNamed s ->
+  | BasicAst.Rocq_nAnon -> ()
+  | BasicAst.Rocq_nNamed s ->
       let cs = Caml_bytestring.caml_string_of_bytestring s in
       Hashtbl.add atom_of_string cs i;
       Hashtbl.add string_of_atom i cs;
@@ -339,11 +339,11 @@ let add_name (a, n) =
 
 let remove_primes (a, n) =
   match n with
-  | BasicAst.Coq_nAnon -> (a,n)
-  | BasicAst.Coq_nNamed s ->
+  | BasicAst.Rocq_nAnon -> (a,n)
+  | BasicAst.Rocq_nNamed s ->
     let s' = Str.global_replace (Str.regexp "'") "p" (Caml_bytestring.caml_string_of_bytestring s)  in
     let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
-    (a, BasicAst.Coq_nNamed (Caml_bytestring.bytestring_of_caml_string s''))
+    (a, BasicAst.Rocq_nNamed (Caml_bytestring.bytestring_of_caml_string s''))
 
 let print_dest prog dest =
   let oc = open_out (implode dest) in

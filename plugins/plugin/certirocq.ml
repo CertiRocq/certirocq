@@ -91,8 +91,8 @@ let global_registers =
 let global_registers_name = "certirocq-registration"
 
 let cache_registers (prims, imports) =
-  let (prims', imports') = !global_registers in
-  global_registers := (prims @ prims', imports @ imports')
+  let (prims', imports') = Summary.Ref.get global_registers in
+  Summary.Ref.set global_registers (prims @ prims', imports @ imports')
 let global_registers_input =
   let open Libobject in
   declare_object
@@ -109,8 +109,8 @@ let register (prims : prim list) (imports : import list) : unit =
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
   Lib.add_leaf (global_registers_input newr)
 
-let get_global_prims () = fst !global_registers
-let get_global_includes () = snd !global_registers
+let get_global_prims () = fst (Summary.Ref.get global_registers)
+let get_global_includes () = snd (Summary.Ref.get global_registers)
 
 (* Extract Inductive *)
 
@@ -120,8 +120,8 @@ let global_inductive_registers =
 let global_inductive_registers_name = "certirocq-extract-inductive-registration"
 
 let cache_inductive_registers inds =
-  let inds' = !global_inductive_registers in
-  global_inductive_registers := inds @ inds'
+  let inds' = Summary.Ref.get global_inductive_registers in
+  Summary.Ref.set global_inductive_registers (inds @ inds')
 
 let global_inductive_registers_input =
   let open Libobject in
@@ -133,7 +133,7 @@ let global_inductive_registers_input =
 let register_inductives (inds : inductives_mapping) : unit =
   Lib.add_leaf (global_inductive_registers_input inds)
 
-let get_global_inductives_mapping () = !global_inductive_registers
+let get_global_inductives_mapping () = Summary.Ref.get global_inductive_registers
 
 (* Extract Inline *)
 
@@ -143,8 +143,8 @@ let global_inlining_registers =
 let global_inlining_registers_name = "certirocq-inlining-registration"
 
 let cache_inlining_registers csts =
-  let csts' = !global_inlining_registers in
-  global_inlining_registers := Kernames.KernameSet.union csts csts'
+  let csts' = Summary.Ref.get global_inlining_registers in
+  Summary.Ref.set global_inlining_registers (Kernames.KernameSet.union csts csts')
 
 let global_inlining_registers_input =
   let open Libobject in
@@ -156,7 +156,7 @@ let global_inlining_registers_input =
 let register_inlines (csts : Kernames.kername list) : unit =
   Lib.add_leaf (global_inlining_registers_input (Obj.magic (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts))))
 
-let get_global_inlinings_mapping () = !global_inlining_registers
+let get_global_inlinings_mapping () = Summary.Ref.get global_inlining_registers
 
 (* Extract Inductive to Constants *)
 
@@ -166,8 +166,8 @@ let global_inductive_constant_registers =
 let global_inductive_constant_registers_name = "certirocq-inductive-constants-registration"
 
 let cache_inductive_constant_registers inds =
-  let inds' = !global_inductive_constant_registers in
-  global_inductive_constant_registers := inds @ inds'
+  let inds' = Summary.Ref.get global_inductive_constant_registers in
+  Summary.Ref.set global_inductive_constant_registers (inds @ inds')
 
 let global_inductive_constant_registers_input =
   let open Libobject in
@@ -179,13 +179,13 @@ let global_inductive_constant_registers_input =
 let register_constant_inductives (extr : extract_inductives) : unit =
   Lib.add_leaf (global_inductive_constant_registers_input extr)
 
-let get_global_inductives_constant_mapping () = !global_inductive_constant_registers
+let get_global_inductives_constant_mapping () = Summary.Ref.get global_inductive_constant_registers
 
 (* Support for dynamically-linked certirocq-compiled programs *)
 type certirocq_run_function = unit -> Obj.t
 
 let certirocq_run_functions =
-  Summary.ref ~local:true ~name:"CertiRocq Run Functions Table"
+  Summary.local_ref ~name:"CertiRocq Run Functions Table"
     (CString.Map.empty : certirocq_run_function CString.Map.t)
 
 let certirocq_run_functions_name = "certirocq-run-functions-registration"
@@ -333,10 +333,10 @@ let quote ~opaque_access opts gr =
 
 module type CompilerInterface = sig
   type name_env
-  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
+  val compile : Pipeline_utils.rocq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
   val printProg : Clight.program -> name_env -> string -> import list -> unit
 
-  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations ->
+  val generate_glue : Pipeline_utils.rocq_Options -> Ast0.Env.global_declarations ->
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
 
 end
@@ -503,7 +503,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let compiler_executable debug =
     match get_c_compiler () with
-    | None -> find_executable debug "which gcc || which clang-11"
+    | None -> find_executable debug "command -v clang || command -v clang-11 || command -v gcc"
     | Some s -> s
 
   let ocamlfind_executable debug =
@@ -528,13 +528,23 @@ module CompileFunctor (CI : CompilerInterface) = struct
     done;
     ignore (Unix.close_process_full (stdout, stdin, stderr))
 
+  (* The runtime is installed next to the CertiRocq.Plugin library, which need not be in
+     Rocq's own user-contrib (e.g. with Nix, where each package has its own prefix). *)
   let runtime_dir () =
-    let open Boot in
-    let env = Env.init_with ~coqlib:None  in
-    Path.relative (Path.relative (Path.relative (Env.user_contrib env) "CertiRocq") "Plugin") "runtime"
+    let plugin_dir = Libnames.dirpath_of_string "CertiRocq.Plugin" in
+    let in_load_path =
+      List.map (fun lp -> Filename.concat (Loadpath.physical lp) "runtime")
+        (Loadpath.find_with_logical_path plugin_dir)
+    in
+    match List.find_opt Sys.file_exists in_load_path with
+    | Some dir -> dir
+    | None ->
+      let open Boot in
+      let env = Env.init_with ~coqlib:None in
+      Path.(to_string (relative (relative (relative (Env.user_contrib env) "CertiRocq") "Plugin") "runtime"))
 
   let make_rt_file na =
-    Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
+    Filename.concat (runtime_dir ()) na
 
   let compile_C ~opaque_access opts gr imports =
     let () = compile_only ~opaque_access opts gr imports in
@@ -547,7 +557,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let rt_dir = runtime_dir () in
     let cmd =
         Printf.sprintf "%s -fPIC -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
+          compiler opts.build_dir rt_dir (name ^ ".o") (name ^ ".c")
     in
     let importso =
       let oname s =
@@ -570,7 +580,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | Unix.WEXITED 0 ->
       let linkcmd =
         Printf.sprintf "%s -fPIC -Wno-everything -g -L %s -L %s -o %s %s %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
+          compiler opts.build_dir rt_dir name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
@@ -784,7 +794,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let rt_dir = runtime_dir () in
     let cmd =
         Printf.sprintf "%s -fPIC -Wno-everything %s -I %s -I %s -c -o %s %s"
-          compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
+          compiler c_flags opts.build_dir rt_dir (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
       let oname s =
@@ -804,7 +814,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
-    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
+    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template.extractable";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"; "rocq-certirocq.plugin"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp,rocq-certirocq.plugin" in

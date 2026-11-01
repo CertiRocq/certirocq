@@ -1,5 +1,5 @@
 COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
-CCOMPILER?=gcc
+CCOMPILER ?= $(shell { command -v clang || command -v gcc; } 2>/dev/null)
 INCLUDE=../../runtime
 WARN_OPTS=-w -Wno-everything
 
@@ -43,7 +43,7 @@ cleanexec:
 	rm -f ./*_opt[1-5]
 
 lib/Makefile:
-	cd ../lib; coq_makefile -f _CoqProject -o Makefile
+	cd ../lib; rocq makefile -f _CoqProject -o Makefile
 
 lib: ../lib/Makefile
 	$(MAKE) -C ../lib
