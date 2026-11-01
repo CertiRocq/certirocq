@@ -35,6 +35,12 @@
   };
 
   bundles."default".push-branches = ["main"];
+  ## genNixActions makes the workflow run on pull_request_target for PRs to
+  ## any branch.  As GitHub always takes that workflow from the default branch,
+  ## PRs to other branches (e.g. rocq-master, which has its own Nix CI) would
+  ## also run this one.  After regenerating
+  ## .github/workflows/nix-action-default.yml, restrict its
+  ## pull_request_target trigger to the main branch.
 
   ## Cachix caches to use in CI
   ## Below we list some standard ones
