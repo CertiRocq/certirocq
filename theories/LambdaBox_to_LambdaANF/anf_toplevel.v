@@ -524,8 +524,10 @@ End Refinement.
 Section ComputationalRefinement.
 
   Context (func_tag kon_tag default_tag default_itag : positive)
-          (tgm : conId_map)
+          (ie : ienv)
           (Σ : EAst.global_context).
+
+  Local Notation tgm := (top_tgm default_tag default_itag ie).
 
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
@@ -567,36 +569,32 @@ Section ComputationalRefinement.
           (HnoArray : has_primarray = false).
   Context (no_prims : forall s, find_prim prims s = None).
 
-  Definition top_cenv (ie : ienv) : ctor_env :=
-    match convert_env default_tag default_itag ie with
-    | (_, cenv, _, _, _) => cenv
-    end.
+  Local Notation top_cenv := (top_cenv default_tag default_itag ie).
 
-  Definition refines_top (ie : ienv) (M : nat) (e_src : EAst.term) (e_tgt : exp) : Prop :=
-    refines tgm (top_cenv ie) Σ M e_src e_tgt.
+  Definition refines_top (M : nat) (e_src : EAst.term) (e_tgt : exp) : Prop :=
+    refines tgm top_cenv Σ M e_src e_tgt.
 
-  Context (ie : ienv).
-  Context (cenv_tgm_coh : cenv_tgm_coherence (top_cenv ie) tgm).
+  Context (cenv_tgm_coh : cenv_tgm_coherence top_cenv tgm).
 
   Theorem convert_top_anf_correct next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
-    convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+    convert_top_anf func_tag default_tag prim_map default_itag next_id prims
       (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
-    exists M, refines_top ie M e e_tgt.
+    exists M, refines_top M e e_tgt.
   Proof.
     intros Hwf Hrun.
     edestruct (@convert_top_anf_corresp
                  func_tag default_tag default_itag
-                 tgm Σ efl HnoAxioms
+                 ie Σ efl HnoAxioms
                  prim_map prims Hwf_glob
                  HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                  no_prims Htgm
-                 next_id ie e e_tgt comp_d' Hwf Hrun)
+                 next_id e e_tgt comp_d' Hwf Hrun)
       as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
     eapply (@anf_correct_top_explicit
               func_tag kon_tag default_tag default_itag
-              tgm cm (top_cenv ie) Σ efl
+              tgm cm top_cenv Σ efl
               HnoAxioms
               dcon_to_tag_inj Htgm             
               cenv_tgm_coh
@@ -610,27 +608,27 @@ Section ComputationalRefinement.
 
   Theorem convert_top_anf_divergence_correct next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
-    convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+    convert_top_anf func_tag default_tag prim_map default_itag next_id prims
       (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     @fuel_sem.diverge nat
       LambdaBox_resource_fuel
       LambdaBox_resource_trace
       Σ [] e ->
-    eval.diverge (top_cenv ie) (M.empty val) e_tgt.
+    eval.diverge top_cenv (M.empty val) e_tgt.
   Proof.
     intros Hwf Hrun Hdiv.
     edestruct (@convert_top_anf_corresp
                  func_tag default_tag default_itag
-                 tgm Σ efl HnoAxioms
+                 ie Σ efl HnoAxioms
                  prim_map prims Hwf_glob
                  HnoVar HnoEvar HnoCoFix HnoLazy Hblocks HnoArray
                  no_prims Htgm
-                 next_id ie e e_tgt comp_d' Hwf Hrun)
+                 next_id e e_tgt comp_d' Hwf Hrun)
       as [cm [Sg' [S' [C_env [C [r [Hglob_cvt [Hmain_cvt ->]]]]]]]].
     eapply (@anf_divergence_top_explicit
               func_tag kon_tag default_tag default_itag
-              tgm cm (top_cenv ie) Σ efl
+              tgm cm top_cenv Σ efl
               HnoAxioms
               dcon_to_tag_inj Htgm
               cenv_tgm_coh

@@ -86,7 +86,7 @@ Section Correctness.
   Context (func_tag kon_tag default_tag default_itag : positive).
   Context (next_id : positive).
 
-  Notation refines_toplevel Σ ie tgm := (@refines_top default_tag default_itag tgm Σ ie).
+  Notation refines_toplevel Σ ie := (@refines_top default_tag default_itag ie Σ).
 
   (** To prove the correctness of connecting the MetaRocq pipeline and CertiRocq's ANF, we
       need a stronger well-formedness property. This formalizes the remaining mismatch 
@@ -95,8 +95,8 @@ Section Correctness.
     - primitives are not supported in fuel_sem, and primitive arrays are forbidden in ANF conversion.
     - the environment must be axiom free, as usual *)
 
-  Definition anf_convert ie tgm := 
-    convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
+  Definition anf_convert ie := 
+    convert_top_anf func_tag default_tag (M.empty _) default_itag next_id []
       (fun _ => None) ie.
   
   Theorem metarocq_to_anf_correct (econf : erasure_configuration) (p : EProgram.eprogram) : 
@@ -105,12 +105,11 @@ Section Correctness.
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
-    let tgm := (convert_env default_tag default_itag ie).2 in
     forall e_tgt comp_d', 
-      anf_convert ie tgm (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') ->
-      exists M, refines_toplevel (fst p) ie tgm M (snd p) e_tgt.
+      anf_convert ie (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') ->
+      exists M, refines_toplevel (fst p) ie M (snd p) e_tgt.
   Proof.
-    intros hp wf' ie tgm e_tgt comp_d' cvt.
+    intros hp wf' ie e_tgt comp_d' cvt.
     cbn in hp. unfold certirocq_flags in wf'. cbn in wf'.
     unfold all_env_flags in hp. cbn in hp.
     match goal with
@@ -119,7 +118,7 @@ Section Correctness.
     destruct hp as [wfp [vg]].
     have wf : wf_env_east ie.
     { apply wf_env_inductive, wfp. }
-    eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag tgm (fst p) 
+    eapply (convert_top_anf_correct func_tag kon_tag default_tag default_itag ie (fst p) 
       (efl:=certirocq_flags env_flags)); trea.
     - (* The tag map is injective *) 
       now apply convert_env_inj.
@@ -144,7 +143,7 @@ Section Correctness.
     - apply wf'.
     - (* No prims *)
       intros s. cbn. reflexivity.
-    - eapply (cenv_tgm_coh default_tag default_itag) in wf. unfold top_cenv.
+    - eapply (cenv_tgm_coh default_tag default_itag) in wf. unfold top_cenv, top_tgm.
       destruct convert_env as [[[[] ?] ?] ?]. apply wf.
     - apply wf'.
   Qed.
@@ -155,22 +154,21 @@ Section Correctness.
     (* Stronger invariant: no axioms, no primitives *)
     EProgram.wf_eprogram (certirocq_flags env_flags) p ->
     let ie := inductive_env_east (fst p) in
-    let tgm := (convert_env default_tag default_itag ie).2 in
     exists e_tgt comp_d', 
-      anf_convert ie tgm (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') /\
-      exists M, refines_toplevel (fst p) ie tgm M (snd p) e_tgt.
+      anf_convert ie (List.rev (fst p)) (snd p) = (compM.Ret e_tgt, comp_d') /\
+      exists M, refines_toplevel (fst p) ie M (snd p) e_tgt.
   Proof.
-    intros hp wf' ie tgm.
+    intros hp wf' ie.
     match goal with
     | [ _ : EProgram.wf_eprogram ?fl p |- _ ] => set (efl := fl) in *
     end.
     destruct hp as [wfp [vg]].
     have wf : wf_env_east ie.
     { apply wf_env_inductive. apply wf'. }
-    unshelve eset (prf := anf_corresp.convert_top_anf_total func_tag default_tag default_itag tgm (fst p) 
+    unshelve eset (prf := anf_corresp.convert_top_anf_total func_tag default_tag default_itag ie (fst p) 
       (efl:=certirocq_flags env_flags) eq_refl (M.empty _) [] (proj1 wf') eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
       _
-      (convert_env_reg _ _ _) next_id ie _ (proj2 wf')); trea.
+      (convert_env_reg _ _ _) next_id _ (proj2 wf')); trea.
     destruct prf as [e_tgt [comp_d' heq]]. exists e_tgt, comp_d'. split.
     unfold anf_convert. exact heq.
     eapply (metarocq_to_anf_correct econf); tea. split => //.

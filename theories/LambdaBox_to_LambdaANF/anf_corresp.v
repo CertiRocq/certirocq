@@ -1051,8 +1051,10 @@ End GlobalCorresp.
 Section TopLevelCorresp.
 
   Context (func_tag default_tag default_itag : positive)
-          (tgm : conId_map)
+          (ie : ienv)
           (Σ : EAst.global_context).
+
+  Local Notation tgm := (top_tgm default_tag default_itag ie).
 
   Context {efl : EEnvFlags}.
   Context (HnoAxioms : has_axioms = false).
@@ -1122,10 +1124,10 @@ Section TopLevelCorresp.
     repeat split; assumption.
   Qed.
 
-  Lemma convert_top_anf_total next_id ie e :
+  Lemma convert_top_anf_total next_id e :
     wellformed Σ 0 e = true ->
     exists e_tgt comp_d', 
-      convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+      convert_top_anf func_tag default_tag prim_map default_itag next_id prims
         (fun _ => None)
         ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d').
   Proof.
@@ -1169,9 +1171,9 @@ Section TopLevelCorresp.
     now do 2 eexists.
   Qed.
 
-  Lemma convert_top_anf_corresp next_id ie e e_tgt comp_d' :
+  Lemma convert_top_anf_corresp next_id e e_tgt comp_d' :
     wellformed Σ 0 e = true ->
-    convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims
+    convert_top_anf func_tag default_tag prim_map default_itag next_id prims
       (fun _ => None)
       ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d') ->
     exists cm Sg' S' C_env C r,

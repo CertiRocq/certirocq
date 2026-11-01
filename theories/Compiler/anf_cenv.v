@@ -305,15 +305,15 @@ Qed.
 
 (** ANF conversion does not modify the constructor environment computed from the inductive
     declarations, whose tags are all between [default_tag] and the next free tag *)
-Lemma convert_top_anf_cenv func_tag default_tag prim_map default_itag next_id tgm prims
+Lemma convert_top_anf_cenv func_tag default_tag prim_map default_itag next_id prims
   preferred ie gd e res comp_d :
-  convert_top_anf func_tag default_tag prim_map default_itag next_id tgm prims preferred ie gd e =
+  convert_top_anf func_tag default_tag prim_map default_itag next_id prims preferred ie gd e =
     (res, comp_d) ->
-  state.cenv comp_d = snd (fst (fst (fst (convert_env default_tag default_itag ie)))) /\
+  state.cenv comp_d = top_cenv default_tag default_itag ie /\
   tags_between (state.cenv comp_d) default_tag (nect_ctor_tag comp_d) /\
   (default_tag < nect_ctor_tag comp_d)%positive.
 Proof.
-  unfold convert_top_anf.
+  unfold convert_top_anf, top_cenv.
   have := convert_env_tags default_tag default_itag ie.
   destruct convert_env as [[[[ie' ce] ct] it] dcm] => htags.
   set (prog := Monad.bind _ _).

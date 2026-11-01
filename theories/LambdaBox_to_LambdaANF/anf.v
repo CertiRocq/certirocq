@@ -313,25 +313,37 @@ Section ANF.
         convert_global_decls preferred gd' cm_acc
       end.
 
+  End TopLevel.
+
+  Section Program.
+
+    Context (prim_map : M.t primitive).
+    Context (default_itag : positive)
+            (next_id : positive).
+    Context (prims : list (primitive * positive)).
+
     (** Convert a full program: global environment + main expression.
+        The constructor environment and the constructor tag map are computed
+        from the inductive environment [ie].
         Global constant bindings are composed around the main expression,
         producing a single [term.exp] where all globals are in rho. *)
     Definition convert_top_anf (preferred : kername -> option var)
                (ie : ienv) (gd : EAst.global_declarations) (e : EAst.term)
       : error term.exp * comp_data :=
-      let '(_, cenv, ctag, itag, _dcm) := convert_env default_tag default_itag ie in
+      let tgm := top_tgm default_tag default_itag ie in
+      let '(_, cenv, ctag, itag, _) := convert_env default_tag default_itag ie in
       let ftag := (func_tag + 1)%positive in
       let fenv : fun_env := M.set func_tag (1%N, (0%N::nil)) (M.empty _) in
       let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
       let prog :=
-        '(cm, C_env) <- convert_global_decls preferred gd [] ;;
+        '(cm, C_env) <- convert_global_decls prim_map tgm prims preferred gd [] ;;
         '(x, C_main) <- convert_anf prim_map tgm prims cm e (M.empty var, 0%N) None ;;
         ret (C_env |[ C_main |[ Ehalt x ]| ]|)
       in
       let '(res_err, (comp_d', _)) := run_compM prog comp_d tt in
       (res_err, comp_d').
 
-  End TopLevel.
+  End Program.
 
 
   (** * Declarative relational specification *)

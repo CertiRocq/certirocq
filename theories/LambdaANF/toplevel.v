@@ -78,11 +78,9 @@ Section IDENT.
                              (fun (p : LambdaBoxEAstTerm) =>
                                 let prim_env := make_prim_env prims in
                                 let ie := inductive_env_east (fst p) in
-                                let '(_, _, _, _, dcm) :=
-                                  CertiRocq.LambdaBox_to_LambdaANF.common.convert_env default_ctor_tag default_ind_tag ie in
                                 match CertiRocq.LambdaBox_to_LambdaANF.anf.convert_top_anf
                                         fun_fun_tag default_ctor_tag prim_env
-                                        default_ind_tag next_var dcm
+                                        default_ind_tag next_var
                                         prims (fun _ => None) ie (List.rev (fst p)) (snd p) with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
