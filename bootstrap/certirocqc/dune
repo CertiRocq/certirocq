@@ -1,0 +1,82 @@
+; The compiler, compiled to C by the CertiRocq plugin. The rule uses the theories of
+; the build directory, and the plugins as installed there, which dune adds to
+; OCAMLPATH.
+(rule
+ (targets
+  CertiRocq.CertiRocqC.Compiler.CertiRocqC.certirocqc.c
+  CertiRocq.CertiRocqC.Compiler.CertiRocqC.certirocqc.h
+  glue.c
+  glue.h
+  compile.vo
+  compile.glob)
+ (deps
+  compile.v
+  (glob_files compiler/*.vo)
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (package rocq-certirocq))
+ (action
+  (system
+   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q compiler CertiRocq.CertiRocqC.Compiler compile.v")))
+
+; C identifiers cannot contain Greek letters, nor can foreign stubs have dots in their
+; names
+(rule
+ (targets certirocqc_compiler.c)
+ (deps ../certirocqc/unicode.sed CertiRocq.CertiRocqC.Compiler.CertiRocqC.certirocqc.c)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run sed -f ../certirocqc/unicode.sed CertiRocq.CertiRocqC.Compiler.CertiRocqC.certirocqc.c))))
+
+(rule
+ (targets certirocqc_glue.c)
+ (deps ../certirocqc/unicode.sed glue.c)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run sed -f ../certirocqc/unicode.sed glue.c))))
+
+(copy_files# ../../runtime/{gc_stack,prim_floats,prim_string,prim_int63,rocq_c_ffi}.c)
+
+(rocq.pp
+ (modules g_certirocqc))
+
+(library
+ (name certirocqc_plugin)
+ (public_name rocq-certirocqc.plugin)
+ (modules certirocqc_plugin_wrapper certirocqc g_certirocqc)
+ (flags (:standard -rectypes -open Metarocq_template_plugin -open Certirocq_vanilla_plugin -w +a-4-8-9-20-26-27-32..34-37-39-41-42-44-45-48-56-58-60-67-68-70 -warn-error -a))
+ (libraries
+  rocq-runtime.plugins.ltac
+  rocq-metarocq-template.extractable
+  rocq-certirocq-vanilla.plugin
+  stdlib-shims)
+ (foreign_stubs
+  (language c)
+  (names certirocqc_wrapper certirocqc_compiler certirocqc_glue gc_stack prim_floats prim_string prim_int63 rocq_c_ffi)
+  ; The generated code stores function pointers in values, without casts
+  (flags
+   (:standard
+    -fomit-frame-pointer
+    -w
+    -Wno-int-conversion
+    -Wno-incompatible-pointer-types))
+  (include_dirs ../../runtime)))
+
+; The test, with the theories of the build directory and the installed plugins
+(rule
+ (alias runtest)
+ (deps
+  test.v
+  (glob_files compiler/*.vo)
+  (glob_files theories/*.vo)
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (glob_files %{workspace_root}/plugins/cplugin/*.vo)
+  (package rocq-certirocq)
+  (package rocq-certirocq-vanilla)
+  (package rocq-certirocqc))
+ (action
+  (system
+   "mkdir -p tests && rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q compiler CertiRocq.CertiRocqC.Compiler -Q theories CertiRocq.CertiRocqC test.v")))

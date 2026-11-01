@@ -9,6 +9,7 @@ These instructions build CertiRocq from source inside a dedicated
   ([installation instructions](https://opam.ocaml.org/doc/Install.html))
 - git, GNU make, Python 3 and a C compiler (clang). On macOS, these come with
   the Xcode Command Line Tools (`xcode-select --install`).
+- GMP, used by the C runtime (`brew install gmp` on macOS).
 
 ## 1. Get the code
 
@@ -55,30 +56,39 @@ run the command again.
 
 ## 5. Build CertiRocq
 
+CertiRocq is built with [dune](https://dune.build):
+
 ```console
-$ ./configure.sh
-$ make -j4        # libraries and theories
-$ make plugin     # the CertiRocq plugin
-$ make cplugin    # the plugin variant built with vanilla extraction
+$ dune build
 ```
 
-Building the theories is by far the slowest step. `-j4` runs four jobs in
-parallel; adjust the number to your machine.
+This builds the theories, the CertiRocq plugin and its C runtime, the plugin
+variant built with vanilla extraction, and the bootstrapped compiler and
+checker under `bootstrap/`. To build only some of them, name their packages,
+for example `dune build -p rocq-certirocq,rocq-certirocq-vanilla`. Building the
+theories is by far the slowest step; dune runs as many jobs in parallel as the
+machine has cores.
+
+`make` and `make install` are shortcuts for `dune build` and `dune install`.
 
 ## Running the tests
 
-The regression suites live under `tests/`. Run them all, or one suite at a
-time:
-
 ```console
-$ make -C tests all
-$ make -C tests programs
+$ make test
 ```
 
-All suites except `tests/ffi` use the plugin from your build directory.
-`tests/ffi` uses the installed plugin, so it needs `make install` first (see
-below). The Wasm tests under `tests/wasm/` additionally require `node` (the CI
-uses Node.js 22) and `wabt`.
+This runs the tests of the bootstrapped compiler and checker (`dune test`),
+then the regression suites under `tests/`. These use the packages as installed
+in the build directory, `_build/install/default`; to run a single suite, point
+`ROCQPATH` and `OCAMLPATH` there:
+
+```console
+$ ROCQPATH=$PWD/_build/install/default/lib/coq/user-contrib \
+  OCAMLPATH=$PWD/_build/install/default/lib make -C tests programs
+```
+
+The Wasm tests under `tests/wasm/` additionally require `node` (the CI uses
+Node.js 22) and `wabt`.
 
 ## Installing CertiRocq (optional)
 
@@ -86,10 +96,8 @@ You don't need this to work on CertiRocq. To install the theories and plugins
 into the current switch, run:
 
 ```console
-$ make install
+$ dune install
 ```
-
-This also builds the bootstrapped plugins under `bootstrap/`.
 
 ## Troubleshooting
 
@@ -103,5 +111,5 @@ before upgrading MetaRocq. The build does not detect this by itself, so clean
 everything and build again as in step 5:
 
 ```console
-$ make clean
+$ dune clean
 ```

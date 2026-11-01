@@ -1,4 +1,4 @@
-COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
+COQOPTS = -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
 
 # Names of the tests
 TESTS=$(shell cat TESTS)
@@ -6,8 +6,9 @@ TESTS=$(shell cat TESTS)
 # Name of generated webassembly files
 WASMFILES=$(patsubst %, CertiRocq.Tests.tests.%.wasm, $(TESTS))
 
-OS=$(shell uname)
-STACKSIZE=$(if $(filter Linux,$(OS)),unlimited,65532)
+# Compiling the tests needs a large stack: take the largest one allowed (it is capped
+# at 64MB on macOS)
+STACKSIZE=$(shell ulimit -Hs)
 
 .PHONY: all default clean lib cleanlib
 .PHONY: tests primitive_unit_tests
@@ -35,10 +36,10 @@ primitive_unit_tests: uint63_unit_tests.v lib
 run: run_tests run_primitive_unit_tests
 
 run_tests: $(WASMFILES)
-	ulimit -s $(STACKSIZE) && ./run_wasm_tests.py
+	./run_wasm_tests.py
 
 run_primitive_unit_tests: primitive_unit_tests
-	node --stack-size=10000000 js/run_uint63_unit_tests.js
+	node js/run_uint63_unit_tests.js
 
 clean:
 	rm -f *.wat *.wasm *.cwasm *.tests.*.js *.ir

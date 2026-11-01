@@ -1,0 +1,35 @@
+(include_subdirs qualified)
+
+(rocq.theory
+ (name CertiRocq)
+ (package rocq-certirocq)
+ ; Unfinished developments, not built
+ (modules
+  :standard
+  \
+  Codegen.LambdaANF_to_Clight_correct
+  LambdaANF.ctx_approx
+  LambdaANF.tags)
+ (theories
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))

@@ -1,0 +1,110 @@
+; The C runtime of the generated code. Its objects are linked by the plugin with the
+; programs it compiles, so they are installed, with the sources and headers, in the
+; runtime directory next to the CertiRocq.Plugin theory.
+
+; gmp.h is needed by certirocq_gmp.c
+(rule
+ (targets gmp_cflags)
+ (action
+  (with-stdout-to
+   %{targets}
+   (system
+    "pkg-config --cflags gmp 2>/dev/null || (test -d /opt/homebrew/include && echo -I/opt/homebrew/include) || true"))))
+
+(rule
+ (targets gc_stack.o)
+ (deps gc_stack.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} gc_stack.c")))
+
+(rule
+ (targets certirocq_run_main.o)
+ (deps certirocq_run_main.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} certirocq_run_main.c")))
+
+(rule
+ (targets rocq_c_ffi.o)
+ (deps rocq_c_ffi.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} rocq_c_ffi.c")))
+
+(rule
+ (targets rocq_ffi.o)
+ (deps rocq_ffi.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} rocq_ffi.c")))
+
+(rule
+ (targets prim_int63.o)
+ (deps prim_int63.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} prim_int63.c")))
+
+(rule
+ (targets prim_floats.o)
+ (deps prim_floats.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} prim_floats.c")))
+
+(rule
+ (targets prim_string.o)
+ (deps prim_string.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} prim_string.c")))
+
+(rule
+ (targets get_ordinal.o)
+ (deps get_ordinal.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} get_ordinal.c")))
+
+(rule
+ (targets certirocq_gmp.o)
+ (deps certirocq_gmp.c (glob_files *.h) gmp_cflags)
+ (action
+  (system
+   "%{cc} $(cat gmp_cflags) -I . -I %{ocaml_where} -fPIC -O2 -g -c -o %{targets} certirocq_gmp.c")))
+
+(install
+ (section lib_root)
+ (package rocq-certirocq)
+ (files
+  (m.h as coq/user-contrib/CertiRocq/Plugin/runtime/m.h)
+  (config.h as coq/user-contrib/CertiRocq/Plugin/runtime/config.h)
+  (values.h as coq/user-contrib/CertiRocq/Plugin/runtime/values.h)
+  (gc_stack.h as coq/user-contrib/CertiRocq/Plugin/runtime/gc_stack.h)
+  (certirocq_run_main.h as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_run_main.h)
+  (rocq_c_ffi.h as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_c_ffi.h)
+  (rocq_ffi.h as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_ffi.h)
+  (prim_int63.h as coq/user-contrib/CertiRocq/Plugin/runtime/prim_int63.h)
+  (prim_floats.h as coq/user-contrib/CertiRocq/Plugin/runtime/prim_floats.h)
+  (prim_string.h as coq/user-contrib/CertiRocq/Plugin/runtime/prim_string.h)
+  (get_ordinal.h as coq/user-contrib/CertiRocq/Plugin/runtime/get_ordinal.h)
+  (certirocq_gmp.h as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_gmp.h)
+  (gc_stack.c as coq/user-contrib/CertiRocq/Plugin/runtime/gc_stack.c)
+  (certirocq_run_main.c as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_run_main.c)
+  (rocq_c_ffi.c as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_c_ffi.c)
+  (rocq_ffi.c as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_ffi.c)
+  (prim_int63.c as coq/user-contrib/CertiRocq/Plugin/runtime/prim_int63.c)
+  (prim_floats.c as coq/user-contrib/CertiRocq/Plugin/runtime/prim_floats.c)
+  (prim_string.c as coq/user-contrib/CertiRocq/Plugin/runtime/prim_string.c)
+  (get_ordinal.c as coq/user-contrib/CertiRocq/Plugin/runtime/get_ordinal.c)
+  (certirocq_gmp.c as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_gmp.c)
+  (gc_stack.o as coq/user-contrib/CertiRocq/Plugin/runtime/gc_stack.o)
+  (certirocq_run_main.o as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_run_main.o)
+  (rocq_c_ffi.o as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_c_ffi.o)
+  (rocq_ffi.o as coq/user-contrib/CertiRocq/Plugin/runtime/rocq_ffi.o)
+  (prim_int63.o as coq/user-contrib/CertiRocq/Plugin/runtime/prim_int63.o)
+  (prim_floats.o as coq/user-contrib/CertiRocq/Plugin/runtime/prim_floats.o)
+  (prim_string.o as coq/user-contrib/CertiRocq/Plugin/runtime/prim_string.o)
+  (get_ordinal.o as coq/user-contrib/CertiRocq/Plugin/runtime/get_ordinal.o)
+  (certirocq_gmp.o as coq/user-contrib/CertiRocq/Plugin/runtime/certirocq_gmp.o)))

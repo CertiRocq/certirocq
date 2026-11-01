@@ -124,4 +124,5 @@ Promise.allSettled(tests.map(run_test))
 	} else {
 	    console.log("Some tests failed:");
 	    errors.forEach((e) => console.log(e.reason));
+	    process.exitCode = 1;
 	}}).catch();

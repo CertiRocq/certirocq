@@ -1,0 +1,133 @@
+; The OCaml sources of the plugin are its own, those of static/ and of ../common,
+; and the result of the extraction of the compiler.
+
+(rocq.extraction
+ (prelude extraction)
+ (extracted_modules
+  All_Forall anf anf_convert_env Archi Ascii AST Ast0 AstCommon AstUtils
+  BasicAst Basics Binary binary_format_printer BinarySingleNaN BinInt
+  BinNat BinNums BinPos BinPosDef Bits Bool Byte Byte0 ByteCompare bytes
+  bytestring Classes1 classes2 Clight closure_conversion Common0 common1
+  common2 compM config0 Cop Coqlib0 cps cps_show CRelationClasses Csyntax
+  ctx Ctypes Ctypesdefs Datatypes datatypes0 datatypes_properties
+  dead_param_elim DecidableClass DecidableType Deciders Decimal EAst
+  EAstUtils EBeta ECoInductiveToInductive EConstantsToValues
+  EConstructorsAsBlocks ECSubst EEnvMap EEtaExpanded EGlobalEnv
+  EImplementBox EImplementLazyForce EInduction EInlineProjections
+  EInlining ELiftSubst Environment EnvironmentTyping EnvMap
+  EOptimizePropDiscr EPretty EPrimitive EProgram EqDecInstances eqtype
+  Equalities Erasure Erasure0 ErasureFunction ErasureFunctionProperties
+  ERemapInductives ERemoveParams EReorderCstrs Errors0 ESpineView
+  EtaExpand ETransform EUnboxing eval EWcbvEval EWellformed ExAst Extract
+  ExtractionCorrectness Fin FloatOps Floats FMapAVL FMapFacts
+  FMapInterface FMapList Globalenvs glue glue_utils Hexadecimal hoisting
+  HornClauses HornSemilatticeEquiv identifiers IEEE754_extra Init
+  InitialSemilattice inline inline_letapp Int0 IntDef Integers Interfaces
+  Kernames lambda_lifting LambdaANF_to_Clight LambdaANF_to_Clight_stack
+  LambdaANF_to_Wasm LambdaANF_to_Wasm_primints
+  LambdaANF_to_Wasm_restrictions leb128 List0 list_extra List_util
+  ListDef Logic0 map_util Maps maps_util Memdata Memory memory0 Memtype
+  merge_dup_funs metarocq_pipeline Model Models Monad0 monad_utils
+  MonadExc MonadState MRClasses MRCompare MRInstances MRList MROption
+  MRPrelude MRProd MRReflect MRString MSetAVL MSetDecide MSetFacts
+  MSetInterface MSetList MSetProperties MSetRBT Nat0 NatDef
+  NonEmptyLevelExprSet Number0 numerics Optimize OptimizeCorrectness
+  OptimizePropDiscr OptionMonad OrderedType0 OrderedTypeAlt Orders
+  OrdersEx OrdersFacts OrdersLists OrdersTac PartialLoopChecking PCUICAst
+  PCUICAstUtils PCUICCases PCUICEqualityDec PCUICErrors PCUICExpandLets
+  PCUICGlobalEnv PCUICNormal PCUICPosition PCUICPrimitive PCUICProgram
+  PCUICSafeReduce PCUICSafeRetyping PCUICTransform PCUICTyping PCUICWfEnv
+  PCUICWfEnvImpl PeanoNat pipeline Pipeline_utils POrderedType PosDef
+  PrimFloat PrimInt63 Primitive PrimString PrimStringAxioms Reflect
+  ReflectEq rename ResultMonad Round SemiLattice seq set_util Show
+  shrink_cps Signature simd Smallstep SpecFloat Specif ssrbool ssrnat
+  state StateMonad String0 TemplateEnvMap TemplateProgram TemplateToPCUIC
+  term0 term_util toplevel toplevel0 toplevel1 Transform Typing0 uGraph0
+  Uint63Axioms uncurry UnivConstraintType Universes0 UnivLoopChecking
+  Utils Values0 Vector VectorDef Wf ZArith_dec Zbits Zpower)
+ (theories
+  CertiRocq
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))
+
+(copy_files# static/*.{ml,mli})
+
+(copy_files# ../common/*.{ml,mli})
+
+; The commands are shared by both plugins, which set their name with cpp
+(rule
+ (targets g_certirocq.mlg)
+ (deps g_certirocq.mlg.in ../common/certirocq_commands.mlg)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run cpp -traditional-cpp -P g_certirocq.mlg.in))))
+
+(rocq.pp
+ (modules g_certirocq))
+
+(copy_files# ../../runtime/get_ordinal.c)
+
+(library
+ (name certirocq_plugin)
+ (public_name rocq-certirocq.plugin)
+ (flags (:standard -rectypes -w +a-4-8-9-20-26-27-32..34-37-39-41-42-44-45-48-56-58-60-67-68-70 -warn-error -a))
+ (libraries
+  rocq-runtime.plugins.ltac
+  rocq-metarocq-template.extractable
+  stdlib-shims
+  unix)
+ (foreign_stubs
+  (language c)
+  (names get_ordinal)
+  (include_dirs ../../runtime)))
+
+(rocq.theory
+ (name CertiRocq.Plugin)
+ (package rocq-certirocq)
+ (modules Loader RocqMsgFFI PrimInt63 PrimFloats PrimString GMP CertiRocq)
+ (plugins rocq-certirocq.plugin)
+ (theories
+  CertiRocq
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))

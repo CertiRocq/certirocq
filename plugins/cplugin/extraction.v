@@ -11,11 +11,11 @@ Require compcert.common.AST
         compcert.common.Globalenvs
     (*    Int31*).
 
-Require Glue.glue
+From CertiRocq Require Glue.glue
         Compiler.pipeline.
 
 From Stdlib Require Import extraction.Extraction.
-Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats.
+From CertiRocq.ExtractionVanilla Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats.
 From Stdlib Require Import ExtrOCamlPString.
 (* Standard lib *)
 
@@ -88,7 +88,6 @@ Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing R
 Set Warnings "-extraction-reserved-identifier".
 Set Warnings "-extraction-opaque-accessed".
 
-Set Extraction Output Directory ".".
 
 (* Extraction Library Zeven. *)
 (* Extraction Library Zeven. *)
@@ -98,7 +97,6 @@ Set Extraction Output Directory ".".
 (* Extraction Library SpecFloat. *)
 Separate Extraction FloatOps.Prim2SF.
 
-Set Extraction Output Directory "ExtractionVanilla".
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax

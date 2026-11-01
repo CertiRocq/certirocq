@@ -1,6 +1,0 @@
--R . CertiRocq.Libraries
-
-# libraries
-maps_util.v
-HashMap.v
-CpdtTactics.v

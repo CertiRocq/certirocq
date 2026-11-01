@@ -1,20 +1,13 @@
--R libraries                    CertiRocq.Libraries
+# For editors: the theories and plugins as built by dune (dune build)
+-R _build/default/theories CertiRocq
 
--R theories/Compiler            CertiRocq.Compiler
--R theories/common              CertiRocq.Common
--R theories/Extraction          CertiRocq.extraction
--R theories/Glue                CertiRocq.Glue
--R theories/LambdaBox_to_LambdaANF CertiRocq.LambdaBox_to_LambdaANF
--R theories/LambdaANF           CertiRocq.LambdaANF
--R theories/Codegen             CertiRocq.Codegen
--R theories/CodegenWasm         CertiRocq.CodegenWasm
+-R _build/default/plugins/plugin CertiRocq.Plugin
+-I _build/default/plugins/plugin
+-R _build/default/plugins/cplugin CertiRocq.VanillaPlugin
+-I _build/default/plugins/cplugin
 
--R plugins/plugin               CertiRocq.Plugin
--I plugins/plugin
--R plugins/cplugin              CertiRocq.VanillaPlugin
--I plugins/cplugin
-
--R bootstrap/certirocqc/theories CertiRocq.CertiRocqC
--I bootstrap/certirocqc
--R bootstrap/certirocqchk        CertiRocq.CertiRocqCheck
--I bootstrap/certirocqchk
+-R _build/default/bootstrap/certirocqc/compiler CertiRocq.CertiRocqC.Compiler
+-R _build/default/bootstrap/certirocqc/theories CertiRocq.CertiRocqC
+-I _build/default/bootstrap/certirocqc
+-R _build/default/bootstrap/certirocqchk CertiRocq.CertiRocqCheck
+-I _build/default/bootstrap/certirocqchk

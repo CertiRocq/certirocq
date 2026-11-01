@@ -1,0 +1,112 @@
+; The checker, compiled to C by the CertiRocq plugin. The rule uses the theories of
+; the build directory, and the plugins as installed there, which dune adds to
+; OCAMLPATH.
+(rule
+ (targets
+  CertiRocq.CertiRocqCheck.compile.certirocqchk.c
+  CertiRocq.CertiRocqCheck.compile.certirocqchk.h
+  glue.c
+  glue.h
+  compile.vo
+  compile.glob)
+ (deps
+  compile.v
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (package rocq-certirocq))
+ (action
+  (system
+   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.CertiRocqCheck compile.v")))
+
+; C identifiers cannot contain Greek letters, nor can foreign stubs have dots in their
+; names
+(rule
+ (targets certirocqchk_checker.c)
+ (deps ../certirocqc/unicode.sed CertiRocq.CertiRocqCheck.compile.certirocqchk.c)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run sed -f ../certirocqc/unicode.sed CertiRocq.CertiRocqCheck.compile.certirocqchk.c))))
+
+(rule
+ (targets certirocqchk_glue.c)
+ (deps ../certirocqc/unicode.sed glue.c)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run sed -f ../certirocqc/unicode.sed glue.c))))
+
+(copy_files# ../../runtime/{gc_stack,prim_floats,prim_string,prim_int63,rocq_ffi}.c)
+
+(rocq.pp
+ (modules g_certirocqchk))
+
+(library
+ (name certirocqchk_plugin)
+ (public_name rocq-certirocqchk.plugin)
+ (modules certirocqchk_plugin_wrapper certirocqchk g_certirocqchk)
+ (flags (:standard -rectypes -open Metarocq_template_plugin -open Certirocq_vanilla_plugin -w +a-4-8-9-20-26-27-32..34-37-39-41-42-44-45-48-56-58-60-67-68-70 -warn-error -a))
+ (libraries
+  rocq-runtime.plugins.ltac
+  rocq-metarocq-template.extractable
+  rocq-certirocq-vanilla.plugin
+  stdlib-shims)
+ (foreign_stubs
+  (language c)
+  (names certirocqchk_wrapper certirocqchk_checker certirocqchk_glue gc_stack prim_floats prim_string prim_int63 rocq_ffi)
+  ; The generated code stores function pointers in values, without casts
+  (flags
+   (:standard
+    -fomit-frame-pointer
+    -w
+    -Wno-int-conversion
+    -Wno-incompatible-pointer-types))
+  (include_dirs ../../runtime)))
+
+(rocq.theory
+ (name CertiRocq.CertiRocqCheck)
+ (package rocq-certirocqchk)
+ (modules Loader)
+ (plugins rocq-certirocqchk.plugin)
+ (theories
+  CertiRocq
+  CertiRocq.Plugin
+  CertiRocq.VanillaPlugin
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))
+
+; The test, with the theories of the build directory and the installed plugins
+(rule
+ (alias runtest)
+ (deps
+  test.v
+  (glob_files *.vo)
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (glob_files %{workspace_root}/plugins/cplugin/*.vo)
+  (package rocq-certirocq)
+  (package rocq-certirocq-vanilla)
+  (package rocq-certirocqchk))
+ (action
+  (system
+   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q . CertiRocq.CertiRocqCheck test.v")))
