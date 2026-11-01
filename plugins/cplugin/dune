@@ -71,14 +71,16 @@
 
 (copy_files# ../common/*.{ml,mli})
 
-; The commands are shared by both plugins, which set their name with cpp
+; The commands are shared by both plugins, which set their name with the C
+; preprocessor. It is run through the C compiler, as cpp alone gets linker flags
+; from the Nix compiler wrapper.
 (rule
  (targets g_certirocq_vanilla.mlg)
  (deps g_certirocq_vanilla.mlg.in ../common/certirocq_commands.mlg)
  (action
   (with-stdout-to
    %{targets}
-   (run cpp -traditional-cpp -P g_certirocq_vanilla.mlg.in))))
+   (run %{cc} -E -x c -traditional-cpp -P g_certirocq_vanilla.mlg.in))))
 
 (rocq.pp
  (modules g_certirocq_vanilla))
