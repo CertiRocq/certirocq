@@ -340,8 +340,8 @@ Definition funTy : type :=
 
 Definition pfunTy : type := Tpointer funTy noattr.
 
-Notation Tcons := cons.
-Notation Tnil := nil.
+Abbreviation Tcons := cons.
+Abbreviation Tnil := nil.
 
 Definition gcTy : type :=
   Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default.
@@ -396,7 +396,7 @@ Definition ptr      : expr := Evar isptrIdent isptrTy.
 Definition tinf  : expr := (Etempvar tinfIdent threadInf).
 Definition tinfd : expr := (Ederef tinf threadStructInf).
 
-Notation heapInf := (Tstruct heapInfIdent noattr).
+Abbreviation heapInf := (Tstruct heapInfIdent noattr).
 
 Definition add (a b : expr) := Ebinop Oadd a b valPtr.
 Notation " a '+'' b " := (add a b) (at level 30).
@@ -410,10 +410,11 @@ Notation " a '='' b " := (int_eq a b) (at level 35).
 Definition not (a : expr) := Eunop Onotbool a type_bool.
 Notation "'!' a " := (not a) (at level 40).
 
-Notation seq := Ssequence.
+Abbreviation seq := Ssequence.
 
+(* Left associative, as sequences have always been nested to the left *)
 Notation " p ';;;' q " := (seq p q)
-                         (at level 100, format " p ';;;' '//' q ").
+                         (at level 101, left associativity, format " p ';;;' '//' q ").
 
 Notation " a '::=' b " := (Sset a b) (at level 50).
 Notation " a ':::=' b " := (Sassign a b) (at level 50).
@@ -428,17 +429,20 @@ Definition c_int (n : Z) (t : type) : expr :=
     else Econst_int (Int.repr n%Z) t.
 
 Notation "'while(' a ')' '{' b '}'" :=
-  (Swhile a b) (at level 60).
+  (Swhile a b) (at level 0).
 
 Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 
+(* Casts are written [[t] e], with the prefix of list notations, which are still
+   parsed as expected *)
+#[warning="-notation-incompatible-prefix"]
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 0). (* what is the type of int being added? *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z val))) (at level 0).
 
 
 
@@ -749,6 +753,7 @@ Definition make_case_switch
     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
 
 Definition to_int64 (i : PrimInt63.int) : int64.
+Proof.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
@@ -1551,9 +1556,9 @@ Fixpoint make_constructors
 
 (* make a function discriminating over the different constructors of an inductive type *)
 
-Notation charPtrTy := (Tpointer tschar noattr).
-Notation nameTy    := (Tpointer charPtrTy noattr).
-Notation arityTy   := (Tpointer val noattr).
+Abbreviation charPtrTy := (Tpointer tschar noattr).
+Abbreviation nameTy    := (Tpointer charPtrTy noattr).
+Abbreviation arityTy   := (Tpointer val noattr).
 
 
 Definition make_elim_Asgn (argv:ident) (valIdent:ident) (arr:nat): statement :=
