@@ -206,8 +206,6 @@ Section IDENT.
       e <- time_anf "Merge duplicate functions" merge_dup_funs_trans e ;;
       ret e.
 
-      Print LambdaANFenv.
-
 
     Definition run_anf_pipeline (t : LambdaANF_FullTerm) : error LambdaANF_FullTerm * string :=
       let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
