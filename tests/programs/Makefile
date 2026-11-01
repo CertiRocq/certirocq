@@ -51,7 +51,7 @@ lib: ../lib/Makefile
 cleanlib:
 	$(MAKE) clean -C ../lib
 
-$(GLUE) $(CFILES): tests.v
+$(GLUE) $(CFILES) &: tests.v
 	rocq c $(COQOPTS) $<
 
 %_default: $(TEST_PREQS) CertiRocq.Tests.tests.%_default.c ; $(TEST_RECIPE)
