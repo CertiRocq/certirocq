@@ -53,7 +53,7 @@ Module GMPNotations.
   Infix "'lor'" := logor (at level 40, left associativity) : gmp_scope.
   Infix "'lxor'" := logxor (at level 20, left associativity) : gmp_scope.
   Notation "'lnot' x" := (lognot x) (at level 10, no associativity) : gmp_scope.
-  Notation "| x |" := (abs x%_gmp) (at level 10, no associativity, only printing) : gmp_scope.
+  Notation "| x |" := (abs x%_gmp) (at level 0, only printing) : gmp_scope.
   Infix "<" := lt : gmp_scope.
   Infix "≤" := leq (at level 70) : gmp_scope.
   Infix "≥" := geq (at level 70) : gmp_scope.
