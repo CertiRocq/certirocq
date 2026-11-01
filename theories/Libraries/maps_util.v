@@ -397,6 +397,7 @@ Section EQDMAP.
   Qed.
 
   Theorem remove_none_d: forall t d v x, M.get x v = None -> map_getd_r t d (M.remove x v) v.
+  Proof.
     unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v0 x). subst. rewrite H. rewrite M.grs. reflexivity. rewrite M.gro. reflexivity. assumption.
   Qed.
