@@ -5643,6 +5643,11 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     | right; now constructor
     | right].
 
+  Create HintDb Decidable_DB.
+  #[global] Hint Constants Opaque : Decidable_DB.
+  #[global] Hint Projections Opaque : Decidable_DB.
+  #[global] Hint Variables Opaque : Decidable_DB.
+
   #[global] Hint Resolve used_vars_dec : Decidable_DB.
   #[global] Hint Resolve used_vars_fundefs_dec : Decidable_DB.
   #[global] Hint Resolve bound_var_dec : Decidable_DB.

@@ -3839,6 +3839,11 @@ Section Uncurry_correct.
     total (bind m f).
   Proof. intros Hm Hf P; eapply bind_triple; [apply Hm|intros; apply Hf]. Qed.
 
+  Create HintDb TotalDB.
+  Hint Constants Opaque : TotalDB.
+  Hint Projections Opaque : TotalDB.
+  Hint Variables Opaque : TotalDB.
+
   Hint Resolve ret_total : TotalDB.
   Hint Extern 1 (total (_ <- _ ;; _)) => (apply bind_total; [|let x := fresh "arbitrary" in intros x]) : TotalDB.
 

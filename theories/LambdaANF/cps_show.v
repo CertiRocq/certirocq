@@ -63,7 +63,7 @@ Definition show_tree t := (show_tree_c t "")%bs.
 (* Variables are shown using "x" as a prefix if their original name is not known*)
 Definition show_var (x:positive) :=
   match M.get x nenv with
-    | Some (nNamed s) => (s+++("_")+++(show_pos x))%bs
+    | Some (nNamed s) => ((s+++("_"))+++(show_pos x))%bs
     | _ => ("x" +++ (show_pos x))%bs
   end.
 
@@ -80,12 +80,12 @@ Definition show_con (tg:ctor_tag) :=
   end.
 
 Definition show_ftag (tg:fun_tag) :=
-  if ftag_flag then ("<"+++(show_pos tg)+++">")%bs else ""%bs.
+  if ftag_flag then (("<"+++(show_pos tg))+++">")%bs else ""%bs.
 
 (* Show a list of variables as comma separated and wrapped in parens. *)
 Definition show_vars (xs:list positive) :=
-  ("(" +++ (List.fold_right (fun x y => x +++ y) ""
-                            (sep (",":string_tree) (List.map show_var xs))) +++ ")")%bs.
+  (("(" +++ (List.fold_right (fun x y => x +++ y) ""
+                            (sep (",":string_tree) (List.map show_var xs)))) +++ ")")%bs.
 
 (* We accumulate a string_tree as we convert the expressions to strings. *)
 Definition M := state string_tree.

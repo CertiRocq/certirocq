@@ -1317,6 +1317,7 @@ Section Closure_conversion_util.
     (Hun : fundefs_names_unique e) :
     occurs_free (C |[ e' ]|) \subset Scope.
 
+  Proof.
     eapply Included_trans. eapply Closure_conversion_occurs_free_toplevel_aux. eassumption.
     eassumption. eassumption. repeat normalize_sets. do 2 rewrite Setminus_Empty_set_abs_r at 1.
     repeat normalize_sets. rewrite image_Empty_set.

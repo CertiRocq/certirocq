@@ -145,8 +145,11 @@ with comp_f_ctx_f (c: fundefs_ctx) (c2:exp_ctx) : fundefs_ctx :=
 
 Declare Scope ctx_scope.
 
+(* Postfix, but at the level of the arguments it is applied to *)
+#[warning="-postfix-notation-not-level-1"]
 Notation "c '|[' e ']|' " := (app_ctx_f c e)  (at level 28, no associativity)
                              : ctx_scope.
+#[warning="-postfix-notation-not-level-1"]
 Notation "f '<[' e ']>'" := (app_f_ctx_f f e)  (at level 28, no associativity)
                             : ctx_scope.
 Open Scope ctx_scope.

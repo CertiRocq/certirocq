@@ -45,8 +45,8 @@ Definition seto {A:Type} (x:var)(oa:option A) (map:M.t A):=
   | None => map
   end.
 
-Notation get_c := (getd 0%nat).
-Notation get_b := (getd false).
+Abbreviation get_c := (getd 0%nat).
+Abbreviation get_b := (getd false).
 
 
 Section MEASURECONTRACT.

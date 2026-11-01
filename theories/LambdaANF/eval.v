@@ -135,7 +135,7 @@ Section EVAL.
   with bstep_fuel :  env -> exp -> fuel -> @res val -> trace -> Prop :=
   | BStepf_OOT : (* not enought time units to take a step *)
       forall rho (e : exp) (c : fuel),
-        (c << <1> e) -> (* not enough fuel *)
+        (c << (<1> e)) -> (* not enough fuel *)
         bstep_fuel rho e c OOT <0>
   | BStepf_run : (* take a step *)
       forall rho e r (cin : fuel) (cout : trace),

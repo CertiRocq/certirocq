@@ -183,10 +183,12 @@ Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
 
 (** Lemmas about [split_fds]. *)
 Lemma split_fds_nil_l fdefs : split_fds fdefs Fnil fdefs.
+Proof.
   induction fdefs; constructor; eauto.
 Qed.
 
 Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
+Proof.
   induction fdefs; constructor; eauto.
 Qed.
 

@@ -32,8 +32,8 @@ Ltac dec_vars :=
 Notation "A =mgd0= B" := (map_getd_r _ 0 A B) (at level 80).
 Notation "A =mg= B" := (map_get_r _ A B) (at level 81).
 
-Notation c_plus := (fun v c => get_c v c + 1)%nat.
-Notation c_minus := (fun v c => get_c v c - 1)%nat.
+Abbreviation c_plus := (fun v c => get_c v c + 1)%nat.
+Abbreviation c_minus := (fun v c => get_c v c - 1)%nat.
 
 Section CENSUS.
 
