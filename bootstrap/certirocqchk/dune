@@ -1,6 +1,6 @@
-; The checker, compiled to C by the CertiRocq plugin. The rule uses the CertiRocq
-; package as installed in the build directory, as compile.v needs the plugin and its
-; runtime.
+; The checker, compiled to C by the CertiRocq plugin. The rule uses the theories of
+; the build directory, and the plugins as installed there, which dune adds to
+; OCAMLPATH.
 (rule
  (targets
   CertiRocq.CertiRocqCheck.compile.certirocqchk.c
@@ -9,10 +9,14 @@
   glue.h
   compile.vo
   compile.glob)
- (deps compile.v (package rocq-certirocq))
+ (deps
+  compile.v
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (package rocq-certirocq))
  (action
   (system
-   "I=$(cd %{workspace_root}/../install/default/lib && pwd) && ROCQPATH=$I/coq/user-contrib${ROCQPATH:+:$ROCQPATH} OCAMLPATH=$I${OCAMLPATH:+:$OCAMLPATH} rocq c -Q . CertiRocq.CertiRocqCheck compile.v")))
+   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.CertiRocqCheck compile.v")))
 
 ; C identifiers cannot contain Greek letters, nor can foreign stubs have dots in their
 ; names
@@ -91,10 +95,18 @@
   MetaRocq.Erasure
   MetaRocq.ErasurePlugin))
 
-; The test, run with the package as installed in the build directory
+; The test, with the theories of the build directory and the installed plugins
 (rule
  (alias runtest)
- (deps test.v (package rocq-certirocqchk))
+ (deps
+  test.v
+  (glob_files *.vo)
+  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (glob_files %{workspace_root}/plugins/cplugin/*.vo)
+  (package rocq-certirocq)
+  (package rocq-certirocq-vanilla)
+  (package rocq-certirocqchk))
  (action
   (system
-   "I=$(cd %{workspace_root}/../install/default/lib && pwd) && ROCQPATH=$I/coq/user-contrib${ROCQPATH:+:$ROCQPATH} OCAMLPATH=$I${OCAMLPATH:+:$OCAMLPATH} rocq c test.v")))
+   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q . CertiRocq.CertiRocqCheck test.v")))
