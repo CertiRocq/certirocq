@@ -24,9 +24,11 @@
     Remaining assumptions, besides the ones of the theorems we compose (see the end of the file):
     - [eval_to_fuel_sem] (axiom): proven by MetaRocq PR #1288 (WcbvEval to eval_SI) and
       CertiRocq PR #156 (eval_SI to fuel_sem);
-    - [convert_top_anf_closed_unique_bindings], [convert_top_anf_cenv] and
-      [anf_pipeline_cenv_extends] (admitted): syntactic properties of ANF conversion and of
-      the constructor environment along the LambdaANF pipeline. *)
+    - [convert_top_anf_closed_unique_bindings] (admitted): ANF conversion produces closed
+      programs with unique bindings.
+
+    The constructor environment along ANF conversion and the LambdaANF pipeline is handled in
+    [anf_cenv.v]. *)
 
 From Stdlib Require Import ssreflect ssrbool.
 From Equations Require Import Equations.
@@ -41,7 +43,7 @@ From CertiRocq.LambdaBox_to_LambdaANF Require Import common fuel_sem anf_convert
   anf_toplevel.
 Require Import LambdaANF.term LambdaANF.state LambdaANF.eval LambdaANF.identifiers
   LambdaANF.term_util LambdaANF.rel_comp LambdaANF.bounds.
-From CertiRocq Require Import metarocq_pipeline pipeline correctness.
+From CertiRocq Require Import metarocq_pipeline pipeline correctness anf_cenv.
 From MetaRocq.TemplatePCUIC Require TemplateToPCUIC.
 From MetaRocq.PCUIC Require PCUICTyping PCUICClassification PCUICFirstorder.
 From MetaRocq.ErasurePlugin Require ErasureCorrectness.
@@ -53,17 +55,12 @@ Import Transform.
 
 (** ** Constructor environments *)
 
-(** [cenv'] extends [cenv] *)
-Definition cenv_extends (cenv cenv' : ctor_env) : Prop :=
-  forall t info, M.get t cenv = Some info -> M.get t cenv' = Some info.
+(** [cenv_extends], [fresh_ctor_tags]: see [anf_cenv.v] *)
 
-(** All the tags of [cenv] are smaller than [t] *)
-Definition fresh_ctor_tags (cenv : ctor_env) (t : ctor_tag) : Prop :=
-  forall t' info, M.get t' cenv = Some info -> (t' < t)%positive.
-
-Lemma cenv_extends_trans c1 c2 c3 :
-  cenv_extends c1 c2 -> cenv_extends c2 c3 -> cenv_extends c1 c3.
-Proof. intros h1 h2 t i h. now apply h2, h1. Qed.
+Lemma top_cenv_proj default_tag default_itag ie :
+  top_cenv default_tag default_itag ie =
+  snd (fst (fst (fst (convert_env default_tag default_itag ie)))).
+Proof. unfold top_cenv. now destruct convert_env as [[[[]]]]. Qed.
 
 Lemma caseConsistent_extends cenv cenv' cl t :
   cenv_extends cenv cenv' -> caseConsistent cenv cl t -> caseConsistent cenv' cl t.
@@ -205,29 +202,6 @@ Lemma convert_top_anf_closed_unique_bindings func_tag default_tag default_itag n
   anf.convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
     (fun _ => None) ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d) ->
   closed_exp e_tgt /\ unique_bindings e_tgt.
-Admitted.
-
-(** ANF conversion does not modify the constructor environment computed from the inductive
-    declarations, and all constructor tags allocated so far are below the next free tag.
-    TODO: prove, by showing that the state operations used by ANF conversion leave the
-    constructor environment unchanged, and that [convert_env] allocates fresh tags. *)
-Lemma convert_top_anf_cenv func_tag default_tag default_itag next_id
-  (Σ : EAst.global_context) e e_tgt comp_d :
-  let ie := inductive_env_east Σ in
-  let tgm := (convert_env default_tag default_itag ie).2 in
-  anf.convert_top_anf func_tag default_tag (M.empty _) default_itag next_id tgm []
-    (fun _ => None) ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d) ->
-  state.cenv comp_d = top_cenv default_tag default_itag ie /\
-  fresh_ctor_tags (state.cenv comp_d) (nect_ctor_tag comp_d).
-Admitted.
-
-(** The LambdaANF pipeline only extends the constructor environment (closure conversion
-    registers the constructors of closure environments, using fresh tags).
-    TODO: prove, pass by pass. *)
-Lemma anf_pipeline_cenv_extends next_var opts e c e' c' :
-  fresh_ctor_tags (state.cenv c) (nect_ctor_tag c) ->
-  anf_pipeline next_var opts e c = (compM.Ret e', c') ->
-  cenv_extends (state.cenv c) (state.cenv c').
 Admitted.
 
 (** ** Inversion of the pipeline *)
@@ -403,8 +377,9 @@ Proof.
   apply run_anf_pipeline_inv in hrun'
     as (c & e' & c' & hnv & hc & hctag & hanf & -> & -> & ->).
   cbn in hnv, hc, hctag, hanf.
-  destruct (convert_top_anf_cenv _ _ _ _ _ _ _ _ hcvt) as [hcenv0 hfresh].
-  rewrite -hc -hctag in hfresh. rewrite -hc in hcenv0.
+  destruct (convert_top_anf_cenv _ _ _ _ _ _ _ _ _ _ _ _ _ hcvt) as (hcenv0 & htags & hlt).
+  rewrite -hc -hctag in htags hlt. rewrite -hc in hcenv0.
+  have hok := cenv_ok_init c htags hlt.
   have hws : identifiers.well_scoped e_anf.
   { split => //. eapply Ensembles_util.Disjoint_Included_r; [apply hclosed|].
     apply Ensembles_util.Disjoint_Empty_set_r. }
@@ -418,7 +393,7 @@ Proof.
   destruct (hterm _ _ _ hev_anf) as (v_tgt & c_tgt & t_tgt & hev_tgt & hv_tgt).
   have hext : cenv_extends (top_cenv default_ctor_tag default_ind_tag (inductive_env_east p_er.1))
     (state.cenv c').
-  { rewrite -hcenv0. exact (anf_pipeline_cenv_extends _ _ _ _ _ _ hfresh hanf). }
+  { rewrite top_cenv_proj -hcenv0. exact (anf_pipeline_cenv_extends _ _ _ _ _ _ hok hanf). }
   apply (bstep_fuel_transfer (trace' := nat * nat) hext) in hev_tgt as [t' hev_tgt].
   exists v_tgt, c_tgt, t'. split; [now exists pre|]. split => //. split => //.
   eapply obs_val_compose; eauto.
@@ -680,7 +655,7 @@ Lemma coinductive_trans_tree (Σ : EEnvMap.GlobalContextMap.t) t :
   ECoInductiveToInductive.trans Σ t = t.
 Proof.
   induction 1 using constr_tree_ind'. intros hind. cbn.
-  rewrite EEnvMap.GlobalContextMap.lookup_inductive_kind_spec.
+  rewrite EEnvMap.GlobalContextMap.is_coind_spec /EGlobalEnv.is_coind.
   have hk := hind ind (or_introl eq_refl).
   have -> : map (ECoInductiveToInductive.trans Σ) args = args.
   { apply map_id_tree. clear -H0 hind. induction H0 as [|x l hx hl IH]; constructor.
@@ -796,7 +771,7 @@ Proof.
        Erasure.inductives_extraction Erasure.betared Erasure.enable_unsafe] in *.
   subst.
   (* The value: only unboxing changes the tree *)
-  rewrite coinductive_trans_tree // unbox_tree //.
+  rewrite unbox_tree //.
   match goal with |- context [unbox_fo ?Σu ?t] => have htree' := unbox_fo_tree Σu t htree end.
   rewrite consts_to_values_tree // unforce_axioms_tree // implement_lazy_force_tree //
     implement_box_tree //.
