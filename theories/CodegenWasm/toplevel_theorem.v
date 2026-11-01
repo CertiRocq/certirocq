@@ -118,7 +118,7 @@ Proof.
 
    assert (HlocInBound: (forall (var : positive) (varIdx : funcidx),
           repr_var (lenv:=lenv) var varIdx -> N.to_nat varIdx < Datatypes.length (f_locs f_before_IH))).
-   { intros ? ? Hvar. subst f_before_IH. cbn. rewrite repeat_length. inv Hvar.
+   { intros ? ? Hvar. subst f_before_IH. cbn. rw repeat_length. inv Hvar.
      eapply var_mapping_list_lt_length. eassumption. }
 
   assert (Hinv_before_IH: INV fenv sr f_before_IH). {
@@ -149,7 +149,7 @@ Proof.
     have H' := create_local_variable_mapping_injective _ 0%N HvarsNodup _ _ _ _ Hneq Hx Hy. auto. }
 
   assert (HenvsDisjoint : domains_disjoint lenv fenv). {
-    rewrite Heqfenv. subst lenv. eapply variable_mappings_nodup_disjoint; eauto.
+    rw Heqfenv. subst lenv. eapply variable_mappings_nodup_disjoint; eauto.
     cbn in HvarsNodup. rewrite <-catA in HvarsNodup.
     now eapply NoDup_app_remove_middle in HvarsNodup.
   }
@@ -167,7 +167,7 @@ Proof.
           fenv ! f = Some i))). {
     subst fenv. intros; split; intros.
     - apply notNone_Some in H.
-      rewrite find_def_in_collect_function_vars in H.
+      rw find_def_in_collect_function_vars in H.
       apply notNone_Some. apply variable_mapping_In_Some.
       + now eapply NoDup_app_remove_l in HvarsNodup.
       + assumption.
@@ -196,7 +196,7 @@ Proof.
     intro Hfd. revert Hcontra'.
     apply name_in_fundefs_find_def_is_Some in Hfd.
     now destruct Hfd as [? [? [? ?]]]. }
-    rewrite catA. eapply NoDup_collect_all_local_variables_find_def; eauto.
+    rw catA. eapply NoDup_collect_all_local_variables_find_def; eauto.
   }
 
   assert (Hunbound: (forall x : var,
@@ -229,7 +229,7 @@ Proof.
       intros ? ? ? ? ? Hdf Hval. have H' := Hdf.
       apply def_funs_spec in Hdf.
       destruct Hdf as [[? ?] | [? H]]. 2: inv H.
-      rewrite def_funs_eq in H'. 2: assumption.
+      rw def_funs_eq in H'. 2: assumption.
       inv H'. apply subval_fun in Hval. 2: assumption.
       destruct Hval as [? [Hval ?]]. inv Hval => //.
     } split.
@@ -262,11 +262,11 @@ Proof.
   destruct HMAIN as [s' [f' [k' [lh' [Hred [Hval [Hfinst _]]]]]]]. cbn. subst frameInit.
   exists s'. split.
   dostep'. apply r_call. cbn.
-  rewrite HinstFuncs. reflexivity.
+  rw HinstFuncs. reflexivity.
   dostep'. eapply r_invoke_native with (ves:=[]) (vs:=[]); eauto.
-  rewrite Hfuncs. subst f_before_IH.  cbn. rewrite Hfinst. reflexivity. reflexivity.
+  rw Hfuncs. subst f_before_IH.  cbn. rw Hfinst. reflexivity. reflexivity.
   erewrite <-map_repeat_eq. by apply default_vals_i32_Some.
-  subst f_before_IH. cbn. subst lh. cbn in Hred. rewrite <- Hfinst. rewrite cats0 in Hred.
+  subst f_before_IH. cbn. subst lh. cbn in Hred. rewrite <- Hfinst. rw cats0 in Hred.
   eapply rt_trans. cbn. unfold to_e_list. apply Hred.
   dostep'. constructor. apply rs_return with (lh:=lh') (vs:=[::]) =>//. apply rt_refl.
   subst f_before_IH. apply Hval.

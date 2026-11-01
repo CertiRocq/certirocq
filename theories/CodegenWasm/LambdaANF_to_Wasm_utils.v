@@ -52,7 +52,7 @@ Ltac separate_instr :=
   cbn;
   repeat match goal with
   |- context C [?x :: ?l] =>
-     lazymatch l with [::] => fail | _ => rewrite -(cat1s x l) end
+     lazymatch l with [::] => fail | _ => rw -(cat1s x l) end
   end.
 
 (** The lemmas [r_eliml] and [r_elimr] are relicts,
@@ -65,8 +65,8 @@ Proof.
   move => hs s f es hs' s' f' es' lconst HConst H.
   apply const_es_exists in HConst. destruct HConst as [vs ?].
   eapply r_label with (lh:=LH_base vs []). eassumption.
-  - cbn. rewrite cats0. congruence.
-  - cbn. rewrite cats0. congruence.
+  - cbn. rw cats0. congruence.
+  - cbn. rw cats0. congruence.
 Qed.
 
 Lemma r_elimr `{ho : host} : forall hs s f es hs' s' f' es' les,
@@ -90,14 +90,14 @@ Ltac elimr_nary_instr n :=
          | |- reduce _ _ _ ([::$VN ?c1] ++ [:: ?instr])        _ _ _ _ => idtac
          | |- reduce _ _ _ ([::$VN ?c1] ++ [:: ?instr] ++ ?l3) _ _ _ _ =>
             assert ([::$VN c1] ++ [:: instr] ++ l3 =
-                    [:: $VN c1; instr] ++ l3) as H by reflexivity; rewrite H;
+                    [:: $VN c1; instr] ++ l3) as H by reflexivity; rw H;
                                                        apply r_elimr; clear H
          end
   | 2 => lazymatch goal with
          | |- reduce _ _ _ ([::$VN ?c1] ++ [::$VN ?c2] ++ [:: ?instr])        _ _ _ _ => idtac
          | |- reduce _ _ _ ([::$VN ?c1] ++ [::$VN ?c2] ++ [:: ?instr] ++ ?l3) _ _ _ _ =>
             assert ([::$VN c1] ++ [:: $VN c2] ++ [:: instr] ++ l3 =
-                    [::$VN c1; $VN c2; instr] ++ l3) as H by reflexivity; rewrite H;
+                    [::$VN c1; $VN c2; instr] ++ l3) as H by reflexivity; rw H;
                                                        apply r_elimr; clear H
          end
   end.
@@ -207,7 +207,7 @@ Proof.
   - destruct i; reflexivity.
   - destruct i; try reflexivity.
     replace (N.of_nat (S i)) with (1 + N.of_nat i)%N by lia.
-    cbn. rewrite -IHl. cbn.
+    cbn. rw -IHl. cbn.
     destruct (N.of_nat i) eqn:Heqn; auto.
     destruct p; auto.
     replace (N.pos (Pos.succ p)~0 - 1)%N with (N.pos p~1)%N by lia. reflexivity.
@@ -229,8 +229,8 @@ Lemma mapi_aux_acc_snoc {A B} : forall xs idx l a (f : nat -> A -> B),
   mapi_aux (idx, l ++ [::a]) f xs = a :: mapi_aux (idx, l) f xs.
 Proof.
   induction xs; intros.
-  - cbn. by rewrite rev_app_distr.
-  - cbn. by rewrite -IHxs.
+  - cbn. by rw rev_app_distr.
+  - cbn. by rw -IHxs.
 Qed.
 
 Lemma mapi_aux_nth_error {A B} : forall xs i x (f : nat -> A -> B) idx,
@@ -238,10 +238,10 @@ Lemma mapi_aux_nth_error {A B} : forall xs i x (f : nat -> A -> B) idx,
   nth_error (mapi_aux (idx, []) f xs) i = Some (f (idx + i) x).
 Proof.
   induction xs; intros. destruct i=>//.
-  cbn. rewrite (mapi_aux_acc_snoc _ _ []).
+  cbn. rw (mapi_aux_acc_snoc _ _ []).
   destruct i. injection H as <-. cbn. do 2 f_equal. lia.
   replace (idx + S i) with (S idx + i) by lia.
-  rewrite -IHxs; auto. cbn.
+  rw -IHxs; auto. cbn.
   do 4 f_equal. lia.
 Qed.
 
@@ -258,7 +258,7 @@ Lemma mapi_aux_nth_error_None {A B} : forall xs i (f : nat -> A -> B) idx,
   nth_error (mapi_aux (idx, []) f xs) i = None.
 Proof.
   induction xs; intros. destruct i=>//.
-  cbn. rewrite (mapi_aux_acc_snoc _ _ []).
+  cbn. rw (mapi_aux_acc_snoc _ _ []).
   destruct i=>//.
   cbn. erewrite <-IHxs; eauto.
 Qed.
@@ -276,7 +276,7 @@ Lemma mapi_aux_length {A B} : forall xs idx l (f : nat -> A -> B) ys,
   length xs + length l = length ys.
 Proof.
   induction xs; cbn; intros.
-  - subst ys. by rewrite length_rev.
+  - subst ys. by rw length_rev.
   - apply IHxs in H. cbn in H. lia.
 Qed.
 
@@ -292,7 +292,7 @@ Lemma drop_is_skipn {A} : forall l n, @drop A n l = List.skipn n l.
 Proof.
   induction l; intros; auto.
   - induction n; cbn; auto.
-  - destruct n. reflexivity. cbn. now rewrite IHl.
+  - destruct n. reflexivity. cbn. now rw IHl.
 Qed.
 
 Lemma take_drop_is_set_nth {B} : forall a (b : B) (l : list B),
@@ -301,16 +301,16 @@ Lemma take_drop_is_set_nth {B} : forall a (b : B) (l : list B),
 Proof.
   intros. apply nth_error_ext; intros.
   assert (Hlen: length (take a l) = a). {
-    rewrite length_is_size size_take -length_is_size.
+    rw length_is_size size_take -length_is_size.
     assert (ssrnat.leq (S a) (Datatypes.length l)). { apply /ssrnat.leP. lia. }
-    now rewrite H0. }
+    now rw H0. }
   destruct (Nat.lt_total n a). 2: destruct H0.
   { (* n < a *)
     erewrite set_nth_nth_error_other; auto; try lia.
     assert (n < Datatypes.length (take a l)). {
-      rewrite length_is_size size_take -length_is_size.
+      rw length_is_size size_take -length_is_size.
       destruct (ssrnat.leq (S a) (Datatypes.length l)); lia. }
-    rewrite nth_error_app1; auto.
+    rw nth_error_app1; auto.
     assert (H': n < length l) by lia. apply nth_error_Some in H'. apply notNone_Some in H'.
     destruct H'.
     erewrite nth_error_take; eauto. apply /ssrnat.leP. lia. }
@@ -318,16 +318,16 @@ Proof.
     subst.
     have H' := H. apply nth_error_Some in H'. apply notNone_Some in H'. destruct H'.
     erewrite set_nth_nth_error_same; eauto.
-    rewrite nth_error_app2. replace (a - Datatypes.length (take a l)) with 0.
+    rw nth_error_app2. replace (a - Datatypes.length (take a l)) with 0.
     reflexivity. lia. lia. }
   { (* a < n *)
-    rewrite nth_error_app2. 2: lia.
-    rewrite set_nth_nth_error_other; try lia.
-    rewrite Hlen drop_is_skipn.
+    rw nth_error_app2. 2: lia.
+    rw set_nth_nth_error_other; try lia.
+    rw Hlen drop_is_skipn.
     destruct n; first lia. destruct l; first inv H.
     replace (a + 1) with (S a) by lia.
     replace (S n - a) with (S (n - a)) by lia. cbn.
-    rewrite MRList.nth_error_skipn. cbn.
+    rw MRList.nth_error_skipn. cbn.
     now replace (a + (n - a)) with n by lia. }
 Qed.
 
@@ -379,7 +379,7 @@ Proof.
     { (* v<>f0 *)
       eapply IHfds with (e:=e1); eauto. cbn in H. cbn.
       rewrite <- catA. repeat rewrite <- catA in H. apply NoDup_app_remove_middle in H.
-      apply NoDup_app_remove_middle in H. rewrite catA in H.
+      apply NoDup_app_remove_middle in H. rw catA in H.
       replace (v
        :: (fix iter (fds : fundefs) : seq var :=
              match fds with
@@ -473,7 +473,7 @@ Proof.
       intro Hcontra. rewrite <- H in Hcontra. now destruct Hcontra. }
     destruct (fenv ! f); auto. exfalso. now apply H1.
   - assert (~ exists p, find_def f fds = Some p). {
-      intro Hcontra. rewrite H in Hcontra. now destruct Hcontra. }
+      intro Hcontra. rw H in Hcontra. now destruct Hcontra. }
     destruct (find_def f fds); auto. exfalso. now apply H1.
 Qed.
 
@@ -494,8 +494,8 @@ Proof.
   generalize dependent loc. revert loc' n.
   induction l; intros. inv Heqn.
   destruct (var_dec loc a).
-  (* loc = a *) subst. cbn in Heqn. rewrite Maps.PTree.gss in Heqn. inv Heqn. cbn. lia.
-  (* loc <> a *) cbn in Heqn. rewrite Maps.PTree.gso in Heqn; auto. cbn.
+  (* loc = a *) subst. cbn in Heqn. rw Maps.PTree.gss in Heqn. inv Heqn. cbn. lia.
+  (* loc <> a *) cbn in Heqn. rw Maps.PTree.gso in Heqn; auto. cbn.
   replace (S (Datatypes.length l + N.to_nat n)) with (Datatypes.length l + N.to_nat (N.succ n)) by lia.
   eapply IHl; eauto.
 Qed.
@@ -519,16 +519,16 @@ Proof.
     + (* x=a *)
       subst. unfold lookup_N in H0.
       destruct (N.to_nat i) eqn:Hi.
-      * cbn. rewrite M.gss. f_equal. lia.
+      * cbn. rw M.gss. f_equal. lia.
       * cbn in H0. apply nth_error_In in H0.
         apply NoDup_cons_iff in H. now destruct H.
     + (* x<> a *)
       unfold lookup_N in H0. destruct i; cbn in H0; first by inv H0.
       destruct (Pos.to_nat p) eqn:Hp; try lia. cbn in H0.
       replace (n + N.pos p)%N with (N.succ n + N.of_nat n1)%N by lia.
-      cbn. rewrite M.gso; auto.
+      cbn. rw M.gso; auto.
       inv H. apply IHl; auto.
-      rewrite -H0. unfold lookup_N. f_equal. lia.
+      rw -H0. unfold lookup_N. f_equal. lia.
 Qed.
 
 Lemma local_variable_mapping_gt_idx : forall l idx x x',
@@ -538,9 +538,9 @@ Proof.
   cbn in H.
   destruct (Pos.eq_dec a x).
   - (* a=x *)
-    subst a. rewrite M.gss in H. inv H. lia.
+    subst a. rw M.gss in H. inv H. lia.
   - (* a<>x *)
-    rewrite M.gso in H; auto.
+    rw M.gso in H; auto.
     apply IHl in H. lia.
 Qed.
 
@@ -553,7 +553,7 @@ Proof.
   - inv H0. congruence.
   - cbn in H0. destruct (var_dec a x).
     + (* a = x*) subst. now cbn.
-    + (* a <> x *) right. rewrite M.gso in H0; auto.
+    + (* a <> x *) right. rw M.gso in H0; auto.
       eapply IHl; eauto.
 Qed.
 
@@ -565,7 +565,7 @@ Proof.
   induction l; intros; cbn; auto. cbn in H.
   assert (x <> a) by auto.
   assert (~ In x l) by auto. clear H.
-  rewrite M.gso; auto.
+  rw M.gso; auto.
 Qed.
 
 Lemma variable_mapping_In_Some : forall l x idx lenv,
@@ -576,8 +576,8 @@ Proof.
   induction l; intros.
   - inv H0.
   - cbn in H0. destruct H0.
-    (* a = x*) subst. cbn. intro. now rewrite M.gss in H0.
-    (* In x l *) cbn. inv H. rewrite M.gso; auto. intro. now subst.
+    (* a = x*) subst. cbn. intro. now rw M.gss in H0.
+    (* In x l *) cbn. inv H. rw M.gso; auto. intro. now subst.
 Qed.
 
 Lemma variable_mappings_nodup_disjoint : forall l1 l2 idx1 idx2,
@@ -601,16 +601,16 @@ Proof.
   destruct (Pos.eq_dec a x).
   - (* a=x *)
     subst a. intro. subst y'.
-    rewrite M.gss in H0. inv H0. rewrite M.gso in H1; auto.
+    rw M.gss in H0. inv H0. rw M.gso in H1; auto.
     apply local_variable_mapping_gt_idx in H1. lia.
   - (* a<>x *)
     destruct (Pos.eq_dec a y).
     + (* a=y *)
-      subst a. intro. subst y'. rewrite M.gss in H1. inv H1.
-      rewrite M.gso in H0; auto. apply local_variable_mapping_gt_idx in H0. lia.
+      subst a. intro. subst y'. rw M.gss in H1. inv H1.
+      rw M.gso in H0; auto. apply local_variable_mapping_gt_idx in H0. lia.
     + (* a<>y *)
-      rewrite M.gso in H0; auto.
-      rewrite M.gso in H1; auto.
+      rw M.gso in H0; auto.
+      rw M.gso in H1; auto.
       clear n n0.
       eapply IHl; eassumption.
 Qed.
@@ -653,7 +653,7 @@ Lemma fds_collect_local_variables_subset : forall fds,
   FromList (fds_collect_local_variables fds) \subset bound_var_fundefs fds.
 Proof.
   induction fds; cbn; repeat normalize_bound_var;
-    rewrite ?FromList_cat; repeat normalize_sets; eauto 20 with Ensembles_DB.
+    rw ?FromList_cat; repeat normalize_sets; eauto 20 with Ensembles_DB.
 Qed.
 
 Lemma fds_fn_names_subset : forall fds,
@@ -669,7 +669,7 @@ Local Hint Resolve fds_collect_local_variables_subset fds_fn_names_subset
 Lemma fds_collect_local_variables_fn_names_subset : forall fds,
   FromList (seq.cat (fds_collect_local_variables fds) (fds_fn_names fds))
   \subset bound_var_fundefs fds.
-Proof. intros fds. rewrite FromList_cat. eauto 20 with Ensembles_DB. Qed.
+Proof. intros fds. rw FromList_cat. eauto 20 with Ensembles_DB. Qed.
 
 Local Hint Resolve fds_collect_local_variables_fn_names_subset : Ensembles_DB.
 
@@ -714,7 +714,7 @@ Proof.
     + now apply IH.
     + eapply Disjoint_Included_r;
         [ apply fds_collect_local_variables_fn_names_subset | ].
-      rewrite FromList_cat. apply Union_Disjoint_l.
+      rw FromList_cat. apply Union_Disjoint_l.
       * now apply Disjoint_sym.
       * eapply Disjoint_Included_l;
           [ apply collect_local_variables_subset | assumption ].
@@ -723,7 +723,7 @@ Proof.
                              ++ fds_collect_local_variables fds'
                              ++ fds_fn_names fds')
                    \subset FromList ys :|: (bound_var e :|: bound_var_fundefs fds')).
-    { rewrite !FromList_cat.
+    { rw !FromList_cat.
       apply Union_Included; [ apply Union_Included | apply Union_Included ];
         eauto 20 with Ensembles_DB. }
     rewrite <- catA in Hin. apply Hsub in Hin.
@@ -734,8 +734,8 @@ Lemma unique_bindings_NoDup_collect : forall e,
   unique_bindings e ->
   NoDup (collect_all_local_variables e ++ collect_function_vars e).
 Proof.
-  intros e Hub. destruct e; rewrite ?collect_function_vars_Efun;
-    cbn [collect_all_local_variables collect_function_vars]; rewrite ?cats0;
+  intros e Hub. destruct e; rw ?collect_function_vars_Efun;
+    cbn [collect_all_local_variables collect_function_vars]; rw ?cats0;
     try now apply NoDup_collect_local_variables.
   (* Efun *)
   inv Hub. rewrite <- catA. apply List_util.NoDup_app.
@@ -916,8 +916,8 @@ Proof.
     destruct (set_lists xs vs rho) eqn:Hsl; inv H1.
     destruct (var_dec x a).
     + subst.
-      rewrite M.gss in H0. inv H0. constructor; reflexivity.
-    + rewrite M.gso in H0=>//.
+      rw M.gss in H0. inv H0. constructor; reflexivity.
+    + rw M.gso in H0=>//.
       constructor 2.
       inv H. exfalso; apply n; reflexivity.
       eapply IHxs; eauto.
@@ -937,13 +937,13 @@ Proof.
     + (* a=v *)
       subst a. destruct vs. inv H1. cbn in H1.
       destruct (set_lists xs vs rho) eqn:Heqn; inv H1.
-      rewrite M.gss in H0. inv H0. exists 0. now cbn.
+      rw M.gss in H0. inv H0. exists 0. now cbn.
     + (* a<>v *)
       destruct vs. inv H1. cbn in H1.
       destruct (set_lists xs vs rho) eqn:Heqn; inv H1.
       destruct (var_dec a x).
-      * subst. rewrite M.gss in H0; inv H0. exists 0; now cbn.
-      * rewrite M.gso in H0; auto.
+      * subst. rw M.gss in H0; inv H0. exists 0; now cbn.
+      * rw M.gso in H0; auto.
         destruct (IHxs _ _ _ _ _ H H0 Heqn ) as [k [Hk1 Hk2]]. exists (S k). now cbn.
 Qed.
 
@@ -954,8 +954,8 @@ Lemma def_funs_find_def : forall fds fds' rho f,
 Proof.
   induction fds; intros; last contradiction.
   cbn in H. destruct (M.elt_eq f0 v).
-  (* f0 = v *) subst. cbn. now rewrite M.gss.
-  (* f0 <> v *) cbn. now rewrite M.gso.
+  (* f0 = v *) subst. cbn. now rw M.gss.
+  (* f0 <> v *) cbn. now rw M.gso.
 Qed.
 
 Lemma def_funs_not_find_def : forall fds fds' rho f,
@@ -965,7 +965,7 @@ Proof.
   induction fds; intros ? ? ? H; auto.
   cbn in H. destruct (M.elt_eq f0 v).
   (* f0 = v *) inv H.
-  (* f0 <> v *) cbn. now rewrite M.gso.
+  (* f0 <> v *) cbn. now rw M.gso.
 Qed.
 
 End LambdaANF.
@@ -981,7 +981,7 @@ Lemma constr_size_ge_32 {cenv} : forall t constr_size arity,
 Proof.
   intros ??? Hsize Harr ?.
   unfold get_ctor_size in Hsize.
-  rewrite Harr in Hsize. cbn in Hsize.
+  rw Harr in Hsize. cbn in Hsize.
   destruct (arity=?0) eqn:Ha; inv Hsize; lia.
 Qed.
 
@@ -992,7 +992,7 @@ Lemma constr_size_0 {cenv} : forall t constr_size,
 Proof.
   intros ?? Hsize Harr.
   unfold get_ctor_size in Hsize.
-  rewrite Harr in Hsize. cbn in Hsize.
+  rw Harr in Hsize. cbn in Hsize.
   now inv Hsize.
 Qed.
 
@@ -1003,7 +1003,7 @@ Lemma ctor_ord_restricted {cenv} : forall y cl t e ord,
   (-1 < Z.of_N ord < Wasm_int.Int32.half_modulus)%Z.
 Proof.
   intros ????? Hr Hin Hord. inv Hr.
-  rewrite Forall_forall in H1. apply H1 in Hin.
+  rw Forall_forall in H1. apply H1 in Hin.
   destruct Hin as [Hr' _].
   simpl_modulus. cbn. cbn in Hr'.
   unfold ctor_ordinal_restricted in Hr'.
@@ -1112,7 +1112,7 @@ Proof.
   intros.
   unfold Wasm_int.Int32.iand, Wasm_int.Int32.and. cbn.
   destruct n. cbn. reflexivity.
-  rewrite Wasm_int.Int32.Z_mod_modulus_id; last lia. reflexivity.
+  rw Wasm_int.Int32.Z_mod_modulus_id; last lia. reflexivity.
 Qed.
 
 Lemma and_1_even : forall n,
@@ -1123,7 +1123,7 @@ Proof.
   unfold Wasm_int.Int32.iand, Wasm_int.Int32.and.
   - destruct n. now cbn.
   - remember (Z.of_N _) as fd. cbn.
-    now rewrite Wasm_int.Int32.Z_mod_modulus_id; subst.
+    now rw Wasm_int.Int32.Z_mod_modulus_id; subst.
 Qed.
 
 
@@ -1172,7 +1172,7 @@ Proof.
   destruct (write_bytes _ _ _) eqn:Hb=>//. inv H.
   apply write_bytes_gen_preserve_length in Hb.
   unfold mem_length.
-  now rewrite Hb.
+  now rw Hb.
 Qed.
 
 Lemma enough_space_to_store m k off bs :
@@ -1182,10 +1182,10 @@ Proof.
   intros H. unfold store.
   assert ((k + off + N.of_nat (length bs) <=? mem_length m)%N = true) as Hleb
       by now apply N.leb_le.
-  rewrite Hleb.
+  rw Hleb.
   assert (bytes_takefill #00 (length bs) bs = bs) as Hfill.
-  { unfold bytes_takefill. rewrite Nat.ltb_irrefl. apply List.firstn_all. }
-  rewrite Hfill.
+  { unfold bytes_takefill. rw Nat.ltb_irrefl. apply List.firstn_all. }
+  rw Hfill.
   unfold write_bytes_meminst, write_bytes.
   destruct (write_bytes_gen _ _ _ _) eqn:Hby=>//.
   exfalso. revert Hby. unfold write_bytes_gen.
@@ -1239,8 +1239,8 @@ Lemma nth_error_iota : forall len m n,
 Proof.
   induction len; intros m n Hlt; first lia.
   destruct n; cbn.
-  - by rewrite Nat.add_0_r.
-  - rewrite IHlen; last lia. f_equal. lia.
+  - by rw Nat.add_0_r.
+  - rw IHlen; last lia. f_equal. lia.
 Qed.
 
 Lemma write_bytes_read_bytes : forall mt md addr bs m0,
@@ -1250,7 +1250,7 @@ Proof.
   intros mt md addr bs m0 Hw.
   unfold read_bytes. cbn.
   apply those_spec.
-  { rewrite length_map. apply (size_iota 0 (length bs)). }
+  { rw length_map. apply (size_iota 0 (length bs)). }
   intros n x Hnth.
   assert (Nat.lt n (length bs)) as Hlt by (apply nth_error_Some; congruence).
   erewrite map_nth_error; last first.
@@ -1258,13 +1258,13 @@ Proof.
   cbn. do 2 f_equal.
   unfold write_bytes, write_bytes_gen in Hw.
   erewrite mem_update_gen_lookup; [ | exact Hw | lia ].
-  unfold lookup_N. rewrite Nnat.Nat2N.id. by rewrite Hnth.
+  unfold lookup_N. rw Nnat.Nat2N.id. by rw Hnth.
 Qed.
 
 Lemma bytes_takefill_id : forall n bs, length bs = n -> bytes_takefill #00 n bs = bs.
 Proof.
   intros n bs Hlen. unfold bytes_takefill.
-  rewrite Hlen Nat.ltb_irrefl -Hlen. apply List.firstn_all.
+  rw Hlen Nat.ltb_irrefl -Hlen. apply List.firstn_all.
 Qed.
 
 Lemma in_iota_lt : forall len m n,
@@ -1297,11 +1297,11 @@ Lemma write_bytes_read_bytes_i32 : forall m addr v m0,
   read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |} addr 4 = Some v.
 Proof.
   intros m addr v m0 Hlen Hw.
-  rewrite (bytes_takefill_id _ _ Hlen) in Hw.
+  rw (bytes_takefill_id _ _ Hlen) in Hw.
   have Hres : read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |}
                 addr (length v) = Some v
     by apply: write_bytes_read_bytes; exact Hw.
-  by rewrite Hlen in Hres.
+  by rw Hlen in Hres.
 Qed.
 
 Lemma store_load_i32 : forall m m' addr v,
@@ -1326,11 +1326,11 @@ Lemma write_bytes_read_bytes_i64 : forall m addr v m0,
   read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |} addr 8 = Some v.
 Proof.
   intros m addr v m0 Hlen Hw.
-  rewrite (bytes_takefill_id _ _ Hlen) in Hw.
+  rw (bytes_takefill_id _ _ Hlen) in Hw.
   have Hres : read_bytes {| meminst_type := meminst_type m; meminst_data := m0 |}
                 addr (length v) = Some v
     by apply: write_bytes_read_bytes; exact Hw.
-  by rewrite Hlen in Hres.
+  by rw Hlen in Hres.
 Qed.
 
 Lemma store_load_i64 : forall m m' addr v,
@@ -1352,7 +1352,7 @@ Lemma enough_space_to_load m k :
   exists v, load_i32 m k = Some v.
 Proof.
   unfold load_i32, load. intros. cbn.
-  apply N.leb_le in H. rewrite H.
+  apply N.leb_le in H. rw H.
   unfold read_bytes, those. cbn.
   apply N.leb_le in H. unfold mem_length in H.
   destruct (mem_lookup (k + 0 + 0) (meminst_data m)) eqn:Hc.
@@ -1367,7 +1367,7 @@ Lemma enough_space_to_load_i64 m k :
   exists v, load_i64 m k = Some v.
 Proof.
   unfold load_i64, load. intros. cbn.
-  apply N.leb_le in H. rewrite H.
+  apply N.leb_le in H. rw H.
   unfold read_bytes, those. cbn.
   apply N.leb_le in H. unfold mem_length in H.
   destruct (mem_lookup (k + 0 + 0) (meminst_data m)) eqn:Hc.
@@ -1402,8 +1402,8 @@ Proof.
   apply mem_grow_length in Hgrow. unfold mem_length.
   destruct (lim_max (meminst_type m)) eqn:Htype=>//.
   - destruct (mem_size m + sgrow <=? u)%N =>//. inv H.
-    rewrite Hgrow. unfold page_size. lia.
-  - inv H. rewrite Hgrow. unfold page_size. lia.
+    rw Hgrow. unfold page_size. lia.
+  - inv H. rw Hgrow. unfold page_size. lia.
 Qed.
 
 Lemma mem_grow_mem_size : forall (m m' : meminst) sgrow,
@@ -1411,7 +1411,7 @@ Lemma mem_grow_mem_size : forall (m m' : meminst) sgrow,
   mem_size m' = (sgrow + mem_size m)%N.
 Proof.
   intros. apply mem_grow_length in H.
-  unfold mem_size. rewrite H.
+  unfold mem_size. rw H.
   unfold page_size. lia.
 Qed.
 
@@ -1464,7 +1464,7 @@ Proof.
     destruct (a + (0 + 4) <=? mem_length m)%N eqn:Hb; try lia.
     destruct (a + (0 + 4) <=? mem_length m')%N eqn:Hb'.
     2:{ apply memory.mem_grow_length in Hgrow. inv H0. unfold mem_length in Hb', Hb.
-        cbn in Hb', Hgrow. rewrite Hgrow in Hb'. lia. }
+        cbn in Hb', Hgrow. rw Hgrow in Hb'. lia. }
     inv H0.
     unfold read_bytes, those. cbn. unfold mem_length in Hb.
     erewrite <- memory.mem_grow_lookup; eauto; try lia.
@@ -1478,7 +1478,7 @@ Proof.
     destruct (a + (0 + 8) <=? mem_length m)%N eqn:Hb; try lia.
     destruct (a + (0 + 8) <=? mem_length m')%N eqn:Hb'.
     2:{ apply memory.mem_grow_length in Hgrow. inv H0. unfold mem_length in Hb', Hb.
-        cbn in Hb', Hgrow. rewrite Hgrow in Hb'. lia. }
+        cbn in Hb', Hgrow. rw Hgrow in Hb'. lia. }
     inv H0.
     unfold read_bytes, those. cbn. unfold mem_length in Hb.
     erewrite <- memory.mem_grow_lookup; eauto; try lia.
@@ -1509,10 +1509,10 @@ Proof.
   unfold max_mem_pages in Hn.
   assert (Hs: (65536 > 0)%Z) by lia.
   destruct (Zdiv_eucl_exist Hs (Z.of_N n)) as [[z z0] [H1 H2]].
-  rewrite H1 in Hn.
-  rewrite Z.add_comm in Hn.
-  rewrite Z.mul_comm in Hn.
-  rewrite Z.div_add in Hn; lia.
+  rw H1 in Hn.
+  rw Z.add_comm in Hn.
+  rw Z.mul_comm in Hn.
+  rw Z.div_add in Hn; lia.
 Qed.
 
 
@@ -1532,7 +1532,7 @@ Proof.
   replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
      with (mem_length m) by (unfold mem_length; cbn; congruence).
   destruct (_ <=? _)%N eqn:Hlen2=>//.
-  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  rw (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
   exact Hload.
 Qed.
 
@@ -1557,7 +1557,7 @@ Proof.
   replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
      with (mem_length m) by (unfold mem_length; cbn; congruence).
   destruct (_ <=? _)%N eqn:Hlen2=>//.
-  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  rw (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
   exact Hload.
 Qed.
 
@@ -1578,7 +1578,7 @@ Proof.
   replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
      with (mem_length m) by (unfold mem_length; cbn; congruence).
   destruct (_ <=? _)%N eqn:Hlen2=>//.
-  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  rw (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
   exact Hload.
 Qed.
 
@@ -1598,7 +1598,7 @@ Proof.
   replace (mem_length {| meminst_type := meminst_type m; meminst_data := m0 |})
      with (mem_length m) by (unfold mem_length; cbn; congruence).
   destruct (_ <=? _)%N eqn:Hlen2=>//.
-  rewrite (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
+  rw (write_bytes_read_bytes_ne _ _ _ _ _ _ _ Hwrite); last (cbn; lia).
   exact Hload.
 Qed.
 
@@ -1612,20 +1612,20 @@ Proof.
   destruct t ;
     unfold serialise_num ;
     destruct v ; (try by inversion Htv).
-  rewrite Memdata.decode_encode_int.
-  rewrite Z.mod_small.
-  by rewrite Wasm_int.Int32.repr_unsigned.
+  rw Memdata.decode_encode_int.
+  rw Z.mod_small.
+  by rw Wasm_int.Int32.repr_unsigned.
   destruct i ; simpl; replace (two_power_pos _)
     with Wasm_int.Int32.modulus ; [lia | done].
-  rewrite Memdata.decode_encode_int.
-  rewrite Z.mod_small.
-  by rewrite Wasm_int.Int64.repr_unsigned.
+  rw Memdata.decode_encode_int.
+  rw Z.mod_small.
+  by rw Wasm_int.Int64.repr_unsigned.
   destruct i ; simpl ; replace (two_power_pos _)
     with Wasm_int.Int64.modulus ; [lia | done].
-  rewrite Memdata.decode_encode_int_4.
-  by rewrite Wasm_float.FloatSize32.of_to_bits.
-  rewrite Memdata.decode_encode_int_8.
-  by rewrite Wasm_float.FloatSize64.of_to_bits.
+  rw Memdata.decode_encode_int_4.
+  by rw Wasm_float.FloatSize32.of_to_bits.
+  rw Memdata.decode_encode_int_8.
+  by rw Wasm_float.FloatSize64.of_to_bits.
 Qed.
 
 (* global vars *)
@@ -1729,7 +1729,7 @@ Proof.
   intros.
   remember (LH_rec [] 0 [] (LH_base [] []) []) as lh.
   have H' := reduce_trans_label instr instr' _ _ _ _ _ _ _ lh. subst lh. cbn in H'.
-  do 2! rewrite cats0 in H'. eapply rt_trans. eapply H'; auto. eassumption.
+  do 2! rw cats0 in H'. eapply rt_trans. eapply H'; auto. eassumption.
   apply rt_refl.
 Qed.
 
@@ -1740,7 +1740,7 @@ Proof.
   intros.
   remember (LH_rec [] 1 [] (LH_base [] []) []) as lh.
   have H' := reduce_trans_label instr instr' _ _ _ _ _ _ _ lh. subst lh. cbn in H'.
-  do 2! rewrite cats0 in H'. eapply rt_trans. eapply H'; auto. eassumption.
+  do 2! rw cats0 in H'. eapply rt_trans. eapply H'; auto. eassumption.
   apply rt_refl.
 Qed.
 
@@ -1789,7 +1789,7 @@ Proof.
   - inv Heqx. apply rt_refl.
   - destruct y as [[[hs'' s''] f''] es''].
     eapply rt_trans with (y := (?[hs], ?[sr], ?[f'], ?[instr])).
-    apply rt_step. apply r_eliml. cbn. now rewrite Hconst. eassumption.
+    apply rt_step. apply r_eliml. cbn. now rw Hconst. eassumption.
     apply IHHred; auto.
 Qed.
 
@@ -1846,10 +1846,10 @@ Lemma lholed_nested_label : forall k (lh : lholed k) es es',
 Proof.
   intros. induction lh; cbn.
   - eexists. exists (LH_rec l 0 [] (LH_base [] []) (es' ++ l0)). cbn.
-    by rewrite cats0.
+    by rw cats0.
   - destruct IHlh as [k' [lh' Heq]]. cbn.
     eexists. exists (LH_rec l n l0 lh' l1). cbn.
-    now rewrite Heq.
+    now rw Heq.
 Qed.
 
 Lemma lholed_nested_label2 : forall k (lh : lholed k) es es',
@@ -1858,10 +1858,10 @@ Lemma lholed_nested_label2 : forall k (lh : lholed k) es es',
 Proof.
   intros. induction lh; cbn.
   - eexists. exists (LH_rec l 0 [] (LH_rec [] 0 [] (LH_base [] []) []) (es' ++ l0)). cbn.
-    by rewrite cats0.
+    by rw cats0.
   - destruct IHlh as [k' [lh' Heq]]. cbn.
     eexists. exists (LH_rec l n l0 lh' l1). cbn.
-    now rewrite Heq.
+    now rw Heq.
 Qed.
 
 Lemma lholed_tail : forall k (lh : lholed k) es es',
@@ -1870,9 +1870,9 @@ Lemma lholed_tail : forall k (lh : lholed k) es es',
 Proof.
   intros.
   induction lh; cbn.
-  - eexists. exists (LH_base l (es' ++ l0)). now rewrite -catA.
+  - eexists. exists (LH_base l (es' ++ l0)). now rw -catA.
   - destruct IHlh as [k' [lh' Heq]].
-    eexists. rewrite Heq.
+    eexists. rw Heq.
     exists (LH_rec l n l0 lh' l1).
     reflexivity.
 Qed.
@@ -1915,9 +1915,9 @@ Lemma small_signed_repr_n_n : forall n,
 Proof.
   intros n H. unfold max_mem_pages in H.
   unfold Wasm_int.Int32.signed. cbn.
-  rewrite zlt_true.
-  rewrite Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; lia.
-  rewrite Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; lia.
+  rw zlt_true.
+  rw Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; lia.
+  rw Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; lia.
 Qed.
 
 Lemma i32_exists_N : forall (x : i32),
@@ -1925,19 +1925,19 @@ Lemma i32_exists_N : forall (x : i32),
 Proof.
   intros [val H]. exists (Z.to_N val). split; try lia.
   destruct (N_to_i32 (Z.to_N val)) eqn:He. inv He. revert intrange.
-  rewrite Wasm_int.Int32.Z_mod_modulus_id; try lia.
-  rewrite Z2N.id; try lia. intros.
+  rw Wasm_int.Int32.Z_mod_modulus_id; try lia.
+  rw Z2N.id; try lia. intros.
   destruct H as [low high].
   destruct intrange as [low' high'].
-  rewrite (Wasm_int.Int32.Z_lt_irrelevant low low').
-  rewrite (Wasm_int.Int32.Z_lt_irrelevant high high'). reflexivity.
+  rw (Wasm_int.Int32.Z_lt_irrelevant low low').
+  rw (Wasm_int.Int32.Z_lt_irrelevant high high'). reflexivity.
 Qed.
 
 Lemma default_vals_i32_Some : forall n,
   default_vals (repeat (T_num T_i32) n) = Some (repeat (VAL_num (nat_to_value 0)) n).
 Proof.
   induction n=>//. unfold default_vals in *. cbn in *.
-  rewrite -cat1s. rewrite <- (cat1s (VAL_num (nat_to_value 0))).
+  rw -cat1s. rewrite <- (cat1s (VAL_num (nat_to_value 0))).
   apply those_cat=>//.
 Qed.
 
@@ -1985,7 +1985,7 @@ Hint Resolve uint63_lt_pow64 : core.
 
 Lemma lt_pow64_mod_modulus_id : forall x, (0 <= x < 2^64)%Z -> Int64.Z_mod_modulus x = x.
 Proof.
-  intros. now rewrite Int64.Z_mod_modulus_id.
+  intros. now rw Int64.Z_mod_modulus_id.
 Qed.
 
 Hint Resolve lt_pow64_mod_modulus_id : core.
@@ -2012,7 +2012,7 @@ Hint Resolve Z.mod_pos_bound : core.
 Lemma Z_bitmask_modulo_equivalent :
   forall (n : Z), Z.land n maxuint63 = Z.modulo n wB.
 Proof.
-  intros; now (replace maxuint63 with (Z.ones 63); [rewrite Z.land_ones|cbn]).
+  intros; now (replace maxuint63 with (Z.ones 63); [rw Z.land_ones|cbn]).
 Qed.
 
 Lemma int64_bitmask_modulo :
@@ -2020,38 +2020,38 @@ Lemma int64_bitmask_modulo :
 Proof.
   intros.
   unfold Int64.iand, Int64.and. simpl.
-  rewrite Int64.Z_mod_modulus_eq.
-  rewrite Int64.modulus_twice_half_modulus.
+  rw Int64.Z_mod_modulus_eq.
+  rw Int64.modulus_twice_half_modulus.
   replace (Z.land (x mod (2 * Int64.half_modulus)) 9223372036854775807)
-    with (Z.modulo (x mod (2 * Int64.half_modulus)) Int64.half_modulus) by now rewrite Z_bitmask_modulo_equivalent.
-  now rewrite Zaux.Zmod_mod_mult.
+    with (Z.modulo (x mod (2 * Int64.half_modulus)) Int64.half_modulus) by now rw Z_bitmask_modulo_equivalent.
+  now rw Zaux.Zmod_mod_mult.
 Qed.
 
 Lemma uint63_eq_int64_eq :
   forall x y, to_Z x = to_Z y -> Int64.eq (to_Z x) (to_Z y) = true.
 Proof.
-  intros; unfold Int64.eq; rewrite H; now rewrite zeq_true.
+  intros; unfold Int64.eq; rw H; now rw zeq_true.
 Qed.
 
 Lemma uint63_neq_int64_neq :
   forall x y, to_Z x <> to_Z y -> Int64.eq (to_Z x) (to_Z y) = false.
 Proof.
-  intros; unfold Int64.eq; do 2 rewrite uint63_unsigned_id; now rewrite zeq_false.
+  intros; unfold Int64.eq; do 2 rw uint63_unsigned_id; now rw zeq_false.
 Qed.
 
 Lemma to_Z_neq_uint63_eqb_false :
   forall x y, to_Z x <> to_Z y -> (x =? y)%uint63 = false.
 Proof.
-  intros; rewrite eqb_false_spec; intro Hcontra; now rewrite Hcontra in H.
+  intros; rw eqb_false_spec; intro Hcontra; now rw Hcontra in H.
 Qed.
 
 Lemma uint63_lt_int64_lt :
   forall x y, (to_Z x < to_Z y)%Z -> Int64.ltu (to_Z x) (to_Z y) = true.
-Proof. intros; unfold Int64.ltu; repeat rewrite uint63_unsigned_id; now rewrite zlt_true. Qed.
+Proof. intros; unfold Int64.ltu; repeat rw uint63_unsigned_id; now rw zlt_true. Qed.
 
 Lemma uint63_nlt_int64_nlt :
   forall x y, ~ (to_Z x < to_Z y)%Z -> Int64.ltu (to_Z x) (to_Z y) = false.
-Proof. intros; unfold Int64.ltu; do 2 rewrite uint63_unsigned_id; now rewrite zlt_false. Qed.
+Proof. intros; unfold Int64.ltu; do 2 rw uint63_unsigned_id; now rw zlt_false. Qed.
 
 Lemma to_Z_nlt_uint63_ltb_false :
   forall x y, ~ (to_Z x < to_Z y)%Z -> (x <? y)%uint63 = false.
@@ -2059,18 +2059,18 @@ Proof. intros; have H' := reflect_iff _ _ (ltbP x y); now destruct (x <? y)%uint
 
 Lemma uint63_le_int64_le :
   forall x y, (to_Z x <= to_Z y)%Z -> negb (Int64.ltu (to_Z y) (to_Z x)) = true.
-Proof. intros; unfold Int64.ltu; repeat rewrite uint63_unsigned_id; rewrite zlt_false; auto; lia. Qed.
+Proof. intros; unfold Int64.ltu; repeat rw uint63_unsigned_id; rw zlt_false; auto; lia. Qed.
 
 Lemma uint63_nle_int64_nle :
   forall x y, ~ (to_Z x <= to_Z y)%Z -> negb (Int64.ltu (to_Z y) (to_Z x)) = false.
-Proof. intros; unfold Int64.ltu; do 2 rewrite uint63_unsigned_id; rewrite zlt_true; auto; lia. Qed.
+Proof. intros; unfold Int64.ltu; do 2 rw uint63_unsigned_id; rw zlt_true; auto; lia. Qed.
 
 Lemma to_Z_nle_uint63_leb_false :
   forall x y, ~ (to_Z x <= to_Z y)%Z -> (x <=? y)%uint63 = false.
 Proof. intros; have H' := reflect_iff _ _ (lebP x y); now destruct (x <=? y)%uint63. Qed.
 
 Local Ltac solve_arith_op d1 d2 spec :=
-  intros; unfold d1, d2; (repeat rewrite uint63_unsigned_id); (try rewrite int64_bitmask_modulo); now rewrite spec.
+  intros; unfold d1, d2; (repeat rw uint63_unsigned_id); (try rw int64_bitmask_modulo); now rw spec.
 
 (* Helper lemmas to show that the Wasm arithmetic is correct w.r.t. 63 bit arithmetic.
    Helps prove that E.g. the instructions
@@ -2092,13 +2092,13 @@ Lemma uint63_add_i64_add' : forall x y z,
     Int64.iand (Int64.iadd (Int64.iadd (to_Z x) (to_Z y)) (to_Z z)) maxuint63 = to_Z (x + y + z).
 Proof.
   intros. unfold Int64.iadd, Int64.add.
-  do 3 rewrite uint63_unsigned_id.
-  rewrite int64_bitmask_modulo.
-  cbn. rewrite Int64.Z_mod_modulus_eq.
-  rewrite Int64.modulus_twice_half_modulus.
-  rewrite -Zplus_mod_idemp_l.
-  rewrite Zaux.Zmod_mod_mult; [|lia|now cbn].
-  now do 2 rewrite -add_spec.
+  do 3 rw uint63_unsigned_id.
+  rw int64_bitmask_modulo.
+  cbn. rw Int64.Z_mod_modulus_eq.
+  rw Int64.modulus_twice_half_modulus.
+  rw -Zplus_mod_idemp_l.
+  rw Zaux.Zmod_mod_mult; [|lia|now cbn].
+  now do 2 rw -add_spec.
 Qed.
 
 Lemma uint63_sub_i64_sub : forall x y, Int64.iand (Int64.isub (to_Z x) (to_Z y)) maxuint63 = to_Z (x - y).
@@ -2108,13 +2108,13 @@ Lemma uint63_sub_i64_sub' : forall x y z,
     Int64.iand (Int64.isub (Int64.isub (to_Z x) (to_Z y)) (to_Z z)) maxuint63 = to_Z (x - y - z).
 Proof.
   intros. unfold Int64.isub, Int64.sub.
-  do 3 rewrite uint63_unsigned_id.
-  rewrite int64_bitmask_modulo.
-  cbn. rewrite Int64.Z_mod_modulus_eq.
-  rewrite Int64.modulus_twice_half_modulus.
-  rewrite -Zminus_mod_idemp_l.
-  rewrite Zaux.Zmod_mod_mult; [|lia|now cbn].
-  now do 2 rewrite -sub_spec.
+  do 3 rw uint63_unsigned_id.
+  rw int64_bitmask_modulo.
+  cbn. rw Int64.Z_mod_modulus_eq.
+  rw Int64.modulus_twice_half_modulus.
+  rw -Zminus_mod_idemp_l.
+  rw Zaux.Zmod_mod_mult; [|lia|now cbn].
+  now do 2 rw -sub_spec.
 Qed.
 
 Lemma uint63_mul_i64_mul : forall x y, Int64.iand (Int64.imul (to_Z x) (to_Z y)) maxuint63 = to_Z (x * y).
@@ -2122,9 +2122,9 @@ Proof. solve_arith_op Int64.imul Int64.mul mul_spec. Qed.
 
 Local Ltac solve_div_mod d1 d2 spec :=
   intros; unfold d1, d2;
-  repeat rewrite uint63_unsigned_id;
-  rewrite spec;
-  now (replace Int64.zero with (Int64.repr (to_Z 0)); [rewrite uint63_neq_int64_neq|rewrite to_Z_0]).
+  repeat rw uint63_unsigned_id;
+  rw spec;
+  now (replace Int64.zero with (Int64.repr (to_Z 0)); [rw uint63_neq_int64_neq|rw to_Z_0]).
 
 Lemma uint63_div_i64_div : forall x y,
     to_Z y <> to_Z 0 -> Int64.idiv_u (to_Z x) (to_Z y) = Some (Int64.repr (to_Z (x / y))).
@@ -2133,7 +2133,7 @@ Proof. solve_div_mod Int64.idiv_u Int64.divu div_spec. Qed.
 Lemma uint63_div0 : forall x y,
     to_Z y = to_Z 0 -> to_Z (x / y) = to_Z 0.
 Proof.
-  intros; rewrite div_spec H to_Z_0; unfold Z.div, Z.div_eucl; now destruct (to_Z x).
+  intros; rw div_spec H to_Z_0; unfold Z.div, Z.div_eucl; now destruct (to_Z x).
 Qed.
 
 Lemma uint63_mod_i64_mod : forall x y,
@@ -2143,7 +2143,7 @@ Proof. solve_div_mod Int64.irem_u Int64.modu mod_spec. Qed.
 Lemma uint63_mod0 : forall x y,
     to_Z y = to_Z 0 -> to_Z (x mod y) = to_Z x.
 Proof.
-  intros; rewrite mod_spec H to_Z_0; unfold Z.modulo, Z.div_eucl; now destruct (to_Z x).
+  intros; rw mod_spec H to_Z_0; unfold Z.modulo, Z.div_eucl; now destruct (to_Z x).
 Qed.
 
 Lemma uint63_land_i64_and : forall x y, Int64.iand (to_Z x) (to_Z y) = to_Z (x land y).
@@ -2162,17 +2162,17 @@ Proof.
   intros.
   destruct (digits <=? i)%uint63 eqn:Hi.
   now apply bit_M.
-  rewrite bit_lsl; unfold digits in *.
+  rw bit_lsl; unfold digits in *.
   assert (to_Z i < to_Z 63)%Z as Hi1 by
-      now destruct (reflect_dec _ _ (lebP 63 i)) as [H'|H']; [rewrite (reflect_iff _ _ (lebP 63 i)) in H'|].
+      now destruct (reflect_dec _ _ (lebP 63 i)) as [H'|H']; [rw (reflect_iff _ _ (lebP 63 i)) in H'|].
   assert (to_Z i < to_Z y)%Z as Hi2 by now replace (to_Z 63) with 63%Z in *; [lia|cbn].
-  now replace (i <? y)%uint63 with true; [cbn|rewrite (reflect_iff _ _ (ltbP i y)) in Hi2].
+  now replace (i <? y)%uint63 with true; [cbn|rw (reflect_iff _ _ (ltbP i y)) in Hi2].
 Qed.
 
 Lemma uint63_bits_inj_0 i : (forall j, bit i j = false) -> i = 0%uint63.
 Proof.
   intros.
-  assert (forall n, bit i n = bit 0 n) by now intros; rewrite bit_0; apply H.
+  assert (forall n, bit i n = bit 0 n) by now intros; rw bit_0; apply H.
   now apply bit_ext.
 Qed.
 
@@ -2181,7 +2181,7 @@ Lemma uint63_lsl63 : forall x y,
   to_Z (x << y) = to_Z 0.
 Proof.
   intros;
-  now replace (x << y)%uint63 with 0%uint63;[reflexivity|rewrite (uint63_bits_inj_0 _ (lsl_bits_high x y H))].
+  now replace (x << y)%uint63 with 0%uint63;[reflexivity|rw (uint63_bits_inj_0 _ (lsl_bits_high x y H))].
 Qed.
 
 Lemma uint63_lsl_i64_shl : forall x y,
@@ -2190,12 +2190,12 @@ Lemma uint63_lsl_i64_shl : forall x y,
 Proof.
   intros.
   have H' := to_Z_bounded y.
-  unfold Int64.ishl, Int64.shl. rewrite int64_modu_iwordsize.
+  unfold Int64.ishl, Int64.shl. rw int64_modu_iwordsize.
   replace (to_Z 63) with 63%Z in H by now cbn.
-  do 2 rewrite uint63_unsigned_id.
-  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64))) with (to_Z y). 2: now rewrite Z.mod_small; [rewrite uint63_unsigned_id|].
-  rewrite Z.shiftl_mul_pow2. 2: lia.
-  now rewrite lsl_spec; rewrite int64_bitmask_modulo.
+  do 2 rw uint63_unsigned_id.
+  replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64))) with (to_Z y). 2: now rw Z.mod_small; [rw uint63_unsigned_id|].
+  rw Z.shiftl_mul_pow2. 2: lia.
+  now rw lsl_spec; rw int64_bitmask_modulo.
 Qed.
 
 Lemma uint63_lsr63 : forall x y,
@@ -2203,8 +2203,8 @@ Lemma uint63_lsr63 : forall x y,
   to_Z (x >> y) = to_Z 0.
 Proof.
   intros;
-  rewrite (reflect_iff _ _ (lebP 63 y)) in H;
-  now replace (x >> y)%uint63 with 0%uint63; [reflexivity|rewrite lsr_M_r].
+  rw (reflect_iff _ _ (lebP 63 y)) in H;
+  now replace (x >> y)%uint63 with 0%uint63; [reflexivity|rw lsr_M_r].
 Qed.
 
 Lemma uint63_lsr_i64_shr : forall x y,
@@ -2213,13 +2213,13 @@ Lemma uint63_lsr_i64_shr : forall x y,
 Proof.
   intros.
   have H' := to_Z_bounded y.
-  unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
+  unfold Int64.ishr_u, Int64.shru. rw int64_modu_iwordsize.
   replace (to_Z 63) with 63%Z in H by now cbn.
-  do 2 rewrite uint63_unsigned_id.
+  do 2 rw uint63_unsigned_id.
   replace (Int64.unsigned (Z_to_i64 (to_Z y mod 64))) with (to_Z y).
-  2: now rewrite Z.mod_small; [rewrite uint63_unsigned_id|].
-  rewrite Z.shiftr_div_pow2. 2: lia.
-  now rewrite lsr_spec.
+  2: now rw Z.mod_small; [rw uint63_unsigned_id|].
+  rw Z.shiftr_div_pow2. 2: lia.
+  now rw lsr_spec.
 Qed.
 
 Lemma uint63_diveucl_0 : forall x y,
@@ -2227,10 +2227,10 @@ Lemma uint63_diveucl_0 : forall x y,
   to_Z (fst (diveucl x y)) = to_Z 0 /\ to_Z (snd (diveucl x y)) = to_Z x.
 Proof.
   intros.
-  rewrite diveucl_def_spec; unfold diveucl_def; simpl.
+  rw diveucl_def_spec; unfold diveucl_def; simpl.
   rewrite ->div_spec, ->mod_spec.
   unfold Z.div, Z.modulo, Z.div_eucl.
-  split; rewrite H; destruct (to_Z x); auto.
+  split; rw H; destruct (to_Z x); auto.
 Qed.
 
 (* mulc *)
@@ -2240,7 +2240,7 @@ Lemma Z_bitmask_modulo32_equivalent : forall (n : Z),
 Proof.
   intros.
   replace 4294967295%Z with (Z.ones 32)=>//.
-  now rewrite Z.land_ones.
+  now rw Z.land_ones.
 Qed.
 
 Ltac unfold_modulus64 := unfold Int64.modulus, Int64.half_modulus, two_power_nat in *; cbn in *.
@@ -2249,8 +2249,8 @@ Lemma lt_pow32_mod_modulus_id : forall x,
   (0 <= x < 2^32)%Z ->
   Int64.Z_mod_modulus x = x.
 Proof.
-  intros. rewrite Int64.Z_mod_modulus_id=>//.
-  rewrite int64_modulus_eq_pow64. lia.
+  intros. rw Int64.Z_mod_modulus_id=>//.
+  rw int64_modulus_eq_pow64. lia.
 Qed.
 
 Hint Resolve lt_pow32_mod_modulus_id : core.
@@ -2280,14 +2280,14 @@ Proof.
   unfold Int64.iand, Int64.and.
   replace (Int64.unsigned x) with x; auto.
   replace (Int64.unsigned 4294967295%Z) with 4294967295%Z; auto.
-  now rewrite Z_bitmask_modulo32_equivalent.
+  now rw Z_bitmask_modulo32_equivalent.
 Qed.
 
 Lemma int64_low32 : forall x,
   (0 <= x < 2^64)%Z ->
   Int64.unsigned (Int64.iand x 4294967295%Z) = (x mod 2^32)%Z.
 Proof.
-intros. rewrite int64_low32'; auto.
+intros. rw int64_low32'; auto.
 Qed.
 
 Lemma high32_max_int32 : forall x,
@@ -2305,11 +2305,11 @@ Lemma int64_high32 : forall x,
   Int64.ishr_u x 32 = (x / 2^32)%Z.
 Proof.
 intros.
-unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
+unfold Int64.ishr_u, Int64.shru. rw int64_modu_iwordsize.
 replace (Int64.unsigned (Z_to_i64 (Int64.unsigned 32 mod 64))) with (Int64.unsigned 32%Z) by now cbn.
 replace (Int64.unsigned x) with x; auto.
 replace (Int64.unsigned 32%Z) with 32%Z; auto.
-now rewrite Z.shiftr_div_pow2; auto.
+now rw Z.shiftr_div_pow2; auto.
 Qed.
 
 Lemma max32bit_mul_modulo64_id : forall x y,
@@ -2407,7 +2407,7 @@ Proof.
   intros ?? Hx Hy.
   unfold Int64.iadd, Int64.add.
   have H := lo_lo_product_63bit x y Hx Hy. have H' := hi_lo_product_63bit x y Hx Hy.
-  repeat rewrite lt_pow64_unsigned_id. reflexivity.
+  repeat rw lt_pow64_unsigned_id. reflexivity.
   all: unfold hi, lo in *; lia.
 Qed.
 
@@ -2431,7 +2431,7 @@ Proof.
   have H := lo_lo_product_63bit x y Hx Hy.
   have H' := hi_lo_product_63bit x y Hx Hy.
   have H'' := lo_hi_product_63bit x y Hx Hy.
-  repeat rewrite lt_pow64_unsigned_id; unfold hi, lo in *; auto; lia.
+  repeat rw lt_pow64_unsigned_id; unfold hi, lo in *; auto; lia.
 Qed.
 
 Lemma hi_cross_range : forall x y,
@@ -2468,7 +2468,7 @@ Proof.
   intros ?? Hx Hy.
   have H := hi_cross_range x y Hx Hy. have H' := hi_hi_lo_range x y Hx Hy.
   unfold Int64.iadd, Int64.add.
-  repeat rewrite lt_pow64_unsigned_id. reflexivity.
+  repeat rw lt_pow64_unsigned_id. reflexivity.
   all: unfold hi in *; lia.
 Qed.
 
@@ -2490,7 +2490,7 @@ Proof.
   intros ?? Hx Hy.
   have H := sum2_range x y Hx Hy. have H' := hi_hi_product_63bit x y Hx Hy.
   unfold Int64.iadd, Int64.add.
-  repeat rewrite lt_pow64_unsigned_id; auto; lia.
+  repeat rw lt_pow64_unsigned_id; auto; lia.
 Qed.
 
 Lemma lo_lo_lo_range : forall x y,
@@ -2514,10 +2514,10 @@ Lemma upper_shifted_i64 : forall x y,
   Int64.ishl (Int64.repr (upper x y)) (Int64.repr 1) = Int64.repr (upper x y * 2)%Z.
 Proof.
   intros ?? Hx Hy. have H := upper_range x y Hx Hy.
-  unfold Int64.ishl, Int64.shl. rewrite int64_modu_iwordsize.
-  repeat rewrite lt_pow64_unsigned_id.
+  unfold Int64.ishl, Int64.shl. rw int64_modu_iwordsize.
+  repeat rw lt_pow64_unsigned_id.
   replace (1 mod 64)%Z with 1%Z by now cbn.
-  rewrite Z.shiftl_mul_pow2. f_equal. lia.
+  rw Z.shiftl_mul_pow2. f_equal. lia.
   all: cbn; lia.
 Qed.
 
@@ -2532,10 +2532,10 @@ Proof.
   have H := cross_range x y Hx Hy.
   have H' := lo_lo_lo_range x y Hx Hy.
   unfold Int64.ior.
-  rewrite Int64.shifted_or_is_add; unfold two_p, two_power_pos; auto.
-  repeat rewrite lt_pow64_unsigned_id; auto; lia.
+  rw Int64.shifted_or_is_add; unfold two_p, two_power_pos; auto.
+  repeat rw lt_pow64_unsigned_id; auto; lia.
   cbn. lia.
-  rewrite lt_pow64_unsigned_id; cbn; lia.
+  rw lt_pow64_unsigned_id; cbn; lia.
 Qed.
 
 Lemma lower_shifted_range : forall x y,
@@ -2551,13 +2551,13 @@ Lemma lower_shifted_i64 : forall x y,
     Int64.repr ((lower x y) mod 2^64 / 2^63).
 Proof.
   intros ?? Hx Hy.
-  unfold Int64.ishr_u, Int64.shru. rewrite int64_modu_iwordsize.
+  unfold Int64.ishr_u, Int64.shru. rw int64_modu_iwordsize.
   replace (Int64.unsigned (Int64.repr (lower x y))) with ((lower x y) mod 2^64)%Z.
-  repeat rewrite lt_pow64_unsigned_id.
+  repeat rw lt_pow64_unsigned_id.
   replace (63 mod 64)%Z with 63%Z by now cbn.
-  rewrite Z.shiftr_div_pow2. reflexivity.
+  rw Z.shiftr_div_pow2. reflexivity.
   lia. lia. cbn; lia. lia.
-  cbn. rewrite Int64.Z_mod_modulus_eq. now rewrite int64_modulus_eq_pow64.
+  cbn. rw Int64.Z_mod_modulus_eq. now rw int64_modulus_eq_pow64.
 Qed.
 
 Lemma upper63_range : forall x y,
@@ -2577,7 +2577,7 @@ Proof.
   intros ?? Hx Hy.
   have H := upper_shifted_range _ _ Hx Hy.
   unfold Int64.iadd, Int64.add.
-  repeat rewrite lt_pow64_unsigned_id; auto; lia.
+  repeat rw lt_pow64_unsigned_id; auto; lia.
 Qed.
 
 Lemma lower_of_product : forall x y,
@@ -2667,8 +2667,8 @@ Proof.
   intros.
   constructor. apply rs_binop_success; auto. cbn.
   unfold Int64.iand, Int64.and. cbn.
-  rewrite Z_bitmask_modulo32_equivalent.
-  rewrite Int64.Z_mod_modulus_id=>//.
+  rw Z_bitmask_modulo32_equivalent.
+  rw Int64.Z_mod_modulus_id=>//.
   now replace Int64.modulus with (2^64)%Z.
 Qed.
 
@@ -2682,7 +2682,7 @@ Proof.
   intros.
   constructor. apply rs_binop_success; auto.
   unfold app_binop. simpl.
-  rewrite int64_high32. reflexivity. lia.
+  rw int64_high32. reflexivity. lia.
 Qed.
 
 (* head0 related *)
@@ -2699,8 +2699,8 @@ Proof.
   assert (Hlog2: (Z.log2 (2 ^ (to_Z (head0 x)) * to_Z x) < 63)%Z).
   apply Z.log2_lt_pow2; lia.
   replace (2 ^ (to_Z (head0 x)) * to_Z x)%Z with (to_Z x * 2 ^ (to_Z (head0 x)))%Z in Hlog1, Hlog2 by lia.
-  rewrite Z.log2_mul_pow2 in Hlog1, Hlog2. 2: lia. 2: apply to_Z_bounded.
-  replace (Z.log2 (2 ^ 62)) with 62%Z in Hlog1 by now rewrite Z.log2_pow2.
+  rw Z.log2_mul_pow2 in Hlog1, Hlog2. 2: lia. 2: apply to_Z_bounded.
+  replace (Z.log2 (2 ^ 62)) with 62%Z in Hlog1 by now rw Z.log2_pow2.
   lia.
 Qed.
 
@@ -2737,7 +2737,7 @@ Proof.
   destruct (Z.eq_dec i a).
   fold Zbits.powerserie.
   rewrite <-e.
-  rewrite two_p_equiv.
+  rw two_p_equiv.
   assert (0 <= Zbits.powerserie l)%Z. apply powserie_nonneg; auto.
   assert (forall x, In x l -> 0 <= x)%Z.
   intros.
@@ -2754,7 +2754,7 @@ Proof.
   specialize (Hrefl _ _ H''').
   destruct Hrefl.
   destruct (i == a)%Z eqn:Heqb. specialize (H2 Logic.eq_refl). contradiction.
-  rewrite orb_false_l in H'. auto.
+  rw orb_false_l in H'. auto.
   rewrite <-H'. assumption.
   assert (forall x, In x l -> 0 <= x)%Z.
   intros.
@@ -2776,7 +2776,7 @@ Proof.
   rewrite <-Hz in Hcontra.
   have Hps := Zbits.Z_one_bits_powerserie n x.
   assert (0 <= x < two_power_nat n)%Z by lia. apply Hps in H1.
-  rewrite Hcontra in H1. rewrite Hz in H1. cbn in H1. lia.
+  rw Hcontra in H1. rw Hz in H1. cbn in H1. lia.
 Qed.
 
 Lemma convert_from_bits_head : forall l i,
@@ -2799,34 +2799,34 @@ assert (Hhead : forall l i',
     simpl in Hi1.
     simpl in Hi2.
     destruct a.
-    rewrite Hi2.
-    rewrite Nat.sub_0_r. exists (Int64.convert_from_bits_to_Z_one_bits l).
-    simpl. rewrite Nat.sub_0_r.
+    rw Hi2.
+    rw Nat.sub_0_r. exists (Int64.convert_from_bits_to_Z_one_bits l).
+    simpl. rw Nat.sub_0_r.
     reflexivity.
     simpl in Hi2.
     simpl in IHl.
     assert (i' - 1 =  (find (fun b => b == true) l)).
-    { rewrite Hi2. simpl. rewrite Nat.sub_0_r. reflexivity. }
+    { rw Hi2. simpl. rw Nat.sub_0_r. reflexivity. }
     assert (forall k, k < (i' - 1) -> (fun b => b == true) (nth false l k) = false). {
       intros k' Hk'.
       assert (ssrnat.leq (S k') (find (fun b => b == true) l)).
-      rewrite -?(rwP ssrnat.leP). lia.
+      rw -?(rwP ssrnat.leP). lia.
       have Hbf := before_find _ H0.
       apply Hbf; auto. }
     destruct (IHl (i' - 1)).
-    simpl in Hi1. rewrite Hi2 in Hi1. rewrite H. simpl in Hi1. lia.
-    rewrite Hi2. now cbn. rewrite Hi2. simpl.
-    rewrite Hi2 in Hi3. simpl in Hi3. rewrite Nat.sub_0_r. assumption. assumption.
+    simpl in Hi1. rw Hi2 in Hi1. rw H. simpl in Hi1. lia.
+    rw Hi2. now cbn. rw Hi2. simpl.
+    rw Hi2 in Hi3. simpl in Hi3. rw Nat.sub_0_r. assumption. assumption.
     assert (size l - (i' - 1) = S (size l) - i'). lia. simpl in H2.
-    rewrite H2 in H1.
+    rw H2 in H1.
     exists x. assumption. }
   assert (forall l,
              (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits l) < two_p (S (size l)))%Z).
   induction l.
   cbn. unfold two_power_pos. cbn. lia.
-  destruct a. rewrite two_p_equiv.
+  destruct a. rw two_p_equiv.
   replace (S (size (true :: l))) with (size l + 2).
-  simpl. rewrite two_p_equiv in IHl. rewrite two_p_equiv. replace  (S (size l)) with (size l + 1) in IHl.
+  simpl. rw two_p_equiv in IHl. rw two_p_equiv. replace  (S (size l)) with (size l + 1) in IHl.
   replace (2^ ((size l) + 1)%nat)%Z with (2^(Z.of_nat (size l) + 1))%Z in IHl.
   replace (2^ ((size l) + 2)%nat)%Z with (2^(Z.of_nat (size l) + 2))%Z.
   assert (2 ^ (size l) +  2 ^ (Z.of_nat (size l) + 1) < 2^ (Z.of_nat (size l) + 2))%Z. {
@@ -2835,23 +2835,23 @@ assert (Hhead : forall l i',
     replace (2^(Z.of_nat (size l) + 2))%Z with (2^(size l) * 4)%Z.
 
     apply Zmult_lt_compat_l. lia. lia. replace 4%Z with (2 * 2)%Z by lia.
-    replace (2 * 2)%Z with (2^2)%Z by lia. rewrite Z.pow_add_r. reflexivity. lia. lia.
+    replace (2 * 2)%Z with (2^2)%Z by lia. rw Z.pow_add_r. reflexivity. lia. lia.
     replace 3%Z with (1 + 2)%Z.
 
-    rewrite Z.mul_add_distr_l.
-    replace (2 ^ (size l) * 2)%Z with (2^(size l + 1))%Z. rewrite Z.mul_1_r. reflexivity.
-    rewrite Z.pow_add_r. lia. lia. lia. lia. }
+    rw Z.mul_add_distr_l.
+    replace (2 ^ (size l) * 2)%Z with (2^(size l + 1))%Z. rw Z.mul_1_r. reflexivity.
+    rw Z.pow_add_r. lia. lia. lia. lia. }
   lia. lia. lia. lia. simpl. lia.
   replace (S (size (false  :: l))) with (size l + 2) by now cbn.
   replace (Z.of_nat (size l + 2))%Z with ((Z.of_nat (size l) + 2))%Z by lia.
-  rewrite two_p_equiv.
-  simpl. rewrite two_p_equiv in IHl.
+  rw two_p_equiv.
+  simpl. rw two_p_equiv in IHl.
   replace (2^ (S (size l))%nat)%Z with (2^(Z.of_nat (size l) + 1))%Z in IHl by lia.
   assert (2^ (Z.of_nat (size l) + 1) < 2^ (Z.of_nat (size l) + 2))%Z. {
     replace (2^ (Z.of_nat (size l) + 1))%Z with (2^(Z.of_nat (size l)) * 2)%Z.
     replace (2^ (Z.of_nat (size l) + 2))%Z with (2^(Z.of_nat (size l)) * 4)%Z.
-    apply Zmult_lt_compat_l. lia. lia. rewrite Z.pow_add_r=>//. lia.
-    rewrite Z.pow_add_r; lia. } lia.
+    apply Zmult_lt_compat_l. lia. lia. rw Z.pow_add_r=>//. lia.
+    rw Z.pow_add_r; lia. } lia.
 
 
   assert (forall xs x,
@@ -2862,34 +2862,34 @@ assert (Hhead : forall l i',
     intros.
     specialize (IHxs a).
     destruct x.
-    assert (Z.of_nat (size (true :: a :: xs)) = Z.of_nat (size (a :: xs)) + 1)%Z. unfold size. fold (size xs). rewrite <-Nat.add_1_l. rewrite Nat2Z.inj_add. rewrite Z.add_comm. reflexivity.
-    rewrite H0.
+    assert (Z.of_nat (size (true :: a :: xs)) = Z.of_nat (size (a :: xs)) + 1)%Z. unfold size. fold (size xs). rewrite <-Nat.add_1_l. rw Nat2Z.inj_add. rw Z.add_comm. reflexivity.
+    rw H0.
     unfold Int64.convert_from_bits_to_Z_one_bits. fold (Int64.convert_from_bits_to_Z_one_bits (a :: xs)).
     unfold Zbits.powerserie. fold (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits (a :: xs))).
     assert (two_p (Z.of_nat (size (a :: xs))) < two_p (Z.of_nat (size (a :: xs)) + 1))%Z.
-    rewrite two_p_equiv.
-    rewrite two_p_equiv.
-    rewrite Z.pow_add_r.
+    rw two_p_equiv.
+    rw two_p_equiv.
+    rw Z.pow_add_r.
     lia.
     lia. lia.
     assert (forall x y y' z, y < y' -> x + y' < z -> x + y < z)%Z. intros. lia.
     assert (forall x y z, x < y -> z = 2 * y -> x + y  < z)%Z. intros. lia.
     assert (two_p (Z.of_nat (size (a :: xs)) + 1) = 2 * two_p (Z.of_nat (size (a :: xs))))%Z.
-    rewrite two_p_equiv.
-    rewrite two_p_equiv.
-    rewrite Z.pow_add_r.
+    rw two_p_equiv.
+    rw two_p_equiv.
+    rw Z.pow_add_r.
     lia.
     lia. lia.
-    rewrite Z.add_comm.
+    rw Z.add_comm.
     apply H3.
     assumption.
     assumption.
-    assert (Z.of_nat (size (false :: a :: xs)) = Z.of_nat (size (a :: xs)) + 1)%Z. unfold size. fold (size xs). rewrite <-Nat.add_1_l. rewrite Nat2Z.inj_add. rewrite Z.add_comm. reflexivity. rewrite H0.
+    assert (Z.of_nat (size (false :: a :: xs)) = Z.of_nat (size (a :: xs)) + 1)%Z. unfold size. fold (size xs). rewrite <-Nat.add_1_l. rw Nat2Z.inj_add. rw Z.add_comm. reflexivity. rw H0.
 
     assert (two_p (Z.of_nat (size (a :: xs))) < two_p (Z.of_nat (size (a :: xs)) + 1))%Z.
-    rewrite two_p_equiv.
-    rewrite two_p_equiv.
-    rewrite Z.pow_add_r.
+    rw two_p_equiv.
+    rw two_p_equiv.
+    rw Z.pow_add_r.
     lia.
     lia. lia.
     unfold Int64.convert_from_bits_to_Z_one_bits. fold (Int64.convert_from_bits_to_Z_one_bits (a :: xs)). lia. }
@@ -2901,13 +2901,13 @@ assert (Hhead : forall l i',
   simpl in Hi3.
   remember (a :: l) as xs.
   destruct a.
-  simpl in *. rewrite Hi2.
+  simpl in *. rw Hi2.
   simpl.
-  rewrite Nat.sub_0_r.
+  rw Nat.sub_0_r.
   assert (two_p (Z.of_nat (size xs)) = two_power_pos (Pos.of_succ_nat (size l))). subst xs. cbn. reflexivity.
   rewrite <-H1 in Hds.
   assert (size xs - 1 = size l). subst xs. cbn. lia.
-  rewrite H2. rewrite Heqxs. simpl. assert (Z.of_nat (size l) + 1 = Z.of_nat (size xs))%Z. subst xs. simpl. lia. rewrite H3. assumption.
+  rw H2. rw Heqxs. simpl. assert (Z.of_nat (size l) + 1 = Z.of_nat (size xs))%Z. subst xs. simpl. lia. rw H3. assumption.
   simpl in Hds.
   assert (two_p (Z.of_nat (size xs)) = two_power_pos (Pos.of_succ_nat (size l))). subst xs. cbn. reflexivity.
   simpl in H1.
@@ -2915,21 +2915,21 @@ assert (Hhead : forall l i',
   simpl.
   assert (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits xs) = Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits l)). {
     subst xs. cbn. reflexivity. }
-  rewrite H2.
+  rw H2.
   simpl in Hi2.
-  assert (i - 1 < size l). rewrite Hi2. simpl. rewrite Nat.sub_0_r. lia.
+  assert (i - 1 < size l). rw Hi2. simpl. rw Nat.sub_0_r. lia.
   assert (i - 1 = find (fun b => b == true) l). subst i. cbn. lia.
   assert ((nth false l (i - 1) == true) = true).
-  rewrite Hi2. simpl. rewrite Nat.sub_0_r.
-  rewrite Hi2 in Hi3. simpl in Hi3. assumption.
+  rw Hi2. simpl. rw Nat.sub_0_r.
+  rw Hi2 in Hi3. simpl in Hi3. assumption.
   assert (forall k, k < (i - 1) -> (nth false l k == true) = false).
   intros k Hk'.
-  assert (ssrnat.leq (S k) (find (fun b => b == true) l)). rewrite -?(rwP ssrnat.leP). lia.      have Hbf := before_find _ H6.
+  assert (ssrnat.leq (S k) (find (fun b => b == true) l)). rw -?(rwP ssrnat.leP). lia.      have Hbf := before_find _ H6.
   simpl in Hbf. apply Hbf.
   have IH := IHl (i - 1) H3 H4 H5 H6.
   simpl in IH.
-  assert (size l - (i - 1) = size l + 1 - i). lia. rewrite H7 in IH.
-  assert (size xs = size l + 1). subst xs. cbn. lia. rewrite H8.
+  assert (size l - (i - 1) = size l + 1 - i). lia. rw H7 in IH.
+  assert (size xs = size l + 1). subst xs. cbn. lia. rw H8.
   assumption.
 Qed.
 
@@ -2948,62 +2948,62 @@ Proof.
   remember (Int64.wordsize) as n eqn:Hn.
   remember (j' \in Zbits.Z_one_bits n x' 0) as inbits eqn:Hinbits.
   assert (nth false (Int64.convert_to_bits x) i = inbits). {
-    rewrite Hinbits. rewrite  Hj'. rewrite Hn. rewrite  Hx'.
-    apply Int64.convert_to_bits_nth. rewrite Hn in Hi.
-    rewrite -?(rwP ssrnat.leP). lia.  }
+    rw Hinbits. rw  Hj'. rw Hn. rw  Hx'.
+    apply Int64.convert_to_bits_nth. rw Hn in Hi.
+    rw -?(rwP ssrnat.leP). lia.  }
   remember (Int64.convert_to_bits x) as s eqn:Hs.
   have Hsize := Int64.convert_to_bits_size x. rewrite <-Hs in Hsize.
   have : Int64.wordsize = 64. by unfold Int64.wordsize, Integers.Wordsize_64.wordsize.
   intro Hws.
   have : find a s <= 64.
   have Hsize' := find_size a s. rewrite <-Hws.
-  rewrite -?(rwP ssrnat.leP) in Hsize'. simpl in Hsize'. rewrite Hsize in  Hsize'. auto.
+  rw -?(rwP ssrnat.leP) in Hsize'. simpl in Hsize'. rw Hsize in  Hsize'. auto.
   intro Hfindleq. simpl in Hfindleq.
   have : (Int64.intval (Z_to_i64 (find a s)) = Z.of_nat (find a s)).
   unfold Z_to_i64. simpl.
-  rewrite Int64.Z_mod_modulus_id. reflexivity.
-  rewrite int64_modulus_eq_pow64. cbn. lia.
+  rw Int64.Z_mod_modulus_id. reflexivity.
+  rw int64_modulus_eq_pow64. cbn. lia.
   intro Hint.
   have : (i = find a s).
-  rewrite Hint in Hclz. by rewrite Nat2Z.id in Hclz.
+  rw Hint in Hclz. by rw Nat2Z.id in Hclz.
   intro Hieq. simpl in Hieq.
-  have : has a s. rewrite has_find. rewrite -?(rwP ssrnat.leP). simpl. rewrite <-Hieq. rewrite ->Hsize, ->Hws. lia.
+  have : has a s. rw has_find. rw -?(rwP ssrnat.leP). simpl. rewrite <-Hieq. rewrite ->Hsize, ->Hws. lia.
   intro Hhas.
   have :  a inbits.
-  rewrite Hj' in Hinbits. rewrite Hn in Hinbits. rewrite Hx' in Hinbits.
-  rewrite <-Int64.convert_to_bits_nth in Hinbits. rewrite Hieq in Hinbits. rewrite  Hs in Hinbits.
-  rewrite Hinbits.
+  rw Hj' in Hinbits. rw Hn in Hinbits. rw Hx' in Hinbits.
+  rewrite <-Int64.convert_to_bits_nth in Hinbits. rw Hieq in Hinbits. rw  Hs in Hinbits.
+  rw Hinbits.
   apply nth_find. by subst s.
-  rewrite -?(rwP ssrnat.leP). rewrite Hws. lia.
+  rw -?(rwP ssrnat.leP). rw Hws. lia.
   intro Hinbits'.
-  rewrite Ha in Hinbits'. rewrite eqb_id in Hinbits'.
-  have Hsize' := find_size a s. rewrite (rwP ssrnat.leP) in Hfindleq.
+  rw Ha in Hinbits'. rw eqb_id in Hinbits'.
+  have Hsize' := find_size a s. rw (rwP ssrnat.leP) in Hfindleq.
   have : forall k, k < i -> a (nth false s k) = false. intros k Hk.
-  have : (ssrnat.leq (S k) (find a s)). rewrite -?(rwP ssrnat.leP). simpl. rewrite <- Hieq. lia.
+  have : (ssrnat.leq (S k) (find a s)). rw -?(rwP ssrnat.leP). simpl. rewrite <- Hieq. lia.
   intro.
   now apply before_find.
   intro Hbefore.
   assert (a (nth false s i) = true).
-  rewrite Hieq.
+  rw Hieq.
   apply nth_find.
   assumption.
   have Hkl := convert_from_bits_head s i.
   assert (i < size s).
-  rewrite has_find in Hhas. rewrite -?(rwP ssrnat.leP) in Hhas. lia.
+  rw has_find in Hhas. rw -?(rwP ssrnat.leP) in Hhas. lia.
   simpl in Hkl.
-  rewrite Ha in Hieq. rewrite Ha in H1. rewrite Ha in Hbefore.
+  rw Ha in Hieq. rw Ha in H1. rw Ha in Hbefore.
   specialize (Hkl H2 Hieq H1 Hbefore).
-  rewrite Hsize in Hkl. rewrite Hws in Hkl.
-  rewrite Hsize in H2.
-  rewrite Hws in H2.
-  rewrite Hn.
-  rewrite Hws.
-  assert (Z.of_nat (64 - i - 1) = Z.of_nat (63 - i))%Z by lia. rewrite H3 in Hkl.
-  assert (Z.of_nat (63 - i) + 1 = Z.of_nat (64 - i))%Z by lia. rewrite H4 in Hkl.
+  rw Hsize in Hkl. rw Hws in Hkl.
+  rw Hsize in H2.
+  rw Hws in H2.
+  rw Hn.
+  rw Hws.
+  assert (Z.of_nat (64 - i - 1) = Z.of_nat (63 - i))%Z by lia. rw H3 in Hkl.
+  assert (Z.of_nat (63 - i) + 1 = Z.of_nat (64 - i))%Z by lia. rw H4 in Hkl.
   assert (two_p (Z.of_nat (64 - i)) <= Int64.modulus)%Z.
-  rewrite two_p_equiv in Hkl.
-  rewrite int64_modulus_eq_pow64. rewrite Nat2Z.inj_sub in Hkl. replace (Z.of_nat 64) with 64%Z in Hkl by lia.
-  rewrite two_p_equiv.
+  rw two_p_equiv in Hkl.
+  rw int64_modulus_eq_pow64. rw Nat2Z.inj_sub in Hkl. replace (Z.of_nat 64) with 64%Z in Hkl by lia.
+  rw two_p_equiv.
 
   replace (Z.of_nat (64 - i))%Z with (64 - Z.of_nat i)%Z by lia.
   apply Z.pow_le_mono_r. lia. lia. lia.
@@ -3019,16 +3019,16 @@ Proof.
   assert (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits s) < Int64.modulus)%Z by lia.
   have Hlow := H6 s.
   assert (Int64.intval (Int64.repr (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits s))) = (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits s))). {
-    simpl. rewrite Int64.Z_mod_modulus_id. reflexivity. lia. }
+    simpl. rw Int64.Z_mod_modulus_id. reflexivity. lia. }
   assert (x' = Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits s)).
     have : x = Int64.convert_from_bits (Int64.convert_to_bits x).
     apply Int64.convert_to_from_bits.
     intro Htofrom.
     unfold Int64.convert_from_bits in Htofrom.
-    rewrite Hx'. rewrite Htofrom.
-    rewrite Hs. rewrite Hs in H8.
-    rewrite H8. reflexivity.
-    rewrite H9. assumption.
+    rw Hx'. rw Htofrom.
+    rw Hs. rw Hs in H8.
+    rw H8. reflexivity.
+    rw H9. assumption.
 Qed.
 
 Lemma clz_lowerbound : forall x i,
@@ -3047,51 +3047,51 @@ Proof.
   remember (Int64.wordsize) as n eqn:Hn.
   remember (j' \in Zbits.Z_one_bits n x' 0) as inbits eqn:Hinbits.
   assert (nth false (Int64.convert_to_bits x) i = inbits). {
-    rewrite Hinbits. rewrite  Hj'. rewrite Hn. rewrite  Hx'.
-    apply Int64.convert_to_bits_nth. rewrite Hn in Hi.
-    rewrite -?(rwP ssrnat.leP). lia.  }
+    rw Hinbits. rw  Hj'. rw Hn. rw  Hx'.
+    apply Int64.convert_to_bits_nth. rw Hn in Hi.
+    rw -?(rwP ssrnat.leP). lia.  }
   remember (Int64.convert_to_bits x) as s eqn:Hs.
   have Hsize := Int64.convert_to_bits_size x. rewrite <-Hs in Hsize.
   have : Int64.wordsize = 64. by unfold Int64.wordsize, Integers.Wordsize_64.wordsize.
   intro Hws.
   have : find a s <= 64.
   have Hsize' := find_size a s. rewrite <-Hws.
-  rewrite -?(rwP ssrnat.leP) in Hsize'. simpl in Hsize'. rewrite Hsize in  Hsize'. auto.
+  rw -?(rwP ssrnat.leP) in Hsize'. simpl in Hsize'. rw Hsize in  Hsize'. auto.
   intro Hfindleq. simpl in Hfindleq.
   have : (Int64.intval (Z_to_i64 (find a s)) = Z.of_nat (find a s)).
   unfold Z_to_i64. simpl.
-  rewrite Int64.Z_mod_modulus_id. reflexivity.
-  rewrite int64_modulus_eq_pow64. cbn. lia.
+  rw Int64.Z_mod_modulus_id. reflexivity.
+  rw int64_modulus_eq_pow64. cbn. lia.
   intro Hint.
   have : (i = find a s).
-  rewrite Hint in Hclz. by rewrite Nat2Z.id in Hclz.
+  rw Hint in Hclz. by rw Nat2Z.id in Hclz.
   intro Hieq. simpl in Hieq.
-  have : has a s. rewrite has_find. rewrite -?(rwP ssrnat.leP). simpl. rewrite <-Hieq. rewrite ->Hsize, ->Hws. lia.
+  have : has a s. rw has_find. rw -?(rwP ssrnat.leP). simpl. rewrite <-Hieq. rewrite ->Hsize, ->Hws. lia.
   intro Hhas.
   have :  a inbits.
-  rewrite Hj' in Hinbits. rewrite Hn in Hinbits. rewrite Hx' in Hinbits.
-  rewrite <-Int64.convert_to_bits_nth in Hinbits. rewrite Hieq in Hinbits. rewrite  Hs in Hinbits.
-  rewrite Hinbits.
+  rw Hj' in Hinbits. rw Hn in Hinbits. rw Hx' in Hinbits.
+  rewrite <-Int64.convert_to_bits_nth in Hinbits. rw Hieq in Hinbits. rw  Hs in Hinbits.
+  rw Hinbits.
   apply nth_find. by subst s.
-  rewrite -?(rwP ssrnat.leP). rewrite Hws. lia.
+  rw -?(rwP ssrnat.leP). rw Hws. lia.
   intro Hinbits'.
-  rewrite Ha in Hinbits'. rewrite eqb_id in Hinbits'.
-  have Hsize' := find_size a s. rewrite (rwP ssrnat.leP) in Hfindleq.
+  rw Ha in Hinbits'. rw eqb_id in Hinbits'.
+  have Hsize' := find_size a s. rw (rwP ssrnat.leP) in Hfindleq.
   assert (forall k, In k (Zbits.Z_one_bits Int64.wordsize (Int64.intval x) 0) -> 0 <= k)%Z. {
     intros k Hk.
     have Hk' := Zbits.Z_one_bits_range _ _ _ Hk; lia. }
   assert (Hx'': (0 <= (Int64.intval x) < two_power_nat Int64.wordsize)%Z).
-  rewrite two_power_nat_equiv. unfold Int64.wordsize, Integers.Wordsize_64.wordsize. rewrite int64_modulus_eq_pow64 in Hrange. lia.
+  rw two_power_nat_equiv. unfold Int64.wordsize, Integers.Wordsize_64.wordsize. rw int64_modulus_eq_pow64 in Hrange. lia.
   have Hpow := Zbits.Z_one_bits_powerserie 64 (Int64.intval x) Hx''.
-  rewrite two_power_nat_equiv.
-  rewrite Hx'. rewrite Hpow.
+  rw two_power_nat_equiv.
+  rw Hx'. rw Hpow.
   have Hpow' := in_Z_one_bits_pow.
   specialize (Hpow' (Zbits.Z_one_bits 64 (Int64.intval x) 0)).
   specialize (Hpow' j).
-  rewrite <-H in Hinbits. rewrite Hinbits in Hinbits'.
-  rewrite Hn in Hinbits'. rewrite Hws in Hinbits'. rewrite Hx' in Hinbits'.
+  rewrite <-H in Hinbits. rw Hinbits in Hinbits'.
+  rw Hn in Hinbits'. rw Hws in Hinbits'. rw Hx' in Hinbits'.
   specialize (Hpow' Hinbits').
-  rewrite Hws in H1.
+  rw Hws in H1.
   specialize (Hpow' H1).
   rewrite <-Hj . assumption.
 Qed.
@@ -3113,35 +3113,35 @@ Proof.
   assert (0 <= Z.of_nat (find a bits))%Z. lia.
   assert (ssrnat.leq (find a bits) Int64.wordsize)%Z.
   rewrite <-Hsize. apply find_size.
-  rewrite -?(rwP ssrnat.leP) in H0.
+  rw -?(rwP ssrnat.leP) in H0.
   unfold Int64.clz.
   rewrite <- Hc2b. rewrite <-Ha.
   destruct (le_lt_eq_dec (find a bits) Int64.wordsize) as [Hlt|Heq]. assumption.
   simpl.
-  rewrite Int64.Z_mod_modulus_id. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. simpl in Hlt. lia.
+  rw Int64.Z_mod_modulus_id. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. simpl in Hlt. lia.
   unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. simpl in Hlt.
-  rewrite int64_modulus_eq_pow64. lia.
-  rewrite Heq in Hi.
+  rw int64_modulus_eq_pow64. lia.
+  rw Heq in Hi.
   simpl in Hi.
   assert (Int64.repr x = Int64.repr 0).
   apply Int64.clz_wordsize.
   remember (Int64.clz (Z_to_i64 x)) as clz eqn:Hclz.
   assert (Int64.intval (Z_to_i64 i) = (Int64.intval clz)).
-  rewrite Hi'. simpl.
-  rewrite Int64.Z_mod_modulus_id. reflexivity. rewrite <-Hi'. rewrite Hi. rewrite int64_modulus_eq_pow64. lia.
+  rw Hi'. simpl.
+  rw Int64.Z_mod_modulus_id. reflexivity. rewrite <-Hi'. rw Hi. rw int64_modulus_eq_pow64. lia.
 
   apply Int64.eq_T_intval in H1.
-  rewrite <-H1. simpl. now rewrite Hi.
+  rewrite <-H1. simpl. now rw Hi.
   apply Int64.repr_inv in H1. lia. lia. lia.
   assert (Z.to_nat i < Int64.wordsize). lia.
   specialize (Hclz_last (Int64.repr x) (Z.to_nat i) H0).
   rewrite <-Hi in Hclz_last. specialize (Hclz_last Logic.eq_refl).
-  replace (Int64.intval (Z_to_i64 x)) with x in Hclz_last. 2: simpl; rewrite Int64.Z_mod_modulus_id; lia.
-  rewrite Nat2Z.inj_sub in Hclz_last. 2: lia.
+  replace (Int64.intval (Z_to_i64 x)) with x in Hclz_last. 2: simpl; rw Int64.Z_mod_modulus_id; lia.
+  rw Nat2Z.inj_sub in Hclz_last. 2: lia.
 
-  rewrite Z2Nat.id in Hclz_last.
+  rw Z2Nat.id in Hclz_last.
   replace (Z.of_nat Int64.wordsize) with 64%Z in Hclz_last by now cbn.
-  rewrite two_p_equiv in Hclz_last.
+  rw two_p_equiv in Hclz_last.
   assert (2^i * x < 2^64)%Z.
   replace (2^64)%Z with (2^i * 2^(64 - i))%Z.
   apply Zmult_lt_compat_l. lia. lia.
@@ -3149,27 +3149,27 @@ Proof.
   unfold Int64.wordsize, Integers.Wordsize_64.wordsize in H0. lia.
   assert (2^63 <= 2^i * x)%Z.
   have Hlower := clz_lowerbound.
-  assert (-1 < Int64.intval x < Int64.modulus)%Z. simpl. rewrite Int64.Z_mod_modulus_id; lia.
+  assert (-1 < Int64.intval x < Int64.modulus)%Z. simpl. rw Int64.Z_mod_modulus_id; lia.
   specialize (Hlower (Int64.repr x) (Z.to_nat i) H2 H0).
   rewrite <-Hi in Hlower.
   specialize (Hlower Logic.eq_refl).
-  rewrite two_power_nat_equiv in Hlower.
+  rw two_power_nat_equiv in Hlower.
   replace (Int64.intval (Int64.repr x)) with x in Hlower.
   unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlower.
-  assert (Z.of_nat (64 - Z.to_nat i - 1) = 63 - i)%Z. rewrite Nat2Z.inj_sub. rewrite Nat2Z.inj_sub. lia. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in H0. lia. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in H0. lia.
-  rewrite H3 in Hlower.
+  assert (Z.of_nat (64 - Z.to_nat i - 1) = 63 - i)%Z. rw Nat2Z.inj_sub. rw Nat2Z.inj_sub. lia. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in H0. lia. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in H0. lia.
+  rw H3 in Hlower.
   assert (2^(63 - i) = 2^63/2^i)%Z.
-  rewrite Z.pow_sub_r; lia.
+  rw Z.pow_sub_r; lia.
   assert ((2^i * x) / 2^i = x)%Z.
-  rewrite Z.mul_comm. rewrite Z_div_mult. reflexivity.
+  rw Z.mul_comm. rw Z_div_mult. reflexivity.
   lia.
   assert (63 = (63 - i) + i)%Z. lia.
-  rewrite H6.
-  rewrite Z.pow_add_r.
-  rewrite Z.mul_comm.
+  rw H6.
+  rw Z.pow_add_r.
+  rw Z.mul_comm.
   apply Zmult_le_compat. lia.  assumption.  lia.  lia. lia.
   lia.
-  simpl. rewrite Int64.Z_mod_modulus_id; lia.
+  simpl. rw Int64.Z_mod_modulus_id; lia.
   lia. lia.
 Qed.
 
@@ -3183,14 +3183,14 @@ Proof.
   assert (Hlog1: (Z.log2 (2^63) <= Z.log2 (2 ^ (Int64.intval (Int64.clz (Int64.repr x))) * x))%Z) by (apply Z.log2_le_mono; assumption).
   assert (Hlog2: (Z.log2 (2 ^ (Int64.intval (Int64.clz (Int64.repr x))) * x) < 64)%Z) by (apply Z.log2_lt_pow2; lia).
   replace (2 ^ (Int64.intval (Int64.clz (Int64.repr x))) * x)%Z with (x * 2 ^ (Int64.intval (Int64.clz (Int64.repr x))))%Z in Hlog1, Hlog2 by lia.
-  rewrite Z.log2_mul_pow2 in Hlog1, Hlog2.
-  replace (Z.log2 (2 ^ 63)) with 63%Z in Hlog1 by (rewrite Z.log2_pow2; lia).
+  rw Z.log2_mul_pow2 in Hlog1, Hlog2.
+  replace (Z.log2 (2 ^ 63)) with 63%Z in Hlog1 by (rw Z.log2_pow2; lia).
   replace (Int64.intval (Z_to_i64 x)) with x.
   lia.
-  simpl. rewrite Int64.Z_mod_modulus_id; lia. lia.
+  simpl. rw Int64.Z_mod_modulus_id; lia. lia.
   unfold Int64.clz.
   assert (forall n, 0 <= Int64.intval (Z_to_i64 (Z.of_nat n)))%Z. intro. simpl.
-  rewrite Int64.Z_mod_modulus_eq. lia.
+  rw Int64.Z_mod_modulus_eq. lia.
   apply H0.
 Qed.
 
@@ -3200,12 +3200,12 @@ Lemma head0_int64_clz : forall x,
 Proof.
   intros.
   unfold Int64.unsigned.
-  rewrite clz_spec_alt.
+  rw clz_spec_alt.
   replace (63 - Z.log2 (Int64.intval (Z_to_i64 (to_Z x))) - 1)%Z with (62 - Z.log2 (Int64.intval (Z_to_i64 (to_Z x))))%Z by lia.
-  replace (Int64.intval (Z_to_i64 (to_Z x))) with (to_Z  x). rewrite head0_spec_alt; auto.
-  simpl. rewrite uint63_mod_modulus_id.
+  replace (Int64.intval (Z_to_i64 (to_Z x))) with (to_Z  x). rw head0_spec_alt; auto.
+  simpl. rw uint63_mod_modulus_id.
   reflexivity. auto.
-  rewrite int64_modulus_eq_pow64. split; auto. apply uint63_lt_pow64.
+  rw int64_modulus_eq_pow64. split; auto. apply uint63_lt_pow64.
 Qed.
 
 (* tail0 related *)
@@ -3223,17 +3223,17 @@ Proof.
   intros i Hsize Hfind Hnth Hbefore.
   assert (ssrnat.leq (S i) (size (a :: l))).
   simpl. simpl in Hsize.
-  rewrite -?(rwP ssrnat.leP). lia.
+  rw -?(rwP ssrnat.leP). lia.
   destruct (size l - i) eqn:Hdiff.
   { (* Special case? is is the index of the _last_ 1 bit in (a :: l), i.e. i = size l *)
     have Hnth' := Hnth.
-    rewrite nth_rev in Hnth'.
+    rw nth_rev in Hnth'.
     assert (Hsize' : i = size l). simpl in Hsize, Hdiff |-*. lia.
     unfold ssrnat.subn in Hnth'; simpl in Hnth'.
-    rewrite Hdiff in Hnth'.
+    rw Hdiff in Hnth'.
     simpl in Hnth'.
-    rewrite eqb_id in Hnth'. rewrite Hnth'.
-    simpl. rewrite two_p_equiv. rewrite Hsize'.
+    rw eqb_id in Hnth'. rw Hnth'.
+    simpl. rw two_p_equiv. rw Hsize'.
     remember (Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits l)) as ps eqn:Hps.
     have Hbefore' := Hbefore.
     assert (Hps0 : forall l' i',
@@ -3245,77 +3245,77 @@ Proof.
       have : (nth false (a0 :: l') 0 == true) = false.
       assert ((i' - 1) < i'). simpl in H0. simpl. lia.
       apply H1 in H2.
-      rewrite nth_rev in H2. rewrite <-H0 in H2.
+      rw nth_rev in H2. rewrite <-H0 in H2.
       unfold ssrnat.subn in H2. simpl in H2.
-      assert (i' - S (i' - 1) = 0). lia. rewrite H3 in H2. assumption.
-      rewrite -(rwP ssrnat.leP). simpl in H0 |- *. lia.
+      assert (i' - S (i' - 1) = 0). lia. rw H3 in H2. assumption.
+      rw -(rwP ssrnat.leP). simpl in H0 |- *. lia.
       intro Ha0.
-      rewrite eqb_id in Ha0. simpl in Ha0.
-      rewrite Ha0. simpl.
+      rw eqb_id in Ha0. simpl in Ha0.
+      rw Ha0. simpl.
       apply IHl' with (i' - 1). simpl in H0 |- *. lia.
       intros k Hk.
       have Hrcons := rev_cons a0 l'.
       have Hnc := nth_rcons false (rev l') a0 k.
       assert (Hk' : k < i'). lia.
       have Hbf' := H1 k Hk'.
-      rewrite Hrcons in Hbf'.
+      rw Hrcons in Hbf'.
       assert (ssrnat.leq (S k) (size (rev l'))).
-      rewrite -(rwP ssrnat.leP). simpl. rewrite size_rev. simpl in H0. lia.
-      rewrite H2 in Hnc. rewrite <- Hnc. assumption.  }
+      rw -(rwP ssrnat.leP). simpl. rw size_rev. simpl in H0. lia.
+      rw H2 in Hnc. rewrite <- Hnc. assumption.  }
 
     have : ps = 0%Z.
-    rewrite Hps. apply Hps0 with (i':=i); auto.
+    rw Hps. apply Hps0 with (i':=i); auto.
     intros k Hk.
     have Hrcons := rev_cons a l.
     have Hnc := nth_rcons false (rev l) a k.
     assert (Hk' : k < i). lia.
     have Hbf' := Hbefore k Hk'.
-    rewrite Hrcons in Hbf'.
+    rw Hrcons in Hbf'.
     assert (ssrnat.leq (S k) (size (rev l))).
-    rewrite -(rwP ssrnat.leP). simpl. rewrite size_rev. simpl. simpl in Hsize'. rewrite <-Hsize'. lia.
-    rewrite H0 in Hnc.
+    rw -(rwP ssrnat.leP). simpl. rw size_rev. simpl. simpl in Hsize'. rewrite <-Hsize'. lia.
+    rw H0 in Hnc.
     simpl. simpl in Hnc.
     rewrite <- Hnc. assumption.
     intro Hps0'. exists 0%Z.
-    rewrite Z.mul_0_l.
-    rewrite Z.add_0_l.
-    rewrite Hps0'. rewrite Z.add_0_r.
-    rewrite Z.mul_1_l. reflexivity.
-    rewrite -(rwP ssrnat.leP). simpl. simpl in Hsize. lia. }
+    rw Z.mul_0_l.
+    rw Z.add_0_l.
+    rw Hps0'. rw Z.add_0_r.
+    rw Z.mul_1_l. reflexivity.
+    rw -(rwP ssrnat.leP). simpl. simpl in Hsize. lia. }
   { (* inductive case: i < size l *)
   assert (Hsize' : i = size l - S n). lia. assert (Hn : n < size l). lia.
   assert (Hnth' : (nth false (rev l) i) == true).
-  assert (Hsize'' : (size l) - (S n) = i). by rewrite Hsize'.
+  assert (Hsize'' : (size l) - (S n) = i). by rw Hsize'.
   assert (Hsize''' :n = (size l) - (S i)). lia.
-  rewrite nth_rev in Hnth; auto.
-  rewrite nth_rev.
-  rewrite ssrnat.subnE in Hnth |- *. simpl in Hnth |- *.
-  rewrite eqb_id in Hnth.
+  rw nth_rev in Hnth; auto.
+  rw nth_rev.
+  rw ssrnat.subnE in Hnth |- *. simpl in Hnth |- *.
+  rw eqb_id in Hnth.
   simpl in Hnth.
-  rewrite Hdiff in Hnth. simpl in Hnth. simpl in Hsize'''. rewrite <-Hsize'''. rewrite eqb_id. assumption.
-  rewrite -(rwP ssrnat.leP). simpl in Hsize', Hsize''. simpl in Hsize', Hdiff. lia.
+  rw Hdiff in Hnth. simpl in Hnth. simpl in Hsize'''. rewrite <-Hsize'''. rw eqb_id. assumption.
+  rw -(rwP ssrnat.leP). simpl in Hsize', Hsize''. simpl in Hsize', Hdiff. lia.
   assert (Hfind' : i = find (fun b => b == true) (rev l)).
   rewrite <-cat1s in Hfind.
-  rewrite rev_cat in Hfind. rewrite find_cat in Hfind.
+  rw rev_cat in Hfind. rw find_cat in Hfind.
   unfold ssrnat.addn in Hfind.
   destruct (has (fun b => b == true) (rev l)). assumption.
-  simpl in Hfind. destruct a; simpl in Hfind. rewrite size_rev in Hfind. simpl in Hdiff, Hsize'. lia. rewrite size_rev in Hfind. simpl in Hdiff, Hsize'. lia.
+  simpl in Hfind. destruct a; simpl in Hfind. rw size_rev in Hfind. simpl in Hdiff, Hsize'. lia. rw size_rev in Hfind. simpl in Hdiff, Hsize'. lia.
   assert (Hbefore' : forall k, k < i -> (nth false (rev l) k == true) = false).
   intros k Hk.
   have Hbf := before_find.
-  assert (ssrnat.leq (S k) i). rewrite -(rwP ssrnat.leP). lia. rewrite Hfind' in H0. apply Hbf with (x0:=false) in H0. assumption.
+  assert (ssrnat.leq (S k) i). rw -(rwP ssrnat.leP). lia. rw Hfind' in H0. apply Hbf with (x0:=false) in H0. assumption.
   assert (Hsizei : i < (size l)). lia.
   have IH := IHl i Hsizei Hfind' Hnth' Hbefore'.
   destruct IH as [y Hy].
   simpl. destruct a.
   exists (2^(size l - i - 1) + y)%Z.
-  rewrite [((2 ^ (size l - i - 1) + y) * 2)%Z] Z.mul_add_distr_r.
-  replace 2%Z with (2^1)%Z at 2. rewrite <- Z.pow_add_r. rewrite Z.sub_add.
-  rewrite Z.mul_add_distr_r.
-  rewrite Z.mul_add_distr_r. rewrite <- Z.pow_add_r. rewrite Z.sub_add.
+  rw [((2 ^ (size l - i - 1) + y) * 2)%Z] Z.mul_add_distr_r.
+  replace 2%Z with (2^1)%Z at 2. rewrite <- Z.pow_add_r. rw Z.sub_add.
+  rw Z.mul_add_distr_r.
+  rw Z.mul_add_distr_r. rewrite <- Z.pow_add_r. rw Z.sub_add.
   rewrite <-Z.add_assoc. rewrite <-Z.mul_add_distr_r.
-  simpl. rewrite two_p_equiv.
-  rewrite Hy. reflexivity. simpl in Hsize'.  lia. lia. lia. lia. lia.
+  simpl. rw two_p_equiv.
+  rw Hy. reflexivity. simpl in Hsize'.  lia. lia. lia. lia. lia.
   exists y. assumption. }
 Qed.
 
@@ -3324,17 +3324,17 @@ Lemma to_from_bits_modulus : forall x,
   x = Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits (Int64.convert_to_bits (Int64.repr x))).
 Proof.
   intros x Hx.
-  rewrite Int64.convert_from_bits_to_Z_one_bits_power_index_to_bits.
+  rw Int64.convert_from_bits_to_Z_one_bits_power_index_to_bits.
   have E: filter (fun x => Coqlib.zlt x Int64.wordsize) (Zbits.Z_one_bits Int64.wordsize (Int64.intval x) 0) = Zbits.Z_one_bits Int64.wordsize (Int64.intval x) 0.
-  rewrite filter_for_all => //.
-  rewrite list_all_forall => e. rewrite -List_In_in_mem => I.
+  rw filter_for_all => //.
+  rw list_all_forall => e. rw -List_In_in_mem => I.
   apply Int64.Zbits_Z_one_bits_range in I. destruct Coqlib.zlt => //. lia.
-  rewrite E.
+  rw E.
   replace (Int64.intval (Z_to_i64_co x)) with x.
   apply Zbits.Z_one_bits_powerserie.
-  rewrite int64_modulus_eq_pow64 in Hx. unfold Int64.wordsize, Integers.Wordsize_64.wordsize.
+  rw int64_modulus_eq_pow64 in Hx. unfold Int64.wordsize, Integers.Wordsize_64.wordsize.
   unfold two_power_nat. simpl. lia.
-  simpl. rewrite Int64.Z_mod_modulus_id; lia.
+  simpl. rw Int64.Z_mod_modulus_id; lia.
   by apply Int64.Zbits_Z_one_bits_uniq.
 Qed.
 
@@ -3352,40 +3352,40 @@ Proof.
   have : Int64.wordsize = 64. by unfold Int64.wordsize, Integers.Wordsize_64.wordsize.
   intro Hws.
   have : i = find (fun b => b == true) (rev s).
-  rewrite Hctz. cbn. rewrite Int64.Z_mod_modulus_id.
-  rewrite Nat2Z.id. reflexivity.
+  rw Hctz. cbn. rw Int64.Z_mod_modulus_id.
+  rw Nat2Z.id. reflexivity.
   have : find (fun b => b == true) (rev s) <= size (rev s).
-  rewrite (rwP ssrnat.leP).
+  rw (rwP ssrnat.leP).
   apply find_size.
-  rewrite size_rev.
+  rw size_rev.
   cbn.
   intro Hfindsize.
-  rewrite int64_modulus_eq_pow64.
+  rw int64_modulus_eq_pow64.
   lia.
   have Hex := powerserie_convert_from_bits_rev.
   assert (Hleq : ssrnat.leq (S i) (size (rev s))).
-  rewrite -(rwP ssrnat.leP).
-  rewrite size_rev. rewrite Hsize.  rewrite Hws in Hi. lia.
+  rw -(rwP ssrnat.leP).
+  rw size_rev. rw Hsize.  rw Hws in Hi. lia.
   intro Hifind.
   have Hnth := Hleq.
-  rewrite Hifind in Hnth.
+  rw Hifind in Hnth.
   rewrite <-has_find in Hnth.
   apply nth_find with (x0:=false) in Hnth.
   assert ((nth false (rev s) i == true) = true).
-  rewrite Hifind. auto.
+  rw Hifind. auto.
   have Hbefore := before_find.
   assert (Hbf: forall k, k < i -> (nth false (rev s) k == true) = false). {
     intros k Hk.
     specialize (Hbefore (Equality.sort Datatypes_bool__canonical__eqtype_Equality) false (fun b => b == true) (rev s) k).
     rewrite <-Hifind in Hbefore.
     apply Hbefore.
-    rewrite -(rwP ssrnat.leP). lia. }
-  assert (Hisize : i < size s). rewrite Hws in Hi. lia.
-  assert (Hinth : (nth false (rev s) i == true) = true). rewrite Hifind; auto.
+    rw -(rwP ssrnat.leP). lia. }
+  assert (Hisize : i < size s). rw Hws in Hi. lia.
+  assert (Hinth : (nth false (rev s) i == true) = true). rw Hifind; auto.
   specialize (Hex s i Hisize Hifind Hinth Hbf).
   destruct Hex as [c Hc].
   assert (x = Zbits.powerserie (Int64.convert_from_bits_to_Z_one_bits s)).
-  rewrite Hs. apply to_from_bits_modulus. lia.
+  rw Hs. apply to_from_bits_modulus. lia.
   exists c. now subst x.
 Qed.
 
@@ -3406,30 +3406,30 @@ remember (fun b => b == true) as a eqn:Ha.
 assert (0 <= Z.of_nat (find a (rev bits)))%Z. lia.
 assert (ssrnat.leq (find a (rev bits)) Int64.wordsize)%Z.
 rewrite <-Hsize. rewrite <-size_rev.  apply find_size.
-rewrite -?(rwP ssrnat.leP) in H0.
+rw -?(rwP ssrnat.leP) in H0.
 unfold Int64.ctz.
 rewrite <- Hc2b. rewrite <-Ha.
 destruct (le_lt_eq_dec (find a (rev bits)) Int64.wordsize) as [Hlt|Heq]. assumption.
 cbn.
-rewrite Int64.Z_mod_modulus_id. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. cbn in Hlt. lia.
+rw Int64.Z_mod_modulus_id. unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. cbn in Hlt. lia.
 unfold Int64.wordsize, Integers.Wordsize_64.wordsize in Hlt. cbn in Hlt.
-rewrite int64_modulus_eq_pow64. lia.
-rewrite Heq in Hi.
+rw int64_modulus_eq_pow64. lia.
+rw Heq in Hi.
 cbn in Hi.
 assert (Int64.repr x = Int64.repr 0).
 apply Int64.ctz_wordsize.
 remember (Int64.ctz (Z_to_i64 x)) as ctz eqn:Hctzv.
 assert (Int64.intval (Z_to_i64 i) = (Int64.intval ctz)).
-rewrite Hi'. cbn.
-rewrite Int64.Z_mod_modulus_id. reflexivity. rewrite <-Hi'. rewrite Hi. rewrite int64_modulus_eq_pow64. lia.
+rw Hi'. cbn.
+rw Int64.Z_mod_modulus_id. reflexivity. rewrite <-Hi'. rw Hi. rw int64_modulus_eq_pow64. lia.
 apply Int64.eq_T_intval in H1.
-rewrite <-H1. simpl. now rewrite Hi.
+rewrite <-H1. simpl. now rw Hi.
 apply Int64.repr_inv in H1. lia. lia. lia.
 assert (Z.to_nat i < Int64.wordsize). lia.
 specialize (Hctz x (Z.to_nat i) Hx H0).
-rewrite Hi in Hctz. specialize (Hctz Logic.eq_refl).
-replace (Int64.intval (Z_to_i64 x)) with x in Hctz. 2: cbn; rewrite Int64.Z_mod_modulus_id; lia.
-rewrite Z2Nat.id in Hctz.
+rw Hi in Hctz. specialize (Hctz Logic.eq_refl).
+replace (Int64.intval (Z_to_i64 x)) with x in Hctz. 2: cbn; rw Int64.Z_mod_modulus_id; lia.
+rw Z2Nat.id in Hctz.
 destruct Hctz as [c Hc].
 unfold Int64.unsigned.
 exists c. exact Hc.
@@ -3446,8 +3446,8 @@ Lemma unique_greatest_power_of_two_divisor : forall x n m,
 Proof.
   assert (forall i, 0 < i -> Z.odd (2^i) = false)%Z as Hpow2odd. {
     intros i Hi.
-    replace (2^i)%Z with (2^(i - 1) * (2 ^ 1))%Z. rewrite Z.odd_mul. simpl. lia.
-    rewrite <-Z.pow_add_r. now rewrite Z.sub_add.
+    replace (2^i)%Z with (2^(i - 1) * (2 ^ 1))%Z. rw Z.odd_mul. simpl. lia.
+    rewrite <-Z.pow_add_r. now rw Z.sub_add.
     lia. lia. }
   intros x n m Hxnz Hnge0 Hmge0 [y Hxn] [y' Hxm].
   remember (2 * y + 1)%Z as a eqn:Ha.
@@ -3455,36 +3455,36 @@ Proof.
   assert (a * 2^n = b * 2^m)%Z as Heq. rewrite <- Hxn, <- Hxm. reflexivity.
   destruct (Z_lt_dec n  m) as [Hlt | Hnlt]. {
     assert (a = b * 2^(m - n))%Z as Ha'. {
-      rewrite Z.pow_sub_r; [|lia|lia].
+      rw Z.pow_sub_r; [|lia|lia].
       rewrite <-Znumtheory.Zdivide_Zdiv_eq_2. 2: lia.
       replace a with (a * 2^n / 2^n)%Z by nia.
       rewrite <-Hxn. rewrite <-Hxm. reflexivity.
       exists (2^(m - n))%Z. rewrite <-Z.pow_add_r.
-      now rewrite Z.sub_add. lia. lia. }
+      now rw Z.sub_add. lia. lia. }
     assert (Z.odd a = true) as Hodda. {
       subst a.
-      rewrite Z.add_comm. rewrite Z.odd_add_mul_2.
+      rw Z.add_comm. rw Z.odd_add_mul_2.
       reflexivity. }
     assert (Z.odd a = false) as Hodda'. {
-      rewrite Ha'. rewrite Z.mul_comm.
-      rewrite Z.odd_mul. rewrite Hpow2odd. reflexivity. lia. }
-    rewrite Hodda' in Hodda. discriminate. }
+      rw Ha'. rw Z.mul_comm.
+      rw Z.odd_mul. rw Hpow2odd. reflexivity. lia. }
+    rw Hodda' in Hodda. discriminate. }
   destruct (Z_lt_dec m n) as [Hlt' | Hnlt']. {
     assert (b = a * 2^(n - m))%Z as Hb'. {
-      rewrite Z.pow_sub_r; [|lia|lia].
+      rw Z.pow_sub_r; [|lia|lia].
       rewrite <-Znumtheory.Zdivide_Zdiv_eq_2. 2: lia.
       replace b with (b * 2^m / 2^m)%Z by nia.
       rewrite <-Hxn. rewrite <-Hxm. reflexivity.
       exists (2^(n - m))%Z. rewrite <-Z.pow_add_r.
-      now rewrite Z.sub_add. lia. lia. }
+      now rw Z.sub_add. lia. lia. }
     assert (Z.odd b = true) as Hoddb. {
       subst b.
-      rewrite Z.add_comm. rewrite Z.odd_add_mul_2.
+      rw Z.add_comm. rw Z.odd_add_mul_2.
       reflexivity. }
     assert (Z.odd b = false) as Hoddb'. {
-      rewrite Hb'. rewrite Z.mul_comm.
-      rewrite Z.odd_mul. rewrite Hpow2odd. reflexivity. lia. }
-    rewrite Hoddb' in Hoddb. discriminate. }
+      rw Hb'. rw Z.mul_comm.
+      rw Z.odd_mul. rw Hpow2odd. reflexivity. lia. }
+    rw Hoddb' in Hoddb. discriminate. }
   lia.
 Qed.
 
@@ -3494,7 +3494,7 @@ Lemma tail0_int64_ctz : forall x,
 Proof.
   intros.
   have HxBounded := to_Z_bounded x.
-  assert (0 < to_Z x < Int64.modulus)%Z as HxBounded'. rewrite int64_modulus_eq_pow64. cbn in HxBounded. lia.
+  assert (0 < to_Z x < Int64.modulus)%Z as HxBounded'. rw int64_modulus_eq_pow64. cbn in HxBounded. lia.
   have Hctz := ctz_spec (to_Z x) HxBounded'.
   have Htail0 := tail0_spec x H.
   assert (to_Z (tail0 x) = Int64.unsigned (Int64.ctz (Int64.repr (to_Z x)))). {
@@ -3502,10 +3502,10 @@ Proof.
     destruct (to_Z_bounded (tail0 x)). lia.
     destruct (Int64.unsigned_range (Int64.ctz (Z_to_i64 (to_Z x)))). lia.
     destruct Htail0 as [y [_ Hy]]. exists y. auto.
-    destruct Hctz as [y Hy]. rewrite - [(y * 2)%Z] Z.mul_comm in Hy.
+    destruct Hctz as [y Hy]. rw - [(y * 2)%Z] Z.mul_comm in Hy.
     exists y; auto. }
-  rewrite H0.
-  rewrite Int64.repr_unsigned.
+  rw H0.
+  rw Int64.repr_unsigned.
   reflexivity.
 Qed.
 
