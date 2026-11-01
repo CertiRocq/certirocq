@@ -29,6 +29,7 @@
       the constructor environment along the LambdaANF pipeline. *)
 
 From Stdlib Require Import ssreflect ssrbool.
+From Equations Require Import Equations.
 From Stdlib Require Import ZArith NArith List ProofIrrelevance.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -41,6 +42,9 @@ From CertiRocq.LambdaBox_to_LambdaANF Require Import common fuel_sem anf_convert
 Require Import LambdaANF.term LambdaANF.state LambdaANF.eval LambdaANF.identifiers
   LambdaANF.term_util LambdaANF.rel_comp LambdaANF.bounds.
 From CertiRocq Require Import metarocq_pipeline pipeline correctness.
+From MetaRocq.TemplatePCUIC Require TemplateToPCUIC.
+From MetaRocq.PCUIC Require PCUICTyping PCUICClassification PCUICFirstorder.
+From MetaRocq.ErasurePlugin Require ErasureCorrectness.
 
 Import Monads.
 Import MonadNotation.
@@ -539,4 +543,376 @@ Proof.
   destruct (CertiRocq_pipeline_total next_id dbg o p w hmap hwt hdirect hwf) as (r & w' & hrun).
   exists r, w'. split => //.
   now eapply CertiRocq_pipeline_correct.
+Qed.
+
+(** ** First-order results
+
+    For programs computing a value of a first-order inductive type (in the sense of
+    [PCUICFirstorder.firstorder_ind]), the value computed by the LambdaANF program is the value
+    computed by the source program: a tree of constructors, with parameters erased (as in
+    MetaRocq's [compile_value_box]), singleton constructors unboxed (as in [EUnboxing.unbox])
+    and constructors mapped to their LambdaANF tags. *)
+
+(** The PCUIC translation of the source program *)
+Definition pcuic_env (p : Ast.Env.program) : PCUICAst.PCUICEnvironment.global_env :=
+  PCUICProgram.trans_env_env (TemplateToPCUIC.trans_global_env p.1).
+
+Definition pcuic_env_ext (p : Ast.Env.program) : PCUICAst.PCUICEnvironment.global_env_ext :=
+  (pcuic_env p, Universes.Monomorphic_ctx).
+
+Definition pcuic_term (p : Ast.Env.program) (t : Ast.term) : PCUICAst.term :=
+  TemplateToPCUIC.trans (TemplateToPCUIC.trans_global_env p.1) t.
+
+(** Whether constructor [c] of [ind] is unboxed by [EUnboxing] in the erased environment [Σ] *)
+Definition is_unboxable_ctor (Σ : EAst.global_context) (ind : inductive) (c : nat) : bool :=
+  match c with
+  | O =>
+    match EGlobalEnv.lookup_constructor Σ ind 0%nat with
+    | Some (_, idecl, cdecl) => EUnboxing.unboxable idecl cdecl
+    | None => false
+    end
+  | S _ => false
+  end.
+
+(** [EUnboxing.unbox], on trees of constructors *)
+Fixpoint unbox_fo (Σ : EAst.global_context) (t : EAst.term) : EAst.term :=
+  match t with
+  | EAst.tConstruct ind c args =>
+    if is_unboxable_ctor Σ ind c then
+      match args with
+      | [a] => unbox_fo Σ a
+      | _ => EAst.tConstruct ind c (map (unbox_fo Σ) args)
+      end
+    else EAst.tConstruct ind c (map (unbox_fo Σ) args)
+  | _ => t
+  end.
+
+Inductive constr_tree : EAst.term -> Prop :=
+| constr_tree_node ind c args :
+    Forall constr_tree args -> constr_tree (EAst.tConstruct ind c args).
+
+(** A tree of constructors and the LambdaANF value representing it *)
+Inductive fo_value_ref (Σ : EAst.global_context) (tgm : conId_map) : EAst.term -> val -> Prop :=
+| fo_ref_unboxed ind c a v :
+    is_unboxable_ctor Σ ind c ->
+    fo_value_ref Σ tgm a v ->
+    fo_value_ref Σ tgm (EAst.tConstruct ind c [a]) v
+| fo_ref_constr ind c args tag vs :
+    ~~ (is_unboxable_ctor Σ ind c && (#|args| =? 1)%nat) ->
+    dcon_to_tag (dcon_of_con ind c) tgm = Some tag ->
+    Forall2 (fo_value_ref Σ tgm) args vs ->
+    fo_value_ref Σ tgm (EAst.tConstruct ind c args) (Vconstr tag vs).
+
+Lemma unbox_fo_constr Σ ind c args :
+  ~~ (is_unboxable_ctor Σ ind c && (#|args| =? 1)%nat) ->
+  unbox_fo Σ (EAst.tConstruct ind c args) = EAst.tConstruct ind c (map (unbox_fo Σ) args).
+Proof.
+  cbn. destruct is_unboxable_ctor => //. now destruct args as [|? []].
+Qed.
+
+Lemma obs_val_unbox_fo Σ tgm :
+  forall t, constr_tree t ->
+  forall v, obs_val tgm (unbox_fo Σ t) v -> fo_value_ref Σ tgm t v.
+Proof.
+  fix IH 2. intros t [ind c args hargs] v hobs.
+  destruct (is_unboxable_ctor Σ ind c && (#|args| =? 1)%nat) eqn:hu.
+  - move/andP: hu => [hunb /Nat.eqb_eq hlen]. destruct args as [|a []] => //.
+    cbn in hobs; rewrite hunb in hobs. inversion hargs; subst. eapply fo_ref_unboxed; eauto.
+  - rewrite unbox_fo_constr ?hu // in hobs.
+    inversion hobs as [? ? ? tag vs htag hvs| |]; subst; cbn in *; try contradiction.
+    eapply fo_ref_constr; [now rewrite hu|exact htag|].
+    clear -IH hargs hvs. revert vs hvs.
+    refine ((fix aux l (hl : Forall constr_tree l) {struct hl} :
+      forall vs, Forall2 (obs_val tgm) (map (unbox_fo Σ) l) vs ->
+        Forall2 (fo_value_ref Σ tgm) l vs := _) _ hargs).
+    destruct hl as [|x l hx hl]; intros vs hvs; inversion hvs; subst; constructor; eauto.
+Qed.
+
+(** *** The post-erasure passes on trees of constructors *)
+
+Lemma constr_tree_ind' (P : EAst.term -> Prop) :
+  (forall ind c args, Forall constr_tree args -> Forall P args -> P (EAst.tConstruct ind c args)) ->
+  forall t, constr_tree t -> P t.
+Proof.
+  intros hP. fix IH 2. intros t [ind c args hargs]. apply hP => //.
+  refine ((fix aux l (hl : Forall constr_tree l) {struct hl} : Forall P l := _) _ hargs).
+  destruct hl; constructor; auto.
+Qed.
+
+Lemma map_id_tree (f : EAst.term -> EAst.term) l :
+  Forall (fun x => f x = x) l -> map f l = l.
+Proof. induction 1; cbn; congruence. Qed.
+
+(** The inductive types of the constructors of a tree *)
+Fixpoint tree_inductives (t : EAst.term) : list inductive :=
+  match t with
+  | EAst.tConstruct ind _ args => ind :: concat (map tree_inductives args)
+  | _ => []
+  end.
+
+Lemma consts_to_values_tree t : constr_tree t -> EConstantsToValues.consts_to_values t = t.
+Proof.
+  induction 1 using constr_tree_ind'. cbn. f_equal. now apply map_id_tree.
+Qed.
+
+Lemma unforce_axioms_tree extracted Σ t : constr_tree t -> unforce_axioms extracted Σ t = t.
+Proof.
+  induction 1 using constr_tree_ind'. cbn. f_equal. now apply map_id_tree.
+Qed.
+
+Lemma implement_lazy_force_tree t : constr_tree t -> EImplementLazyForce.implement_lazy_force t = t.
+Proof.
+  induction 1 using constr_tree_ind'. simp implement_lazy_force. rewrite ?map_InP_spec.
+  f_equal. now apply map_id_tree.
+Qed.
+
+Lemma implement_box_tree t : constr_tree t -> EImplementBox.implement_box t = t.
+Proof.
+  induction 1 using constr_tree_ind'. simp implement_box. rewrite ?map_InP_spec.
+  f_equal. now apply map_id_tree.
+Qed.
+
+Lemma coinductive_trans_tree (Σ : EEnvMap.GlobalContextMap.t) t :
+  constr_tree t ->
+  (forall ind, In ind (tree_inductives t) ->
+    EGlobalEnv.lookup_inductive_kind (EEnvMap.GlobalContextMap.global_decls Σ) (inductive_mind ind)
+      <> Some BasicAst.CoFinite) ->
+  ECoInductiveToInductive.trans Σ t = t.
+Proof.
+  induction 1 using constr_tree_ind'. intros hind. cbn.
+  rewrite EEnvMap.GlobalContextMap.lookup_inductive_kind_spec.
+  have hk := hind ind (or_introl eq_refl).
+  have -> : map (ECoInductiveToInductive.trans Σ) args = args.
+  { apply map_id_tree. clear -H0 hind. induction H0 as [|x l hx hl IH]; constructor.
+    - apply hx => i hi. apply hind. right. cbn. apply in_or_app. now left.
+    - apply IH => i hi. apply hind. cbn in hi |- *. destruct hi as [<-|hi]; [now left|].
+      right. apply in_or_app. now right. }
+  destruct EGlobalEnv.lookup_inductive_kind as [[]|] => //.
+Qed.
+
+Lemma unbox_tree (Σ : EEnvMap.GlobalContextMap.t) t :
+  constr_tree t -> EUnboxing.unbox Σ t = unbox_fo (EEnvMap.GlobalContextMap.global_decls Σ) t.
+Proof.
+  induction 1 using constr_tree_ind'. simp unbox.
+  have hu : EUnboxing.is_unboxable Σ ind c =
+    is_unboxable_ctor (EEnvMap.GlobalContextMap.global_decls Σ) ind c.
+  { destruct c; simp is_unboxable => //=. rewrite EEnvMap.GlobalContextMap.lookup_constructor_spec.
+    destruct EGlobalEnv.lookup_constructor as [[[]]|] => //. }
+  destruct (PCUICSafeReduce.inspect (EUnboxing.is_unboxable Σ ind c)) as [[] hunb].
+  all: have e := eq_trans hunb hu; cbn [unbox_fo]; rewrite -e.
+  all: have hmap : map (EUnboxing.unbox Σ) args =
+    map (unbox_fo (EEnvMap.GlobalContextMap.global_decls Σ)) args
+    by (clear -H0; induction H0; cbn; congruence).
+  - destruct args as [|a [|a' args]]; simp unbox; rewrite ?hmap //. now inversion H0.
+  - simp unbox. now rewrite hmap.
+Qed.
+
+(** The constructor environment seen by [is_unboxable_ctor] is preserved by maps on
+    declarations that keep the bodies of inductive declarations *)
+Lemma is_unboxable_ctor_map (f : EAst.global_decl -> EAst.global_decl) Σ ind c :
+  (forall d, match d, f d with
+    | EAst.InductiveDecl m, EAst.InductiveDecl m' => EAst.ind_bodies m' = EAst.ind_bodies m
+    | EAst.ConstantDecl _, EAst.ConstantDecl _ => True
+    | _, _ => False
+    end) ->
+  is_unboxable_ctor (map (on_snd f) Σ) ind c = is_unboxable_ctor Σ ind c.
+Proof.
+  intros hf. destruct c as [|c] => //. cbn.
+  unfold EGlobalEnv.lookup_constructor, EGlobalEnv.lookup_inductive, EGlobalEnv.lookup_minductive.
+  rewrite ECoInductiveToInductive.lookup_env_map_snd.
+  destruct EGlobalEnv.lookup_env as [d|] => //=.
+  specialize (hf d). destruct d as [cb|m]; destruct (f _) as [cb'|m'] => //=.
+  cbv beta iota delta [Monad.bind Monad.ret OptionMonad.Monad_option].
+  rewrite hf. destruct nth_error => //. destruct ind_ctors => //.
+Qed.
+
+Lemma obseq_compose_inv {env env' env'' term term' term'' value value' value'' : Type}
+  {eval : Transform.program env term -> value -> Prop}
+  {eval' : Transform.program env' term' -> value' -> Prop}
+  {eval'' : Transform.program env'' term'' -> value'' -> Prop}
+  (o : Transform.t env env' term term' value value' eval eval')
+  (o' : Transform.t env' env'' term' term'' value' value'' eval' eval'') hpp g pr g' v v' :
+  Transform.obseq (Transform.compose o o' hpp) g pr g' v v' ->
+  exists v'', Transform.obseq o g pr (Transform.run o g pr) v v'' /\
+    Transform.obseq o' (Transform.run o g pr) (hpp _ (Transform.correctness o _ pr)) g' v'' v'.
+Proof. intros [v'' [h1 h2]]. now exists v''. Qed.
+
+Lemma unbox_fo_tree Σ t : constr_tree t -> constr_tree (unbox_fo Σ t).
+Proof.
+  induction 1 using constr_tree_ind'. cbn.
+  have hmap : Forall constr_tree (map (unbox_fo Σ) args).
+  { clear -H0. induction H0; constructor; auto. }
+  destruct is_unboxable_ctor; [destruct args as [|a [|]]|]; try now constructor.
+  now inversion H0.
+Qed.
+
+Lemma unbox_fo_ext Σ Σ' t :
+  (forall ind c, is_unboxable_ctor Σ ind c = is_unboxable_ctor Σ' ind c) ->
+  constr_tree t -> unbox_fo Σ t = unbox_fo Σ' t.
+Proof.
+  intros hΣ. induction 1 using constr_tree_ind'. cbn. rewrite hΣ.
+  have -> : map (unbox_fo Σ) args = map (unbox_fo Σ') args.
+  { clear -H0. induction H0; cbn; congruence. }
+  destruct is_unboxable_ctor => //. destruct args as [|a [|]] => //. now inversion H0.
+Qed.
+
+Lemma is_unboxable_ctor_unforce_axioms extracted Σ ind c :
+  is_unboxable_ctor (unforce_axioms_env extracted Σ) ind c = is_unboxable_ctor Σ ind c.
+Proof.
+  rewrite /unforce_axioms_env.
+  apply (is_unboxable_ctor_map (fun d => match d with
+    | EAst.ConstantDecl cb =>
+      EAst.ConstantDecl
+        {| EAst.cst_body := option_map (unforce_axioms extracted Σ) (EAst.cst_body cb) |}
+    | EAst.InductiveDecl i => EAst.InductiveDecl i end)).
+  by case.
+Qed.
+
+Lemma is_unboxable_ctor_consts_to_values Σ ind c :
+  is_unboxable_ctor (EConstantsToValues.consts_to_values_env Σ) ind c = is_unboxable_ctor Σ ind c.
+Proof.
+  apply (is_unboxable_ctor_map EConstantsToValues.consts_to_values_global_decl). by case.
+Qed.
+
+(** Without unsafe passes, [certirocq_post_metarocq_pipeline] maps a tree of constructors of
+    inductive (not coinductive) types to its unboxing *)
+Lemma post_pipeline_firstorder econf (p : eprogram) pr p' v v' :
+  enable_unsafe econf = no_unsafe_passes ->
+  constr_tree v ->
+  (forall ind, In ind (tree_inductives v) ->
+    EGlobalEnv.lookup_inductive_kind p.1 (inductive_mind ind) <> Some BasicAst.CoFinite) ->
+  Transform.obseq (certirocq_post_metarocq_pipeline [] econf) p pr p' v v' ->
+  v' = unbox_fo (Transform.transform (certirocq_post_metarocq_pipeline [] econf) p pr).1 v.
+Proof.
+  destruct econf as [unsafe ? ? ? ? ?]. intros hunsafe htree hind. cbn in hunsafe. subst unsafe.
+  unfold certirocq_post_metarocq_pipeline in pr |- *.
+  intros obs.
+  repeat (apply obseq_compose_inv in obs as (? & obs & ?)).
+  cbn [Transform.obseq ETransform.rebuild_wf_env_transform
+       ETransform.coinductive_to_inductive_transformation ETransform.unbox_transformation
+       ETransform.optional_self_transform ETransform.consts_to_values_transformation
+       unforce_axioms_transformation ETransform.implement_lazy_force_transformation
+       ETransform.implement_box_transformation Erasure.no_unsafe_passes Erasure.make_unsafe_passes
+       Erasure.inductives_extraction Erasure.betared Erasure.enable_unsafe] in *.
+  subst.
+  (* The value: only unboxing changes the tree *)
+  rewrite coinductive_trans_tree // unbox_tree //.
+  match goal with |- context [unbox_fo ?Σu ?t] => have htree' := unbox_fo_tree Σu t htree end.
+  rewrite consts_to_values_tree // unforce_axioms_tree // implement_lazy_force_tree //
+    implement_box_tree //.
+  (* The environment: the later passes do not change the constructors *)
+  apply unbox_fo_ext => // ind c.
+  cbn [Transform.transform Transform.compose Transform.run Transform.time fst
+       ETransform.implement_box_transformation ETransform.implement_lazy_force_transformation
+       unforce_axioms_transformation ETransform.consts_to_values_transformation
+       ETransform.unbox_transformation EImplementBox.implement_box_program
+       EImplementLazyForce.implement_lazy_force_program unforce_axioms_program
+       EConstantsToValues.consts_to_values_program EUnboxing.unbox_program].
+  rewrite /EImplementBox.implement_box_env
+    (is_unboxable_ctor_map EImplementBox.implement_box_decl); [|by case].
+  rewrite /EImplementLazyForce.implement_lazy_force_env
+    (is_unboxable_ctor_map EImplementLazyForce.implement_lazy_force_decl); [|by case].
+  rewrite is_unboxable_ctor_unforce_axioms is_unboxable_ctor_consts_to_values.
+  rewrite /EUnboxing.unbox_env (is_unboxable_ctor_map (EUnboxing.unbox_decl _)); [|by case].
+  reflexivity.
+Qed.
+
+(** *** MetaRocq's erasure pipeline on first-order values *)
+
+Notation erasure_pipeline_mapping econf :=
+  (@Erasure.erasure_pipeline_mapping fake_guard_impl econf).
+
+(** MetaRocq's untyped erasure pipeline, without unsafe passes nor inductive mappings, maps a
+    first-order value to its tree of constructors (with parameters erased), in which no
+    constructor belongs to a coinductive type.
+    TODO: prove, from [ErasureCorrectness.verified_erasure_pipeline_theorem] (more precisely
+    [v_t_spec], [firstorder_erases_deterministic] and [obseq_lambdabox]), through the translation
+    from Template to PCUIC and eta-expansion ([pre_erasure_pipeline_mapping]), and the mapping
+    variants of the erasure transformations with an empty mapping. *)
+Lemma erasure_pipeline_mapping_firstorder econf (p : Ast.Env.program) pr i u args v v1 :
+  enable_unsafe econf = no_unsafe_passes ->
+  PCUICClassification.axiom_free (pcuic_env p) ->
+  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
+      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
+  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
+    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  eval_template_program_mapping ([], p) v ->
+  Transform.obseq (erasure_pipeline_mapping econf) ([], p) pr
+    (Transform.run (erasure_pipeline_mapping econf) ([], p) pr) v v1 ->
+  let t := ErasureCorrectness.compile_value_box (pcuic_env p) (pcuic_term p v) [] in
+  v1 = t /\ constr_tree t /\
+  forall ind, In ind (tree_inductives t) ->
+    EGlobalEnv.lookup_inductive_kind (Transform.run (erasure_pipeline_mapping econf) ([], p) pr).1
+      (inductive_mind ind) <> Some BasicAst.CoFinite.
+Admitted.
+
+(** The erasure pipeline maps first-order values to their trees of constructors, with
+    parameters erased and singleton constructors unboxed. We restrict to the verified passes
+    of MetaRocq's untyped erasure pipeline, without inductive mappings: typed erasure removes
+    dead constructor arguments (dearging), and the unsafe passes and inductive mappings change
+    the representation of inductive values. *)
+Lemma erasure_obseq_firstorder (o : Options) (p : Ast.Env.program) i u args v v_er :
+  enable_typed_erasure (erasure_config o) = false ->
+  enable_unsafe (erasure_config o) = no_unsafe_passes ->
+  Pipeline_utils.inductives_mapping o = [] ->
+  PCUICClassification.axiom_free (pcuic_env p) ->
+  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
+      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
+  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
+    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  eval_template_program_mapping (Pipeline_utils.inductives_mapping o, p) v ->
+  erasure_obseq o p v v_er ->
+  let t := ErasureCorrectness.compile_value_box (pcuic_env p) (pcuic_term p v) [] in
+  constr_tree t /\ v_er = unbox_fo (erased_program o p).1 t.
+Proof.
+  intros htyped hunsafe himap hax hty hfo hev [pr hobs] t.
+  rewrite /erased_program (erase_program_run _ _ _ pr) in hobs |- *.
+  move: pr hev hobs. rewrite himap /certirocq_erasure_pipeline htyped => pr hev hobs.
+  apply obseq_compose_inv in hobs as (v1 & hobs1 & hobs2).
+  destruct (erasure_pipeline_mapping_firstorder _ _ _ _ _ _ _ _ hunsafe hax hty hfo hev hobs1)
+    as (-> & htree & hind).
+  split => //.
+  exact (post_pipeline_firstorder _ _ _ _ _ _ hunsafe htree hind hobs2).
+Qed.
+
+(** The first-order variant of [CertiRocq_pipeline_total_correct]: the LambdaANF program
+    computes the same tree of constructors as the source program. *)
+Theorem CertiRocq_pipeline_firstorder (next_id : positive) (dbg : bool) (o : Options)
+  (p : Ast.Env.program) w i u args :
+  (* The source program is well-typed *)
+  wf_template_inductives_mapping p.1 (Pipeline_utils.inductives_mapping o) ->
+  ∥ @TemplateProgram.wt_template_program config.extraction_checker_flags p ∥ ->
+  (* We use the ANF translation, and do not register primitives *)
+  direct o = true ->
+  (* The erased program has no axioms nor primitive arrays *)
+  wf_eprogram (certirocq_flags env_flags) (erased_program o p) ->
+  (* Only the verified erasure passes are used, without inductive mappings *)
+  enable_typed_erasure (erasure_config o) = false ->
+  enable_unsafe (erasure_config o) = no_unsafe_passes ->
+  Pipeline_utils.inductives_mapping o = [] ->
+  (* The source program computes a value of a first-order inductive type *)
+  PCUICClassification.axiom_free (pcuic_env p) ->
+  ∥ @PCUICTyping.typing config.extraction_checker_flags (pcuic_env_ext p) []
+      (pcuic_term p p.2) (PCUICAst.mkApps (PCUICAst.tInd i u) args) ∥ ->
+  PCUICFirstorder.firstorder_ind (pcuic_env_ext p)
+    (PCUICFirstorder.firstorder_env (pcuic_env_ext p)) i ->
+  exists r w',
+    runState (CertiRocq_pipeline next_id [] dbg p) o w = (compM.Ret r, w') /\
+    forall v,
+      eval_template_program_mapping (Pipeline_utils.inductives_mapping o, p) v ->
+      exists v_tgt c t,
+        @bstep_fuel (anf_cenv r) nat fuel_res (nat * nat) trace_res (anf_env r) (anf_exp r) c
+          (Res v_tgt) t /\
+        fo_value_ref (erased_program o p).1 (erased_tag_map o p)
+          (ErasureCorrectness.compile_value_box (pcuic_env p) (pcuic_term p v) []) v_tgt.
+Proof.
+  intros hmap hwt hdirect hwf htyped hunsafe himap hax hty hfo.
+  destruct (CertiRocq_pipeline_total_correct next_id dbg o p w hmap hwt hdirect hwf)
+    as (r & w' & hrun & hcorr).
+  exists r, w'. split => // v hev.
+  destruct (hcorr v hev) as (v_er & v_tgt & c & t & hobs & _ & hev_tgt & hv).
+  destruct (erasure_obseq_firstorder o p i u args v v_er htyped hunsafe himap hax hty hfo hev hobs)
+    as [htree ->].
+  exists v_tgt, c, t. split => //.
+  now apply obs_val_unbox_fo.
 Qed.
