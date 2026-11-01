@@ -350,3 +350,29 @@ Proof.
   apply check_wf_glob_spec in hm as [wfΣ heq].
   rewrite wellformed_map_spec heq in ht. now split.
 Qed.
+
+Lemma fresh_global_lookup_env_None kn Σ :
+  EGlobalEnv.fresh_global kn Σ -> EGlobalEnv.lookup_env Σ kn = None.
+Proof.
+  induction 1 as [|[kn' d] Σ hneq _ IH]; cbn => //.
+  case: (ReflectEq.eqb_spec kn kn') => // heq. subst. now elim hneq.
+Qed.
+
+Lemma check_wf_glob_complete {efl : EEnvFlags} Σ :
+  wf_glob Σ -> exists m, check_wf_glob Σ = Some m /\ GlobalContextMap.global_decls m = Σ.
+Proof.
+  induction 1 as [|kn d Σ wfΣ [m [hm heq]] hd hfresh]; cbn.
+  - now eexists.
+  - rewrite hm.
+    destruct option_None_dec as [hl|hl].
+    + rewrite wf_global_decl_map_spec heq hd. eexists; split; [reflexivity|]. cbn. now rewrite heq.
+    + elim hl. rewrite GlobalContextMap.lookup_env_spec heq.
+      now apply fresh_global_lookup_env_None.
+Qed.
+
+Lemma check_wf_eprogram_complete efl p : wf_eprogram efl p -> check_wf_eprogram efl p.
+Proof.
+  intros [wfΣ ht]. unfold check_wf_eprogram.
+  destruct (check_wf_glob_complete _ wfΣ) as [m [-> heq]].
+  now rewrite wellformed_map_spec heq.
+Qed.
