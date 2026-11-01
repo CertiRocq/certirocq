@@ -637,13 +637,12 @@ Qed.
 Lemma coinductive_trans_tree (Σ : EEnvMap.GlobalContextMap.t) t :
   constr_tree t ->
   (forall ind, In ind (tree_inductives t) ->
-    EGlobalEnv.lookup_inductive_kind (EEnvMap.GlobalContextMap.global_decls Σ) (inductive_mind ind)
-      <> Some BasicAst.CoFinite) ->
+    erasure_firstorder.not_coinductive (EEnvMap.GlobalContextMap.global_decls Σ) ind) ->
   ECoInductiveToInductive.trans Σ t = t.
 Proof.
   induction 1 using constr_tree_ind'. intros hind. cbn.
   rewrite EEnvMap.GlobalContextMap.is_coind_spec /EGlobalEnv.is_coind.
-  have hk := hind ind (or_introl eq_refl).
+  have hk := hind ind (or_introl eq_refl). rewrite /erasure_firstorder.not_coinductive in hk.
   have -> : map (ECoInductiveToInductive.trans Σ) args = args.
   { apply map_id_tree. clear -H0 hind. induction H0 as [|x l hx hl IH]; constructor.
     - apply hx => i hi. apply hind. right. cbn. apply in_or_app. now left.
@@ -741,8 +740,7 @@ Qed.
 Lemma post_pipeline_firstorder econf (p : eprogram) pr p' v v' :
   enable_unsafe econf = no_unsafe_passes ->
   constr_tree v ->
-  (forall ind, In ind (tree_inductives v) ->
-    EGlobalEnv.lookup_inductive_kind p.1 (inductive_mind ind) <> Some BasicAst.CoFinite) ->
+  (forall ind, In ind (tree_inductives v) -> erasure_firstorder.not_coinductive p.1 ind) ->
   Transform.obseq (certirocq_post_metarocq_pipeline [] econf) p pr p' v v' ->
   v' = unbox_fo (Transform.transform (certirocq_post_metarocq_pipeline [] econf) p pr).1 v.
 Proof.
@@ -812,8 +810,8 @@ Lemma erasure_pipeline_mapping_firstorder econf (p : Ast.Env.program) pr i u arg
   let t := ErasureCorrectness.compile_value_box (pcuic_env p) (pcuic_term p v) [] in
   v1 = t /\ constr_tree t /\
   forall ind, In ind (tree_inductives t) ->
-    EGlobalEnv.lookup_inductive_kind (Transform.run (erasure_pipeline_mapping econf) ([], p) pr).1
-      (inductive_mind ind) <> Some BasicAst.CoFinite.
+    erasure_firstorder.not_coinductive
+      (Transform.run (erasure_pipeline_mapping econf) ([], p) pr).1 ind.
 Proof.
   intros hax hty hfo hev hobs t.
   destruct (erasure_firstorder.erasure_pipeline_mapping_firstorder econf p pr i u args v v1
