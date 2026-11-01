@@ -592,15 +592,15 @@ Section GlobalBindingsCorrect.
   Let src_eval := @eval_env_fuel nat Hf_src Ht_src Σ.
 
   (** Per-(cm,Σ') versions of the value, env, and global env relations. *)
-  Local Notation val_rel_at cm0 Σ0 :=
+  Local Abbreviation val_rel_at cm0 Σ0 :=
     (@anf_val_rel func_tag default_tag tgm cm0 nat Hf_src Ht_src Σ0).
-  Local Notation env_rel_at cm0 Σ0 :=
+  Local Abbreviation env_rel_at cm0 Σ0 :=
     (@anf_env_rel func_tag default_tag tgm cm0 nat Hf_src Ht_src Σ0).
-  Local Notation glob_rel_at cm0 Σ0 :=
+  Local Abbreviation glob_rel_at cm0 Σ0 :=
     (@global_env_rel func_tag default_tag tgm cm0 nat Hf_src Ht_src Σ0).
-  Local Notation cvt_rel_at cm0 :=
+  Local Abbreviation cvt_rel_at cm0 :=
     (@anf_cvt_rel func_tag default_tag tgm cm0).
-  Local Notation eval_at Σ0 :=
+  Local Abbreviation eval_at Σ0 :=
     (@eval_env_fuel nat Hf_src Ht_src Σ0).
 
   Context (Hglob_term :
@@ -1770,9 +1770,9 @@ Section GlobalBindingsCoherence.
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
 
-  Local Notation cvt_rel_at cm0 :=
+  Local Abbreviation cvt_rel_at cm0 :=
     (@anf_cvt_rel func_tag default_tag tgm cm0).
-  Local Notation eval_at Σ0 :=
+  Local Abbreviation eval_at Σ0 :=
     (@eval_env_fuel nat Hf_src Ht_src Σ0).
 
   Context (Hglob_term :

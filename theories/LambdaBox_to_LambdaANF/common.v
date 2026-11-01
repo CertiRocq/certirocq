@@ -20,7 +20,7 @@ From CertiRocq.LambdaANF Require Import term ctx Ensembles_util.
 Import ListNotations.
 Open Scope bs_scope.
 
-Local Notation string := bytestring.string.
+Local Abbreviation string := bytestring.string.
 
 (** * Constructor discriminant *)
 

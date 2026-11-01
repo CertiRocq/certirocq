@@ -215,10 +215,10 @@ Section ANF_Val.
           | (eapply Included_trans; [eassumption |];
              eapply Included_trans; [apply Setminus_Included |]; eassumption) ].
 
-  Local Notation P_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
-  Local Notation P0_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
-  Local Notation P1_sub := (fun S0 _ _ _ S0' _ => Included _ S0' S0).
-  Local Notation P2_sub := (fun S0 _ _ _ _ _ S0' _ => Included _ S0' S0).
+  Local Abbreviation P_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
+  Local Abbreviation P0_sub := (fun S0 _ _ S0' _ _ => Included _ S0' S0).
+  Local Abbreviation P1_sub := (fun S0 _ _ _ S0' _ => Included _ S0' S0).
+  Local Abbreviation P2_sub := (fun S0 _ _ _ _ _ S0' _ => Included _ S0' S0).
 
   Lemma anf_cvt_exp_subset :
     forall S e vn S' C x,
