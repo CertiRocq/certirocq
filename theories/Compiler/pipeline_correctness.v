@@ -23,12 +23,11 @@
 
     Remaining assumptions, besides the ones of the theorems we compose (see the end of the file):
     - [eval_to_fuel_sem] (axiom): proven by MetaRocq PR #1288 (WcbvEval to eval_SI) and
-      CertiRocq PR #156 (eval_SI to fuel_sem);
-    - [convert_top_anf_closed_unique_bindings] (admitted): ANF conversion produces closed
-      programs with unique bindings.
+      CertiRocq PR #156 (eval_SI to fuel_sem).
 
     The constructor environment along ANF conversion and the LambdaANF pipeline is handled in
-    [anf_cenv.v]. *)
+    [anf_cenv.v], and the scoping of the programs produced by ANF conversion in
+    [anf_scoping.v]. *)
 
 From Stdlib Require Import ssreflect ssrbool.
 From Equations Require Import Equations.
@@ -40,7 +39,7 @@ From MetaRocq.Erasure Require Import EAst EWellformed EProgram.
 From MetaRocq.ErasurePlugin Require Import Erasure.
 From MetaRocq.Utils Require Import utils.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common fuel_sem anf_convert_env anf_correct
-  anf_toplevel.
+  anf_toplevel anf_scoping.
 Require Import LambdaANF.term LambdaANF.state LambdaANF.eval LambdaANF.identifiers
   LambdaANF.term_util LambdaANF.rel_comp LambdaANF.bounds.
 From CertiRocq Require Import metarocq_pipeline pipeline correctness anf_cenv.
@@ -189,8 +188,7 @@ Axiom eval_to_fuel_sem :
       @eval_env_step nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ [] t (Val v') f tr /\
       v = fs_value_to_term v'.
 
-(** The program produced by ANF conversion is closed and has unique bindings.
-    TODO: prove, by induction on [anf_cvt_rel] and [anf_cvt_rel_global] (see [anf_corresp.v]). *)
+(** The program produced by ANF conversion is closed and has unique bindings *)
 Lemma convert_top_anf_closed_unique_bindings func_tag default_tag default_itag next_id
   (Σ : EAst.global_context) e e_tgt comp_d :
   wf_eprogram (certirocq_flags env_flags) (Σ, e) ->
@@ -198,7 +196,15 @@ Lemma convert_top_anf_closed_unique_bindings func_tag default_tag default_itag n
   anf.convert_top_anf func_tag default_tag (M.empty _) default_itag next_id []
     (fun _ => None) ie (List.rev Σ) e = (compM.Ret e_tgt, comp_d) ->
   closed_exp e_tgt /\ unique_bindings e_tgt.
-Admitted.
+Proof.
+  intros wf ie hcvt.
+  destruct (anf_corresp.convert_top_anf_corresp func_tag default_tag default_itag ie Σ
+    (efl := certirocq_flags env_flags) eq_refl (M.empty _) [] (proj1 wf)
+    eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl (fun _ => eq_refl) (convert_env_reg _ _ _)
+    next_id e e_tgt comp_d (proj2 wf) hcvt)
+    as (cm & Sg & S' & C_env & C & r & hglob & hmain & ->).
+  exact: anf_cvt_program_scoping hglob hmain.
+Qed.
 
 (** ** Inversion of the pipeline *)
 
