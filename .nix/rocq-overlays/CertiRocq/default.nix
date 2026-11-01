@@ -15,6 +15,8 @@ with lib;
 let
   # The theories, the optimized plugin and its runtime, and the vanilla plugin
   packages = [ "rocq-certirocq" "rocq-certirocq-vanilla" ];
+  # The bootstrapped compiler and checker, which are only built by the tests
+  allPackages = packages ++ [ "rocq-certirocqc" "rocq-certirocqchk" ];
 in
 (mkRocqDerivation {
   pname = "CertiRocq";
@@ -53,6 +55,22 @@ in
     runHook preBuild
     dune build -p ${concatStringsSep "," packages} ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
     runHook postBuild
+  '';
+  doCheck = true;
+  # For the Wasm tests
+  nativeCheckInputs = [ pkgs.nodejs_22 pkgs.python3 ];
+  checkPhase = ''
+    runHook preCheck
+    echo "running bootstrap"
+    dune build -p ${concatStringsSep "," allPackages} @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+    echo "running tests"
+    # Some test programs recurse deeper than the default stack allows
+    ulimit -Ss "$(ulimit -Hs)"
+    patchShebangs tests
+    installed=$PWD/_build/install/default/lib
+    ROCQPATH=$installed/coq/user-contrib''${ROCQPATH:+:$ROCQPATH} \
+      OCAMLPATH=$installed''${OCAMLPATH:+:$OCAMLPATH} make -C tests
+    runHook postCheck
   '';
   installPhase = ''
     runHook preInstall
