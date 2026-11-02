@@ -1,20 +1,13 @@
 name: OPAM CI
 
+# Run on demand only, from the Actions tab or with `gh workflow run build.yml --ref <branch>`
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - "**"
   workflow_dispatch:
     inputs: {}
 
 jobs:
   build-matrix:
     runs-on: ubuntu-latest
-    # Optional: a failure of this job does not fail the workflow
-    continue-on-error: true
     strategy:
       matrix:
         opam_file:
