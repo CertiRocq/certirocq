@@ -190,7 +190,9 @@ let fix_opts opts =
 
 let compile opts prog =
   info "Calling certirocq-compiled certirocq";
+  Printf.printf "options before fix_opts: %!"; print_obj 4 (Obj.repr opts); print_newline ();
   let opts = fix_opts opts in
+  Printf.printf "options after fix_opts: %!"; print_obj 4 (Obj.repr opts); print_newline ();
   (* let pretty= Pretty.print_program false (Obj.magic (Caml_nat.nat_of_caml_int 100)) (Obj.magic prog) in *)
   (* let _ = info (Caml_bytestring.caml_string_of_bytestring (Obj.magic pretty)) in *)
   let prog = fix_quoted_program prog in

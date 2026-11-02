@@ -59,5 +59,5 @@ jobs:
               cd ~/repo && ./configure.sh global
               cd ~/repo/bootstrap/certirocqc && mkdir -p tests
               ulimit -s unlimited
-              gdb -batch -ex "set follow-fork-mode child" -ex "handle SIGSEGV stop" -ex run -ex "bt 40" -ex "info threads" -ex "thread apply all bt 8" -ex "info registers" -ex "x/8i \$pc" --args coqc test.v
+              gdb -batch -x crash.gdb --args coqc test.v
             endGroup
