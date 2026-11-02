@@ -1,4 +1,5 @@
-COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ../lib CertiRocq.Tests.lib
+include ../config.mk
+COQOPTS = $(PLUGINOPTS) -R ../lib CertiRocq.Tests.lib
 
 # Benchmarks compiled and run by this directory.
 TESTS=$(shell cat TESTS)
