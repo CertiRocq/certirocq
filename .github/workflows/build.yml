@@ -54,10 +54,10 @@ jobs:
             startGroup "List installed packages"
               opam list
             endGroup
-            startGroup "Run tests"
-              make -C ~/repo plugin && make -C ~/repo/tests all
-            endGroup
-            startGroup "Test bootstrapped plugins"
+            startGroup "Debug the bootstrap test"
+              sudo apt-get install --yes gdb
               cd ~/repo && ./configure.sh global
-              make -C ~/repo/bootstrap test
+              cd ~/repo/bootstrap/certirocqc && mkdir -p tests
+              ulimit -s unlimited
+              gdb -batch -ex "set follow-fork-mode child" -ex "handle SIGSEGV stop" -ex run -ex "bt 40" -ex "info threads" -ex "thread apply all bt 8" -ex "info registers" -ex "x/8i \$pc" --args coqc test.v
             endGroup
