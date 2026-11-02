@@ -28,9 +28,6 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
-            startGroup "Add the Rocq package repository"
-              opam repo add --yes rocq-released https://rocq-prover.org/opam/released
-            endGroup
             startGroup "Pin the MetaRocq 9.1 branch"
               # CertiRocq depends on this unreleased version of MetaRocq.
               opam pin add --yes --no-action \
