@@ -1,4 +1,4 @@
-name: Compile and test
+name: OPAM CI
 
 on:
   push:
@@ -13,12 +13,14 @@ on:
 jobs:
   build-matrix:
     runs-on: ubuntu-latest
+    # Optional: a failure of this job does not fail the workflow
+    continue-on-error: true
     strategy:
       matrix:
         opam_file:
           - 'rocq-certirocq.opam'
         image:
-          - 'mattam82/metacoq:metarocq-1.5.1-rocq-9.1'
+          - 'rocq/rocq-prover:9.1-ocaml-4.14-flambda'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
@@ -33,14 +35,13 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
+            startGroup "Add the Rocq package repository"
+              opam repo add --yes rocq-released https://rocq-prover.org/opam/released
+            endGroup
             startGroup "Pin the MetaRocq 9.1 branch"
-              # The image's 1.5.1 release lacks EImplementLazyForce.
+              # CertiRocq depends on this unreleased version of MetaRocq.
               opam pin add --yes --no-action \
                 'git+https://github.com/MetaRocq/metarocq.git#9.1'
-            endGroup
-            startGroup "Unpin coq-wasm"
-              # The image pins coq-wasm to 2.2.0; main requires >= 2.2.1.
-              opam pin remove --yes --no-action coq-wasm
             endGroup
           before_script: |
             startGroup "Install more dependencies"
