@@ -20,8 +20,11 @@ mkCoqDerivation {
 
   buildInputs = [ CertiRocq ];
 
+  # The _CoqProject files load the vanilla plugin from the source tree, which
+  # is not built here: use the installed one instead.
   patchPhase = ''
     patchShebangs ./configure.sh
+    sed -i '/plugins\/cplugin/d' bootstrap/certirocqc/_CoqProject bootstrap/certirocqchk/_CoqProject
   '';
 
   configurePhase = ''
