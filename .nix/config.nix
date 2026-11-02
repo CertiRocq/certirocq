@@ -1,3 +1,36 @@
+let
+  ## The development branches of Rocq and of all the libraries CertiRocq
+  ## depends on, shared by the bundles below
+  rocqPackages = {
+    rocq-core.override.version = "master";
+    coq.override.version = "master";
+    stdlib.override.version = "master";
+    metarocq.job = false;
+    metarocq.override.version = "main";
+    metarocq-erasure.job = true;
+    metarocq-safechecker.job = true;
+    equations.job = false;
+    equations.override.version = "main";
+    ExtLib.job = false;
+    ExtLib.override.version = "master";
+    compcert.job = false;
+    compcert.override.version = "master";
+    MenhirLib.job = false;
+    MenhirLib.override.version = "master";
+    flocq.job = false;
+    flocq.override.version = "master";
+    wasmcert.job = false;
+    wasmcert.override.version = "rocq-master";
+    mathcomp.job = false;
+    mathcomp.override.version = "master";
+    parseque.job = false;
+    parseque.override.version = "master";
+    hierarchy-builder.job = false;
+    hierarchy-builder.override.version = "master";
+    rocq-elpi.job = false;
+    rocq-elpi.override.version = "master";
+  };
+in
 {
   ## DO NOT CHANGE THIS
   format = "1.0.0";
@@ -19,34 +52,15 @@
   ## The default bundle uses the development branches of Rocq
   ## and of all the libraries CertiRocq depends on.
   bundles."default" = {
-    rocqPackages = {
-      rocq-core.override.version = "master";
-      coq.override.version = "master";
-      stdlib.override.version = "master";
-      metarocq.job = false;
-      metarocq.override.version = "main";
-      metarocq-erasure.job = true;
-      metarocq-safechecker.job = true;
-      equations.job = false;
-      equations.override.version = "main";
-      ExtLib.job = false;
-      ExtLib.override.version = "master";
-      compcert.job = false;
-      compcert.override.version = "master";
-      MenhirLib.job = false;
-      MenhirLib.override.version = "master";
-      flocq.job = false;
-      flocq.override.version = "master";
-      wasmcert.job = false;
-      wasmcert.override.version = "rocq-master";
-      mathcomp.job = false;
-      mathcomp.override.version = "master";
-      parseque.job = false;
-      parseque.override.version = "master";
-      hierarchy-builder.job = false;
-      hierarchy-builder.override.version = "master";
-      rocq-elpi.job = false;
-      rocq-elpi.override.version = "master";
+    inherit rocqPackages;
+  };
+  ## The same, with the check phase also building and testing the
+  ## bootstrapped compiler and checker, which takes about 15 more minutes.
+  ## It has no generated workflow: .github/workflows/nix-bootstrap.yml
+  ## builds it on the pull requests labeled "bootstrap".
+  bundles."bootstrap" = {
+    rocqPackages = rocqPackages // {
+      CertiRocq.override.bootstrap = true;
     };
   };
 

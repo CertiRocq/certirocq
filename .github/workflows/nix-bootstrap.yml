@@ -1,0 +1,39 @@
+# Builds CertiRocq with the bootstrap bundle of .nix/config.nix, whose check phase
+# also builds and tests the bootstrapped compiler and checker. It only runs on the
+# pull requests that have the "bootstrap" label, and is skipped on the others:
+# adding the label runs it. It is a separate workflow so that labeling a pull
+# request does not restart the regular Nix CI.
+name: Nix CI with bootstrap
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+permissions:
+  contents: read
+# Adding another label starts a run that does nothing: it gets a group of its own,
+# so that it does not cancel a bootstrap run in progress.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'bootstrap' && format('-{0}', github.run_id) || '' }}
+jobs:
+  CertiRocq-bootstrap:
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'bootstrap')
+      && (github.event.action != 'labeled' || github.event.label.name == 'bootstrap')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Git checkout
+      uses: actions/checkout@v7
+    - name: Cachix install
+      uses: cachix/install-nix-action@v31
+      with:
+        nix_path: nixpkgs=channel:nixpkgs-unstable
+    - name: Cachix setup metarocq
+      uses: cachix/cachix-action@v16
+      with:
+        authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        extraPullNames: coq, coq-community, math-comp
+        name: metarocq
+    # The dependencies are those of the default bundle, usually in the cache
+    - name: Building CertiRocq with the bootstrap
+      run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
+        "bootstrap" --argstr job "CertiRocq"

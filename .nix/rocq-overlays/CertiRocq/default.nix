@@ -10,7 +10,7 @@
   ExtLib,
   version ? null,
   # Whether the check phase builds and tests the bootstrapped compiler and checker
-  # (temporarily disabled)
+  # (only in the bootstrap bundle of .nix/config.nix)
   bootstrap ? false,
 }:
 
