@@ -1,12 +1,7 @@
-name: Compile and test
+name: OPAM CI
 
+# Run on demand only, from the Actions tab or with `gh workflow run build.yml --ref <branch>`
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - "**"
   workflow_dispatch:
     inputs: {}
 
@@ -18,7 +13,7 @@ jobs:
         opam_file:
           - 'rocq-certirocq.opam'
         image:
-          - 'mattam82/metacoq:metarocq-1.5.1-rocq-9.1'
+          - 'rocq/rocq-prover:9.1-ocaml-4.14-flambda'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
@@ -33,14 +28,10 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
-            startGroup "Pin the MetaRocq 9.1 development snapshot"
-              # The image's 1.5.1 release lacks EImplementLazyForce.
+            startGroup "Pin the MetaRocq 9.1 branch"
+              # CertiRocq depends on this unreleased version of MetaRocq.
               opam pin add --yes --no-action \
-                'git+https://github.com/MetaRocq/metarocq.git#c8cd46054518193103c3bb33aa6e15c7f489e72c'
-            endGroup
-            startGroup "Unpin coq-wasm"
-              # The image pins coq-wasm to 2.2.0; main requires >= 2.2.1.
-              opam pin remove --yes --no-action coq-wasm
+                'git+https://github.com/MetaRocq/metarocq.git#9.1'
             endGroup
           before_script: |
             startGroup "Install more dependencies"

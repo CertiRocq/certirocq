@@ -38,6 +38,7 @@ depends: [
   "rocq-metarocq-safechecker-plugin" {>= "1.5.1"}
   "coq-ext-lib" {>= "0.12"}
   "coq-wasm" {>= "2.2.1"}
+  "rocq-mathcomp-ssreflect" {< "2.6~"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "

@@ -29,6 +29,8 @@
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;
       metarocq.override.version = "9.1";
+      # Built against the cached CertiRocq package, see its overlay.
+      CertiRocq-bootstrap.job = true;
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };

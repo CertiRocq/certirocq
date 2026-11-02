@@ -33,11 +33,10 @@ Whenever you open a new terminal, run
 ## 3. Pin MetaRocq
 
 CertiRocq currently depends on a version of MetaRocq that has not been
-released yet (the `9.1` branch). Pin MetaRocq to the commit that CertiRocq is
-tested against:
+released yet. Pin MetaRocq to its `9.1` branch:
 
 ```console
-$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#c8cd46054518193103c3bb33aa6e15c7f489e72c
+$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.1
 ```
 
 ## 4. Install the dependencies
