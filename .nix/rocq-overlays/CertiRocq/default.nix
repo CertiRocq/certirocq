@@ -9,6 +9,9 @@
   metarocq-safechecker-plugin,
   ExtLib,
   version ? null,
+  # Whether the check phase builds and tests the bootstrapped compiler and checker
+  # (temporarily disabled)
+  bootstrap ? false,
 }:
 
 with lib;
@@ -61,8 +64,10 @@ in
   nativeCheckInputs = [ pkgs.nodejs_22 pkgs.python3 ];
   checkPhase = ''
     runHook preCheck
+  '' + optionalString bootstrap ''
     echo "running bootstrap"
     dune build -p ${concatStringsSep "," allPackages} @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+  '' + ''
     echo "running tests"
     # Some test programs recurse deeper than the default stack allows
     ulimit -Ss "$(ulimit -Hs)"
