@@ -24,7 +24,7 @@ mpz_ptr mpz_of_value(gmp_int x) {
   { mpz_ptr res;
     res = malloc(sizeof(__mpz_struct));
     trace("found a long value\n");
-    mpz_init_set_ui (res, Long_val (x));
+    mpz_init_set_si (res, Long_val (x));
     return res; }
   { trace("found a structured mpz value at %p\n", (void*) x);
     return MPZ_val(x); }
@@ -183,7 +183,8 @@ gmp_int gmp_abs(struct thread_info *tinfo, mpz_t x) {
 
 gmp_int z_abs(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
-    return (Long_val (labs (Val_long(x))));
+    intnat y = Long_val(x);
+    if (y > Min_long) { return Val_long (labs (y)); }
   }
   return gmp_abs(tinfo, MPZ_val(x));
 }
@@ -208,21 +209,16 @@ gmp_int z_neg(struct thread_info *tinfo, gmp_int x) {
 
 gmp_int gmp_add(struct thread_info *tinfo, mpz_t x, mpz_t y) {
   mpz_ptr res = malloc(sizeof(__mpz_struct));
+  mpz_init(res);
   mpz_add(res, x, y);
   return mk_gmp_int(tinfo, res);
 }
 
 gmp_int z_add(struct thread_info *tinfo, gmp_int x, gmp_int y) {
   if (Is_long (x) && Is_long(y)) {
-    // TODO Overflow
-    unsigned long long z = Long_val (x) + Long_val(y);
-    if (((1LLU << 63) & z) == 0) {
-      trace ("no overflow in z_add: 0x%08llx\n", z);
-      return Val_long(z);
-    } else {
-      trace ("overflow in z_add\n");
-      return gmp_add(tinfo, mpz_of_value(x), mpz_of_value(y));
-    }
+    intnat z = Long_val (x) + Long_val(y);
+    if (Min_long <= z && z <= Max_long) { return Val_long(z); }
+    return gmp_add(tinfo, mpz_of_value(x), mpz_of_value(y));
   } else {
     return gmp_add(tinfo, mpz_of_value(x), mpz_of_value(y));
   }
@@ -237,8 +233,9 @@ gmp_int gmp_sub(struct thread_info *tinfo, mpz_t x, mpz_t y) {
 
 gmp_int z_sub(struct thread_info *tinfo, gmp_int x, gmp_int y) {
   if (Is_long (x) && Is_long(y)) {
-    // TODO Overflow
-    return (Val_long (Long_val (x) - Long_val(y)));
+    intnat z = Long_val (x) - Long_val(y);
+    if (Min_long <= z && z <= Max_long) { return Val_long(z); }
+    return gmp_sub(tinfo, mpz_of_value(x), mpz_of_value(y));
   } else {
     return gmp_sub(tinfo, mpz_of_value(x), mpz_of_value(y));
   }
@@ -262,7 +259,7 @@ gmp_int z_mul(struct thread_info *tinfo, gmp_int x, gmp_int y) {
 gmp_int gmp_div(struct thread_info *tinfo, mpz_t x, mpz_t y) {
   mpz_ptr res = malloc(sizeof(__mpz_struct));
   mpz_init(res);
-  mpz_cdiv_q(res, x, y);
+  mpz_tdiv_q(res, x, y);
   return mk_gmp_int(tinfo, res);
 }
 
@@ -276,7 +273,7 @@ gmp_int z_div(struct thread_info *tinfo, gmp_int x, gmp_int y) {
 gmp_int gmp_rem(struct thread_info *tinfo, mpz_t x, mpz_t y) {
   mpz_ptr res = malloc(sizeof(__mpz_struct));
   mpz_init(res);
-  mpz_cdiv_r(res, x, y);
+  mpz_tdiv_r(res, x, y);
   return mk_gmp_int(tinfo, res);
 }
 
@@ -284,7 +281,7 @@ gmp_int z_rem(struct thread_info *tinfo, gmp_int x, gmp_int y) {
   if (Is_long (x) && Is_long(y))
     // TODO Overflow
     { return (Val_long (Long_val (x) % Long_val(y))); }
-  { return gmp_add(tinfo, mpz_of_value(x), mpz_of_value(y)); }
+  { return gmp_rem(tinfo, mpz_of_value(x), mpz_of_value(y)); }
 }
 
 // Truncate y to an unsigned long int
@@ -384,7 +381,7 @@ primint z_equal(gmp_int x, gmp_int y) {
 }
 
 primbool gmp_leq(mpz_t x, mpz_t y) {
-  return (mk_bool (mpz_cmp (x, y) ? 0 : 1));
+  return (mk_bool (mpz_cmp (x, y) <= 0));
 }
 
 primbool z_leq(gmp_int x, gmp_int y) {
@@ -436,7 +433,7 @@ gmp_int z_max(gmp_int x, gmp_int y) {
     // Correct ?
     { return (Long_val(x) > Long_val(y) ? x : y); }
   { int cmp = mpz_cmp (mpz_of_value(x), mpz_of_value(y));
-    return (cmp ? x : y); }
+    return (cmp > 0 ? x : y); }
 }
 
 gmp_int z_min(gmp_int x, gmp_int y) {
@@ -444,7 +441,7 @@ gmp_int z_min(gmp_int x, gmp_int y) {
     // Correct ?
     { return (Long_val(x) < Long_val(y) ? x : y); }
   { int cmp = mpz_cmp (mpz_of_value(x), mpz_of_value(y));
-    return (cmp ? y : x); }
+    return (cmp < 0 ? x : y); }
 }
 
 gmp_int gmp_of_int(primint x) {
