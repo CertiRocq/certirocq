@@ -55,9 +55,10 @@ jobs:
               opam list
             endGroup
             startGroup "Run tests"
-              make -C ~/repo plugin && make -C ~/repo/tests all
+              # Against the installed packages, rather than building the source tree again
+              cd ~/repo && ./configure.sh global
+              make -C ~/repo/tests all
             endGroup
             startGroup "Test bootstrapped plugins"
-              cd ~/repo && ./configure.sh global
               make -C ~/repo/bootstrap test
             endGroup

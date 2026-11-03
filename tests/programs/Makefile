@@ -1,6 +1,6 @@
-COQOPTS = -R ../../plugins/plugin CertiRocq.Plugin -I ../../plugins/plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
+include ../config.mk
+COQOPTS = $(PLUGINOPTS) -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
 CCOMPILER?=gcc
-INCLUDE=../../runtime
 WARN_OPTS=-w -Wno-everything
 
 # Names of the tests
