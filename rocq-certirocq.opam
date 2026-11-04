@@ -47,6 +47,7 @@ depends: [
 # includes it.
 pin-depends: [
   ["rocq-vellvm.dev" "git+https://github.com/vellvm/vellvm.git#b63a28a0a36cbae73a454d99a97bb8171568343e"]
+  "rocq-mathcomp-ssreflect" {< "2.6~"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "

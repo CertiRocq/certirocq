@@ -142,14 +142,18 @@ let get_global_inductives_mapping () = !global_inductive_registers
 
 (* Extract Inline *)
 
+(* The registered constants are kept in MetaRocq's representation of kername sets, which
+   [fix_opts] converts to the one expected by the pipeline. *)
 let global_inlining_registers =
-  Summary.ref ~name:"CertiRocq Extraction Inlining Registration" Kernames.KernameSet.empty
+  Summary.ref ~name:"CertiRocq Extraction Inlining Registration"
+    Metarocq_template_plugin.Kernames.KernameSet.empty
 
 let global_inlining_registers_name = "certirocq-inlining-registration"
 
 let cache_inlining_registers csts =
   let csts' = !global_inlining_registers in
-  global_inlining_registers := Kernames.KernameSet.union csts csts'
+  global_inlining_registers :=
+    Metarocq_template_plugin.Kernames.KernameSet.union csts csts'
 
 let global_inlining_registers_input =
   let open Libobject in
@@ -159,7 +163,7 @@ let global_inlining_registers_input =
     ~subst:None)
 
 let register_inlines (csts : Kernames.kername list) : unit =
-  Lib.add_leaf (global_inlining_registers_input (Obj.magic (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts))))
+  Lib.add_leaf (global_inlining_registers_input (Metarocq_template_plugin.Kernames.KernameSetProp.of_list (Obj.magic csts)))
 
 let get_global_inlinings_mapping () = !global_inlining_registers
 
@@ -290,7 +294,7 @@ let make_pipeline_options (opts : options) =
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         dearging_config = default_dearging_config;
         inlining = not (opts.no_inlining);
-        inlined_constants = get_global_inlinings_mapping ();
+        inlined_constants = Obj.magic (get_global_inlinings_mapping ());
         extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)
         })
   in

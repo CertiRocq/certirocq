@@ -1084,6 +1084,20 @@ Section Hoisting_correct.
     - (* Eprim *)
       eapply preord_exp_prim_val_compat.
       + now eauto.
+      + eauto.
+      + intros m1 vs1 vs2 Hlt Hall.
+        eapply IHk; try eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. lia.
+             normalize_occurs_free. sets.
+          -- rewrite preord_val_eq. constructor; eauto.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
     - (* Eprim *)
       eapply preord_exp_prim_compat.
       + now eauto.

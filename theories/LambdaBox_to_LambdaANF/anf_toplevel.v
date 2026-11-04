@@ -111,6 +111,7 @@ Section Refinement.
       dcon_to_tag c1 tgm = Some c2 /\ Forall2_aux vs1 vs2
     | fuel_sem.Clos_v _ _ _, Vfun _ _ _ => True
     | fuel_sem.ClosFix_v _ _ _, Vfun _ _ _ => True
+    | fuel_sem.Prim_v v, Vprim v' => v = v'
     | _, _ => False
     end.
 
@@ -120,6 +121,7 @@ Section Refinement.
       dcon_to_tag c1 tgm = Some c2 /\ Forall2 value_ref' vs1 vs2
     | fuel_sem.Clos_v _ _ _, Vfun _ _ _ => True
     | fuel_sem.ClosFix_v _ _ _, Vfun _ _ _ => True
+    | fuel_sem.Prim_v v, Vprim v' => v = v'
     | _, _ => False
     end.
 
@@ -178,6 +180,10 @@ Section Refinement.
     - rewrite preord_val_eq in Hpre.
       destruct v3; try contradiction.
       simpl. exact I.
+    - rewrite preord_val_eq in Hpre.
+      destruct v3; try contradiction.
+      cbn in Hpre. subst.
+      simpl. reflexivity.
   Qed.
 
   Theorem anf_correct_top_explicit e Sg Sg' S' C_env C r :

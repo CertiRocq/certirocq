@@ -46,7 +46,9 @@ Section WF.
                   EAst.isLambda d.(EAst.dbody) = true /\
                   wellformed Σ (List.length mfix + List.length vs) d.(EAst.dbody) = true)
                mfix ->
-        well_formed_val (ClosFix_v vs mfix idx).
+        well_formed_val (ClosFix_v vs mfix idx)
+  | Wf_Prim :
+      forall v, well_formed_val (Prim_v v).
 
   Definition well_formed_env (rho : env) : Prop :=
     Forall well_formed_val rho.
@@ -261,7 +263,7 @@ Section WF_EVAL.
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
       destruct r; [| exact I].
       apply wellformed_tApp in Hwft as [Hwf1 Hwf2].
-      specialize (IH1 Hwfe Hwf1). inversion IH1 as [| ? ? ? Hwf_rho' Hwf_body |]. subst.
+      specialize (IH1 Hwfe Hwf1). inversion IH1 as [| ? ? ? Hwf_rho' Hwf_body | | ]. subst.
       specialize (IH2 Hwfe Hwf2).
       apply IH3.
       + constructor; assumption.
@@ -273,7 +275,7 @@ Section WF_EVAL.
       destruct r; [| exact I].
       apply wellformed_tApp in Hwft as [Hwf1 Hwf2].
       specialize (IH1 Hwfe Hwf1).
-      inversion IH1 as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix]. subst.
+      inversion IH1 as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix|]. subst.
       specialize (IH2 Hwfe Hwf2).
       unfold fix_body in Hfb.
       destruct (nth_error mfix idx) as [d |] eqn:Hd; [| discriminate].
@@ -305,7 +307,7 @@ Section WF_EVAL.
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
       destruct r; [| exact I].
       pose proof (wellformed_tCase_mch Σ _ _ _ _ _ Hwft) as Hwf_mch.
-      specialize (IH1 Hwfe Hwf_mch). inversion IH1 as [? ? Hwf_vs | |]. subst.
+      specialize (IH1 Hwfe Hwf_mch). inversion IH1 as [? ? Hwf_vs | | |]. subst.
       pose proof (find_branch_wellformed Σ _ _ _ _ _ _ _ _ Hwft Hfind) as Hwf_body.
       apply IH2.
       + unfold well_formed_env. apply Forall_app. split.
@@ -316,7 +318,7 @@ Section WF_EVAL.
     (* eval_Proj_step *)
     - intros p c rho0 vs v0 f1 t1 _ IH Hnth Hwfe Hwft.
       apply (wellformed_tProj Σ) in Hwft.
-      specialize (IH Hwfe Hwft). inversion IH as [? ? Hwf_vs | |]. subst.
+      specialize (IH Hwfe Hwft). inversion IH as [? ? Hwf_vs | | |]. subst.
       eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
       eapply nth_error_In. exact Hnth.
     (* eval_Const_step *)
@@ -324,6 +326,9 @@ Section WF_EVAL.
       apply IH.
       + constructor.
       + exact (globals_wellformed _ _ _ Hdecl Hbody).
+    (* eval_Prim_step *)
+    - intros rho0 p p' htr Hwf Hwft.
+      constructor.
     (* eval_many_nil *)
     - intros rho0 _ _. constructor.
     (* eval_many_cons *)
@@ -417,7 +422,7 @@ Section WF_EVAL.
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
       destruct r; [| exact I].
       apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
-      specialize (IH1 Hwfe Hwf1). inversion IH1 as [| ? ? ? Hwf_rho' Hwf_body |]. subst.
+      specialize (IH1 Hwfe Hwf1). inversion IH1 as [| ? ? ? Hwf_rho' Hwf_body | | ]. subst.
       specialize (IH2 Hwfe Hwf2).
       apply IH3.
       + constructor; assumption.
@@ -429,7 +434,7 @@ Section WF_EVAL.
       destruct r; [| exact I].
       apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
       specialize (IH1 Hwfe Hwf1).
-      inversion IH1 as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix]. subst.
+      inversion IH1 as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix|]. subst.
       specialize (IH2 Hwfe Hwf2).
       unfold fix_body in Hfb.
       destruct (nth_error mfix idx) as [d |] eqn:Hd; [| discriminate].
@@ -460,7 +465,7 @@ Section WF_EVAL.
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
       destruct r; [| exact I].
       pose proof (wellformed_tCase_mch Σ_tail _ _ _ _ _ Hwft) as Hwf_mch.
-      specialize (IH1 Hwfe Hwf_mch). inversion IH1 as [? ? Hwf_vs | |]. subst.
+      specialize (IH1 Hwfe Hwf_mch). inversion IH1 as [? ? Hwf_vs | | |]. subst.
       pose proof (find_branch_wellformed Σ_tail _ _ _ _ _ _ _ _ Hwft Hfind) as Hwf_body.
       apply IH2.
       + unfold well_formed_env. apply Forall_app. split.
@@ -471,7 +476,7 @@ Section WF_EVAL.
     (* eval_Proj_step *)
     - intros p c rho0 vs v0 f1 t1 _ IH Hnth Hwfe Hwft.
       apply (wellformed_tProj Σ_tail) in Hwft.
-      specialize (IH Hwfe Hwft). inversion IH as [? ? Hwf_vs | |]. subst.
+      specialize (IH Hwfe Hwft). inversion IH as [? ? Hwf_vs | | |]. subst.
       eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
       eapply nth_error_In. exact Hnth.
     (* eval_Const_step — KEY CASE: bridge from Σ to Σ_tail *)
@@ -490,6 +495,9 @@ Section WF_EVAL.
       apply IH.
       + constructor.
       + exact (Hgw_tail _ _ _ Hlenv Hbody).
+    (* eval_Prim_step *)
+    - intros rho0 p p' htr Hwf Hwft.
+      constructor.
     (* eval_many_nil *)
     - intros rho0 _ _. constructor.
     (* eval_many_cons *)
@@ -574,7 +582,7 @@ Section EVAL_RESTRICT.
              _ IH1 _ IH2 _ IH3 Hwfe Hwft.
       apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
       destruct (IH1 Hwfe Hwf1) as [Heval1' Hwf_clos].
-      inversion Hwf_clos as [| ? ? ? Hwf_rho' Hwf_body |]. subst.
+      inversion Hwf_clos as [| ? ? ? Hwf_rho' Hwf_body | |]. subst.
       destruct (IH2 Hwfe Hwf2) as [Heval2' Hwf_v2].
       destruct (IH3 ltac:(constructor; assumption) Hwf_body) as [Heval3' Hwf_r].
       split; [| destruct r0; [exact Hwf_r | exact I]].
@@ -598,7 +606,7 @@ Section EVAL_RESTRICT.
              _ IH1 Hfb Hmre _ IH2 _ IH3 Hwfe Hwft.
       apply (wellformed_tApp Σ_tail) in Hwft as [Hwf1 Hwf2].
       destruct (IH1 Hwfe Hwf1) as [Heval1' Hwf_fix].
-      inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix]. subst.
+      inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx Hwf_mfix|]. subst.
       destruct (IH2 Hwfe Hwf2) as [Heval2' Hwf_v2].
       unfold fix_body in Hfb.
       destruct (nth_error mfix idx) as [d |] eqn:Hd; [| discriminate].
@@ -654,7 +662,7 @@ Section EVAL_RESTRICT.
              _ IH1 Hdc Hfind _ IH2 Hwfe Hwft.
       pose proof (wellformed_tCase_mch Σ_tail _ _ _ _ _ Hwft) as Hwf_mch.
       destruct (IH1 Hwfe Hwf_mch) as [Heval1' Hwf_con].
-      inversion Hwf_con as [? ? Hwf_vs | |]. subst.
+      inversion Hwf_con as [? ? Hwf_vs | | |]. subst.
       pose proof (find_branch_wellformed Σ_tail _ _ _ _ _ _ _ _ Hwft Hfind) as Hwf_body.
       assert (Hwfe' : well_formed_env Σ_tail (List.rev vs ++ rho0)).
       { unfold well_formed_env. apply Forall_app. split.
@@ -676,7 +684,7 @@ Section EVAL_RESTRICT.
     - intros p c rho0 vs v0 f1 t1 _ IH Hnth Hwfe Hwft.
       apply (wellformed_tProj Σ_tail) in Hwft.
       destruct (IH Hwfe Hwft) as [Heval1' Hwf_con].
-      inversion Hwf_con as [? ? Hwf_vs | |]. subst.
+      inversion Hwf_con as [? ? Hwf_vs | | |]. subst.
       split.
       + eapply fuel_sem.eval_Proj_step; eassumption.
       + eapply Forall_forall in Hwf_vs; [exact Hwf_vs |].
@@ -701,6 +709,9 @@ Section EVAL_RESTRICT.
         as [Heval0' Hwf_v].
       split; [| exact Hwf_v].
       eapply fuel_sem.eval_Const_step; [exact Hlenv | exact Hbody | exact Heval0'].
+    (* eval_Prim_step *)
+    - intros rho0 p p' htr Hwf Hwft.
+      split. constructor; assumption. constructor.
     (* eval_many_nil *)
     - intros rho0 _ _. split; [constructor | constructor].
     (* eval_many_cons *)
@@ -761,6 +772,7 @@ Section EVAL_RESTRICT.
     - (* eval_Const_step *)
       eapply fuel_sem.eval_Const_step; [| eassumption | eassumption].
       unfold declared_constant in *. exact (Hext _ _ H).
+    - constructor; assumption.
     - constructor.
     - eapply fuel_sem.eval_many_cons; eassumption.
     - eapply fuel_sem.eval_OOT; eassumption.

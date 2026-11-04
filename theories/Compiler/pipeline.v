@@ -69,7 +69,7 @@ Section Pipeline.
 
   Program Definition erase_program (econf : Erasure.erasure_configuration) imap
           (p : Ast.Env.program) : EAst.global_declarations * EAst.term :=
-    run_erase_program econf (imap, p) _.
+    run_erase_program (map (fun pr => (fst pr).(prim_name)) prims) econf (imap, p) _.
   Next Obligation.
     split.
     now eapply assume_wellformed_inductives_mapping.

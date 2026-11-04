@@ -29,12 +29,20 @@
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;
       metarocq.override.version = "9.1";
+      # Built against the cached CertiRocq package, see its overlay.
+      CertiRocq-bootstrap.job = true;
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };
   };
 
   bundles."default".push-branches = ["main"];
+  ## genNixActions makes the workflow run on pull_request_target for PRs to
+  ## any branch.  As GitHub always takes that workflow from the default branch,
+  ## PRs to other branches (e.g. rocq-master, which has its own Nix CI) would
+  ## also run this one.  After regenerating
+  ## .github/workflows/nix-action-default.yml, restrict its
+  ## pull_request_target trigger to the main branch.
 
   ## Cachix caches to use in CI
   ## Below we list some standard ones

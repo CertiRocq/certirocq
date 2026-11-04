@@ -22,7 +22,8 @@ Open Scope alg_scope.
 Inductive value :=
 | Con_v : dcon -> list value -> value
 | Clos_v : list value -> name -> EAst.term -> value
-| ClosFix_v : list value -> list (EAst.def EAst.term) -> nat -> value.
+| ClosFix_v : list value -> list (EAst.def EAst.term) -> nat -> value
+| Prim_v : primitive_value -> value.
 
 Definition env := list value.
 
@@ -30,9 +31,10 @@ Lemma value_ind' (P : value -> Prop) :
   (forall dc vs, Forall P vs -> P (Con_v dc vs)) ->
   (forall vs na e, Forall P vs -> P (Clos_v vs na e)) ->
   (forall vs mfix n, Forall P vs -> P (ClosFix_v vs mfix n)) ->
+  (forall v, P (Prim_v v)) ->
   (forall v, P v).
 Proof.
-  intros H1 H2 H3.
+  intros H1 H2 H3 H4.
   fix IHv 1; intros v. destruct v.
   - eapply H1. induction l.
     constructor.
@@ -43,6 +45,7 @@ Proof.
   - eapply H3. induction l.
     constructor.
     constructor. eapply IHv. eassumption.
+  - eapply H4.
 Qed.
 
 
@@ -226,6 +229,10 @@ Section FUEL_SEM.
         decl.(EAst.cst_body) = Some body ->
         eval_env_fuel [] body (Val v) f t ->
         eval_env_step rho (EAst.tConst k) (Val v) f t
+
+  | eval_Prim_step rho p v : 
+    trans_prim_val p = Some v ->
+    eval_env_step rho (EAst.tPrim p) (Val (Prim_v v)) <0> <0>
 
   (** ** Mutual evaluation of argument lists *)
   with eval_fuel_many : env -> list EAst.term -> list value -> nat -> trace -> Prop :=
@@ -412,6 +419,16 @@ Section FUEL_SEM.
       assert (decl = decl0) by (unfold declared_constant in *; congruence).
       subst decl0. rewrite Hbody in H0. injection H0 as <-.
       exact (IH _ _ _ H1).
+    - (* eval_Prim_step *)
+      intros rho0 p v Htrans v_target f_t t_t Heval2.
+      remember (EAst.tPrim p) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate. subst.
+      remember (EAst.tPrim p) as ea in H.
+      remember (Val v_target) as rv in H.
+      destruct H; try discriminate.
+      injection Heqea as <-. injection Heqrv as <-. subst.
+      congruence. 
     (* eval_many_nil *)
     - intros rho0 vs2 fs2 ts2 Hmany2.
       remember (@nil EAst.term) as es in Hmany2.
@@ -598,6 +615,14 @@ Section FUEL_SEM.
       subst decl0. rewrite Hbody in H0. injection H0 as <-.
       specialize (IH _ _ _ H1). destruct IH as [-> [-> ->]].
       split; [reflexivity | split; reflexivity].
+    - intros rho0 p v Htrans v_target f_t t_t Heval2.
+      remember (EAst.tPrim p) as ea in Heval2.
+      remember (Val v_target) as rv in Heval2.
+      destruct Heval2; try discriminate;
+        try match goal with
+            | [ Hrv : Val _ = Val _ |- _ ] => injection Hrv as <-; subst
+            end.
+      injection Heqea as <-. subst. split; [congruence | split; reflexivity].
     - intros rho0 vs2 fs2 ts2 Hmany2.
       remember (@nil EAst.term) as es in Hmany2.
       destruct Hmany2; [split; [reflexivity | split; reflexivity] | discriminate].

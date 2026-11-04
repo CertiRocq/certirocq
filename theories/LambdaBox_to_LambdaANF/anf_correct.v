@@ -1378,7 +1378,17 @@ Section Correct.
         eapply Hcmap_eval_coherent;
           [exact Hlk0 | exact Hlk | exact Hdecl0 | exact Hbody0
           | exact Hdecl_k | exact Hbody_k | exact Heval_body].
-
+    - (* Prim *)
+      intros rho0 p v hpv v' [= <-] S0 vn0 S0' C0 x0 Hcvt Hdis Hdis_cm Hcons Hcmap.
+      remember (EAst.tPrim p) as e_p.
+      destruct Hcvt; try discriminate. injection Heqe_p. intros ->.
+      split.
+      + intros i Hnth_i. exfalso. eapply Hdis. constructor.
+        * eapply nth_error_In. exact Hnth_i.
+        * assumption.
+      + intros k_f decl_f body_f Hlk_f _ _. exfalso. eapply Hdis_cm. constructor.
+        * exists k_f. exact Hlk_f.
+        * assumption.
     - (* eval_step: delegate *)
       intros rho0 e0 r0 f0 t0 Hstep IH. exact IH.
     - exact Heval.
@@ -4269,7 +4279,7 @@ Section Correct.
                 assert (Hle : Datatypes.length names = Datatypes.length rho').
                 { symmetry. exact (anf_env_rel_length _ _ _ H). }
                 rewrite Hfl, Hle.
-                inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies].
+                inversion Hwf_fix as [| | ? ? ? Hwf_rho' Hidx_bound Hwf_mfix_bodies |].
                 subst.
                 eapply Forall_forall in Hwf_mfix_bodies;
                   [| eapply nth_error_In; exact Hnth_d].
@@ -6029,7 +6039,19 @@ Section Correct.
           rewrite M.gso in Hget; [| exact Hneq_zx].
           eexists. split. { exact Hget. }
           eapply preord_val_refl. tci.
-
+    - intros rho p v htr.
+      unfold anf_cvt_correct_exp_step.
+      intros rho' vnames C x S S' i Hwf Hwfe Hcons Hcmap Hdis Hdis_cmap Henv Hglob Hrel e_k Hdis_ek.
+      intros v0 v' [= <-] Hrel'. inversion Hrel'; subst.
+      inversion Hrel; subst.
+      cbn -[preord_exp'].
+      intros v1 cin cout hin hev.
+      do 3 eexists. split.
+      econstructor 2. econstructor; try eassumption.
+      inversion Hrel'. subst. assert (v = pv) by congruence. subst pv. reflexivity.
+      split.
+      red. cbn. lia.
+      eapply preord_res_refl. tci.
 
     (* ================================================================ *)
     (* P0 cases: eval_fuel_many (2 cases)                               *)
