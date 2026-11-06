@@ -145,7 +145,7 @@ End LambdaANF_PRIMITIVE_WRAPPERS.
 
 Section PRIMITIVE_TRANSLATION_CORRECT.
 
-Notation i32_glob gidx := (In gidx [ glob_result ; glob_out_of_mem ; glob_mem_ptr ; glob_cap ]).
+Notation i32_glob gidx := (In gidx [ glob_result ; glob_out_of_mem ; glob_mem_ptr ; glob_tmp_i32 ]).
 Notation i64_glob gidx := (In gidx [ glob_tmp1 ; glob_tmp2 ; glob_tmp3 ; glob_tmp4 ]).
 
 
@@ -1332,16 +1332,16 @@ Definition div21_loop_invariant sr fr i xh xl xh' xl' y q :=
   /\ ((q * y + xh') * 2^(63 - i) + (xl mod 2^(63 - i)) = (xh mod y) * 2^63 + xl)%Z.
 
 Lemma div21_loop_reduce_stop : forall state sr fr i,
-    sglob_val sr (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
+    sglob_val sr (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
     (-1 < i < Int32.modulus)%Z ->
     ~ (i < 63)%Z ->
     reduce_trans
       (state, sr, fr,
-        [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
+        [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
       (state, sr, fr, []).
 Proof.
   intros state sr fr i Hival Hi Hlt.
-  remember (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z) as es.
+  remember (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z) as es.
   apply rt_trans with (y:=(state, sr, fr, [AI_label 0 [:: AI_basic (BI_loop (BT_valtype None) es)] (to_e_list es)])).
   apply rt_step. eapply r_loop with (vs:=[]); cbn; auto.
   remember (LH_rec [] 0 [:: AI_basic (BI_loop (BT_valtype None) es)] (LH_base [] []) [])
@@ -1367,7 +1367,7 @@ Proof.
 Qed.
 
 Lemma div21_loop_reduce_continue : forall state sr sr' fr m gmp i xh xl xh0' xl0' xh1' xl1' q0 q1 y,
-    sglob_val sr (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
+    sglob_val sr (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
     (0 <= i < 63)%Z ->
     div21_loop_invariant sr fr i xh xl xh0' xl0' y q0 ->
     reduce_trans
@@ -1378,15 +1378,15 @@ Lemma div21_loop_reduce_continue : forall state sr sr' fr m gmp i xh xl xh0' xl0
     smem sr' (f_inst fr) = Some m ->
     s_funcs sr = s_funcs sr' ->
     sglob_val sr' (f_inst fr) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp))) ->
-    sglob_val sr' (f_inst fr) glob_cap  = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
+    sglob_val sr' (f_inst fr) glob_tmp_i32  = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
     exists sr'',
       reduce_trans
         (state, sr, fr,
-          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
+          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
         (state, sr'', fr,
-          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
+          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
       /\ div21_loop_invariant sr'' fr (i + 1)%Z xh xl xh1' xl1' y q1
-      /\ sglob_val sr'' (f_inst fr) glob_cap  = Some (VAL_num (VAL_int32 (Int32.repr (i + 1))))
+      /\ sglob_val sr'' (f_inst fr) glob_tmp_i32  = Some (VAL_num (VAL_int32 (Int32.repr (i + 1))))
       /\ INV fenv sr'' fr
       /\ smem sr'' (f_inst fr) = Some m
       /\ s_funcs sr = s_funcs sr''
@@ -1394,14 +1394,14 @@ Lemma div21_loop_reduce_continue : forall state sr sr' fr m gmp i xh xl xh0' xl0
 Proof.
   intros state sr sr' fr m gmp i xh xl xh0' xl0' xh1' xl1' q0 q1 y.
   intros Hival Hi HLoopINVpre HredBody HLoopINVpost HINV Hmem Hsfs Hgmp Hival'.
-  remember (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z) as loop.
+  remember (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z) as loop.
   remember (LH_rec [] 0 [:: AI_basic (BI_loop (BT_valtype None) loop)] (LH_base [] []) []) as lh eqn:Hlh.
   assert (Hlfill : lfill lh (to_e_list loop) =
                      [:: AI_label 0 [:: AI_basic (BI_loop (BT_valtype None) loop)] (to_e_list loop)]). {
     subst lh. cbn. rewrite cats0. reflexivity. }
   have I := HINV. destruct I as [_ [_ [_ [_ [Hcap [_ [[Hmem1 [m' [Hmem2 [size [Hmem3 Hmem5 ]]]]] [_ [_ [_ [HnoDups _]]]]]]]]]]].
   destruct (Hcap (VAL_int32 (Int32.repr (i + 1)))) as [sr'' Hupd].
-  assert (Hival'' : sglob_val sr'' (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr (i + 1))))).
+  assert (Hival'' : sglob_val sr'' (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr (i + 1))))).
   by now eapply update_global_get_same; eauto.
   assert (HINV' : INV fenv sr'' fr).
   eapply update_global_preserves_INV; eauto. cbn; tauto.
@@ -1545,7 +1545,7 @@ Lemma div21_loop_body_reduce (gidx : globalidx) :
     INV fenv sr fr ->
     smem sr (f_inst fr) = Some m ->
     sglob_val sr (f_inst fr) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp))) ->
-    sglob_val sr (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
+    sglob_val sr (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
     (0 <= i < 63)%Z ->
     div21_loop_invariant sr fr i xh xl xh0' xl0' y q0 ->
     exists sr' xh1' xl1' q1,
@@ -1557,7 +1557,7 @@ Lemma div21_loop_body_reduce (gidx : globalidx) :
     /\ smem sr' (f_inst fr) = Some m
     /\ sglob_val sr' (f_inst fr) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp)))
     /\ div21_loop_invariant sr' fr (i + 1) xh xl xh1' xl1' y q1
-    /\ sglob_val sr' (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr i))).
+    /\ sglob_val sr' (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr i))).
 Proof with eassumption.
   intros state sr fr m gmp i xh xl xh0' xl0' q0 y.
   intros HINV Hmem Hgmp Hival Hi HLoopINV.
@@ -1826,20 +1826,20 @@ Lemma div21_loop_reduce_full :
     smem sr (f_inst fr) = Some m ->
     sglob_val sr (f_inst fr) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp))) ->
     div21_loop_invariant sr fr i xh xl xh0' xl0' y q0 ->
-    sglob_val sr (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
+    sglob_val sr (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr i))) ->
     (0 <= i <= 63)%Z ->
     d = Z.to_nat (63 - i) ->
     exists sr' xh1' xl1' q1,
       reduce_trans
         (state, sr, fr,
-          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
+          [ AI_basic (BI_loop (BT_valtype None) (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63%Z))])
         (state, sr', fr, [])
       /\ INV fenv sr' fr
       /\ s_funcs sr = s_funcs sr'
       /\ smem sr' (f_inst fr) = Some m
       /\ sglob_val sr' (f_inst fr) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp)))
       /\ div21_loop_invariant sr' fr 63%Z xh xl xh1' xl1' y q1
-      /\ sglob_val sr' (f_inst fr) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr 63))).
+      /\ sglob_val sr' (f_inst fr) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr 63))).
 Proof.
   induction d as [|d'] => state sr fr m gmp i xh xl xh0' xl0' q0 y HINV Hmem Hgmp HLoopINV Hival Hi Hd.
   - assert (Heq : i = 63) by lia. subst i.
@@ -4517,7 +4517,7 @@ Proof.
           unfold diveucl_21_instrs.
           remember (make_product glob_mem_ptr glob_tmp1 glob_tmp1) as mkprod_instrs.
           remember (make_product glob_mem_ptr glob_tmp4 glob_tmp1) as mkprod_instrs'.
-          remember (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_instrs.
+          remember (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_instrs.
           separate_instr.
           dostep_nary 0. eapply r_local_get; eauto.
           dostep_nary 1. eapply r_load_success; eauto.
@@ -4569,31 +4569,31 @@ Proof.
         destruct (Hcap (VAL_int32 (Int32.repr 0))) as [s4 Hupd4]. clear Hcap.
         have Hs4m := update_global_preserves_memory _ _ _ _ _ Hupd4. symmetry in Hs4m. rewrite Hs3m in Hs4m.
         have : INV fenv s4 f.
-        eapply update_global_preserves_INV with (sr:=s3) (i:=glob_cap) (num:=VAL_int32 (Int32.repr 0)); eauto.
-        left; split; auto. apply cap_i32_glob; auto. discriminate. now intros. now intros.
+        eapply update_global_preserves_INV with (sr:=s3) (i:=glob_tmp_i32) (num:=VAL_int32 (Int32.repr 0)); eauto.
+        left; split; auto. apply tmp_i32_glob; auto. discriminate. now intros. now intros.
         intro HINV4.
         have : (sglob_val s4 (f_inst f) glob_tmp1 = Some (VAL_num (VAL_int64 (Int64.repr (to_Z xh))))).
-        eapply update_global_get_other with (sr:=s3) (j:=glob_cap); eauto. discriminate.
+        eapply update_global_get_other with (sr:=s3) (j:=glob_tmp_i32); eauto. discriminate.
         eapply update_global_get_other with (sr:=s2) (j:=glob_tmp4); eauto. discriminate.
         eapply update_global_get_other with (sr:=s1) (j:=glob_tmp3); eauto. discriminate.
         eapply update_global_get_other with (sr:=s0) (j:=glob_tmp2); eauto. discriminate.
         have : (sglob_val s4 (f_inst f) glob_tmp2 = Some (VAL_num (VAL_int64 (Int64.repr (to_Z xl))))).
-        eapply update_global_get_other with (sr:=s3) (j:=glob_cap); eauto. discriminate.
+        eapply update_global_get_other with (sr:=s3) (j:=glob_tmp_i32); eauto. discriminate.
         eapply update_global_get_other with (sr:=s2) (j:=glob_tmp4); eauto. discriminate.
         eapply update_global_get_other with (sr:=s1) (j:=glob_tmp3); eauto. discriminate.
         eapply update_global_get_same; eauto.
         have : (sglob_val s4 (f_inst f) glob_tmp3 = Some (VAL_num (VAL_int64 (Int64.repr (to_Z y))))).
-        eapply update_global_get_other with (sr:=s3) (j:=glob_cap); eauto. discriminate.
+        eapply update_global_get_other with (sr:=s3) (j:=glob_tmp_i32); eauto. discriminate.
         eapply update_global_get_other with (sr:=s2) (j:=glob_tmp4); eauto. discriminate.
         eapply update_global_get_same; eauto.
         have : (sglob_val s4 (f_inst f) glob_tmp4 = Some (VAL_num (VAL_int64 (Int64.repr 0)))).
-        eapply update_global_get_other with (sr:=s3) (j:=glob_cap); eauto. discriminate.
+        eapply update_global_get_other with (sr:=s3) (j:=glob_tmp_i32); eauto. discriminate.
         eapply update_global_get_same; eauto.
-        have : (sglob_val s4 (f_inst f) glob_cap = Some (VAL_num (VAL_int32 (Int32.repr 0)))).
+        have : (sglob_val s4 (f_inst f) glob_tmp_i32 = Some (VAL_num (VAL_int32 (Int32.repr 0)))).
         eapply update_global_get_same; eauto.
         intros Hg_counter Hg_q Hg_y Hg_xl Hg_xh.
         have : (sglob_val s4 (f_inst f) glob_mem_ptr = Some (VAL_num (VAL_int32 (N_to_i32 gmp_v)))).
-        eapply update_global_get_other with (sr:=s3) (j:=glob_cap); eauto. discriminate.
+        eapply update_global_get_other with (sr:=s3) (j:=glob_tmp_i32); eauto. discriminate.
         eapply update_global_get_other with (sr:=s2) (j:=glob_tmp4); eauto. discriminate.
         eapply update_global_get_other with (sr:=s1) (j:=glob_tmp3); eauto. discriminate.
         eapply update_global_get_other with (sr:=s0) (j:=glob_tmp2); eauto. discriminate.
@@ -4654,7 +4654,7 @@ Proof.
           unfold diveucl_21_instrs.
           remember (make_product glob_mem_ptr glob_tmp1 glob_tmp1) as mkprod_instrs.
           remember (make_product glob_mem_ptr glob_tmp4 glob_tmp1) as mkprod_instrs'.
-          remember (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_instrs.
+          remember (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_instrs.
           separate_instr.
           dostep_nary 0. eapply r_local_get; eassumption.
           dostep_nary 1. eapply r_load_success; eauto.
