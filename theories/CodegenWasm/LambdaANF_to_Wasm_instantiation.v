@@ -831,8 +831,11 @@ Proof.
          map (fun f => ET_func (Tf (repeat (T_num T_i32) (N.to_nat f.(type))) [::])) fns ++ (* all fns exported *)
          [:: ET_global {| tg_mut := MUT_var; tg_t := T_num T_i32 |}
            ; ET_global {| tg_mut := MUT_var; tg_t := T_num T_i32 |}
-           ; ET_global {| tg_mut := MUT_var; tg_t := T_num T_i32 |}           (* global vars *)
-           ; ET_mem {| lim_min := 1%N; lim_max := Some max_mem_pages|}]).     (* global mem *)
+           ; ET_global {| tg_mut := MUT_var; tg_t := T_num T_i32 |}           (* globals *)
+           ; ET_mem {| lim_min := 1%N; lim_max := Some max_mem_pages|}        (* memory *)
+           ; ET_table {| tt_limits := {| lim_min := N.of_nat (length fns + num_custom_funs)
+                                       ; lim_max := None |}
+                       ; tt_elem_type := T_funcref |}]).                      (* function table *)
   exists hs.
   exists inst.
   (* initial values of globals: 0 *)
@@ -1016,7 +1019,10 @@ Proof.
         rewrite nth_error_map. rewrite Hnth. by apply /eqfunction_typeP.
       }
       (* global vars, memory *)
-      repeat apply Forall2_cons =>//.
+      do 4 (apply Forall2_cons; first by cbn).
+      (* table *)
+      apply Forall2_cons; last by apply Forall2_nil.
+      cbn. by apply /eqtable_typeP.
       (* export names unique *)
       apply /eqseqP.
       apply nodup_fixed_point. cbn.
