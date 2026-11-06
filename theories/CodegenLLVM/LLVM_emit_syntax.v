@@ -239,7 +239,10 @@ Definition la_env (fs : list positive) (env : nenv) (fresh : positive) (x : var)
   let roots := la_roots fs x e' in
   env_set_list env roots (map (fun i => ssname fresh (1000 + i)) (seq 0 (List.length roots))).
 
-Definition la_code (fs : list positive) (env : nenv) (fresh : positive) (x f : var)
+Definition la_call (fs : list positive) (env : nenv) (x f : var) (ys : list var) : code typ :=
+  [ (IId (Raw (Zpos x)), INSTR_Call (val_ty, gcallee fs env f) (call_args fs env ys) [] [], []) ].
+
+Definition la_frame_code (fs : list positive) (env : nenv) (fresh : positive) (x f : var)
            (ys : list var) (e' : exp) : code typ :=
   let roots := la_roots fs x e' in
   let nr := List.length roots in
@@ -262,6 +265,21 @@ Definition la_code (fs : list positive) (env : nenv) (fresh : positive) (x f : v
           INSTR_Call (val_ty, gcallee fs env f) (call_args fs env ys) [] [], []) ]
     ++ reload_code fresh rootse arr_ty 0 roots
     ++ [ (IVoid 0%Z, INSTR_Store (tinfo_ty, prevR) (tinfo_ty, gep_tinfo 4) [], []) ] )%list.
+
+(** A call with no live root has no shadow-stack frame. *)
+Definition la_code (fs : list positive) (env : nenv) (fresh : positive) (x f : var)
+           (ys : list var) (e' : exp) : code typ :=
+  match la_roots fs x e' with
+  | [] => la_call fs env x f ys
+  | _ :: _ => la_frame_code fs env fresh x f ys e'
+  end.
+
+Lemma la_code_cases fs env fresh x f ys e' :
+  (la_roots fs x e' = [] /\ la_code fs env fresh x f ys e' = la_call fs env x f ys) \/
+  la_code fs env fresh x f ys e' = la_frame_code fs env fresh x f ys e'.
+Proof.
+  unfold la_code. destruct (la_roots fs x e'); [left; auto|right; reflexivity].
+Qed.
 
 Definition prim_call (po : positive -> option (String.string * bool)) (fs : list positive)
            (env : nenv) (p : prim) (ys : list var) : instr typ :=
@@ -702,7 +720,9 @@ Lemma la_code_defs fs env fresh x f ys e' r :
   In r (code_defs (la_code fs env fresh x f ys e')) ->
   r = Raw (Zpos x) \/ exists k, r = ssname fresh k.
 Proof.
-  unfold la_code. simpl. rewrite !code_defs_app, code_defs_spill. simpl.
+  destruct (la_code_cases fs env fresh x f ys e') as [(_ & ->) | ->].
+  { unfold la_call. simpl. intros [<-|[]]; auto. }
+  unfold la_frame_code. simpl. rewrite !code_defs_app, code_defs_spill. simpl.
   intros [<-|[<-|[<-|[<-|H]]]]; eauto.
   rewrite code_defs_app, in_app_iff in H. destruct H as [H|[]].
   apply code_defs_reload in H. auto.

@@ -1155,11 +1155,18 @@ Section CallCases.
     (ccode (reload_code fresh (EXP_Ident (ID_Local (ssname fresh 1))) (TYPE_Array (N.of_nat nr) val_ty) 0 roots)
      ++ [ (IVoid 0%Z, INSTR_Store (dptr, locE (ssname fresh 3)) (dptr, gepT 4) [], []) ])%list.
 
-  Lemma ccode_la_code env fresh x f ys e' :
-    ccode (la_code fs env fresh x f ys e') =
+  Lemma ccode_la_call env x f ys :
+    ccode (la_call fs env x f ys) = [la_callI env x f ys].
+  Proof.
+    unfold la_call. rewrite ccode_cons, ccode_nil, cinstr_Call, call_args_conv.
+    unfold la_callI, ctexp. cbn [fst snd]. rewrite cty_val. reflexivity.
+  Qed.
+
+  Lemma ccode_la_frame_code env fresh x f ys e' :
+    ccode (la_frame_code fs env fresh x f ys e') =
     (la_pre env fresh (la_roots fs x e') ++ la_callI env x f ys :: la_post fresh (la_roots fs x e'))%list.
   Proof.
-    unfold la_code. cbn zeta. rewrite ccode_cons. rewrite ccode_cons. rewrite !ccode_app.
+    unfold la_frame_code. cbn zeta. rewrite ccode_cons. rewrite ccode_cons. rewrite !ccode_app.
     rewrite !ccode_cons, !ccode_nil, cinstr_Alloca, cinstr_Alloca, !cinstr_Store, cinstr_Load, cinstr_Call, call_args_conv.
     unfold la_pre, la_post, la_callI. cbn zeta. cbn [app]. rewrite <- !app_assoc. cbn [app].
     unfold ctexp. cbn [fst snd].
@@ -1995,7 +2002,30 @@ Section CallCases.
   (* ================================================================ *)
   (** ** [la_spec] holds *)
 
-  Lemma la_spec_holds : la_spec.
+  (** The case with a frame.  [la_frame_code] is the code of [la_code] when a
+      root is live; the proof does not use that a root exists. *)
+  Lemma la_frame_spec_holds :
+    forall va x f ft ft' ys e' rho rho' fl f' vs_a xs e_body rho'' v env fresh sf stk st fp rs vs
+           l tmt c (K : block_id + dvalue -> CFGtop ((block_id * block_id) + dvalue)),
+      M.get f rho = Some (Vfun rho' fl f') -> get_list ys rho = Some vs_a ->
+      find_def f' fl = Some (ft', xs, e_body) ->
+      set_lists xs vs_a (def_funs fl fl rho' rho') = Some rho'' -> sim_stmt_fr rho'' e_body v ->
+      env_ok2 (Eletapp x f ft ys e') env fresh ->
+      env_rel (occurs_free (Eletapp x f ft ys e')) rho env sf st ->
+      is_fun fs x = false -> ~ occurs_free (Eletapp x f ft ys e') x ->
+      INV st fp rs vs -> LLVM_sim.tinfo_local tinfo sf ->
+      ends_in_oom (Flatten_sem.run ctx
+                     (Flatten_sem.flat_tail va (ccode (la_frame_code fs env fresh x f ys e') ++ l)%list tmt c K)
+                     (st, ((sf, stk), G))) \/
+      exists st4 sf4 c1 ks,
+        Flatten_sem.run ctx (Flatten_sem.flat_tail va (ccode (la_frame_code fs env fresh x f ys e') ++ l)%list tmt c K)
+                        (st, ((sf, stk), G))
+        ≈ Flatten_sem.run ctx (Flatten_sem.flat_tail va l tmt c1 K) (st4, ((sf4, stk), G)) /\
+        INV st4 fp rs vs /\ keeps_stack st st4 rs /\
+        frames_of st4 = push_top ks (frames_of st) /\
+        Forall (fun k => IntMaps.lookup (ptr_to_int k) (mem_of st) = None) ks /\
+        env_rel (occurs_free e') (M.set x v rho) (la_env fs env fresh x e') sf4 st4 /\
+        LLVM_sim.tinfo_local tinfo sf4.
   Proof.
     intros va x f ft ft' ys e' rho rho' fl f' vs_a xs e_body rho'' v env fresh sf stk st fp rs vs l tmt c K
            Hf Hys Hfd Hset IHb Hok Henv Hxf Hxfree HI Htl.
@@ -2010,7 +2040,7 @@ Section CallCases.
       - symmetry in E. exact (ssname_not_pos _ _ _ E).
       - apply ssname_inj in E. lia. }
     assert (Hnf : forall y, Flatten_sem.is_flat (env y) = false) by apply (env_ok2_not_flat _ _ _ Hok).
-    rewrite ccode_la_code. fold roots. rewrite <- app_assoc. cbn [app].
+    rewrite ccode_la_frame_code. fold roots. rewrite <- app_assoc. cbn [app].
     destruct (la_pre_run va env fresh roots S rho sf stk st fp rs vs HI Htl Hroots Henv HnR Hnf)
       as [Hoom1|[(st1 & sf1 & Hor1 & Hoom2)|
                  (st8 & pR & pF & fF & eR & sR & rs1 & vs1 & a_fp & ks & Hor & HI8 & Hff & Hsl & Hlrs1 & Hlvs1 &
@@ -2184,6 +2214,78 @@ Section CallCases.
       - apply In_nth_error in Hyin. destruct Hyin as [i Hiy]. rewrite (la_env_root _ _ _ _ _ _ _ Hiy). apply noflat_ss.
       - rewrite la_env_other by exact Hnin. apply Hnf. }
     eapply LLVM_sim.tinfo_local_noflat; [exact Htl10|exact Hagn11].
+  Qed.
+
+  (** The case with no live root: the call runs in the caller's state, with no
+      frame to link or unlink, and no variable other than [x] and the functions
+      is live afterwards. *)
+  Lemma la_spec_holds : la_spec.
+  Proof.
+    intros va x f ft ft' ys e' rho rho' fl f' vs_a xs e_body rho'' v env fresh sf stk st fp rs vs l tmt c K
+           Hf Hys Hfd Hset IHb Hok Henv Hxf Hxfree HI Htl.
+    destruct (la_code_cases fs env fresh x f ys e') as [(Hnil & ->) | ->];
+      [|exact (la_frame_spec_holds va x f ft ft' ys e' rho rho' fl f' vs_a xs e_body rho'' v env fresh sf stk st fp rs vs l tmt c K
+                 Hf Hys Hfd Hset IHb Hok Henv Hxf Hxfree HI Htl)].
+    rewrite ccode_la_call. cbn [app]. unfold la_callI.
+    set (S := occurs_free (Eletapp x f ft ys e')) in *.
+    assert (Hnf : forall y, Flatten_sem.is_flat (env y) = false) by apply (env_ok2_not_flat _ _ _ Hok).
+    destruct (callee_value S (Eletapp x f ft ys e') rho env fresh sf stk st f rho' fl f' Hok Henv
+                (Free_Eletapp1 f x f ft ys e' (or_introl eq_refl)) Hf)
+      as (-> & fpf & p & Hg & Hp & Hevf & Hnff & Hintr).
+    destruct (args_eval S (Eletapp x f ft ys e') rho env fresh sf stk st ys vs_a Hok Henv
+                (fun y Hy => Free_Eletapp1 y x f ft ys e' (or_intror Hy)) Hys)
+      as (dvs & Hev & Hst & Hnfa).
+    pose proof (find_def_correct _ _ _ _ _ Hfd) as Hin.
+    edestruct (Flatten_sem.flat_tail_call ctx va (IId (Raw (Zpos x))) i64 (cexp (gcallee fs env f))
+                 (((dptr, EXP_Ident (ID_Local (Name "tinfo"))), []) ::
+                  map (fun y => ((i64, cexp (gvar fs env y)), [])) ys) [] [] []
+                 l tmt c K st sf sf stk G (Ptr p) (Ptr tinfo :: dvs))
+      as (Hc9 & af & args' & sf2F & Hag9 & Hi & _ & Hevf2 & _ & Hevargs2 & Heq9).
+    { exact Hnff. }
+    { constructor; [apply Flatten_sem.is_flat_Name|]. rewrite Forall_map. exact Hnfa. }
+    { exact Hevf. }
+    { cbn [map fst]. constructor; [apply exp_eval_local, Htl|]. rewrite map_map. exact Hev. }
+    { apply Flatten_sem.agree_noflat_refl. }
+    match type of Hc9 with (_ <= ?cc)%positive => set (c9 := cc) in * end.
+    assert (Hi' : IntrinsicsDefinitions.intrinsic_exp af = None) by (rewrite Hi; exact Hintr).
+    destruct (callee_run f' ft' xs e_body rho' rho'' vs_a dvs st sf2F stk fp rs vs v p fpf i64
+                Hin Hg Hp Hset Hst IHb HI)
+      as [Hoom|(st9 & z & Hrun9 & Hz & HI9 & Hfr9 & Hk9)].
+    { left. rewrite Heq9. apply Flatten_sem.ends_in_oom_bind.
+      exact (oom_instr_call ctx va (Raw (Zpos x)) i64 af args' p (Ptr tinfo :: dvs) st sf2F stk G Hi' Hevf2 Hevargs2 Hoom). }
+    right.
+    pose proof (instr_call ctx va (Raw (Zpos x)) i64 af args' p (Ptr tinfo :: dvs) st sf2F stk G st9 sf2F stk G (I64 z)
+                  Hi' Hevf2 Hevargs2 Hrun9) as Hcall.
+    set (sf9 := upd_local_sf sf (Maps.add (Raw (Zpos x)) (I64 z) (stack_vars sf))).
+    set (sf9F := upd_local_sf sf2F (Maps.add (Raw (Zpos x)) (I64 z) (stack_vars sf2F))) in Hcall.
+    assert (Hag9' : Flatten_sem.agree_except c c9 sf9 sf9F).
+    { unfold sf9, sf9F. rewrite !Flatten_sem.upd_add_eq. apply Flatten_sem.agree_except_add.
+      - apply Flatten_sem.flat_in_noflat, Flatten_sem.is_flat_pos.
+      - exact Hag9. }
+    assert (Hagn9 : Flatten_sem.agree_noflat sf9 sf9F) by (eapply Flatten_sem.agree_except_noflat'; exact Hag9').
+    assert (Hno : forall r, ~ In r (la_roots fs x e')) by (rewrite Hnil; intros r []).
+    assert (Htl9 : LLVM_sim.tinfo_local tinfo sf9).
+    { unfold LLVM_sim.tinfo_local, sf9. rewrite stack_vars_upd, rfind_add_neq; [exact Htl|discriminate]. }
+    assert (Henv9 : env_rel (occurs_free e') (M.set x v rho) (la_env fs env fresh x e') sf9 st9).
+    { intros y Hy. destruct (Pos.eq_dec y x) as [->|Hne].
+      - exists v. rewrite M.gss. split; [reflexivity|]. rewrite Hxf. exists z. split; [|exact Hz].
+        rewrite la_env_other by apply Hno.
+        destruct (Hok x) as [Hb _]. rewrite (Hb (Bound_Eletapp1 x f ft ys e')).
+        unfold sf9. rewrite stack_vars_upd. apply rfind_add_eq.
+      - rewrite M.gso by exact Hne. destruct (is_fun fs y) eqn:Ef.
+        + destruct (Henv y (Free_Eletapp2 y x f ft ys e' (fun E => Hne (eq_sym E)) Hy)) as (w & Hw & Hc).
+          rewrite Ef in Hc. exists w. split; [exact Hw|]. exact Hc.
+        + exfalso. apply (Hno y). apply la_roots_spec. auto. }
+    exists st9, sf9F, c9, []. split.
+    { rewrite Heq9.
+      change (interp_mcfg (interp_mrec ctx ?t) ?s) with (Flatten_sem.run ctx t s) in Hcall.
+      unfold runs in Hcall. rewrite Hcall, Eqit.bind_ret_l. cbv beta iota. reflexivity. }
+    split; [exact HI9|]. split; [exact Hk9|].
+    split; [rewrite Hfr9; destruct (frames_of st); reflexivity|]. split; [constructor|].
+    split.
+    { eapply env_rel_agree; [exact Henv9|exact Hagn9|]. intros y _.
+      rewrite la_env_other by apply Hno. apply Hnf. }
+    eapply LLVM_sim.tinfo_local_noflat; [exact Htl9|exact Hagn9].
   Qed.
 
   (* ================================================================ *)

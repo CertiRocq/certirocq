@@ -509,7 +509,10 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
          collection moved anything).  [f]/[ys] use the pre-call [env]; the
          continuation is compiled under [env''] mapping each root to its reloaded
          name.  [fresh] is reserved as the [ssname] seed (continuation from
-         [fresh+1]). *)
+         [fresh+1]).  A call with no live root pushes no frame, as in the C
+         backend: the frame holds nothing, the collector would walk it at each
+         collection, and its address, stored in [thread_info], stops LLVM from
+         treating the alloca as local. *)
       let fv     := PS.elements (exp_fv e') in
       let roots  := List.filter (fun v => negb (is_fun fs v))
                       (nodup Pos.eq_dec (List.remove Pos.eq_dec x fv)) in
@@ -523,6 +526,10 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
       let framep := ssname fresh 2 in let framee := EXP_Ident (ID_Local framep) in
       let prevRn := ssname fresh 3 in let prevR  := EXP_Ident (ID_Local prevRn) in
       let setup :=
+        match roots with
+        | [] => [ (IId (Raw (Zpos x)),
+                   INSTR_Call (val_ty, gcallee fs env f) (call_args fs env ys) [] [], []) ]
+        | _ :: _ =>
         ( (IId rootsp, INSTR_Alloca arr_ty [], [])
           :: (IId framep, INSTR_Alloca frame_ty [], [])
           :: spill_code env rootse arr_ty 0 roots
@@ -537,7 +544,8 @@ Fixpoint translate_cfg (get_ord get_arity : ctor_tag -> N)
                (IId (Raw (Zpos x)),
                 INSTR_Call (val_ty, gcallee fs env f) (call_args fs env ys) [] [], []) ]
           ++ reload_code fresh rootse arr_ty 0 roots
-          ++ [ (IVoid 0%Z, INSTR_Store (tinfo_ty, prevR) (tinfo_ty, fpp) [], []) ] )%list in
+          ++ [ (IVoid 0%Z, INSTR_Store (tinfo_ty, prevR) (tinfo_ty, fpp) [], []) ] )%list
+        end in
       ( prepend_code setup blks, f' )
   | Efun _ e' =>
       (* Post-pipeline the fundefs are flat top-level closed functions, lifted

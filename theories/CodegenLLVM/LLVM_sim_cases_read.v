@@ -283,7 +283,7 @@ Section EnvExt.
           destruct Hz as [Hz|Hz]; [|right; apply Bound_Eletapp2; exact Hz].
           destruct (Pos.eq_dec x z) as [<-|Hne]; [right; apply Bound_Eletapp1|left; apply Free_Eletapp2; auto]. }
       rewrite (tr_letapp _ _ _ _ env chunk x f ft ys e' fresh blks f' E).
-      unfold la_code. rewrite (spill_code_ext env env') by exact Hroots.
+      unfold la_code, la_call, la_frame_code. rewrite (spill_code_ext env env') by exact Hroots.
       rewrite (gcallee_ext env env' f) by (apply H; left; apply Free_Eletapp1; left; reflexivity).
       rewrite (call_args_ext env env') by (intros y Hy; apply H; left; apply Free_Eletapp1; right; exact Hy).
       reflexivity.

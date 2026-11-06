@@ -265,7 +265,7 @@ Section TrExt.
         apply Free_Eletapp2; auto. }
       rewrite (IH _ (la_env fs env' fresh x e)) in E.
       + rewrite (tr_letapp go ga po fs env' chunk x f ft ys e fresh blks f' E).
-        unfold la_code. rewrite (spill_code_ext env env') by exact Hroot.
+        unfold la_code, la_call, la_frame_code. rewrite (spill_code_ext env env') by exact Hroot.
         rewrite (call_args_ext fs env env') by (intros; apply H; left; constructor; right; auto).
         unfold gcallee, nvar. rewrite (H f) by (left; constructor; left; auto). reflexivity.
       + intros r Hr. unfold la_env. apply env_set_list_ext; [rewrite length_map, length_seq; reflexivity|].
