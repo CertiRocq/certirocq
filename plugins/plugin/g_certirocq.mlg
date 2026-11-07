@@ -1,3 +1,4 @@
 #define CERTIROCQ_PLUGIN_NAME "rocq-certirocq.plugin"
 #define CERTIROCQ_HAS_WASM 1
+#define CERTIROCQ_HAS_LLVM 1
 #include "../common/certirocq_commands.mlg"

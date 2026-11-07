@@ -121,3 +121,4 @@ result
 /tests/wasm/CertiRocq.Tests.tests.*.wasm
 bootstrap/certirocqchk/glue.*
 bootstrap/certirocqc/glue.*
+/plugins/

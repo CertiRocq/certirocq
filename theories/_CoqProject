@@ -5,6 +5,7 @@
 -R ../libraries         CertiRocq.Libraries
 -R Codegen              CertiRocq.Codegen
 -R CodegenWasm          CertiRocq.CodegenWasm
+-R CodegenLLVM          CertiRocq.CodegenLLVM
 -R Glue                 CertiRocq.Glue
 -R Extraction           CertiRocq.extraction
 -R ExtractionVanilla    CertiRocq.extraction_vanilla
@@ -101,6 +102,33 @@ CodegenWasm/LambdaANF_to_Wasm_typing.v
 CodegenWasm/LambdaANF_to_Wasm_instantiation.v
 CodegenWasm/toplevel.v
 CodegenWasm/toplevel_theorem.v
+
+# CodegenLLVM — runnable VIR backend
+CodegenLLVM/Flatten.v
+CodegenLLVM/LambdaANF_to_LLVM.v
+CodegenLLVM/Serialize.v
+CodegenLLVM/toplevel.v
+# CodegenLLVM — correctness statement against Vellvm's semantics, and its proof
+# (see LLVM_PROOF.md at the repository root)
+CodegenLLVM/CertiGC_Contract.v
+CodegenLLVM/LambdaANF_to_LLVM_statement.v
+CodegenLLVM/LLVM_interp_lemmas.v
+CodegenLLVM/LLVM_call_lemmas.v
+CodegenLLVM/LLVM_convert.v
+CodegenLLVM/LLVM_exp_lemmas.v
+CodegenLLVM/LLVM_mem_lemmas.v
+CodegenLLVM/LLVM_emit_syntax.v
+CodegenLLVM/LLVM_emit_facts.v
+CodegenLLVM/LLVM_instr_lemmas.v
+CodegenLLVM/Flatten_sem.v
+CodegenLLVM/LLVM_sim.v
+CodegenLLVM/LLVM_toplevel_link.v
+CodegenLLVM/LLVM_sim_cases_read.v
+CodegenLLVM/LLVM_sim_cases_constr.v
+CodegenLLVM/LLVM_sim_cases_call.v
+CodegenLLVM/LLVM_sim_exp.v
+CodegenLLVM/LLVM_nonvacuity.v
+CodegenLLVM/LLVM_nonvacuity_run.v
 
 # Glue
 Glue/glue_utils.v
