@@ -344,8 +344,11 @@ Proof.
   rewrite handle_malloc_eq.
   assert (Hlen : N_length (generate_num_poison_bytes (Z.to_N (@Integers.unsigned 64 (Integers.repr nv_block_size))) (DTYPE_I 8)) = Z.to_N nv_block_size).
   { rewrite generate_num_poison_bytes_length. reflexivity. }
-  remember (generate_num_poison_bytes (Z.to_N (@Integers.unsigned 64 (Integers.repr nv_block_size))) (DTYPE_I 8)) as init eqn:Einit.
-  clear Einit.
+  (* [generalize], not [remember]: [remember] leaves [let init := <16432 poison
+     bytes> in] in the proof term, and the kernel unfolds it at Qed. *)
+  revert Hlen.
+  generalize (generate_num_poison_bytes (Z.to_N (@Integers.unsigned 64 (Integers.repr nv_block_size))) (DTYPE_I 8)) as init.
+  intros init Hlen.
   assert (Hkey : next_key_with_alignment (mem_of (fst initial_fused)) 8 = 0) by reflexivity.
   destruct (malloc_bytes_runs (fst initial_fused) init) as (p & ptrs & st1 & Hrun & Hp & Hprov & Eg & Eprov & Est).
   { cbv zeta. rewrite Hkey, Hlen. cbn. lia. }
