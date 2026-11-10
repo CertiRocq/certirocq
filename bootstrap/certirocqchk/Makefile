@@ -30,7 +30,8 @@ endif
 
 PKGS = -package rocq-runtime,rocq-runtime.clib,rocq-runtime.config,rocq-runtime.engine,rocq-runtime.gramlib,rocq-runtime.interp,rocq-runtime.kernel,rocq-runtime.lib,rocq-runtime.library,rocq-runtime.toplevel,rocq-runtime.vernac,rocq-runtime.plugins.ltac
 COQLIB = $(shell coqc -where)
-COQLIBINSTALL = $(COQLIB)/user-contrib/CertiRocq/CertiRocqCheck
+COQLIBINSTALL ?= $(if $(DESTDIR),$(DESTDIR)/)$(COQLIB)/user-contrib
+INSTALLDIR = $(COQLIBINSTALL)/CertiRocq/CertiRocqCheck
 OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -package rocq-metarocq-template-ocaml.plugin -open Metarocq_template_plugin -package rocq-certirocq-vanilla.plugin -open Certirocq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
@@ -54,7 +55,7 @@ test.vo: test.v
 	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
 clean: Makefile.certirocqchk
-	make -f Makefile.certirocqchk clean
+	$(MAKE) -f Makefile.certirocqchk clean
 	rm -f *.cm* *.o *.vo
 
 Makefile.certirocqchk: _CoqProject
@@ -97,9 +98,9 @@ certirocqchk.cmx: certirocqchk_plugin_wrapper.cmx certirocqchk_plugin_wrapper.cm
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certirocqchk_plugin -o $@ $<
 
 install: Loader.vo certirocqchk_plugin.cmxs
-	install -d "$(COQLIBINSTALL)"
-	install -m 0644 Loader.v Loader.vo certirocqchk_plugin.cmx* "$(COQLIBINSTALL)"
-	make -f Makefile.certirocqchk install
+	install -d "$(INSTALLDIR)"
+	install -m 0644 Loader.v Loader.vo certirocqchk_plugin.cmx* "$(INSTALLDIR)"
+	$(MAKE) -f Makefile.certirocqchk install
 	ocamlfind install -add rocq-certirocqchk certirocqchk_plugin.cmx* certirocqchk_plugin.cmi
 
 .PHONY: plugin test

@@ -4,7 +4,8 @@ LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 
 TARGETS = ${SRC:.c=.o}
 COQLIB = `coqc -where`
-DST ?= ${COQLIB}/user-contrib/CertiRocq/Plugin/runtime
+COQLIBINSTALL ?= $(if $(DESTDIR),$(DESTDIR)/)${COQLIB}/user-contrib
+INSTALLDIR = ${COQLIBINSTALL}/CertiRocq/Plugin/runtime
 
 all: ${TARGETS}
 
@@ -12,10 +13,10 @@ all: ${TARGETS}
 	$(CC) -I /opt/homebrew/include -I . -I `ocamlc -where` -fPIC -O2 -g -c -o $@ $+
 
 install: all
-	install -d ${DST}
-	install -m 0644 ${HEADERS} ${DST}
-	install -m 0644 ${SRC} ${DST}
-	install -m 0644 ${TARGETS} ${DST}
+	install -d "${INSTALLDIR}"
+	install -m 0644 ${HEADERS} "${INSTALLDIR}"
+	install -m 0644 ${SRC} "${INSTALLDIR}"
+	install -m 0644 ${TARGETS} "${INSTALLDIR}"
 
 clean:
 	rm -f *.o
