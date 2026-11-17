@@ -81,14 +81,15 @@ uses Node.js 22) and `wabt`.
 
 ## Installing CertiRocq (optional)
 
-You don't need this to work on CertiRocq. To install the theories and plugins
-into the current switch, run:
+You don't need this to work on CertiRocq. To install the theories, the runtime
+and the plugins into the current switch, run:
 
 ```console
 $ make install
 ```
 
 This also builds the bootstrapped plugins under `bootstrap/`.
+To leave those out, install `make install-core` instead.
 
 ## Troubleshooting
 
