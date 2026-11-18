@@ -152,7 +152,9 @@ primbool prim_int63_eqb(primint x, primint y)
 primbool prim_int63_leb(primint x, primint y)
 { 
   trace("Calling prim_int63_leb\n");
-  return (mk_bool (x <= y));
+  /* Rocq's PrimInt63.leb is an unsigned comparison; [value] is signed, and a
+     tagged word 2x+1 with x >= 2^62 has its top bit set, so compare unsigned. */
+  return (mk_bool ((uintnat)x <= (uintnat)y));
 }
 
 // Beware, the fact is is an arithmetic right shift is implementation dependent
@@ -165,7 +167,7 @@ primbool prim_int63_lesb(primint x, primint y)
 primbool prim_int63_ltb(primint x, primint y)
 {
   trace("Calling prim_int63_ltb\n");
-  return (mk_bool (x < y));
+  return (mk_bool ((uintnat)x < (uintnat)y));
 }
 primbool prim_int63_ltsb(primint x, primint y)
 {

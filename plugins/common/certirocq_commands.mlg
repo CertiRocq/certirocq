@@ -182,6 +182,13 @@ VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY STATE opaque_access
     Certirocq.compile_wasm opts gr
   }
 #endif
+#if CERTIROCQ_HAS_LLVM
+| [ "CertiRocq" "Compile" "LLVM" cargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certirocq.make_options l [] (get_name gr) in
+    Certirocq.compile_llvm opts gr
+  }
+#endif
 | [ "CertiRocq" "Run" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l cs (get_name gr) in

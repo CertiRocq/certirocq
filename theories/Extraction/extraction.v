@@ -111,7 +111,8 @@ Separate Extraction
          Glue.glue.generate_glue
          term.M.elements
          Compiler.pipeline.show_IR
-         Compiler.pipeline.compile_Wasm.
+         Compiler.pipeline.compile_Wasm
+         Compiler.pipeline.compile_LLVM.
 
 Recursive Extraction Library Ascii.
 Recursive Extraction Library BinPos.

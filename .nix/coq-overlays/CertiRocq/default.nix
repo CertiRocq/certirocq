@@ -8,6 +8,7 @@
   compcert,
   metarocq,
   ExtLib,
+  vellvm,
   version ? null,
 }:
 
@@ -41,6 +42,7 @@ mkCoqDerivation ({
     compcert
     ExtLib
     metarocq
+    vellvm
   ];
 
   patchPhase = ''

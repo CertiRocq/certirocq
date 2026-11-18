@@ -927,6 +927,32 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug (string_of_bytestring dbg);
       CErrors.user_err Pp.(str "compile_wasm" ++ (str "Could not compile: " ++ (pr_string s) ++ str "\n"))
 
+  (* LLVM backend: [Pipeline.compile_LLVM] returns the textual LLVM module
+     (Vellvm's [show_tle] of the emitted top-level entities, joined by newlines)
+     as a bytestring.  It defines [i64 @certirocq_main(ptr %tinfo)] and calls,
+     without declaring, [void @garbage_collect(ptr)]: link it with the runtime
+     prelude (see tests/llvm/prelude.ll). *)
+  let compile_llvm ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+    let p = Pipeline.compile_LLVM options (Obj.magic term) in
+    match p with
+    | (CompM.Ret prg, dbg) ->
+      debug_msg debug "Finished compiling, printing to file.";
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let file = make_fname opts (opts.filename ^ suff ^ ".ll") in
+      print_to_file (string_of_bytestring prg) file;
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." file time);
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg)
+    | (CompM.Err s, dbg) ->
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg);
+      CErrors.user_err Pp.(str "compile_llvm" ++ (str "Could not compile: " ++ (pr_string s) ++ str "\n"))
+
 
   (* Quote Coq inductive type *)
   let quote_ind ~opaque_access opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
