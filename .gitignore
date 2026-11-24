@@ -78,6 +78,8 @@ bootstrap/certirocqc/META
 bootstrap/certirocqchk/META
 plugins/plugin/.merlin
 _build
+# Compilation database for C tooling, written by dune
+/compile_commands.json
 .vscode/CertiRocq.code-workspace
 .vscode/settings.json
 bootstrap/certirocqc/CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
