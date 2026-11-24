@@ -566,6 +566,9 @@ Definition LambdaANF_to_Wasm (nenv : name_env) (cenv : ctor_env) (penv : prim_en
                     |} ::
                     {| modexp_name := String.print "memory"
                      ; modexp_desc := MED_mem 0%N
+                    |} ::
+                    {| modexp_name := String.print "table"
+                     ; modexp_desc := MED_table 0%N
                     |} :: nil
   in
 
