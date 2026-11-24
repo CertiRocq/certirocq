@@ -9,5 +9,5 @@
 (callPackage (pkgs.path + "/pkgs/development/rocq-modules/MenhirLib") { inherit version; })
 .overrideAttrs
   (o: {
-    patches = (o.patches or [ ]) ++ [ ./fix-proof-commands.patch ];
+    patches = (o.patches or [ ]) ++ [ ../../../opam-overlay/packages/coq-menhirlib/coq-menhirlib.20260209/files/fix-proof-commands.patch ];
   })

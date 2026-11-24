@@ -10,5 +10,5 @@
 (callPackage (pkgs.path + "/pkgs/development/rocq-modules/wasmcert") { inherit version; })
 .overrideAttrs
   (o: {
-    patches = (o.patches or [ ]) ++ [ ./rocq-9.3.patch ];
+    patches = (o.patches or [ ]) ++ [ ../../../opam-overlay/packages/coq-wasm/coq-wasm.2.2.1/files/rocq-9.3.patch ];
   })

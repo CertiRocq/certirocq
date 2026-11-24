@@ -1,0 +1,55 @@
+opam-version: "2.0"
+name: "coq-wasm"
+version: "2.2.1"
+synopsis: "Wasm formalisation in Coq"
+description:
+  "Wasm formalisation in Coq, following the AFP formalisation of Conrad Watt"
+maintainer: ["Xiaojia Rao" "Martin Bodin"]
+authors: [
+  "Martin Bodin" "Philippa Gardner" "Jean Pichon" "Xiaojia Rao" "Conrad Watt"
+]
+license: "MIT"
+tags: [
+  "keyword:WebAssembly"
+  "category:Computer Science/Semantics and Compilation/Semantics"
+  "date:2026-10-12"
+  "logpath:Wasm"
+]
+homepage: "https://github.com/WasmCert/WasmCert-Coq"
+bug-reports: "https://github.com/WasmCert/WasmCert-Coq/issues"
+depends: [
+  "dune" {>= "3.11" & < "3.24"}
+  "coq" {>= "9.0" & < "9.4~"}
+  "coq-compcert" {>= "3.14"}
+  "coq-ext-lib" {>= "0.11.8"}
+  "rocq-mathcomp-ssreflect" {>= "2.4.0" & < "2.7~"}
+  "rocq-parseque" {>= "0.3.1"}
+  "cmdliner" {>= "1.1.0"}
+  "linenoise" {>= "1.4.0"}
+  "mdx" {>= "1.9.0"}
+  "wasm" {>= "2.0.2" & <= "2.0.2"}
+  "odoc" {with-doc}
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
+]
+dev-repo: "git+https://github.com/WasmCert/WasmCert-Coq.git"
+url {
+  src:
+    "https://github.com/WasmCert/WasmCert-Coq/archive/refs/tags/v2.2.1.tar.gz"
+  checksum:
+    "sha256=def864ac2cc56054dac1001720166978ae4cc1ac705b2caf67492ca90a2bbeab"
+}
+patches: ["rocq-9.3.patch"]
+extra-files: [["rocq-9.3.patch" "md5=8e237fe57f932c578074db3bbe4f8796"]]

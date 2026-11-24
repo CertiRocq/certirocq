@@ -1,0 +1,30 @@
+opam-version: "2.0"
+name: "coq-menhirlib"
+version: "20260209"
+synopsis: "A support library for verified Rocq parsers produced by Menhir"
+maintainer: "francois.pottier@inria.fr"
+authors: "Jacques-Henri Jourdan <jacques-henri.jourdan@lri.fr>"
+license: "LGPL-3.0-or-later"
+tags: ["date:2026-02-09" "logpath:MenhirLib"]
+homepage: "https://gitlab.inria.fr/fpottier/coq-menhirlib"
+bug-reports: "https://gitlab.inria.fr/fpottier/menhir/-/issues"
+depends: [
+  "coq" {>= "8.13" & < "9.4~"}
+]
+conflicts: [
+  "menhir" {!= version}
+]
+patches: ["fix-proof-commands.patch"]
+build: [make "-C" "coq-menhirlib" "-j%{jobs}%"]
+install: [make "-C" "coq-menhirlib" "install"]
+dev-repo: "git+https://gitlab.inria.fr/fpottier/menhir.git"
+url {
+  src:
+    "https://gitlab.inria.fr/fpottier/menhir/-/archive/20260209/archive.tar.gz"
+  checksum: [
+    "md5=e993231085db95ab011ffe0cd606d9dd"
+    "sha512=aafad186f328ae8dd4cc69af0f30c1a0b208cf5148a7a94c150099be03838503c5ec12918de26cd7f794b5a72f114bc1bae8d81058bd0ea10372a3b06818687e"
+  ]
+}
+x-maintenance-intent: ["(latest)"]
+extra-files: [["fix-proof-commands.patch" "md5=7d5ffe615eee008459882c40fde79461"]]

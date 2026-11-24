@@ -40,16 +40,17 @@ released yet. Pin MetaRocq to its `9.3` branch:
 $ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.3
 ```
 
-> **Rocq 9.3 note.** The latest opam releases of CompCert (3.18), MenhirLib
-> (20260209) and WasmCert (2.2.1) do not support Rocq 9.3 yet: their opam
-> packages require an earlier Rocq, and MenhirLib and WasmCert need the small
-> patches kept in `.nix/rocq-overlays/MenhirLib` and
-> `.nix/rocq-overlays/wasmcert`. WasmCert also requires dune < 3.24. Until
-> they are released for Rocq 9.3, step 4 below fails on these three packages;
-> the Nix build (`nix-build --argstr bundle default --argstr job CertiRocq`)
-> applies the patches and is the supported way to build this branch.
+## 4. Add the opam overlay
 
-## 4. Install the dependencies
+The latest releases of CompCert, MenhirLib and WasmCert do not support
+Rocq 9.3 yet. The `opam-overlay/` directory provides versions of their opam
+packages that do (see its `README.md`). From the `certirocq/` directory, run:
+
+```console
+$ opam repo add certirocq-overlay ./opam-overlay
+```
+
+## 5. Install the dependencies
 
 From the `certirocq/` directory, run:
 
@@ -62,7 +63,7 @@ from source, which takes about half an hour on a recent laptop. If opam reports 
 packages (for example GMP), install them with your system package manager and
 run the command again.
 
-## 5. Build CertiRocq
+## 6. Build CertiRocq
 
 CertiRocq is built with [dune](https://dune.build):
 
@@ -116,7 +117,7 @@ the switch has a released MetaRocq. Pin it as in step 3 and rerun
 **`Compiled library ... makes inconsistent assumptions over library ...`**:
 some build files were compiled against older dependencies, for example
 before upgrading MetaRocq. The build does not detect this by itself, so clean
-everything and build again as in step 5:
+everything and build again as in step 6:
 
 ```console
 $ dune clean
