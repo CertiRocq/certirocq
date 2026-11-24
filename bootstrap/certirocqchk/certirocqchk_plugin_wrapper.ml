@@ -51,9 +51,9 @@ let fix_neues neues : Obj.t =
 let fix_universe u =
   let open Sort in
   match u with
-  | Rocq_sProp -> Rocq_sProp
-  | Rocq_sSProp -> Rocq_sSProp
-  | Rocq_sType neues -> Rocq_sType (Obj.magic (fix_neues neues))
+  | Coq_sProp -> Coq_sProp
+  | Coq_sSProp -> Coq_sSProp
+  | Coq_sType neues -> Coq_sType (Obj.magic (fix_neues neues))
 
 (* Instances are lists of universes *)
 let fix_instance u =
@@ -83,25 +83,25 @@ let fix_term (p : Ast0.term) : Ast0.term =
   let open List in
   let rec aux p =
   match p with
-  | Rocq_tRel _ | Rocq_tVar _ -> p
-  | Rocq_tConst (kn, u) -> Rocq_tConst (kn, fix_instance u)
-  | Rocq_tInd (ind, u) -> Rocq_tInd (ind, fix_instance u)
-  | Rocq_tConstruct (ind, k, u) -> Rocq_tConstruct (ind, k, fix_instance u)
-  | Rocq_tEvar (k, l) -> Rocq_tEvar (k, map aux l)
-  | Rocq_tSort u -> Rocq_tSort (fix_universe u)
-  | Rocq_tCast (t, k, t') -> Rocq_tCast (aux t, k, aux t')
-  | Rocq_tProd (na, t, t') -> Rocq_tProd (na, aux t, aux t')
-  | Rocq_tLambda (na, t, t') -> Rocq_tLambda (na, aux t, aux t')
-  | Rocq_tLetIn (na, t, b, t') -> Rocq_tLetIn (na, aux t, aux b, aux t')
-  | Rocq_tApp (t, l) -> Rocq_tApp (aux t, map aux l)
-  | Rocq_tCase (ci, p, c, brs) -> Rocq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
-  | Rocq_tProj (p, t) -> Rocq_tProj (p, aux t)
-  | Rocq_tFix (mfix, i) -> Rocq_tFix (map aux_def mfix, i)
-  | Rocq_tCoFix (mfix, i) -> Rocq_tCoFix (map aux_def mfix, i)
-  | Rocq_tInt i -> Rocq_tInt i
-  | Rocq_tFloat f -> Rocq_tFloat f
-  | Rocq_tString f -> Rocq_tString f
-  | Rocq_tArray (u, v, def, ty) -> Rocq_tArray (Obj.magic (fix_neues u), map aux v, aux def, aux ty)
+  | Coq_tRel _ | Coq_tVar _ -> p
+  | Coq_tConst (kn, u) -> Coq_tConst (kn, fix_instance u)
+  | Coq_tInd (ind, u) -> Coq_tInd (ind, fix_instance u)
+  | Coq_tConstruct (ind, k, u) -> Coq_tConstruct (ind, k, fix_instance u)
+  | Coq_tEvar (k, l) -> Coq_tEvar (k, map aux l)
+  | Coq_tSort u -> Coq_tSort (fix_universe u)
+  | Coq_tCast (t, k, t') -> Coq_tCast (aux t, k, aux t')
+  | Coq_tProd (na, t, t') -> Coq_tProd (na, aux t, aux t')
+  | Coq_tLambda (na, t, t') -> Coq_tLambda (na, aux t, aux t')
+  | Coq_tLetIn (na, t, b, t') -> Coq_tLetIn (na, aux t, aux b, aux t')
+  | Coq_tApp (t, l) -> Coq_tApp (aux t, map aux l)
+  | Coq_tCase (ci, p, c, brs) -> Coq_tCase (ci, aux_pred p, aux c, map aux_branch brs)
+  | Coq_tProj (p, t) -> Coq_tProj (p, aux t)
+  | Coq_tFix (mfix, i) -> Coq_tFix (map aux_def mfix, i)
+  | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
+  | Coq_tInt i -> Coq_tInt i
+  | Coq_tFloat f -> Coq_tFloat f
+  | Coq_tString f -> Coq_tString f
+  | Coq_tArray (u, v, def, ty) -> Coq_tArray (Obj.magic (fix_neues u), map aux v, aux def, aux ty)
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
     { puinst = fix_instance puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
   and aux_branch { bcontext = bcontext; bbody = bbody } =

@@ -34,10 +34,10 @@ Whenever you open a new terminal, run
 ## 3. Pin MetaRocq
 
 CertiRocq currently depends on a version of MetaRocq that has not been
-released yet. Pin MetaRocq to its `9.1` branch:
+released yet. Pin MetaRocq to its `9.2` branch:
 
 ```console
-$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.1
+$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.2
 ```
 
 ## 4. Install the dependencies
@@ -48,7 +48,7 @@ From the `certirocq/` directory, run:
 $ opam install --deps-only -y .
 ```
 
-This builds Rocq 9.1, MetaRocq, CompCert, WasmCert and the other dependencies
+This builds Rocq 9.2, MetaRocq, CompCert, WasmCert and the other dependencies
 from source, which takes about half an hour on a recent laptop. If opam reports missing system
 packages (for example GMP), install them with your system package manager and
 run the command again.

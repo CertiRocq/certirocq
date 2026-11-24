@@ -3,8 +3,9 @@
 (rocq.theory
  (name CertiRocq)
  (package rocq-certirocq)
- ; Nested inductive types do not need All schemes, as in MetaRocq
- (flags (:standard -w -register-all))
+ ; Nested inductive types do not need All schemes, as in MetaRocq.
+ ; The proofs still end many tactics with "...", deprecated since Rocq 9.2.
+ (flags (:standard -w -register-all -w -deprecated-end-tac))
  ; Unfinished developments, not built
  (modules
   :standard

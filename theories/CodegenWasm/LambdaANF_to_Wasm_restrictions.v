@@ -19,6 +19,8 @@ From CertiRocq Require Import
 From MetaRocq.Utils Require Import bytestring MRString.
 
 Import MonadNotation compM ssreflect.
+(* MathComp 2.6 no longer sets this option, which the proofs below rely on *)
+Set SsrOldRewriteGoalsOrder.
 
 (* ***** RESTRICTIONS ON lANF EXPRESSIONS ****** *)
 Definition max_function_args := 100%Z.       (* should be possible to vary without breaking much *)
@@ -247,7 +249,7 @@ Proof.
     cbn in H2. destruct (check_restrictions cenv e) eqn:Hrestr=>//.
     destruct (sequence _ ) eqn:Hseq; inv H2. destruct u.
     assert (check_restrictions cenv (Ecase v l) = Ret ()). {
-      unfold check_restrictions. simpl. now rw Hseq. }
+      unfold check_restrictions. simpl. now rewrite Hseq. }
     assert (expression_restricted cenv (Ecase v l)). {
        apply IHe0; auto. apply rt_refl. }
     apply clos_rt_rtn1 in Hsub. inv Hsub.

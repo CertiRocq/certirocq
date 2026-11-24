@@ -49,7 +49,7 @@
  (flags (:standard -rectypes -open Metarocq_template_plugin -open Certirocq_vanilla_plugin -w +a-4-8-9-20-26-27-32..34-37-39-41-42-44-45-48-56-58-60-67-68-70 -warn-error -a))
  (libraries
   rocq-runtime.plugins.ltac
-  rocq-metarocq-template.extractable
+  rocq-metarocq-template-ocaml.plugin
   rocq-certirocq-vanilla.plugin
   stdlib-shims)
  (foreign_stubs
