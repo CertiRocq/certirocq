@@ -956,7 +956,7 @@ Section CtorEnumTag.
     match ctors with
     | nil => (nil, nil)
     | ctor :: ctors' =>
-        if unbox_check ctor
+        if unbox_check ctor is unboxed
         then
           let (bs, us) := match_ordinals_with_tag ctors' boxed (S unboxed) (S total) in
           (bs, (unboxed, total) :: us)

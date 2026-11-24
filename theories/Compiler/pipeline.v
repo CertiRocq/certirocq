@@ -55,7 +55,7 @@ Section Pipeline.
     match env with
     | [] => acc
     | (kn, EAst.ConstantDecl {| EAst.cst_body := None |}) :: decls =>
-        if List.find (fun prim => ReflectEq.eqb kn (fst prim).(prim_name)) prims then find_axioms acc decls
+        if List.find (fun prim => ReflectEq.eqb kn (fst prim).(prim_name)) prims is Some _ then find_axioms acc decls
         else find_axioms (kn :: acc) decls
     | _ :: decls => find_axioms acc decls
       end.

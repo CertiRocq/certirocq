@@ -16,7 +16,7 @@
   (package rocq-certirocq))
  (action
   (system
-   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.CertiRocqCheck compile.v")))
+   "rocq c -w -already-declared-rewrite-hint-db -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.CertiRocqCheck compile.v")))
 
 ; C identifiers cannot contain Greek letters, nor can foreign stubs have dots in their
 ; names
@@ -109,4 +109,4 @@
   (package rocq-certirocqchk))
  (action
   (system
-   "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q . CertiRocq.CertiRocqCheck test.v")))
+   "rocq c -w -already-declared-rewrite-hint-db -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q . CertiRocq.CertiRocqCheck test.v")))

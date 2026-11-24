@@ -374,6 +374,6 @@ on:
   pull_request:
   push:
     branches:
-    - rocq-9.2
+    - rocq-9.3
 permissions:
   contents: read

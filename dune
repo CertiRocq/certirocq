@@ -1,0 +1,7 @@
+; Loading the libraries of MetaRocq 9.3 declares some rewrite hint databases
+; several times, which Rocq 9.3 warns about at each Require.
+(env
+ (_
+  (rocq
+   (flags
+    (:standard -w -already-declared-rewrite-hint-db)))))

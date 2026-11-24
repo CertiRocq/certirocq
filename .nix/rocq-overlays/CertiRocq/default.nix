@@ -36,7 +36,7 @@ in
   propagatedBuildInputs = [
     # Used by the runtime, and by the programs compiled with its GMP bindings
     pkgs.gmp
-    # The plugins of MetaRocq 9.2 depend on the coq-core compatibility package
+    # The plugins of MetaRocq 9.3 depend on the coq-core compatibility package
     coq
     wasmcert
     compcert

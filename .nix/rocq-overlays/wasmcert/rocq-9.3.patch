@@ -1,0 +1,53 @@
+diff --git a/theories/instantiation_properties.v b/theories/instantiation_properties.v
+index 8ff3f72..2cfa76a 100644
+--- a/theories/instantiation_properties.v
++++ b/theories/instantiation_properties.v
+@@ -492,7 +492,8 @@ Proof.
+       by apply reduce_not_nil in Hred.
+     }
+     destruct es => //=; first by apply reduce_not_nil in Hred.
+-    by destruct es, l => //=.
++    destruct es, l => //=.
++    by apply IHHred in H.
+   }
+ Qed.
+ 
+diff --git a/theories/numerics.v b/theories/numerics.v
+index d001345..18f68fa 100644
+--- a/theories/numerics.v
++++ b/theories/numerics.v
+@@ -1452,7 +1452,7 @@ Definition opp : T -> T := Binary.Bopp _ _ wasm_opp_nan.
+   The sign is not specified if given 0 as a mantissa. **)
+ Definition normalise (m e : Z) : T :=
+   Binary.binary_normalize _ _ prec_gt_0 Hmax
+-    BinarySingleNaN.mode_NE m e ltac:(abstract exact false).
++    BinarySingleNaN.mode_NE m e false.
+ 
+ (** As Flocq is unfortunately undocumented, let us introduce a unit test here, to check
+   that indeed we have the correct understanding of definitions.
+@@ -1581,9 +1581,7 @@ Definition BofZ : Z -> T :=
+ (** [BofZ] is actually just the same thing than calling [normalise] with an empty exponent. **)
+ Lemma BofZ_normalise : forall i, BofZ i = normalise i 0.
+ Proof.
+-  rewrite /BofZ /IEEE754_extra.BofZ /normalise => i.
+-  f_equal; apply: Logic.Eqdep_dec.eq_proofs_unicity_on;
+-    move=> c; case: c; by [ left | right ]. (* LATER: Remove this bruteforce. *)
++  rewrite /BofZ /IEEE754_extra.BofZ /normalise => i //.
+ Qed.
+ 
+ (** We can then define versions of these operators directly from float to float,
+diff --git a/theories/subtyping_properties.v b/theories/subtyping_properties.v
+index 94b8a7f..5152b7b 100644
+--- a/theories/subtyping_properties.v
++++ b/theories/subtyping_properties.v
+@@ -559,6 +559,10 @@ Ltac extract_premise :=
+     try specialize (H _ _ erefl)
+   | H: forall t ts, ?ts0 ++ [::?t0] = ts ++ [::t] -> _ |- _ =>
+     try specialize (H _ _ erefl)
++  (* Same equation, other binder-generalisation order: [dependent induction]
++     may emit the bound list/element in either order across Rocq versions. *)
++  | H: forall ts t, ?ts0 ++ [::?t0] = ts ++ [::t] -> _ |- _ =>
++    try specialize (H _ _ erefl)
+   | H: forall x y z, [:: ?c ?x0 ?y0 ?z0] = [:: ?c z y x] -> _ |- _ =>
+     try specialize (H _ _ _ erefl)
+   | H: forall x y, (Tf ?x0 ?y0) = (Tf y x) -> _ |- _ =>

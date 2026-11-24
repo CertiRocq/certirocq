@@ -1,18 +1,25 @@
 let
-  ## Rocq 9.2 and the 9.2 branch of MetaRocq, shared by the bundles below.
+  ## Rocq 9.3 and the 9.3 branch of MetaRocq, shared by the bundles below.
   ## The other libraries CertiRocq depends on are the releases that nixpkgs
-  ## selects for Rocq 9.2.
+  ## selects for Rocq 9.3, except CompCert, MenhirLib and WasmCert: nixpkgs
+  ## does not mark any of their releases as compatible with Rocq 9.3 yet,
+  ## although the latest ones build with it, so they are selected explicitly
+  ## (see also the overlay in .nix/rocq-overlays/compcert).
   rocqPackages = {
-    rocq-core.override.version = "9.2";
-    coq.override.version = "9.2";
+    rocq-core.override.version = "9.3";
+    coq.override.version = "9.3";
     metarocq.job = false;
-    metarocq.override.version = "9.2";
+    metarocq.override.version = "9.3";
     metarocq-erasure-plugin.job = true;
     metarocq-safechecker-plugin.job = true;
     equations.job = false;
     ExtLib.job = false;
     compcert.job = false;
+    compcert.override.version = "3.18";
+    MenhirLib.job = false;
+    MenhirLib.override.version = "20260203";
     wasmcert.job = false;
+    wasmcert.override.version = "2.2.1";
   };
 in
 {
@@ -33,7 +40,7 @@ in
   default-bundle = "default";
   ## When generating GitHub Action CI, one workflow file
   ## will be created per bundle
-  ## The default bundle uses Rocq 9.2 and the 9.2 branch of MetaRocq.
+  ## The default bundle uses Rocq 9.3 and the 9.3 branch of MetaRocq.
   bundles."default" = {
     inherit rocqPackages;
   };
@@ -47,10 +54,10 @@ in
     };
   };
 
-  bundles."default".push-branches = ["rocq-9.2"];
+  bundles."default".push-branches = ["rocq-9.3"];
   ## genNixActions makes the workflow run on pull_request_target, which
   ## GitHub always takes from the default branch (main), not from the PR's
-  ## base branch: PRs to rocq-9.2 would then get no Nix CI.  After
+  ## base branch: PRs to rocq-9.3 would then get no Nix CI.  After
   ## regenerating .github/workflows/nix-action-default.yml, replace its
   ## pull_request and pull_request_target triggers by a plain, unfiltered
   ## pull_request one (fork PRs then cannot push to the cache, but are built).

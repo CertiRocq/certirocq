@@ -34,11 +34,20 @@ Whenever you open a new terminal, run
 ## 3. Pin MetaRocq
 
 CertiRocq currently depends on a version of MetaRocq that has not been
-released yet. Pin MetaRocq to its `9.2` branch:
+released yet. Pin MetaRocq to its `9.3` branch:
 
 ```console
-$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.2
+$ opam pin add --no-action -y git+https://github.com/MetaRocq/metarocq.git#9.3
 ```
+
+> **Rocq 9.3 note.** The latest opam releases of CompCert (3.18), MenhirLib
+> (20260209) and WasmCert (2.2.1) do not support Rocq 9.3 yet: their opam
+> packages require an earlier Rocq, and MenhirLib and WasmCert need the small
+> patches kept in `.nix/rocq-overlays/MenhirLib` and
+> `.nix/rocq-overlays/wasmcert`. WasmCert also requires dune < 3.24. Until
+> they are released for Rocq 9.3, step 4 below fails on these three packages;
+> the Nix build (`nix-build --argstr bundle default --argstr job CertiRocq`)
+> applies the patches and is the supported way to build this branch.
 
 ## 4. Install the dependencies
 
@@ -48,7 +57,7 @@ From the `certirocq/` directory, run:
 $ opam install --deps-only -y .
 ```
 
-This builds Rocq 9.2, MetaRocq, CompCert, WasmCert and the other dependencies
+This builds Rocq 9.3, MetaRocq, CompCert, WasmCert and the other dependencies
 from source, which takes about half an hour on a recent laptop. If opam reports missing system
 packages (for example GMP), install them with your system package manager and
 run the command again.
