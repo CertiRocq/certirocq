@@ -6,13 +6,13 @@ CLEAN_DIRS=$(addprefix clean,$(DIRS))
 all: $(DIRS)
 
 lib/Makefile:
-	cd lib; rocq makefile -f _CoqProject -o Makefile
+	cd lib; rocq makefile --no-rocq-package-warning -f _CoqProject -o Makefile
 
 lib: lib/Makefile
 	$(MAKE) -C $@
 
 ffi/Makefile:
-	cd ffi; rocq makefile -f _RocqProject -o Makefile; mkdir _build
+	cd ffi; rocq makefile --no-rocq-package-warning -f _RocqProject -o Makefile; mkdir _build
 
 ffi: ffi/Makefile
 	$(MAKE) -C $@

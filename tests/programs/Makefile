@@ -43,7 +43,7 @@ cleanexec:
 	rm -f ./*_opt[1-5]
 
 lib/Makefile:
-	cd ../lib; rocq makefile -f _CoqProject -o Makefile
+	cd ../lib; rocq makefile --no-rocq-package-warning -f _CoqProject -o Makefile
 
 lib: ../lib/Makefile
 	$(MAKE) -C ../lib

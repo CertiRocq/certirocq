@@ -82,6 +82,7 @@ Definition sha (_ : unit) := sha256.SHA_256 (sha256.str_to_bytes test).
 
 Definition sha_fast (_ : unit) := sha256.SHA_256' (sha256.str_to_bytes test).
 
+Set Extraction Output Directory ".".
 Extraction "demo1" demo1.
 Extraction "demo2" demo2.
 Extraction "list_sum" list_sum.

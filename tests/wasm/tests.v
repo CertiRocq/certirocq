@@ -105,6 +105,7 @@ Fixpoint even n :=
     | O => false
     | S k => even k
     end.
+#[warnings="-abstract-large-number"]
 Definition even_10000 := even 10000.
 
 Eval compute in "Compiling ack".

@@ -76,6 +76,10 @@ in
     ulimit -Ss "$(ulimit -Hs)"
     patchShebangs tests
     installed=$PWD/_build/install/default/lib
+    # The setup hook of the coq compatibility package sets COQPATH, which
+    # Rocq warns about. ROCQPATH has the same libraries.
+    if [ -z "''${ROCQPATH-}" ]; then ROCQPATH=''${COQPATH-}; fi
+    unset COQPATH
     ROCQPATH=$installed/coq/user-contrib''${ROCQPATH:+:$ROCQPATH} \
       OCAMLPATH=$installed''${OCAMLPATH:+:$OCAMLPATH} make -C tests
     runHook postCheck

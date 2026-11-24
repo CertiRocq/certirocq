@@ -1,6 +1,7 @@
 (* basic.v *)
 
 Require Import BinPos micromega.Lia.
+Require Recdef.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -413,7 +414,6 @@ Qed.
 
 
 (* clauses.v *)
-Unset Arguments.
 
 Require Import ZArith List Recdef Coq.MSets.MSetInterface Coq.Sorting.Mergesort
                Permutation Coq.MSets.MSetAVL Coq.MSets.MSetRBT.
@@ -1003,12 +1003,10 @@ Lemma extensionality:
   forall (A B: Type) (f g : A -> B),  (forall x, f x = g x) -> f = g.
 Proof. intros; apply functional_extensionality. auto. Qed.
 
-Arguments extensionality.
 
 (** We also assert propositional extensionality. *)
 
 Axiom prop_ext: ClassicalFacts.prop_extensionality.
-Arguments prop_ext.
 
 (** * Proof irrelevance *)
 
@@ -1019,7 +1017,6 @@ Lemma proof_irr: ClassicalFacts.proof_irrelevance.
 Proof.
   exact (ClassicalFacts.ext_prop_dep_proof_irrel_cic prop_ext).
 Qed.
-Arguments proof_irr.
 
 (* end msl/Axioms.v *)
 
@@ -1507,12 +1504,13 @@ intros; destruct (Psucc_pred n) as [Hpred | Hpred]; try contradiction;
 pattern n at 2; rewrite <- Hpred; rewrite nat_of_P_succ_morphism; lia.
 Defined.
 
-Require Import Recdef.
+Import Recdef.
 
 (* begin show *)
 
 (** The Superpose main loop *)
 
+Set Warnings "-funind-cannot-define-graph,-funind-cannot-build-inversion".
 Function main (n : positive) (units l : list clause) {measure nat_of_P n}
   : superposition_result * list clause * M.t*M.t :=
   if Pos.eqb n 1 then (Aborted l, units, M.empty, M.empty)
@@ -1693,7 +1691,7 @@ Fixpoint do_well4_5 (sc : list space_atom) : list (list pure_atom) :=
         let atms := map (fun a => normalize_atoms [Eqv x0 y; a]) l0 in
           atms ++ do_well4_5 sc'
       end
-  | _ as a :: sc' => do_well4_5 sc'
+  | _ :: sc' => do_well4_5 sc'
   | nil => nil
   end.
 
@@ -1883,6 +1881,7 @@ Definition unfolding5NPR (sc1 sc2 : clause) : list clause :=
 
 (** Rule as given in NPR's paper, corrected variable uses *)
 
+#[warnings="-non-recursive"]
 Fixpoint unfolding5NPRALT' (sigma0 sigma1 sigma2 : list space_atom)
   : list (pure_atom * list space_atom) :=
   match sigma2 with
@@ -2193,7 +2192,6 @@ Defined.
 
 (* end show *)
 (* Required to work around Coq bug #2613 *)
-Arguments eq_sym.
 
 Definition check_entailment (ent: entailment) : veristar_result :=
   let s := clause_list2set (pure_clauses (map order_eqv_clause (cnf ent)))
@@ -2359,6 +2357,7 @@ Definition myMain :=
                         example1_myfail; example1_myfail;
                           example_ent; harder_ent;
                             harder_ent2; harder_ent3].
+Set Extraction Output Directory ".".
 Extraction "myMain" myMain.
 
 Definition ce_harder_ent := check_entailment harder_ent.
