@@ -468,6 +468,7 @@ End DPE.
 End ToplevelTheorems.
 
 Require Import ExtLib.Structures.Monad LambdaANF.toplevel.
+Require Import LambdaANF.merge_dup_funs LambdaANF.merge_dup_funs_correct.
 Import MonadNotation.
 
 
@@ -555,10 +556,74 @@ Section Compose.
 
   Opaque uncurry_top.
 
-  (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
+  (** A term is related to itself. *)
+  Lemma preord_exp_n_refl_simple e :
+    exists n, preord_exp_n cenv wf_pres (post_prop cenv) n e e.
+  Proof.
+    eexists. econstructor 1.
+    3:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+    intros. eapply preord_exp_refl.
+    eapply simple_bound_compat. eassumption.
+    clear. firstorder.
+  Qed.
+
+  (** Each round of merging is correct, so the iteration of rounds is. *)
+  Lemma merge_dup_funs_iter fuel e :
+    well_scoped e ->
+    well_scoped (merge_dup_funs fuel e) /\
+    bound_var (merge_dup_funs fuel e) \subset bound_var e /\
+    occurs_free (merge_dup_funs fuel e) \subset occurs_free e /\
+    exists n, preord_exp_n cenv wf_pres (post_prop cenv) n e (merge_dup_funs fuel e).
+  Proof.
+    revert e. induction fuel as [| fuel IH]; intros e Hws.
+    - (* no round left *)
+      split; [ exact Hws |]. split; [ now sets |]. split; [ now sets |].
+      apply preord_exp_n_refl_simple.
+    - destruct e as [ | | | | B e0 | | | | ];
+        try (split; [ exact Hws |]; split; [ now sets |]; split; [ now sets |];
+             apply preord_exp_n_refl_simple).
+      rewrite merge_dup_funs_S.
+      match goal with
+      | |- context [ merge_list ?a ?b ?c ?d ?e ?f ] =>
+          destruct (merge_list a b c d e f) as [kept σ] eqn:Hm
+      end.
+      destruct (Nat.eqb _ _).
+      + (* nothing was merged *)
+        split; [ exact Hws |]. split; [ now sets |]. split; [ now sets |].
+        apply preord_exp_n_refl_simple.
+      + destruct Hws as [Hun Hdis].
+        assert (Hmp : merge_props B kept σ).
+        { eapply merge_list_props; [| exact Hm ]. now inv Hun. }
+        destruct (merge_round_syntax _ _ _ e0 Hun Hmp) as [Hun1 [Hbv1 Hfv1]].
+        set (e1 := Efun (rename_fds σ (list_to_fds kept)) (rename_exp σ e0)) in *.
+        assert (Hws1 : well_scoped e1).
+        { split; [ exact Hun1 |].
+          eapply Disjoint_Included; [ exact Hfv1 | exact Hbv1 | exact Hdis ]. }
+        destruct (IH e1 Hws1) as [Hws2 [Hbv2 [Hfv2 [n Hn]]]].
+        split; [ exact Hws2 |].
+        split; [ eapply Included_trans; eassumption |].
+        split; [ eapply Included_trans; eassumption |].
+        exists (1 + n)%nat. econstructor 2; [| exact Hn ].
+        econstructor 1.
+        3:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+        * intros k rho1 rho2 Henv _.
+          eapply merge_round_correct;
+            [ eapply simple_bound_compat | exact Hun | exact Hmp | exact Henv ].
+        * exact Hfv1.
+  Qed.
+
+  (** Merging alpha-equivalent functions *)
   Lemma merge_dup_funs_correct :
     correct cenv merge_dup_funs_trans.
-  Admitted.
+  Proof.
+    intros e c Hws Hmax.
+    destruct (merge_dup_funs_iter 10 e Hws) as [Hws' [Hbv [Hfv Hrel]]].
+    do 2 eexists. split; [ reflexivity |].
+    split; [ exact Hws' |].
+    split; [| exact Hrel ].
+    eapply Pos.le_lt_trans; [| exact Hmax ].
+    apply max_var_le. now apply Included_Union_compat.
+  Qed.
 
   Lemma correct_id_trans :
     correct cenv id_trans.
