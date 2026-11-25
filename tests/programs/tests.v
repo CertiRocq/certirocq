@@ -150,8 +150,7 @@ Eval compute in "Compiling vs_hard".
 
 CertiRocq Compile --output-suffix "_default" vs_hard.
 CertiRocq Compile -O 0 --output-suffix "_O0" vs_hard.
-(* FIXME: --cps currently overflows the C stack for this larger VeriStar test. *)
-(* CertiRocq Compile --cps --output-suffix "_cps" vs_hard. *)
+CertiRocq Compile --cps --output-suffix "_cps" vs_hard.
 
 CertiRocq Generate Glue --output "glue_vs_hard" [ bool, vs.space_atom, vs.clause ].
 
@@ -188,8 +187,7 @@ Eval compute in "Compiling rec_clos".
 
 CertiRocq Compile --output-suffix "_default" rec_clos.
 CertiRocq Compile -O 0 --output-suffix "_O0" rec_clos.
-(* FIXME: --cps currently overflows the C stack for this program. *)
-(* CertiRocq Compile --cps --output-suffix "_cps" rec_clos. *)
+CertiRocq Compile --cps --output-suffix "_cps" rec_clos.
 
 CertiRocq Generate Glue --output "glue_rec_clos" [ nat, list ].
 
@@ -198,8 +196,7 @@ Eval compute in "Compiling rec_clos2".
 
 CertiRocq Compile --output-suffix "_default" rec_clos2.
 CertiRocq Compile -O 0 --output-suffix "_O0" rec_clos2.
-(* FIXME: --cps currently overflows the C stack for this program. *)
-(* CertiRocq Compile --cps --output-suffix "_cps" rec_clos2. *)
+CertiRocq Compile --cps --output-suffix "_cps" rec_clos2.
 
 CertiRocq Generate Glue --output "glue_rec_clos2" [ nat, list ].
 
@@ -207,8 +204,7 @@ Eval compute in "Compiling sha_fast".
 
 CertiRocq Compile --output-suffix "_default" sha_fast.
 CertiRocq Compile -O 0 --output-suffix "_O0" sha_fast.
-(* FIXME: --cps currently overflows the C stack for this program. *)
-(* CertiRocq Compile --cps --output-suffix "_cps" sha_fast. *)
+CertiRocq Compile --cps --output-suffix "_cps" sha_fast.
 
 CertiRocq Generate Glue --output "glue_sha_fast" [ bool, list ].
 
