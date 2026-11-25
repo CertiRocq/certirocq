@@ -87,15 +87,15 @@ primstring prim_string_make(struct thread_info* tinfo, primint bytes, primint d)
   $limit = (*tinfo).limit;
   $alloc = (*tinfo).alloc;
   unsigned long long words = (bytes / 8) + 1;
-  if (!(words <= $limit - $alloc)) {
+  if (!(words + 1 <= $limit - $alloc)) {
     /*skip*/;
-    (*tinfo).nalloc = words;
+    (*tinfo).nalloc = words + 1;
     garbage_collect(tinfo);
     /*skip*/;
     $alloc = (*tinfo).alloc;
     $limit = (*tinfo).limit;
   }
-  assert (words <= $limit - $alloc);
+  assert (words + 1 <= $limit - $alloc);
   *($alloc + 0LLU) = String_tag | (words << 10);
   int i = 0;
   char *strp = (char*) ($alloc + 1LLU);
@@ -108,7 +108,7 @@ primstring prim_string_make(struct thread_info* tinfo, primint bytes, primint d)
   for (; ((j + 1) / 8) < words; j++)
   { strp[j] = (char) 0; }
   strp[j] = j - i;
-  (*tinfo).alloc = (*tinfo).alloc + words;
+  (*tinfo).alloc = (*tinfo).alloc + words + 1;
   return (value) ((unsigned long long *) $alloc + 1LLU);
 }
 
@@ -119,15 +119,15 @@ primstring prim_string_sub(struct thread_info* tinfo, primstring x,
   $limit = (*tinfo).limit;
   $alloc = (*tinfo).alloc;
   unsigned long long words = (len / 8) + 1;
-  if (!(words <= $limit - $alloc)) {
+  if (!(words + 1 <= $limit - $alloc)) {
     /*skip*/;
-    (*tinfo).nalloc = words;
+    (*tinfo).nalloc = words + 1;
     garbage_collect(tinfo);
     /*skip*/;
     $alloc = (*tinfo).alloc;
     $limit = (*tinfo).limit;
   }
-  assert (words <= $limit - $alloc);
+  assert (words + 1 <= $limit - $alloc);
   *($alloc + 0LLU) = String_tag | (words << 10);
   int i = 0;
   char *strp = (char*) ($alloc + 1LLU);
@@ -140,7 +140,7 @@ primstring prim_string_sub(struct thread_info* tinfo, primstring x,
   for (; ((j + 1) / 8) < words; j++)
   { strp[j] = (char) 0; }
   strp[j] = j - i;
-  (*tinfo).alloc = (*tinfo).alloc + words;
+  (*tinfo).alloc = (*tinfo).alloc + words + 1;
   return (value) ((unsigned long long *) $alloc + 1LLU);
 }
 
@@ -152,15 +152,15 @@ primstring prim_string_cat(struct thread_info* tinfo, primstring x, primstring y
   size_t lenx = prim_strlen(x);
   size_t leny = prim_strlen(y);
   unsigned long long words = ((lenx + leny) / 8) + 1;
-  if (!(words <= $limit - $alloc)) {
+  if (!(words + 1 <= $limit - $alloc)) {
     /*skip*/;
-    (*tinfo).nalloc = words;
+    (*tinfo).nalloc = words + 1;
     garbage_collect(tinfo);
     /*skip*/;
     $alloc = (*tinfo).alloc;
     $limit = (*tinfo).limit;
   }
-  assert (words <= $limit - $alloc);
+  assert (words + 1 <= $limit - $alloc);
   *($alloc + 0LLU) = String_tag | (words << 10);
   int i = lenx + leny;
   char *strp = (char*) ($alloc + 1LLU);
@@ -172,6 +172,6 @@ primstring prim_string_cat(struct thread_info* tinfo, primstring x, primstring y
   for (; ((j + 1) / 8) < words; j++)
   { strp[j] = (char) 0; }
   strp[j] = j - i;
-  (*tinfo).alloc = (*tinfo).alloc + words;
+  (*tinfo).alloc = (*tinfo).alloc + words + 1;
   return (value) ((unsigned long long *) $alloc + 1LLU);
 }

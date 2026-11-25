@@ -294,7 +294,7 @@ primintcarry prim_int63_addc(struct thread_info *ti, primint x, primint y)
   trace("Calling prim_int63_addc on %llu and %llu\n", xr, yr);
   register unsigned long long r = xr + yr;
   trace("Result: %llu\n", r);
-  if (r < xr) { return mk_C1(ti, Val_long (r)); }
+  if (r > maxuint63) { return mk_C1(ti, Val_long (r)); }
   else { return mk_C0(ti, Val_long (r)); }
 }
 
