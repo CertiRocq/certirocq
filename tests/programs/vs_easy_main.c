@@ -2,7 +2,7 @@
 #include "gc_stack.h"
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 extern void print_Corelib_Init_Datatypes_bool(unsigned long long);
 
@@ -46,9 +46,8 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
 
   tinfo = make_tinfo();
-  body(tinfo);
+  val = body(tinfo);
 
-  val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
   print_Corelib_Init_Datatypes_bool(val);
   printf("\n");
