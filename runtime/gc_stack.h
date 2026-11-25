@@ -151,6 +151,16 @@ void garbage_collect(struct thread_info *ti);
   (where N>=num_allocs), such that limit-alloc=N.
 */
 
+void garbage_collect_args(struct thread_info *ti, value n, value nalloc);
+/* Like garbage_collect, with ti->args[0..n) as additional roots
+   and ti->nalloc set to nalloc. */
+
+static inline _Bool certirocq_is_ptr(value x)
+/* Tells whether x is a pointer.  If it is not, it is an integer. */
+{
+  return (((intnat) x) & 1) == 0;
+}
+
 void free_heap(struct heap *h);
 /* Deallocates all heap data associated with h, and returns the
  * memory to the operating system (via the malloc/free system).

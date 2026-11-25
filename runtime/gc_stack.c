@@ -435,6 +435,19 @@ void garbage_collect(struct thread_info *ti)
   abort_with("Ran out of generations\n");
 }
 
+void garbage_collect_args(struct thread_info *ti, value n, value nalloc)
+/* See the header file for the interface-spec of this function. */
+{
+  struct stack_frame frame;
+  frame.root = ti->args;
+  frame.next = ti->args + (uintnat) n;
+  frame.prev = ti->fp;
+  ti->fp = &frame;
+  ti->nalloc = (uintnat) nalloc;
+  garbage_collect(ti);
+  ti->fp = frame.prev;
+}
+
 /* REMARK.  The generation-management policy in the garbage_collect function
    has a potential flaw.  Whenever a record is copied, it is promoted to
    a higher generation.  This is generally a good idea.  But there is
