@@ -56,13 +56,16 @@ Section Correct.
 
   (** ** Source fuel and trace for EAst.term *)
 
+  (* Only application costs fuel. The divergence proof is by induction on
+     fuel and term size, so fuel must decrease whenever an evaluation that
+     runs out of fuel continues with a term that is not a subterm of the
+     current one. Application (of a closure or of a fixpoint) is the only
+     such rule: the other rules continue with subterms, and the body of a
+     constant is only ever evaluated to a value. *)
   Definition fuel_exp (e : EAst.term) : nat :=
     match e with
-    | EAst.tRel _ => 0  (* variables translate to [Hole_c], so no target step *)
-    | EAst.tLetIn _ _ _ => 0
-    | EAst.tConst _ => 0  (* globals are values: no fuel overhead *)
-    | EAst.tLambda _ _ => 0 (* lambdas are values *)
-    | _ => 1
+    | EAst.tApp _ _ => 1
+    | _ => 0
     end.
 
   Fixpoint max_branch_fields (brs : list (list name * EAst.term)) : nat :=
