@@ -55,6 +55,9 @@ Definition wf_trivial {A} : A -> A -> Prop := fun _ _ => True.
 
 Definition preserves_fv (e1 e2 : exp) := occurs_free e2 \subset occurs_free e1.
 
+Definition post_prop (cenv : ctor_env) : post_property :=
+  fun P1 PG => Post_properties cenv P1 P1 PG /\ post_upper_bound P1.
+
 
 Section RelComp.
 
@@ -353,6 +356,15 @@ Section RelComp.
   Qed.
 
 End RelComp.
+
+Lemma preord_exp_n_refl cenv (wf_pres : exp -> exp -> Prop) (P : PostT) (PG : PostGT) e :
+  (forall e, wf_pres e e) ->
+  post_prop cenv P PG ->
+  preord_exp_n cenv wf_pres (post_prop cenv) 1 e e.
+Proof.
+  intros Hwf Hpp. econstructor 1; [| apply Hwf | exact Hpp ].
+  intros k rho1 rho2 Henv _. eapply preord_exp_refl; [ exact (proj1 Hpp) | exact Henv ].
+Qed.
 
 Section Linking.
 

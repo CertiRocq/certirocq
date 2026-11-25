@@ -3,11 +3,13 @@
 
    This file proves that one round of merging gives a term related to its input
    by the logical relation ([merge_round_correct]), and that it keeps unique
-   bindings and adds no bound or free variables ([merge_round_syntax]). *)
+   bindings and adds no bound or free variables ([merge_round_syntax]). Then it
+   proves the same for any number of rounds ([merge_dup_funs_iter]). *)
 
 From Stdlib Require Import Lists.List NArith.BinNat PArith.BinPos micromega.Lia
      Sets.Ensembles Relations.Relations Arith.
 Require Import compcert.lib.Coqlib.
+Require Import LambdaANF.rel_comp.
 Require Import LambdaANF.term LambdaANF.eval LambdaANF.identifiers LambdaANF.Ensembles_util
         LambdaANF.List_util LambdaANF.tactics LambdaANF.map_util LambdaANF.set_util
         LambdaANF.functions LambdaANF.term_util LambdaANF.algebra
@@ -1009,3 +1011,59 @@ Lemma merge_dup_funs_S fuel B e :
   if Nat.eqb (length kept) (length (fds_to_list B)) then Efun B e
   else merge_dup_funs fuel (Efun (rename_fds σ (list_to_fds kept)) (rename_exp σ e)).
 Proof. reflexivity. Qed.
+
+
+(** * Any number of rounds *)
+
+Section Iter.
+
+  Context (cenv : ctor_env).
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  Context (P : @logical_relations.PostT fuel trace) (PG : @logical_relations.PostGT fuel trace)
+          (Hpp : post_prop cenv P PG).
+
+  Lemma merge_dup_funs_iter rounds e :
+    well_scoped e ->
+    well_scoped (merge_dup_funs rounds e) /\
+    bound_var (merge_dup_funs rounds e) \subset bound_var e /\
+    occurs_free (merge_dup_funs rounds e) \subset occurs_free e /\
+    exists n, preord_exp_n cenv preserves_fv (post_prop cenv) n e (merge_dup_funs rounds e).
+  Proof.
+    assert (Hrefl : forall e',
+               exists n, preord_exp_n cenv preserves_fv (post_prop cenv) n e' e').
+    { intros e'. exists 1%nat. eapply preord_exp_n_refl; [| exact Hpp ].
+      intro. unfold preserves_fv. sets. }
+    revert e. induction rounds as [| rounds IH]; intros e Hws.
+    - (* no round left *)
+      split; [ exact Hws |]. split; [ now sets |]. split; [ now sets |]. apply Hrefl.
+    - destruct e as [ | | | | B e0 | | | | ];
+        try (split; [ exact Hws |]; split; [ now sets |]; split; [ now sets |];
+             apply Hrefl).
+      rewrite merge_dup_funs_S.
+      match goal with
+      | |- context [ merge_list ?a ?b ?c ?d ?e ?f ] =>
+          destruct (merge_list a b c d e f) as [kept σ] eqn:Hm
+      end.
+      destruct (Nat.eqb _ _).
+      + (* nothing was merged *)
+        split; [ exact Hws |]. split; [ now sets |]. split; [ now sets |]. apply Hrefl.
+      + destruct Hws as [Hun Hdis].
+        assert (Hmp : merge_props B kept σ).
+        { eapply merge_list_props; [| exact Hm ]. now inv Hun. }
+        destruct (merge_round_syntax _ _ _ e0 Hun Hmp) as [Hun1 [Hbv1 Hfv1]].
+        set (e1 := Efun (rename_fds σ (list_to_fds kept)) (rename_exp σ e0)) in *.
+        assert (Hws1 : well_scoped e1).
+        { split; [ exact Hun1 |].
+          eapply Disjoint_Included; [ exact Hfv1 | exact Hbv1 | exact Hdis ]. }
+        destruct (IH e1 Hws1) as [Hws2 [Hbv2 [Hfv2 [n Hn]]]].
+        split; [ exact Hws2 |].
+        split; [ eapply Included_trans; eassumption |].
+        split; [ eapply Included_trans; eassumption |].
+        exists (1 + n)%nat. econstructor 2; [| exact Hn ].
+        econstructor 1; [| exact Hfv1 | exact Hpp ].
+        intros k rho1 rho2 Henv _.
+        eapply merge_round_correct;
+          [ exact (proj1 Hpp) | exact Hun | exact Hmp | exact Henv ].
+  Qed.
+
+End Iter.

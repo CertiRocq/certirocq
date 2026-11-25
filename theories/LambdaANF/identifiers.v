@@ -1805,6 +1805,11 @@ with unique_bindings_fundefs : fundefs -> Prop :=
 | UBound_Fnil :
     unique_bindings_fundefs Fnil.
 
+(** Well-scoped terms: no variable is bound twice, or both bound and free *)
+(* TODO use John's definition *)
+Definition well_scoped (e : exp) :=
+  unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
+
 (** Uniqueness of names in a block of functions *)
 Inductive unique_functions : fundefs -> Prop :=
 | Fnil_un :

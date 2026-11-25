@@ -39,17 +39,6 @@ Section Srink_top_correct.
           (Hubound2 : post_upper_bound PG).
 
 
-  (* XXX duplicate definitions *)
-  Definition well_scoped e :=
-    unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
-
-  Definition wf_pres e1 e2 :=
-    occurs_free e2 \subset occurs_free e1.
-
-  Definition post_prop P1 PG :=
-    Post_properties cenv P1 P1 PG /\
-    post_upper_bound P1.
-
   (* To handle terms with disjoint bv and of instead of closed, used this with xs = fv (e) : *)
   Theorem gsr_clos_unwrap :
     forall s f t xs e  e',
@@ -78,7 +67,7 @@ Section Srink_top_correct.
     unique_bindings e ->
     Disjoint var (bound_var e) (occurs_free e) ->
     let (e', n) := shrink_top e in
-    (exists m, m >= n /\ preord_exp_n cenv wf_pres post_prop m e e') /\
+    (exists m, m >= n /\ preord_exp_n cenv preserves_fv (post_prop cenv) m e e') /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
     occurs_free e' \subset occurs_free e /\
