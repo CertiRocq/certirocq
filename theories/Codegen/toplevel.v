@@ -1,5 +1,6 @@
 From Stdlib Require Import ZArith.
 From CertiRocq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight Codegen.LambdaANF_to_Clight_stack.
+From CertiRocq Require Codegen.LambdaANF_to_C.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
 
@@ -77,9 +78,17 @@ Definition Clight_trans_ANF bodyName prims (args : nat) (t : toplevel.LambdaANF_
   end.
 
 
+Definition Clight_trans_C bodyName prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
+  let '(_, pr_env, cenv, _, _, nenv, _, _, prog) := t in
+  match LambdaANF_to_C.compile bodyName args pr_env prog cenv nenv with
+  | Ret (nenv, header, prog) => (Ret (add_prim_names prims nenv, header, prog), ""%bs)
+  | Err s => (Err s, ""%bs)
+  end.
+
+
 Definition compile_Clight prims : CertiRocqTrans toplevel.LambdaANF_FullTerm Cprogram :=
   fun s =>
     debug_msg "Translating from LambdaANF to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    LiftErrorLogCertiRocqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
+    LiftErrorLogCertiRocqTrans "Codegen" (Clight_trans_C opts.(body_name) prims args) s.

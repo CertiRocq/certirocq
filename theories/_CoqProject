@@ -89,6 +89,7 @@ LambdaANF/toplevel_theorems.v
 Codegen/tactics.v
 Codegen/LambdaANF_to_Clight.v
 Codegen/LambdaANF_to_Clight_stack.v
+Codegen/LambdaANF_to_C.v
 Codegen/toplevel.v
 
 # CodegenWasm

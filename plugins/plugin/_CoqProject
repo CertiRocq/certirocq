@@ -277,10 +277,10 @@ extraction/interfaces.ml
 extraction/interfaces.mli
 extraction/kernames.ml
 extraction/kernames.mli
+extraction/lambdaANF_to_C.ml
+extraction/lambdaANF_to_C.mli
 extraction/lambdaANF_to_Clight.ml
 extraction/lambdaANF_to_Clight.mli
-extraction/lambdaANF_to_Clight_stack.ml
-extraction/lambdaANF_to_Clight_stack.mli
 extraction/lambdaANF_to_Wasm.ml
 extraction/lambdaANF_to_Wasm.mli
 extraction/lambdaANF_to_Wasm_primints.ml
