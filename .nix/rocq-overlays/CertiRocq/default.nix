@@ -5,8 +5,8 @@
   rocq-core,
   wasmcert,
   compcert,
-  metarocq-erasure-plugin,
-  metarocq-safechecker-plugin,
+  metarocq-erasure,
+  metarocq-safechecker,
   ExtLib,
   version ? null,
   # Whether the check phase builds and tests the bootstrapped compiler and checker
@@ -38,8 +38,8 @@ in
     wasmcert
     compcert
     ExtLib
-    metarocq-erasure-plugin
-    metarocq-safechecker-plugin
+    metarocq-erasure
+    metarocq-safechecker
   ];
 
   # The plugin invokes a C compiler to build the code it generates,

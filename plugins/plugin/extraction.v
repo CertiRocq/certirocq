@@ -96,7 +96,7 @@ Set Warnings "-extraction-opaque-accessed".
 Separate Extraction FloatOps.Prim2SF.
 
 Separate Extraction
-         Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
+         Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax
          Clight
          Ctypes.make_program
