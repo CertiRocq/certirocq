@@ -25,18 +25,6 @@ Section ToplevelTheorems.
   Context (clo_tag : ctor_tag).
   Context (clo_itag : ind_tag).
 
-  (* TODO use John's definition  *)
-  Definition well_scoped e :=
-    unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
-
-  Definition fv_pres e1 e2 :=
-    occurs_free e2 \subset occurs_free e1.
-
-
-  Definition post_prop P1 PG :=
-    Post_properties cenv P1 P1 PG /\
-    post_upper_bound P1.
-
   (** Correctness spec for (composition of) "identity" transformations *)
 
   Definition correct (trans :  exp -> comp_data -> error exp * comp_data) :=
@@ -47,7 +35,7 @@ Section ToplevelTheorems.
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
-        exists n, preord_exp_n cenv wf_pres post_prop n e e'.     (* src and trg are in the logical relation  *)
+        exists n, preord_exp_n cenv preserves_fv (post_prop cenv) n e e'. (* src and trg are in the logical relation  *)
 
   (** Correctness spec for closure conversion tranformations *)
 
@@ -59,7 +47,7 @@ Section ToplevelTheorems.
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
-        exists n m,  R_n_exp cenv clo_tag wf_pres post_prop       (* src and trg are in the logical relation  *)
+        exists n m,  R_n_exp cenv clo_tag preserves_fv (post_prop cenv) (* src and trg are in the logical relation  *)
                              (simple_bound 0) (simple_bound 0) n m e e'.
 
 
@@ -70,7 +58,7 @@ Section Inline.
    well_scoped e ->
    exists (e' : exp) (c' : state.comp_data) click,
      inline_top' St IH z d st e c = (Ret e', c', click) /\
-     wf_pres e e' /\
+     preserves_fv e e' /\
      well_scoped e' /\
      max_var e' 1 < state.next_var c' /\
      (forall (k : nat) (rho1 rho2 : env),
@@ -138,7 +126,7 @@ Section LambdaLift.
    exists (e' : exp) (c' : state.comp_data),
      lambda_lift k l b e c = (Ret e', c') /\
      max_var e' 1 < state.next_var c' /\
-     wf_pres e e' /\
+     preserves_fv e e' /\
      well_scoped e'  /\
      (forall (k : nat) (rho1 rho2 : env),
          preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
@@ -182,27 +170,6 @@ Section LambdaLift.
 
 End LambdaLift.
 
-
-(* TODO move *)
-Section Refl.
-
-  Context (wf_pres : exp -> exp -> Prop)
-          (wf_pres_refl : forall e, wf_pres e e)
-          (lf : var).
-
-  Context (fuel trace : Type)  {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
-
-  Lemma preord_exp_n_refl e :
-    preord_exp_n cenv wf_pres post_prop 1 e e.
-  Proof.
-    econstructor; eauto.
-    2:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
-    intros.
-    eapply preord_exp_refl; eauto.
-    eapply simple_bound_compat.
-  Qed.
-
-End Refl.
 
 Section CCHoist.
 
@@ -258,6 +225,7 @@ Section CCHoist.
         * do 2 eexists. econstructor. split.
           ++ eapply preord_exp_n_refl.
              clear; firstorder.
+             split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
           ++ eexists. split. split.
              2:{ eassumption. }
              2:{ econstructor. intros. eapply H6. eassumption.
@@ -278,7 +246,7 @@ Section Shrink.
       well_scoped e' /\
       occurs_free e' \subset occurs_free e /\
       bound_var e' \subset bound_var e /\
-      preord_exp_n cenv wf_pres post_prop m e e'.
+      preord_exp_n cenv preserves_fv (post_prop cenv) m e e'.
   Proof.
     intros.
     intros. intros.
@@ -288,7 +256,7 @@ Section Shrink.
     assert (Ha : let (e', n) := shrink_top e in
                  (exists m : nat,
                      (m >= n)%nat /\
-                     preord_exp_n cenv shrink_cps_toplevel.wf_pres (shrink_cps_toplevel.post_prop cenv) m e e') /\
+                     preord_exp_n cenv preserves_fv (post_prop cenv) m e e') /\
                  unique_bindings e' /\
                  Disjoint var (occurs_free e') (bound_var e') /\
                  occurs_free e' \subset occurs_free e /\ bound_var e' \subset bound_var e).
@@ -346,7 +314,8 @@ Section InlineLoop.
      split. reflexivity.
      split. eassumption. split. eassumption.
      eexists. eapply preord_exp_n_refl.
-     intros. unfold wf_pres. sets.
+     intros. unfold preserves_fv. sets.
+     split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
    - destructAll. simpl.
      edestruct inline_correct with (e := e). eassumption.
      destructAll.
@@ -388,7 +357,7 @@ Section Uncurry.
    exists (e' : exp) (c' : state.comp_data),
      uncurry_top cps e c = (Ret e', c') /\
      max_var e' 1 < state.next_var c' /\
-     wf_pres e e' /\
+     preserves_fv e e' /\
      well_scoped e'  /\
      (forall (k : nat) (rho1 rho2 : env),
          preord_env_P cenv (simple_bound 0) (occurs_free e) k rho1 rho2 ->
@@ -432,7 +401,7 @@ Section DPE.
     exists (e' : exp) (c' : state.comp_data),
       DPE e c = (Ret e', c') /\
       max_var e' 1 < state.next_var c' /\
-      wf_pres e e' /\
+      preserves_fv e e' /\
       well_scoped e'  /\
       (forall (k : nat) (rho1 rho2 : env),
           preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
@@ -468,6 +437,7 @@ End DPE.
 End ToplevelTheorems.
 
 Require Import ExtLib.Structures.Monad LambdaANF.toplevel.
+Require Import LambdaANF.merge_dup_funs LambdaANF.merge_dup_funs_correct.
 Import MonadNotation.
 
 
@@ -555,10 +525,20 @@ Section Compose.
 
   Opaque uncurry_top.
 
-  (* TODO: prove. Merging alpha-equivalent closed top-level functions. *)
+  (** Merging alpha-equivalent functions *)
   Lemma merge_dup_funs_correct :
     correct cenv merge_dup_funs_trans.
-  Admitted.
+  Proof.
+    intros e c Hws Hmax.
+    assert (Hpp : post_prop cenv (simple_bound 0) (simple_bound 0)).
+    { split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+    destruct (merge_dup_funs_iter cenv _ _ Hpp 10 e Hws) as [Hws' [Hbv [Hfv Hrel]]].
+    do 2 eexists. split; [ reflexivity |].
+    split; [ exact Hws' |].
+    split; [| exact Hrel ].
+    eapply Pos.le_lt_trans; [| exact Hmax ].
+    apply max_var_le. now apply Included_Union_compat.
+  Qed.
 
   Lemma correct_id_trans :
     correct cenv id_trans.

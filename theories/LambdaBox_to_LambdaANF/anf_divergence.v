@@ -901,28 +901,35 @@ Section Divergence.
         exists t_body. exact Hbody_oot.
   Qed.
 
+  (** Only applications cost fuel. Evaluating any other term is a single
+      evaluation step that uses the same fuel. *)
+  Lemma src_eval_free_step rho e r f t :
+    src_eval rho e r f t ->
+    src_one e = 0 ->
+    exists t0, @eval_env_step _ src_fuel_res src_trace_res Σ rho e r f t0.
+  Proof.
+    intros Hev Hzero.
+    unfold src_one in Hzero.
+    destruct Hev as [rho0 e0 f0 Hlt | rho0 e0 r0 f0 t0 Hstep].
+    - simpl in Hzero, Hlt. lia.
+    - exists t0. simpl in Hzero |- *. rewrite Hzero, Nat.add_0_r. exact Hstep.
+  Qed.
+
   Lemma src_eval_case_oot_mch_if_no_mch_val
         rho ind npars mch brs f t :
     (forall src_v f' t', ~ src_eval rho mch (fuel_sem.Val src_v) f' t') ->
-    src_eval rho (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT (S f) t ->
+    src_eval rho (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT f t ->
     exists t1, src_eval rho mch fuel_sem.OOT f t1.
   Proof.
     intros Hnoval Hoot_case.
-    inversion Hoot_case; subst.
-    - simpl in H. lia.
-    - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ rho
-                     (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT _ _ |- _ ] =>
-          remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep;
-          remember fuel_sem.OOT as r_oot in Hstep;
-          destruct Hstep; try discriminate
-      end.
-      + injection Heqe_case as <- <- <-.
-        exfalso. eapply Hnoval. exact H0.
-      + injection Heqe_case as <- <- <-.
-        assert (f1 = f).
-        { cbv [one_i fuel_resource_LambdaBox fuel_exp] in Hoot_case. simpl in Hoot_case. lia. }
-        subst f1. exists t1. exact H0.
+    destruct (src_eval_free_step _ _ _ _ _ Hoot_case eq_refl) as [t_step Hstep].
+    remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep.
+    remember fuel_sem.OOT as r_oot in Hstep.
+    destruct Hstep; try discriminate.
+    - injection Heqe_case as <- <- <-.
+      exfalso. eapply Hnoval. eassumption.
+    - injection Heqe_case as <- <- <-.
+      eexists. eassumption.
   Qed.
 
   Lemma src_not_stuck_case_mch rho ind npars mch brs :
@@ -942,7 +949,7 @@ Section Divergence.
                     Σ rho ind npars mch brs src_v f_case t_case Hcase_val)
           as [dc [vs [f1 [t1 Hmch_val]]]].
         apply Hnoval. eexists _, _, _. exact Hmch_val.
-      + destruct (Hdiv_case (S f)) as [t_case Hoot_case].
+      + destruct (Hdiv_case f) as [t_case Hoot_case].
         eapply src_eval_case_oot_mch_if_no_mch_val.
         * intros src_v f' t' Hmch_val. apply Hnoval. eexists _, _, _. exact Hmch_val.
         * exact Hoot_case.
@@ -955,38 +962,26 @@ Section Divergence.
     find_branch ind c (List.length vs) brs = Some body ->
     (forall src_v f' t',
         ~ src_eval ((List.rev vs) ++ rho) body (fuel_sem.Val src_v) f' t') ->
-    src_eval rho (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT (f1 + f + 1) t ->
+    src_eval rho (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT (f1 + f) t ->
     exists t2, src_eval ((List.rev vs) ++ rho) body fuel_sem.OOT f t2.
   Proof.
     intros Hmch Hdc Hfind Hnoval Hoot_case.
-    inversion Hoot_case; subst.
-    - simpl in H. lia.
-    - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ rho
-                     (EAst.tCase (ind, npars) mch brs) fuel_sem.OOT _ _ |- _ ] =>
-          remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep;
-          remember fuel_sem.OOT as r_oot in Hstep;
-          destruct Hstep; try discriminate
-      end.
-      + injection Heqe_case as <- <- <-.
-        pose proof (eval_val_exact_det _ _ _ _ _ _ _ _ Hmch H0)
-          as [Heq_con [-> ->]].
-        assert (vs0 = vs) by congruence. subst vs0.
-        assert (c0 = c).
-        { assert (Hde : dcon_of_con ind0 c = dcon_of_con ind0 c0) by congruence.
-          unfold dcon_of_con in Hde. injection Hde as HN.
-          now apply Nnat.Nat2N.inj. }
-        subst c0.
-        subst brs0.
-        rewrite Hfind in H2. injection H2 as <-.
-        rewrite Heqr_oot in H3.
-        assert (f2 = f).
-        { cbv [one_i fuel_resource_LambdaBox fuel_exp] in Hoot_case. simpl in Hoot_case.
-          simpl in H. lia. }
-        subst f2. exists t2. exact H3.
-      + injection Heqe_case as <- <- <-.
-        pose proof (src_eval_val_gt_oot _ _ _ _ _ Hmch _ _ H0) as Hlt_mch.
-        cbv [one_i fuel_resource_LambdaBox fuel_exp] in Hoot_case. simpl in Hoot_case. lia.
+    destruct (src_eval_free_step _ _ _ _ _ Hoot_case eq_refl) as [t_step Hstep].
+    remember (EAst.tCase (ind, npars) mch brs) as e_case in Hstep.
+    remember fuel_sem.OOT as r_oot in Hstep.
+    remember (f1 + f) as f_case in Hstep.
+    destruct Hstep; try discriminate;
+      injection Heqe_case; intros; subst.
+    - (* the scrutinee is a value and the branch body runs out of fuel *)
+      pose proof (eval_val_exact_det _ _ _ _ _ _ _ _ Hmch H) as [Heq_con [<- _]].
+      injection Heq_con as Hc_eq <-.
+      apply Nnat.Nat2N.inj in Hc_eq. subst c0.
+      rewrite Hfind in H1. injection H1 as <-.
+      assert (f2 = f) by (simpl in Heqf_case; lia). subst f2.
+      eexists. exact H2.
+    - (* the scrutinee runs out of fuel: impossible, it evaluates to a value *)
+      pose proof (src_eval_val_gt_oot _ _ _ _ _ Hmch _ _ H) as Hlt_mch.
+      lia.
   Qed.
 
   Lemma src_not_stuck_case_body
@@ -1012,7 +1007,7 @@ Section Divergence.
                     f1 t1 f_case t_case Hmch Hdc Hfind Hcase_val)
           as [f2 [t2 Hbody_val]].
         apply Hnoval. eexists _, _, _. exact Hbody_val.
-      + destruct (Hdiv_case (f1 + f + 1)) as [t_case Hoot_case].
+      + destruct (Hdiv_case (f1 + f)) as [t_case Hoot_case].
         eapply src_eval_case_oot_body_if_mch_val_no_body_val.
         * exact Hmch.
         * exact Hdc.
@@ -1023,23 +1018,16 @@ Section Divergence.
 
   Lemma src_eval_proj_oot_scrut_if_no_scrut_val rho p c f t :
     (forall src_v f' t', ~ src_eval rho c (fuel_sem.Val src_v) f' t') ->
-    src_eval rho (EAst.tProj p c) fuel_sem.OOT (S f) t ->
+    src_eval rho (EAst.tProj p c) fuel_sem.OOT f t ->
     exists t1, src_eval rho c fuel_sem.OOT f t1.
   Proof.
     intros Hnoval Hoot_proj.
-    inversion Hoot_proj; subst.
-    - simpl in H. lia.
-    - match goal with
-      | [ Hstep : @eval_env_step _ _ _ Σ rho
-                     (EAst.tProj p c) fuel_sem.OOT _ _ |- _ ] =>
-          remember (EAst.tProj p c) as e_proj in Hstep;
-          remember fuel_sem.OOT as r_oot in Hstep;
-          destruct Hstep; try discriminate
-      end.
-      + injection Heqe_proj as <- <-.
-        assert (f1 = f).
-        { cbv [one_i fuel_resource_LambdaBox fuel_exp] in Hoot_proj. simpl in Hoot_proj. lia. }
-        subst f1. exists t1. exact H0.
+    destruct (src_eval_free_step _ _ _ _ _ Hoot_proj eq_refl) as [t_step Hstep].
+    remember (EAst.tProj p c) as e_proj in Hstep.
+    remember fuel_sem.OOT as r_oot in Hstep.
+    destruct Hstep; try discriminate.
+    injection Heqe_proj as <- <-.
+    eexists. eassumption.
   Qed.
 
   Lemma src_not_stuck_proj_scrut rho p c :
@@ -1059,7 +1047,7 @@ Section Divergence.
                     Σ rho p c src_v f_proj t_proj Hproj_val)
           as [vs [f1 [t1 Hc_val]]].
         apply Hnoval. eexists _, _, _. exact Hc_val.
-      + destruct (Hdiv_proj (S f)) as [t_proj Hoot_proj].
+      + destruct (Hdiv_proj f) as [t_proj Hoot_proj].
         eapply src_eval_proj_oot_scrut_if_no_scrut_val.
         * intros src_v f' t' Hc_val. apply Hnoval. eexists _, _, _. exact Hc_val.
         * exact Hoot_proj.
@@ -1101,54 +1089,57 @@ Section Divergence.
                              Σ rho args_done vs_done fs ts ->
     (forall src_v f' t', ~ src_eval rho e (fuel_sem.Val src_v) f' t') ->
     src_eval rho (EAst.tConstruct ind c (args_done ++ e :: args_rest))
-                 fuel_sem.OOT (fs + f + 1) t ->
+                 fuel_sem.OOT (fs + f) t ->
     exists t_e, src_eval rho e fuel_sem.OOT f t_e.
   Proof.
     intros Hdone Hnoval Hoot_con.
-    inversion Hoot_con; subst.
-    - simpl in H. lia.
-    - remember (EAst.tConstruct ind c (args_done ++ e :: args_rest)) as e_con in H3.
-      remember fuel_sem.OOT as r_oot in H3.
-      destruct H3; try discriminate;
-        try match goal with
-            | [ Hr : fuel_sem.Val _ = fuel_sem.OOT |- _ ] => discriminate
-            end.
-      inversion Heqe_con; subst; clear Heqe_con.
-      destruct (compare_marked_splits args_done args_done0 args_rest args_rest0 e e0 (eq_sym H6))
-        as [Hearly | [Hsame | Hlate]].
-      + destruct Hearly as [prefix Hprefix].
-        rewrite Hprefix in Hdone.
-        edestruct (@fuel_sem.eval_many_app_inv
-                      nat src_fuel_res src_trace_res
-                      Σ rho args_done0 e0 prefix _ _ _ Hdone)
-          as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
-              ts_before & t_val & ts_after &
-              _ & Hmany_before & Hval_bad & Hmany_after & Hfs_done & _).
-        pose proof (@fuel_sem.eval_many_exact_det
-                      nat src_fuel_res src_trace_res
-                      Σ rho args_done0 _ _ _ _ _ _ H1 Hmany_before)
-          as [_ [Hfs_prefix _]].
-        pose proof (src_eval_val_gt_oot _ _ _ _ _ Hval_bad _ _ H2) as Hlt_bad.
-        rewrite <- Hfs_prefix in Hfs_done.
-        rewrite Hfs_done in H.
-        simpl in H. lia.
-      + destruct Hsame as [-> [-> ->]].
-        pose proof (@fuel_sem.eval_many_exact_det
-                      nat src_fuel_res src_trace_res
-                      Σ rho _ _ _ _ _ _ _ H1 Hdone)
-          as [_ [Hfs_eq _]].
-        simpl in H. subst fs0.
-        assert (Hff : f = f0) by lia.
-        rewrite Hff. exists t. exact H2.
-      + destruct Hlate as [prefix Hprefix].
-        rewrite Hprefix in H1.
-        edestruct (@fuel_sem.eval_many_app_inv
-                      nat src_fuel_res src_trace_res
-                      Σ rho args_done e prefix _ _ _ H1)
-          as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
-              ts_before & t_val & ts_after &
-              _ & _ & Hval_bad & _ & _ & _).
-        exfalso. eapply Hnoval. exact Hval_bad.
+    destruct (src_eval_free_step _ _ _ _ _ Hoot_con eq_refl) as [t_step Hstep].
+    remember (EAst.tConstruct ind c (args_done ++ e :: args_rest)) as e_con in Hstep.
+    remember fuel_sem.OOT as r_oot in Hstep.
+    remember (fs + f) as f_con in Hstep.
+    destruct Hstep as [| | | | | | | | | | ind0 c0 args args_done0 args_rest0 e0 vs
+                         rho0 fs0 f0 t0 ts0 Hargs Hmany Hoot_e | | | | | |];
+      try discriminate.
+    injection Heqe_con as -> -> Hargs_eq.
+    rewrite Hargs_eq in Hargs.
+    destruct (compare_marked_splits args_done args_done0 args_rest args_rest0 e e0 Hargs)
+      as [Hearly | [Hsame | Hlate]].
+    - (* the argument that runs out of fuel comes before [e]: impossible,
+         every argument before [e] evaluates to a value *)
+      destruct Hearly as [prefix Hprefix].
+      rewrite Hprefix in Hdone.
+      edestruct (@fuel_sem.eval_many_app_inv
+                    nat src_fuel_res src_trace_res
+                    Σ rho0 args_done0 e0 prefix _ _ _ Hdone)
+        as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
+            ts_before & t_val & ts_after &
+            _ & Hmany_before & Hval_bad & Hmany_after & Hfs_done & _).
+      pose proof (@fuel_sem.eval_many_exact_det
+                    nat src_fuel_res src_trace_res
+                    Σ rho0 args_done0 _ _ _ _ _ _ Hmany Hmany_before)
+        as [_ [Hfs_prefix _]].
+      pose proof (src_eval_val_gt_oot _ _ _ _ _ Hval_bad _ _ Hoot_e) as Hlt_bad.
+      subst. simpl in *. lia.
+    - (* [e] is the argument that runs out of fuel *)
+      destruct Hsame as [-> [-> ->]].
+      pose proof (@fuel_sem.eval_many_exact_det
+                    nat src_fuel_res src_trace_res
+                    Σ rho0 _ _ _ _ _ _ _ Hmany Hdone)
+        as [_ [Hfs_eq _]].
+      subst fs0. simpl in Heqf_con.
+      assert (Hff : f0 = f) by lia. subst f0.
+      eexists. exact Hoot_e.
+    - (* the argument that runs out of fuel comes after [e]: impossible,
+         [e] has no value *)
+      destruct Hlate as [prefix Hprefix].
+      rewrite Hprefix in Hmany.
+      edestruct (@fuel_sem.eval_many_app_inv
+                    nat src_fuel_res src_trace_res
+                    Σ rho0 args_done e prefix _ _ _ Hmany)
+        as (vs_before & v_bad & vs_after & fs_before & f_val & fs_after &
+            ts_before & t_val & ts_after &
+            _ & _ & Hval_bad & _ & _ & _).
+      exfalso. eapply Hnoval. exact Hval_bad.
   Qed.
 
   Lemma src_not_stuck_construct_arg
@@ -1174,7 +1165,7 @@ Section Divergence.
                     f_con t_con Hcon_val)
           as [v_e [f_e [t_e Hval_e]]].
         apply Hnoval. eexists _, _, _. exact Hval_e.
-      + destruct (Hdiv_con (fs + f + 1)) as [t_con Hoot_con].
+      + destruct (Hdiv_con (fs + f)) as [t_con Hoot_con].
         eapply src_eval_construct_oot_arg_if_prefix_val_no_arg_val.
         * exact Hdone.
         * intros src_v f' t' Hval_e.
@@ -2056,6 +2047,18 @@ Section Divergence.
     { destruct e; vm_compute in Hfuel_lt; lia. }
     subst f.
     exists 0. split; [lia | exact (bstep_fuel_zero_OOT cenv rho (C |[ e_k ]|))].
+  Qed.
+
+  (** The body of a case branch is smaller than the case. *)
+  Lemma find_branch_size ind c nargs brs body npars mch :
+    find_branch ind c nargs brs = Some body ->
+    EInduction.size body < EInduction.size (EAst.tCase (ind, npars) mch brs).
+  Proof.
+    intros Hfind.
+    apply find_branch_In in Hfind.
+    apply in_map_iff in Hfind as [[names b] [Hb Hin]]. simpl in Hb. subst b.
+    pose proof (MRList.In_size snd EInduction.size Hin) as Hlt.
+    cbn [EInduction.size]. simpl in Hlt. lia.
   Qed.
 
   Definition div_measure (p : nat * EAst.term) : { n : nat & nat } :=
@@ -3912,19 +3915,19 @@ Section Divergence.
                            (args_rest := args_rest) (vs_done := vs0)
                            (fs := fs) (ts := ts);
               [exact H0 | right; exact Hdiv]. }
-          assert (Hlt_e1 : div_lt (Datatypes.S f1, e1) (f0, e0)).
+          assert (Hlt_e1 : div_lt (f1, e1) (f0, e0)).
           { unfold div_lt, div_measure.
-            destruct (Nat.eq_dec f0 (Datatypes.S f1)) as [Heq_f | Hneq_f].
+            destruct (Nat.eq_dec f0 f1) as [Heq_f | Hneq_f].
             - rewrite Heq_f.
               cbn in Heqe_cur. subst e0.
               change (@Relation_Operators.lexprod nat (fun _ => nat) lt (fun _ => lt)
-                        (existT (fun _ => nat) (Datatypes.S f1) (EInduction.size e1))
-                        (existT (fun _ => nat) (Datatypes.S f1)
+                        (existT (fun _ => nat) f1 (EInduction.size e1))
+                        (existT (fun _ => nat) f1
                            (EInduction.size
                               (EAst.tConstruct ind c (args_done ++ e1 :: args_rest))))).
               refine (@Relation_Operators.right_lex
                         nat (fun _ => nat) lt (fun _ => lt)
-                        (Datatypes.S f1)
+                        f1
                         (EInduction.size e1)
                         (EInduction.size
                            (EAst.tConstruct ind c (args_done ++ e1 :: args_rest)))
@@ -3934,13 +3937,13 @@ Section Divergence.
               simpl. lia.
             - refine (@Relation_Operators.left_lex
                         nat (fun _ => nat) lt (fun _ => lt)
-                        (Datatypes.S f1) f0
+                        f1 f0
                         (EInduction.size e1) (EInduction.size e0)
                         _).
-              assert (Datatypes.S f1 < f0).
+              assert (Hlt : f1 < f0).
               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
                 simpl in H3. revert H3. lia. }
-              exact H. }
+              exact Hlt. }
           (* set (c_tag := dcon_to_tag default_tag (dcon_of_con ind c) tgm) in *. *)
           set (e_k_inner :=
                  C2 |[ Econstr x c_tag (xs_done ++ x1 :: xs) e_k ]|) in *.
@@ -4255,128 +4258,38 @@ Section Divergence.
                 eapply Setminus_Included. eapply Setminus_Included.
                 exact HzB.
             - eapply Disjoint_Included_r; [exact HB_done_sub | exact Hdis_ek]. }
-          destruct Hns_e1 as [[src_v [fv [tv Hval1]]] | Hdiv_e1].
-          * pose proof (src_eval_val_gt_oot rho0 e1 src_v fv tv Hval1 f1 t0 H1)
-              as Hlt_oot.
-            destruct (Nat.eq_dec fv (Datatypes.S f1)) as [Hfv | Hneq_fv].
-            -- subst fv.
-               assert (Hwf_src_v : well_formed_val Σ src_v).
-               { eapply eval_preserves_wf;
-                   [exact Hglob_wf | exact Hwf | | exact Hval1].
-                 pose proof Henv as Henv_len.
-                 unfold anf_env_rel' in Henv_len.
-                 apply Forall2_length in Henv_len.
-                 rewrite Henv_len.
-                 exact Hwfe1. }
-               destruct (val_rel_exists src_v Hwf_src_v) as [src_v' Hrel_v].
-               destruct (anf_cvt_correct_val_cont_oot
-                           rho0 e1 src_v (Datatypes.S f1) tv
-                           (set_many xs_done vs_done' rho) vn C1 x1 S1 S2 0
-                           e_k_inner src_v' 0
-                           (le_n _)
-                           Hwf
-                           Hwfe1
-                           Hcons
-                           Hcmap
-                           Hdis_S1
-                           Hdis_cmap_S1
-                           Henv_done
-                           Hglob_e1
-                           Hcvt_e1
-                           Hdis_ek_inner
-                           Hval1
-                           Hrel_v
-                           (bstep_fuel_zero_OOT cenv
-                              (M.set x1 src_v' (set_many xs_done vs_done' rho))
-                              e_k_inner))
-                 as [c1' [Hlb1 Hoot1']].
-               destruct (anf_cvt_correct_exps_oot
-                           rho0 args_done vs0 fs ts rho vn C_done xs_done
-                           (S \\ [set x]) S1 e_k_done vs_done' c1'
-                           H0 Hwf Hwf_done Hcons Hcmap Hdis_x Hdis_cmap_x
-                           Henv Hglob_done Hcvt_done Hrel_done_vals
-                           Hdis_ek_done Hoot1')
-                 as [c0 [Hlb0 Hoot0]].
-	               exists c0. split.
-	               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-	                 simpl in H3, Hlb0, Hlb1 |- *. lia. }
-	               unfold e_k_done, e_k_inner in Hoot0.
-	               rewrite Hxs_args.
-	               cbn.
-	               exact Hoot0.
-            -- assert (Datatypes.S f1 < fv) as Hlt_succ by lia.
-               destruct (src_eval_lt_OOT rho0 e1 src_v fv tv (Datatypes.S f1) Hval1 Hlt_succ)
-                 as [t1' Hoot1'].
-	            pose proof (IH (Datatypes.S f1, e1) Hlt_e1 rho0 t1' Hoot1')
-	              as IHe1.
-	            unfold anf_cvt_correct_oot_lower_bound_goal in IHe1.
-	            assert (Hns_e1' : src_not_stuck rho0 e1).
-	            { left. eexists. eexists. eexists. exact Hval1. }
-	            destruct (IHe1 (set_many xs_done vs_done' rho) vn C1 x1 S1 S2
-	                           Hwf
-	                           Hwfe1
-	                              Hcons
-                              Hcmap
-                              Hdis_S1
-                              Hdis_cmap_S1
-                              Henv_done
-	                              Hglob_e1
-	                              Hcvt_e1
-	                              e_k_inner
-	                              Hdis_ek_inner
-	                              (or_introl
-	                                 (ex_intro _ src_v
-	                                    (ex_intro _ fv
-	                                       (ex_intro _ tv Hval1)))))
-	                 as [c1' [Hlb1 Hoot1'']].
-               destruct (anf_cvt_correct_exps_oot
-                           rho0 args_done vs0 fs ts rho vn C_done xs_done
-                           (S \\ [set x]) S1 e_k_done vs_done' c1'
-                           H0 Hwf Hwf_done Hcons Hcmap Hdis_x Hdis_cmap_x
-                           Henv Hglob_done Hcvt_done Hrel_done_vals
-                           Hdis_ek_done Hoot1'')
-                 as [c0 [Hlb0 Hoot0]].
-	               exists c0. split.
-	               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-	                 simpl in H3, Hlb0, Hlb1 |- *. lia. }
-	               unfold e_k_done, e_k_inner in Hoot0.
-	               rewrite Hxs_args.
-	               cbn.
-	               exact Hoot0.
-          * destruct (Hdiv_e1 (Datatypes.S f1)) as [t1' Hoot1'].
-            pose proof (IH (Datatypes.S f1, e1) Hlt_e1 rho0 t1' Hoot1')
-              as IHe1.
-	            unfold anf_cvt_correct_oot_lower_bound_goal in IHe1.
-	            assert (Hns_e1' : src_not_stuck rho0 e1).
-	            { right. exact Hdiv_e1. }
-		            destruct (IHe1 (set_many xs_done vs_done' rho) vn C1 x1 S1 S2
-	                           Hwf
-	                           Hwfe1
-	                           Hcons
-                           Hcmap
-                           Hdis_S1
-                           Hdis_cmap_S1
-                           Henv_done
-	                           Hglob_e1
-	                           Hcvt_e1
-	                           e_k_inner
-	                           Hdis_ek_inner
-	                           Hns_e1')
-	              as [c1' [Hlb1 Hoot1'']].
-            destruct (anf_cvt_correct_exps_oot
-                        rho0 args_done vs0 fs ts rho vn C_done xs_done
-                        (S \\ [set x]) S1 e_k_done vs_done' c1'
-                        H0 Hwf Hwf_done Hcons Hcmap Hdis_x Hdis_cmap_x
-                        Henv Hglob_done Hcvt_done Hrel_done_vals
-                        Hdis_ek_done Hoot1'')
-              as [c0 [Hlb0 Hoot0]].
-	            exists c0. split.
-	            { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-	              simpl in H3, Hlb0, Hlb1 |- *. lia. }
-	            unfold e_k_done, e_k_inner in Hoot0.
-	            rewrite Hxs_args.
-	            cbn.
-	            exact Hoot0.
+          (* The argument [e1] runs out of fuel [f1]; the induction hypothesis
+             applies to that evaluation directly. *)
+          pose proof (IH (f1, e1) Hlt_e1 rho0 t0 H1) as IHe1.
+          unfold anf_cvt_correct_oot_lower_bound_goal in IHe1.
+          destruct (IHe1 (set_many xs_done vs_done' rho) vn C1 x1 S1 S2
+                         Hwf
+                         Hwfe1
+                         Hcons
+                         Hcmap
+                         Hdis_S1
+                         Hdis_cmap_S1
+                         Henv_done
+                         Hglob_e1
+                         Hcvt_e1
+                         e_k_inner
+                         Hdis_ek_inner
+                         Hns_e1)
+            as [c1' [Hlb1 Hoot1'']].
+          destruct (anf_cvt_correct_exps_oot
+                      rho0 args_done vs0 fs ts rho vn C_done xs_done
+                      (S \\ [set x]) S1 e_k_done vs_done' c1'
+                      H0 Hwf Hwf_done Hcons Hcmap Hdis_x Hdis_cmap_x
+                      Henv Hglob_done Hcvt_done Hrel_done_vals
+                      Hdis_ek_done Hoot1'')
+            as [c0 [Hlb0 Hoot0]].
+          exists c0. split.
+          { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
+            simpl in H3, Hlb0, Hlb1 |- *. lia. }
+          unfold e_k_done, e_k_inner in Hoot0.
+          rewrite Hxs_args.
+          cbn.
+          exact Hoot0.
         + (* eval_Case_step *)
           rewrite <- Heqe_cur in Hrel, Hwfe, Hglob, Hdiv, H3 |- *.
           subst r.
@@ -4633,11 +4546,16 @@ Section Divergence.
             - right. exact Hdiv. }
           assert (Hlt_body : div_lt (f2, body) (f0, e0)).
           { unfold div_lt, div_measure.
-            apply Relation_Operators.left_lex.
-            assert (Hlt_f : f2 < f0).
-            { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-              simpl in H3. lia. }
-            exact Hlt_f. }
+            destruct (Nat.eq_dec f0 f2) as [Heq_f | Hneq_f].
+            - (* same fuel: the branch body is a smaller term *)
+              rewrite Heq_f. cbn in Heqe_cur. subst e0.
+              apply Relation_Operators.right_lex.
+              exact (find_branch_size _ _ _ _ _ npars mch H1).
+            - apply Relation_Operators.left_lex.
+              assert (Hlt_f : f2 < f0).
+              { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
+                simpl in H3. lia. }
+              exact Hlt_f. }
           assert (Hdis_ehalt_body :
             Disjoint _ (occurs_free (Ehalt r_br))
               ((S_br \\ FromList br_vars) \\ S_br_out \\ [set r_br])).
@@ -4856,149 +4774,50 @@ Section Divergence.
                       with (rho := rho0) (ind := ind) (npars := npars)
                            (mch := mch) (brs := brs).
             right. exact Hdiv. }
-          assert (Hlt_mch : div_lt (Datatypes.S f1, mch) (f0, e0)).
+          assert (Hlt_mch : div_lt (f1, mch) (f0, e0)).
           { unfold div_lt, div_measure.
-            replace f0 with (Datatypes.S f1).
+            replace f0 with f1.
             - cbn in Heqe_cur. rewrite <- Heqe_cur.
               apply Relation_Operators.right_lex. simpl. lia.
             - cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
               simpl in H3. lia. }
-          destruct Hns_mch as [[src_v [fv [tv Hval_mch]]] | Hdiv_mch].
-          * pose proof (src_eval_val_gt_oot rho0 mch src_v fv tv Hval_mch f1 t1 H)
-              as Hlt_oot.
-            destruct (Nat.eq_dec fv (Datatypes.S f1)) as [Hfv | Hneq_fv].
-            -- subst fv.
-               assert (Hwf_src_v : well_formed_val Σ src_v).
-               { eapply eval_preserves_wf;
-                   [exact Hglob_wf | exact Hwf | | exact Hval_mch].
-                 pose proof Henv as Henv_len.
-                 unfold anf_env_rel' in Henv_len.
-                 apply Forall2_length in Henv_len.
-                 rewrite Henv_len.
-                 exact Hwfe_mch. }
-               destruct (val_rel_exists src_v Hwf_src_v) as [src_v' Hrel_v].
-               destruct (anf_cvt_correct_val_cont_oot
-                           rho0 mch src_v (Datatypes.S f1) tv
-                           rho_efun vnames C1 x1
-                           (S \\ [set f2] \\ [set y]) S2 0
-                           (Eletapp x f2 func_tag [x1] e_k)
-                           src_v' 0
-                           (le_n _)
-                           Hwf
-                           Hwfe_mch
-                           Hcons
-                           Hcmap
-                           Hdis_prefix
-                           Hdis_cmap_prefix
-                           Henv_efun
-                           Hglob_mch
-                           H12
-                           Hdis_eletapp
-                           Hval_mch
-                           Hrel_v
-                           (bstep_fuel_zero_OOT cenv
-                              (M.set x1 src_v' rho_efun)
-                              (Eletapp x f2 func_tag [x1] e_k)))
-                 as [c1 [Hlb1 Hoot_mid]].
-               assert (Hoot_fun :
-                 bstep_fuel cenv rho (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                            (Datatypes.S c1) eval.OOT tt).
-               { pose proof
-                   (BStepf_run cenv rho
-                      (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                      eval.OOT c1 tt
-                      (BStept_fun cenv rho defs
-                         (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|) eval.OOT c1 tt
-                         Hoot_mid))
-                   as Hbsf.
-                 unfold one, one_i in Hbsf. simpl in Hbsf.
-                 replace (c1 + 1)%nat with (Datatypes.S c1) in Hbsf by lia.
-                 exact Hbsf. }
-               exists (Datatypes.S c1). split.
-               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                 simpl in H3, Hlb1 |- *. lia. }
-               exact Hoot_fun.
-            -- assert (Datatypes.S f1 < fv) as Hlt_succ by lia.
-               destruct (src_eval_lt_OOT rho0 mch src_v fv tv (Datatypes.S f1) Hval_mch Hlt_succ)
-                 as [t1' Hoot_mch'].
-               pose proof (IH (Datatypes.S f1, mch) Hlt_mch rho0 t1' Hoot_mch')
-                 as IHmch.
-               unfold anf_cvt_correct_oot_lower_bound_goal in IHmch.
-               destruct (IHmch rho_efun vnames C1 x1
-                         (S \\ [set f2] \\ [set y]) S2
-                         Hwf
-                         Hwfe_mch
-                         Hcons
-                         Hcmap
-                         Hdis_prefix
-                         Hdis_cmap_prefix
-                         Henv_efun
-                         Hglob_mch
-                         H12
-                         (Eletapp x f2 func_tag [x1] e_k)
-                         Hdis_eletapp
-                         (or_introl
-                            (ex_intro _ src_v
-                               (ex_intro _ fv
-                                  (ex_intro _ tv Hval_mch)))))
-                 as [c1 [Hlb1 Hoot_mid]].
-               assert (Hoot_fun :
-                 bstep_fuel cenv rho (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                            (Datatypes.S c1) eval.OOT tt).
-               { pose proof
-                   (BStepf_run cenv rho
-                      (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                      eval.OOT c1 tt
-                      (BStept_fun cenv rho defs
-                         (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|) eval.OOT c1 tt
-                         Hoot_mid))
-                   as Hbsf.
-                 unfold one, one_i in Hbsf. simpl in Hbsf.
-                 replace (c1 + 1)%nat with (Datatypes.S c1) in Hbsf by lia.
-                 exact Hbsf. }
-               exists (Datatypes.S c1). split.
-               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                 simpl in H3, Hlb1 |- *. lia. }
-               exact Hoot_fun.
-          * destruct (Hdiv_mch (Datatypes.S f1)) as [t1' Hoot_mch'].
-            pose proof (IH (Datatypes.S f1, mch) Hlt_mch rho0 t1' Hoot_mch')
-              as IHmch.
-            unfold anf_cvt_correct_oot_lower_bound_goal in IHmch.
-            assert (Hns_mch' : src_not_stuck rho0 mch).
-            { right. exact Hdiv_mch. }
-            destruct (IHmch rho_efun vnames C1 x1
-                      (S \\ [set f2] \\ [set y]) S2
-                      Hwf
-                      Hwfe_mch
-                      Hcons
-                      Hcmap
-                      Hdis_prefix
-                      Hdis_cmap_prefix
-                      Henv_efun
-                      Hglob_mch
-                      H12
-                      (Eletapp x f2 func_tag [x1] e_k)
-                      Hdis_eletapp
-                      Hns_mch')
-              as [c1 [Hlb1 Hoot_mid]].
-            assert (Hoot_fun :
-              bstep_fuel cenv rho (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                         (Datatypes.S c1) eval.OOT tt).
-            { pose proof
-                (BStepf_run cenv rho
-                   (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
-                   eval.OOT c1 tt
-                   (BStept_fun cenv rho defs
-                      (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|) eval.OOT c1 tt
-                      Hoot_mid))
-                as Hbsf.
-              unfold one, one_i in Hbsf. simpl in Hbsf.
-              replace (c1 + 1)%nat with (Datatypes.S c1) in Hbsf by lia.
-              exact Hbsf. }
-            exists (Datatypes.S c1). split.
-            { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-              simpl in H3, Hlb1 |- *. lia. }
-            exact Hoot_fun.
+          (* The scrutinee runs out of fuel [f1]; the induction hypothesis
+             applies to that evaluation directly. *)
+          pose proof (IH (f1, mch) Hlt_mch rho0 t1 H) as IHmch.
+          unfold anf_cvt_correct_oot_lower_bound_goal in IHmch.
+          destruct (IHmch rho_efun vnames C1 x1
+                    (S \\ [set f2] \\ [set y]) S2
+                    Hwf
+                    Hwfe_mch
+                    Hcons
+                    Hcmap
+                    Hdis_prefix
+                    Hdis_cmap_prefix
+                    Henv_efun
+                    Hglob_mch
+                    H12
+                    (Eletapp x f2 func_tag [x1] e_k)
+                    Hdis_eletapp
+                    Hns_mch)
+            as [c1 [Hlb1 Hoot_mid]].
+          assert (Hoot_fun :
+            bstep_fuel cenv rho (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
+                       (Datatypes.S c1) eval.OOT tt).
+          { pose proof
+              (BStepf_run cenv rho
+                 (Efun defs (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|))
+                 eval.OOT c1 tt
+                 (BStept_fun cenv rho defs
+                    (C1 |[ Eletapp x f2 func_tag [x1] e_k ]|) eval.OOT c1 tt
+                    Hoot_mid))
+              as Hbsf.
+            unfold one, one_i in Hbsf. simpl in Hbsf.
+            replace (c1 + 1)%nat with (Datatypes.S c1) in Hbsf by lia.
+            exact Hbsf. }
+          exists (Datatypes.S c1). split.
+          { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
+            simpl in H3, Hlb1 |- *. lia. }
+          exact Hoot_fun.
         + (* eval_Proj_step_OOT *)
           rewrite <- Heqe_cur in Hrel, Hwfe, Hglob, Hdiv, H3 |- *.
           inv Hrel.
@@ -5035,113 +4854,38 @@ Section Divergence.
           { eapply src_not_stuck_proj_scrut
                       with (rho := rho0) (p := p) (c := c).
             right. exact Hdiv. }
-          assert (Hlt_c : div_lt (Datatypes.S f1, c) (f0, e0)).
+          assert (Hlt_c : div_lt (f1, c) (f0, e0)).
           { unfold div_lt, div_measure.
-            replace f0 with (Datatypes.S f1).
+            replace f0 with f1.
             - cbn in Heqe_cur. rewrite <- Heqe_cur.
               apply Relation_Operators.right_lex. simpl. lia.
             - cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
               simpl in H3. lia. }
-          destruct Hns_c as [[src_v [fv [tv Hval_c]]] | Hdiv_c].
-          * pose proof (src_eval_val_gt_oot rho0 c src_v fv tv Hval_c f1 t1 H)
-              as Hlt_oot.
-            destruct (Nat.eq_dec fv (Datatypes.S f1)) as [Hfv | Hneq_fv].
-            -- subst fv.
-               assert (Hwf_src_v : well_formed_val Σ src_v).
-               { eapply eval_preserves_wf;
-                   [exact Hglob_wf | exact Hwf | | exact Hval_c].
-                 pose proof Henv as Henv_len.
-                 unfold anf_env_rel' in Henv_len.
-                 apply Forall2_length in Henv_len.
-                 rewrite Henv_len.
-                 exact Hwfc. }
-               destruct (val_rel_exists src_v Hwf_src_v) as [src_v' Hrel_v].
-               destruct (anf_cvt_correct_val_cont_oot
-                           rho0 c src_v (Datatypes.S f1) tv
-                           rho vnames C0 x0 S S2 0
-                           (Eproj x
-                              c_tag
-                              (N.of_nat (proj_arg p)) x0 e_k)
-                           src_v' 0
-                           (le_n _)
-                           Hwf
-                           Hwfc
-                           Hcons
-                           Hcmap
-                           Hdis
-                           Hdis_cmap
-                           Henv
-                           Hglob_c
-                           H5
-                           Hdis_eproj
-                           Hval_c
-                           Hrel_v
-                           (bstep_fuel_zero_OOT cenv
-                              (M.set x0 src_v' rho)
-                              (Eproj x
-                                 c_tag
-                                 (N.of_nat (proj_arg p)) x0 e_k)))
-                 as [c0 [Hlb Hoot_tgt]].
-               exists c0. split.
-               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                 cbv [one_i fuel_resource_LambdaBox fuel_exp].
-                 simpl in Hlb |- *. lia. }
-               exact Hoot_tgt.
-            -- assert (Datatypes.S f1 < fv) as Hlt_succ by lia.
-               destruct (src_eval_lt_OOT rho0 c src_v fv tv (Datatypes.S f1) Hval_c Hlt_succ)
-                 as [t1' Hoot_c'].
-               pose proof (IH (Datatypes.S f1, c) Hlt_c rho0 t1' Hoot_c') as IHc.
-               unfold anf_cvt_correct_oot_lower_bound_goal in IHc.
-               destruct (IHc rho vnames C0 x0 S S2
-                            Hwf
-                            Hwfc
-                            Hcons
-                            Hcmap
-                            Hdis
-                            Hdis_cmap
-                            Henv
-                            Hglob_c
-                            H5
-                            (Eproj x
-                               c_tag
-                               (N.of_nat (proj_arg p)) x0 e_k)
-                            Hdis_eproj
-                            (or_introl
-                               (ex_intro _ src_v
-                                  (ex_intro _ fv
-                                     (ex_intro _ tv Hval_c)))))
-                 as [c0 [Hlb Hoot_tgt]].
-               exists c0. split.
-               { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-                 cbv [one_i fuel_resource_LambdaBox fuel_exp].
-                 simpl in Hlb |- *. lia. }
-               exact Hoot_tgt.
-          * destruct (Hdiv_c (Datatypes.S f1)) as [t1' Hoot_c'].
-            pose proof (IH (Datatypes.S f1, c) Hlt_c rho0 t1' Hoot_c') as IHc.
-            unfold anf_cvt_correct_oot_lower_bound_goal in IHc.
-            assert (Hns_c' : src_not_stuck rho0 c).
-            { right. exact Hdiv_c. }
-            destruct (IHc rho vnames C0 x0 S S2
-                          Hwf
-                          Hwfc
-                          Hcons
-                          Hcmap
-                          Hdis
-                          Hdis_cmap
-                          Henv
-                          Hglob_c
-                          H5
-                          (Eproj x
-                             c_tag
-                             (N.of_nat (proj_arg p)) x0 e_k)
-                          Hdis_eproj
-                          Hns_c')
-              as [c0 [Hlb Hoot_tgt]].
-            exists c0. split.
-            { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
-              cbv [one_i fuel_resource_LambdaBox fuel_exp].
-              simpl in Hlb |- *. lia. }
-            exact Hoot_tgt.
+          (* The projected term runs out of fuel [f1]; the induction
+             hypothesis applies to that evaluation directly. *)
+          pose proof (IH (f1, c) Hlt_c rho0 t1 H) as IHc.
+          unfold anf_cvt_correct_oot_lower_bound_goal in IHc.
+          destruct (IHc rho vnames C0 x0 S S2
+                        Hwf
+                        Hwfc
+                        Hcons
+                        Hcmap
+                        Hdis
+                        Hdis_cmap
+                        Henv
+                        Hglob_c
+                        H5
+                        (Eproj x
+                           c_tag
+                           (N.of_nat (proj_arg p)) x0 e_k)
+                        Hdis_eproj
+                        Hns_c)
+            as [c0 [Hlb Hoot_tgt]].
+          exists c0. split.
+          { cbv [one_i fuel_resource_LambdaBox fuel_exp] in H3.
+            cbv [one_i fuel_resource_LambdaBox fuel_exp].
+            simpl in Hlb |- *. lia. }
+          exact Hoot_tgt.
     }
     exact (Hmain (f, e) vs t Hoot_init).
   Qed.
