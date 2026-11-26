@@ -99,7 +99,8 @@ Section Relation.
 
   Context (cenv : ctor_env)   (* the constructors of the source program *)
           (ge : genv)         (* the global environment of the C program *)
-          (nparam : nat).     (* the number of arguments passed as C arguments *)
+          (nparam : nat)      (* the number of arguments passed as C arguments *)
+          (ratio : nat).      (* the most fuel that the source takes per step of a C call *)
 
   (* The invariant of the collector on its own data, for a heap, a memory and the address
      of the thread info. The proof never looks inside it. *)
@@ -228,15 +229,34 @@ Section Relation.
     (forall b o, root_at tb tofs n fs b o -> still_represented h m h' m' b o) /\
     changes X tb tofs fs h m h' m'.
 
-  (* The C function [fd] called with [args] returns, whatever the caller does next, and
-     [call_post] holds *)
-  Definition call_returns (X : block -> Z -> Prop) (R : heap -> mem -> Values.val -> Prop)
+  (* [s] reaches [s'] in at least [lb] steps, with no event *)
+  Definition steps (lb : nat) (s s' : Clight.state) : Prop :=
+    exists n, (lb <= n)%nat /\ starN step2 ge n s E0 s'.
+
+  (* The C function [fd] called with [args] returns after at least [lb] steps, whatever
+     the caller does next, and [call_post] holds *)
+  Definition call_returns (lb : nat) (X : block -> Z -> Prop)
+             (R : heap -> mem -> Values.val -> Prop)
              (n : Z) (tb : block) (tofs : Z) (fs : list frame) (h : heap) (m : mem)
              (fd : fundef) (args : list Values.val) : Prop :=
     exists w h' m',
-      (forall k, is_call_cont k ->
-                 star step2 ge (Callstate fd args k m) E0 (Returnstate w k m')) /\
+      (forall k, is_call_cont k -> steps lb (Callstate fd args k m) (Returnstate w k m')) /\
       call_post X R n tb tofs fs h m w h' m'.
+
+  (* The C function [fd] called with [args] runs for at least [lb] steps *)
+  Definition call_runs (lb : nat) (m : mem) (fd : fundef) (args : list Values.val) : Prop :=
+    forall k, is_call_cont k -> exists s, steps lb (Callstate fd args k m) s.
+
+  (* A call whose source evaluation has the result [r]: it returns a result that [R]
+     accepts, or it runs out of fuel. Either way it makes at least [lb] steps. *)
+  Definition call_outcome (r : @res val) (lb : nat) (X : block -> Z -> Prop)
+             (R : val -> heap -> mem -> Values.val -> Prop)
+             (n : Z) (tb : block) (tofs : Z) (fs : list frame) (h : heap) (m : mem)
+             (fd : fundef) (args : list Values.val) : Prop :=
+    match r with
+    | Res v => call_returns lb X (R v) n tb tofs fs h m fd args
+    | OOT => call_runs lb m fd args
+    end.
 
   (** * Functions *)
 
@@ -247,7 +267,8 @@ Section Relation.
 
   (* For [k] steps of the source program, the C function [fd] behaves as the function [v]:
      if the body of [v] evaluates to a value, the call of [fd] with related arguments
-     returns a related result *)
+     returns a related result, and if it runs out of fuel the call runs. A body that takes
+     the fuel [c] makes the call take more than [c / ratio] steps. *)
   Fixpoint fun_rel (k : nat) (v : val) (fd : fundef) {struct k} : Prop :=
     match v with
     | Vfun rho fds f =>
@@ -257,18 +278,18 @@ Section Relation.
         match k with
         | O => True
         | S k =>
-          forall (j : nat) vs rho' (c : fuel) v' (tr : trace) ws tb tofs h fs m,
+          forall (j : nat) vs rho' (c : fuel) r (tr : trace) ws tb tofs h fs m,
             (j <= k)%nat ->
             set_lists xs vs (def_funs fds fds rho rho) = Some rho' ->
-            bstep_fuel cenv rho' e c (Res v') tr ->
+            bstep_fuel cenv rho' e c r tr ->
             (to_nat c <= j)%nat ->
             tinfo_ok h fs m tb tofs ->
             (* [k - (k - j)] is [j], written so that the recursion is accepted *)
             Forall2 (repr_val (fun_rel (k - (k - j))) h m) vs ws ->
             args_in_tinfo m tb tofs ws ->
-            call_returns (fun _ _ => False)
-                         (fun h' m' w' => repr_val (fun_rel (k - (k - j) - to_nat c))
-                                                   h' m' v' w')
+            call_outcome r (S (to_nat c / ratio)) (fun _ _ => False)
+                         (fun v' h' m' w' => repr_val (fun_rel (k - (k - j) - to_nat c))
+                                                      h' m' v' w')
                          0 tb tofs fs h m
                          fd (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws)
         end
@@ -322,7 +343,7 @@ Section Relation.
           (forall i, 0 <= i < n ->
                      exists w, Mem.load Mptr m tb (tofs + args_ofs + 8 * i) = Some w /\
                                is_value h m w) ->
-          call_returns (fun _ _ => False)
+          call_returns 0 (fun _ _ => False)
                        (fun h' _ _ => 8 * nalloc <= free_end h' - free_start h')
                        n tb tofs fs h m fd
                        [Vptr tb (Ptrofs.repr tofs); Vlong (Int64.repr n);

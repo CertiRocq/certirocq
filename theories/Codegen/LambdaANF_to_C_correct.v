@@ -1,6 +1,6 @@
 (* Correctness of the translation of LambdaANF to Clight in [LambdaANF_to_C]. The main
    steps are [trans_correct] (an expression), [fun_correct] (a call), [program_correct] and
-   [compile_correct]. *)
+   [compile_correct]. Divergence is [program_diverges] and [compile_diverges]. *)
 
 From Stdlib Require Import ZArith.ZArith Lists.List Relations.Relations Sets.Ensembles
      micromega.Lia.
@@ -311,17 +311,24 @@ Proof.
     apply Z.leb_le in Ho. inv H. right. auto.
 Qed.
 
+Lemma to_nat_zero {fuel : Type} {Hf : @fuel_resource fuel} :
+  to_nat (@algebra.zero _ fuel _) = 0%nat.
+Proof.
+  pose proof (to_nat_add (@algebra.zero _ fuel _) algebra.zero) as H.
+  rewrite plus_zero in H. lia.
+Qed.
+
 Section Correct.
 
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
-  Context (nparam : nat) (prims : M.t primitive) (cenv : ctor_env) (tmp : positive).
+  Context (nparam ratio : nat) (prims : M.t primitive) (cenv : ctor_env) (tmp : positive).
   Context (fds : fundefs) (main : exp) (rho0 : eval.env) (ge : genv).
   Context (gc_inv : heap -> mem -> block -> Z -> Prop).
 
   Let fenv := fun_arities fds.
 
-  Notation val_rel := (val_rel cenv ge nparam gc_inv).
-  Notation fun_rel := (fun_rel cenv ge nparam gc_inv).
+  Notation val_rel := (val_rel cenv ge nparam ratio gc_inv).
+  Notation fun_rel := (fun_rel cenv ge nparam ratio gc_inv).
   Notation repr_val := (repr_val cenv ge).
   Notation tinfo_wf := (tinfo_wf cenv ge gc_inv).
   Notation tinfo_ok := (tinfo_ok cenv ge gc_inv).
@@ -337,6 +344,7 @@ Section Correct.
       bo_free : forall x, occurs_free e x -> In x ps \/ M.get x fenv <> None;
       bo_ids : forall x, bound_var e x \/ In x ps -> (100 <= x < tmp)%positive;
       bo_sub : forall e', subterm_or_eq e' e -> good e';
+      bo_depth : (depth e < ratio)%nat;
       bo_arity : Z.of_nat (length ps) <= max_args }.
 
   Hypothesis Hprog : program_ok nparam prims cenv tmp ge fds main.
@@ -346,6 +354,83 @@ Section Correct.
   Hypothesis Hmain : body_ok [] main.
   Hypothesis Hfnames : forall f, M.get f fenv <> None -> (100 <= f < tmp)%positive.
   Hypothesis Htmp : (100 <= tmp)%positive.
+
+  (** * Steps and fuel *)
+
+  (* [s] reaches [s'] in [n] steps, and [ratio * n + slack] covers the fuel [c] *)
+  Definition runs_for (c slack : nat) (s s' : Clight.state) : Prop :=
+    exists n, (c <= ratio * n + slack)%nat /\ starN step2 ge n s E0 s'.
+
+  Lemma runs_for_star slack s s' : star step2 ge s E0 s' -> runs_for 0 slack s s'.
+  Proof. intros H. destruct (star_starN H) as [n Hn]. exists n. split; [lia | exact Hn]. Qed.
+
+  Lemma runs_for_trans c1 c2 slack s1 s2 s3 :
+    runs_for c1 0 s1 s2 -> runs_for c2 slack s2 s3 -> runs_for (c1 + c2) slack s1 s3.
+  Proof.
+    intros (n1 & H1 & R1) (n2 & H2 & R2). exists (n1 + n2)%nat.
+    split; [rewrite Nat.mul_add_distr_l; lia | eapply starN_trans; eauto].
+  Qed.
+
+  Lemma runs_for_le c c' slack slack' s s' :
+    runs_for c slack s s' -> (c' + slack <= c + slack')%nat -> runs_for c' slack' s s'.
+  Proof. intros (n & H & R) Hle. exists n. split; [lia | exact R]. Qed.
+
+  (* A call that makes more than [c / ratio] steps covers the fuel [c] and one unit more *)
+  Lemma steps_runs_for c s s' :
+    (0 < ratio)%nat -> steps ge (S (c / ratio)) s s' -> runs_for (S c) 0 s s'.
+  Proof.
+    intros Hr (n & Hn & R). exists n. split; [| exact R].
+    pose proof (Nat.mul_succ_div_gt c ratio ltac:(lia)) as Hd.
+    assert (ratio * S (c / ratio) <= ratio * n)%nat by (apply Nat.mul_le_mono_l; exact Hn). lia.
+  Qed.
+
+  (* One step more than a run whose slack is below [ratio] is more than [c / ratio] steps *)
+  Lemma runs_for_steps c slack s1 s2 s3 :
+    (slack < ratio)%nat -> step2 ge s1 E0 s2 -> runs_for c slack s2 s3 ->
+    steps ge (S (c / ratio)) s1 s3.
+  Proof.
+    intros Hs Hstep (n & Hn & R). exists (S n). split.
+    - apply le_n_S. apply Nat.lt_succ_r. apply Nat.Div0.div_lt_upper_bound.
+      rewrite Nat.mul_succ_r. lia.
+    - eapply starN_step; [exact Hstep | exact R | reflexivity].
+  Qed.
+
+  (* A run of a statement that is not [Sskip], inside a sequence *)
+  Lemma seq_runs_for f e (c0 rest : statement) k le m le' m' a :
+    c0 <> Sskip ->
+    (forall k', runs_for a 0 (Clight.State f c0 k' e le m) (Clight.State f Sskip k' e le' m')) ->
+    runs_for a 0 (Clight.State f (seq c0 rest) k e le m) (Clight.State f rest k e le' m').
+  Proof.
+    intros N1 H.
+    destruct (statement_eq_skip rest) as [-> | N2].
+    { replace (seq c0 Sskip) with c0 by (destruct c0; reflexivity). apply H. }
+    replace (seq c0 rest) with (Ssequence c0 rest)
+      by (destruct c0; try congruence; destruct rest; try congruence; reflexivity).
+    apply runs_for_le with (c := (0 + (a + 0))%nat) (slack := 0%nat); [| lia].
+    eapply runs_for_trans; [apply runs_for_star; apply star_one; apply step_seq |].
+    eapply runs_for_trans; [apply H |].
+    apply runs_for_star. apply star_one. apply step_skip_seq.
+  Qed.
+
+  Lemma seq_runs_for_oot f e (c0 rest : statement) k le m a :
+    c0 <> Sskip ->
+    (forall k', exists s', runs_for a 0 (Clight.State f c0 k' e le m) s') ->
+    exists s', runs_for a 0 (Clight.State f (seq c0 rest) k e le m) s'.
+  Proof.
+    intros N1 H.
+    destruct (statement_eq_skip rest) as [-> | N2].
+    { replace (seq c0 Sskip) with c0 by (destruct c0; reflexivity). apply H. }
+    replace (seq c0 rest) with (Ssequence c0 rest)
+      by (destruct c0; try congruence; destruct rest; try congruence; reflexivity).
+    destruct (H (Kseq rest k)) as (s' & Hs'). exists s'.
+    eapply (runs_for_trans 0 a); [apply runs_for_star; apply star_one; apply step_seq | exact Hs'].
+  Qed.
+
+  Lemma seq_not_skip (s1 s2 : statement) : s2 <> Sskip -> seq s1 s2 <> Sskip.
+  Proof.
+    intros N. destruct (statement_eq_skip s1) as [-> | N1]; [exact N |].
+    destruct s1; try congruence; destruct s2; try congruence; discriminate.
+  Qed.
 
   (* The proof for a number of steps [K], assuming it for fewer steps *)
   Section Index.
@@ -384,10 +469,17 @@ Section Correct.
     data_kept h m h' m' -> val_rel i h m v w -> val_rel i h' m' v w.
   Proof. intros. eapply repr_val_kept; eauto. Qed.
 
-  Lemma bstep_fuel_halt rho x (c : fuel) v (t : trace) :
-    bstep_fuel cenv rho (Ehalt x) c (Res v) t -> M.get x rho = Some v.
+  (* [Ehalt x] returns the value of [x] with one unit of fuel, or has no fuel *)
+  Lemma bstep_fuel_halt rho x (c : fuel) r (t : trace) :
+    bstep_fuel cenv rho (Ehalt x) c r t ->
+    (to_nat c <= 1)%nat /\ (r = OOT \/ exists v, r = Res v /\ M.get x rho = Some v).
   Proof.
-    intros H. inv H. match goal with [ H0 : bstep _ _ _ _ _ _ |- _ ] => inv H0 end. assumption.
+    intros H. inv H.
+    - match goal with [ H0 : algebra.lt _ _ |- _ ] => apply lt_one in H0; subst end.
+      rewrite to_nat_zero. split; [lia | now left].
+    - match goal with [ H0 : bstep _ _ _ _ _ _ |- _ ] => inv H0 end.
+      rewrite to_nat_add, to_nat_zero. unfold one. rewrite to_nat_one.
+      split; [lia | right; eauto].
   Qed.
 
   (* One function of the program, or its main expression *)
@@ -428,6 +520,9 @@ Section Correct.
 
     Lemma nroots_unsigned : 8 * Z.of_nat nroots <= Ptrofs.max_unsigned.
     Proof. pose proof Hnroots as H. rewrite ptrofs_max_signed in H. rewrite ptrofs_max_unsigned. lia. Qed.
+
+    Lemma ratio_pos : (0 < ratio)%nat.
+    Proof. pose proof (bo_depth _ _ Hbody). lia. Qed.
 
     (* The C variables [frame] and [roots] are in the blocks [fb] and [rb] *)
     Definition local_env (fb rb : block) : Clight.env :=
@@ -490,19 +585,24 @@ Section Correct.
       intros Hk0. induction 1; simpl; auto; destruct k0; simpl in *; auto; contradiction.
     Qed.
 
-    (* [continue] goes back to the start of the code *)
+    (* [continue] goes back to the start of the code, in at least one step *)
     Lemma cont_ok_continue k0 k le m :
       cont_ok k0 k -> loops = true ->
-      star step2 ge (Clight.State fn Scontinue k lenv le m) E0
-           (Clight.State fn code (Kloop1 code Sskip k0) lenv le m).
+      runs_for ratio 0 (Clight.State fn Scontinue k lenv le m)
+               (Clight.State fn code (Kloop1 code Sskip k0) lenv le m).
     Proof.
       intros Hk Hl. induction Hk.
       - congruence.
-      - eapply star_step; [apply step_skip_or_continue_loop1; now right | | reflexivity].
-        eapply star_step; [apply step_skip_loop2 | | reflexivity].
-        apply star_one. apply step_loop.
-      - eapply star_step; [apply step_continue_seq | exact IHHk | reflexivity].
-      - eapply star_step; [apply step_continue_switch | exact IHHk | reflexivity].
+      - exists 3%nat. split; [lia |].
+        eapply starN_step; [apply step_skip_or_continue_loop1; now right | | reflexivity].
+        eapply starN_step; [apply step_skip_loop2 | | reflexivity].
+        eapply starN_step; [apply step_loop | apply starN_refl | reflexivity].
+      - destruct IHHk as (n & Hn & R). exists (S n).
+        split; [rewrite Nat.mul_succ_r; lia |].
+        eapply starN_step; [apply step_continue_seq | exact R | reflexivity].
+      - destruct IHHk as (n & Hn & R). exists (S n).
+        split; [rewrite Nat.mul_succ_r; lia |].
+        eapply starN_step; [apply step_continue_switch | exact R | reflexivity].
     Qed.
 
     (** ** The invariant *)
@@ -1340,7 +1440,7 @@ Section Correct.
           constructor.
         - simpl. destruct (Ptrofs.eq_dec Ptrofs.zero Ptrofs.zero); [exact Hfgc | congruence].
         - exact Htygc.
-        - exact Hcall. }
+        - intros k Hk. eapply steps_star. apply Hcall. exact Hk. }
       exists le4, h', m2. split; [| split; [| split]].
       - eapply runs_seq; [exact Hrun1 |].
         eapply runs_ifthenelse; [exact Htest | apply bool_val_of_bool |].
@@ -2009,7 +2109,7 @@ Section Correct.
     (* The call statement, for a function value that is related for [i] steps and whose
        body evaluates with less fuel *)
     Lemma call_correct i le h m fs r f ys c rho' fl f' wf vs ws xs t e_body rho''
-          (cin : fuel) v (cout : trace) :
+          (cin : fuel) rc (cout : trace) :
       (to_nat cin < i)%nat ->
       call nparam fenv r f ys = Ret c ->
       tinfo_ok h fs m tb tofs ->
@@ -2018,13 +2118,20 @@ Section Correct.
       Forall2 (var_val ge le fenv) ys ws -> Forall2 (val_rel i h m) vs ws ->
       find_def f' fl = Some (t, xs, e_body) ->
       set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-      bstep_fuel cenv rho'' e_body cin (Res v) cout ->
-      exists w h' m',
-        runs ge fn lenv c le m (PTree.set r w le) m' /\
-        val_rel (i - 1 - to_nat cin) h' m' v w /\
-        tinfo_ok h' fs m' tb tofs /\
-        (forall b o, root_at tb tofs 0 fs b o -> still_represented h m h' m' b o) /\
-        changes (fun _ _ => False) tb tofs fs h m h' m'.
+      bstep_fuel cenv rho'' e_body cin rc cout ->
+      c <> Sskip /\
+      match rc with
+      | Res v =>
+        exists w h' m',
+          (forall k, runs_for (S (to_nat cin)) 0 (Clight.State fn c k lenv le m)
+                              (Clight.State fn Sskip k lenv (PTree.set r w le) m')) /\
+          val_rel (i - 1 - to_nat cin) h' m' v w /\
+          tinfo_ok h' fs m' tb tofs /\
+          (forall b o, root_at tb tofs 0 fs b o -> still_represented h m h' m' b o) /\
+          changes (fun _ _ => False) tb tofs fs h m h' m'
+      | OOT =>
+        forall k, exists s', runs_for (S (to_nat cin)) 0 (Clight.State fn c k lenv le m) s'
+      end.
     Proof.
       intros Hi Hc Hti Hle Hvf Hrf Hys Hrs Hfind Hset Hbstep.
       pose proof Hti as [Hwf Hal].
@@ -2042,7 +2149,7 @@ Section Correct.
       (* the function *)
       inversion Hrf as [| | ? ? ? b fd Hfp Hfr]; subst.
       destruct i as [| i']; [lia |].
-      destruct (proj1 (fun_rel_S cenv ge nparam gc_inv i' rho' fl f' fd) Hfr)
+      destruct (proj1 (fun_rel_S cenv ge nparam ratio gc_inv i' rho' fl f' fd) Hfr)
         as (t0 & xs0 & e0 & Hfind0 & Hty & Hcall).
       assert (Hxs0 : xs0 = xs) by congruence. assert (He0 : e0 = e_body) by congruence.
       subst xs0 e0. clear Hfind0.
@@ -2090,9 +2197,12 @@ Section Correct.
         intros b0 o Hnr _ [Hb Ho]. apply Hnr. split; auto. rewrite length_skipn in Ho.
         clear - Ho Hmax Hlen_ys. ofs_lia. }
       { intros b0. eapply store_words_perm; eauto. }
-      destruct (Hcall i' vs rho'' cin v cout ws tb tofs h fs m1)
-        as (w & h' & m' & Hstar & Hres & Hti' & Hroots' & Hch'); auto.
-      { lia. }
+      assert (Hout : call_outcome cenv ge gc_inv rc (S (to_nat cin / ratio)) (fun _ _ => False)
+                                  (fun v' h' m' w' => val_rel (i' - to_nat cin) h' m' v' w')
+                                  0 tb tofs fs h m1
+                                  fd (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws)).
+      { apply (Hcall i' vs rho'' cin rc cout ws tb tofs h fs m1); auto.
+        { lia. }
       { clear - Hrs Hk1. induction Hrs; constructor; auto.
         eapply val_rel_mono with (k := S i'); [lia |]. eapply repr_val_kept; eauto. }
       { intros j w Hj Hw.
@@ -2101,11 +2211,19 @@ Section Correct.
         eapply store_words_load; [exact Hm1 | |].
         - rewrite nth_error_skipn. rewrite <- Hw. f_equal. lia.
         - rewrite Forall_forall in Hwords. specialize (Hwords w (nth_error_In _ _ Hw)).
-          destruct w; try contradiction; reflexivity. }
-      exists w, h', m'. split; [| split; [| split; [exact Hti' | split]]].
-      - eapply runs_seq; [exact Hrun1 |].
-        change (PTree.set r w le) with (set_opttemp (Some r) w le).
-        eapply runs_call.
+          destruct w; try contradiction; reflexivity. } }
+      (* the statement reaches the call of the function *)
+      assert (Hstart : forall k,
+                 star step2 ge
+                      (Clight.State fn (seq (store_args nparam fenv nparam (skipn nparam ys))
+                                            (Scall (Some r) callee
+                                                   (tinfo :: map (var_expr nparam fenv)
+                                                                 (firstn nparam ys))))
+                                    k lenv le m)
+                      E0 (Callstate fd (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws)
+                                    (Kcall (Some r) fn lenv le k) m1)).
+      { intros k. eapply star_trans; [apply seq_star; exact Hrun1 | | reflexivity].
+        apply star_one. eapply step_call.
         + exact Hclass.
         + apply Hcallee_eval.
         + econstructor.
@@ -2120,11 +2238,24 @@ Section Correct.
         + rewrite Genv.find_funct_find_funct_ptr. exact Hfp.
         + rewrite Hty. unfold fun_ty. do 3 f_equal. f_equal.
           transitivity (length ws); [| symmetry; exact Hlen_ys].
-          transitivity (length vs); [exact Hlen_xs | exact Hlen_vs].
-        + exact Hstar.
-      - replace (S i' - 1 - to_nat cin)%nat with (i' - to_nat cin)%nat by lia. exact Hres.
-      - intros b0 o Hr. eapply still_represented_trans; [apply Hroots1 | apply Hroots']; exact Hr.
-      - eapply changes_trans; eauto.
+          transitivity (length vs); [exact Hlen_xs | exact Hlen_vs]. }
+      split; [apply seq_not_skip; discriminate |].
+      destruct rc as [| v]; cbn [call_outcome] in Hout.
+      - (* the function runs out of fuel *)
+        intros k. destruct (Hout (Kcall (Some r) fn lenv le k) I) as (s' & Hs'). exists s'.
+        eapply (runs_for_trans 0 (S (to_nat cin))); [apply runs_for_star; apply Hstart |].
+        apply steps_runs_for; [apply ratio_pos | exact Hs'].
+      - (* the function returns *)
+        destruct Hout as (w & h' & m' & Hsteps & Hres & Hti' & Hroots' & Hch').
+        exists w, h', m'. split; [| split; [| split; [exact Hti' | split]]].
+        + intros k.
+          apply runs_for_le with (c := (0 + (S (to_nat cin) + 0))%nat) (slack := 0%nat); [| lia].
+          eapply runs_for_trans; [apply runs_for_star; apply Hstart |].
+          eapply runs_for_trans; [apply steps_runs_for; [apply ratio_pos | apply Hsteps; exact I] |].
+          apply runs_for_star. apply star_one. apply step_returnstate.
+        + replace (S i' - 1 - to_nat cin)%nat with (i' - to_nat cin)%nat by lia. exact Hres.
+        + intros b0 o Hr. eapply still_represented_trans; [apply Hroots1 | apply Hroots']; exact Hr.
+        + eapply changes_trans; eauto.
     Qed.
 
     (** ** The start of the code *)
@@ -2265,53 +2396,102 @@ Section Correct.
       - split; [apply Mem.unchanged_on_refl |]. split; [auto |]. intros b Hb. now left.
     Qed.
 
-    (* The code of [e], run when [rho] holds the values of its variables, returns the
-       layout of [v]. [c] is the fuel that [e] takes, without [d]. *)
-    Definition exp_correct (rho : eval.env) (e : exp) (c : fuel) (v : val) (d : nat) : Prop :=
+    (** ** The statement for an expression *)
+
+    (* What the code [s] does when the source expression has the result [r] and takes the
+       fuel [c]: it returns the layout of the value, or it runs. Its steps cover the fuel
+       up to [slack]. *)
+    Definition outcome (r : @res val) (c slack i : nat) (s : statement) (le : temp_env)
+               (h : heap) (m : mem) : Prop :=
+      match r with
+      | Res v =>
+        exists w h' m',
+          (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
+                        runs_for c slack (Clight.State fn s k lenv le m) (Returnstate w k0 m')) /\
+          val_rel i h' m' v w /\
+          tinfo_ok h' fs0 m' tb tofs /\
+          step_ok h m h' m'
+      | OOT =>
+        forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
+                     exists s', runs_for c slack (Clight.State fn s k lenv le m) s'
+      end.
+
+    (* An outcome of [s1] is an outcome of [s] when [s] runs to [s1]. The run covers the
+       fuel [c0]. *)
+    Lemma outcome_prefix r c0 c slack c' slack' i i' s s1 le le1 h h1 m m1 :
+      (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
+                    exists k1, cont_ok k0 k1 /\
+                               runs_for c0 0 (Clight.State fn s k lenv le m)
+                                        (Clight.State fn s1 k1 lenv le1 m1)) ->
+      step_ok h m h1 m1 ->
+      (c' + slack <= c0 + c + slack')%nat -> (i' <= i)%nat ->
+      outcome r c slack i s1 le1 h1 m1 ->
+      outcome r c' slack' i' s le h m.
+    Proof.
+      intros Hhead Hstep Hc Hi Hout. destruct r as [| v]; cbn [outcome] in *.
+      - intros k0 k Hk0 Hcont. destruct (Hhead k0 k Hk0 Hcont) as (k1 & Hcont1 & Hrun).
+        destruct (Hout k0 k1 Hk0 Hcont1) as (s' & Hrun'). exists s'.
+        eapply runs_for_le; [eapply runs_for_trans; eassumption | lia].
+      - destruct Hout as (w & h' & m' & Hruns & Hres & Hti & Hstep').
+        exists w, h', m'. split; [| split; [| split; [exact Hti |]]].
+        + intros k0 k Hk0 Hcont. destruct (Hhead k0 k Hk0 Hcont) as (k1 & Hcont1 & Hrun).
+          eapply runs_for_le; [eapply runs_for_trans; [exact Hrun | apply Hruns; auto] | lia].
+        + eapply val_rel_mono; [| exact Hres]. lia.
+        + eapply step_ok_trans; eauto.
+    Qed.
+
+    (* The same when [s] runs to [s1] with the same continuation and no fuel is counted *)
+    Lemma outcome_after r c slack c' slack' i i' s s1 le le1 h h1 m m1 :
+      (forall k, star step2 ge (Clight.State fn s k lenv le m) E0
+                      (Clight.State fn s1 k lenv le1 m1)) ->
+      step_ok h m h1 m1 ->
+      (c' + slack <= c + slack')%nat -> (i' <= i)%nat ->
+      outcome r c slack i s1 le1 h1 m1 ->
+      outcome r c' slack' i' s le h m.
+    Proof.
+      intros Hhead Hstep Hc Hi Hout.
+      eapply outcome_prefix with (c0 := 0%nat) (c := c) (slack := slack) (i := i);
+        [| exact Hstep | lia | exact Hi | exact Hout].
+      intros k0 k _ Hcont. exists k. split; [exact Hcont | apply runs_for_star; apply Hhead].
+    Qed.
+
+    (* The code of [e], run when [rho] holds the values of its variables, has the outcome
+       of the result [r]. [c] is the fuel that [e] takes, without [d]. *)
+    Definition exp_correct (rho : eval.env) (e : exp) (c : fuel) (r : @res val) (d : nat)
+      : Prop :=
       forall i st s le h m,
         (to_nat c + d <= i)%nat -> (i < K)%nat ->
         trans nparam prims cenv fenv self (Z.of_nat nroots) tmps st e = Ret s ->
         inv i st rho e le h m -> uses_ok st e -> exp_ok st e ->
-        exists w h' m',
-          (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
-                        star step2 ge (Clight.State fn s k lenv le m) E0 (Returnstate w k0 m')) /\
-          val_rel (i - to_nat c - d) h' m' v w /\
-          tinfo_ok h' fs0 m' tb tofs /\
-          step_ok h m h' m'.
+        outcome r (to_nat c + d) (depth e) (i - to_nat c - d) s le h m.
 
     (* The code of the function, run from its start *)
-    Lemma code_correct rho (c : fuel) v i vs ws le h m :
-      exp_correct rho body c v 0 ->
+    Lemma code_correct rho (c : fuel) r i vs ws le h m :
+      exp_correct rho body c r 0 ->
       (to_nat c <= i)%nat -> (i < K)%nat ->
       set_lists params vs (def_funs fds fds rho0 rho0) = Some rho ->
       Forall2 (val_rel i h m) vs ws ->
       (forall j p w, nth_error params j = Some p -> nth_error ws j = Some w -> le ! p = Some w) ->
       le ! tinfoId = Some (Vptr tb (Ptrofs.repr tofs)) ->
       tinfo_ok h fs0 m tb tofs -> locals_ok h m ->
-      exists w h' m',
-        (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
-                      star step2 ge (Clight.State fn code k lenv le m) E0 (Returnstate w k0 m')) /\
-        val_rel (i - to_nat c) h' m' v w /\
-        tinfo_ok h' fs0 m' tb tofs /\
-        step_ok h m h' m'.
+      outcome r (to_nat c) (depth body) (i - to_nat c) code le h m.
     Proof.
       intros IH Hc Hi Hset Hrs Hle Hti Htok Hloc.
       pose proof (start_inv i vs ws rho le h m Hset Hrs Hle Hti Htok Hloc) as Hinv0.
       destruct (enter_correct i init_state rho body le h m s_check st1 Hi Hinv0 start_exp_ok Henter)
         as (le1 & h1 & m1 & Hrun & Hinv1 & Hstep1 & Hstale & Hslots & Hlinked).
-      destruct (IH i st1 s_body le1 h1 m1) as (w & h' & m' & Hstar & Hres & Hti' & Hstep'); auto.
-      { lia. }
-      { intros x _ Hin. rewrite Hstale in Hin. exact Hin. }
-      { eapply exp_ok_slots; [apply start_exp_ok |]. intros x Hin. rewrite Hslots in Hin. now left. }
-      exists w, h', m'. split; [| split; [| split; [exact Hti' |]]].
-      - intros k0 k Hk0 Hcont. unfold code.
-        eapply star_trans; [apply seq_star; exact Hrun | apply Hstar; auto | reflexivity].
-      - replace (i - to_nat c)%nat with (i - to_nat c - 0)%nat by lia. exact Hres.
-      - eapply step_ok_trans; eauto.
+      eapply outcome_after with (s1 := s_body) (le1 := le1) (h1 := h1) (m1 := m1);
+        [intros k; unfold code; apply seq_star; exact Hrun | exact Hstep1 | | |
+         apply (IH i st1 s_body le1 h1 m1); auto].
+      - lia.
+      - lia.
+      - lia.
+      - intros x _ Hin. rewrite Hstale in Hin. exact Hin.
+      - eapply exp_ok_slots; [apply start_exp_ok |]. intros x Hin. rewrite Hslots in Hin. now left.
     Qed.
 
-    Lemma halt_correct rho x v (c : fuel) :
-      M.get x rho = Some v -> exp_correct rho (Ehalt x) c v 1.
+    Lemma halt_correct rho x v :
+      M.get x rho = Some v -> exp_correct rho (Ehalt x) algebra.zero (Res v) 1.
     Proof.
       intros Hx i st s le h m Hc Hi Htr Hinv Huse Hexp.
       cbn [trans] in Htr. apply Ret_inj in Htr. subst s.
@@ -2324,6 +2504,9 @@ Section Correct.
       assert (v' = v) by congruence. subst v'.
       exists w, h, m2. split; [| split; [| split; [exact Hti2 |]]].
       - intros k0 k Hk0 Hcont.
+        apply runs_for_le with (c := 0%nat) (slack := 0%nat);
+          [| rewrite to_nat_zero; simpl; lia].
+        apply runs_for_star.
         eapply star_trans; [apply seq_star; exact Hrun | | reflexivity].
         rewrite <- (cont_ok_call_cont k0 k Hk0 Hcont).
         eapply star_return; [| | exact Hfree].
@@ -2340,10 +2523,10 @@ Section Correct.
       uses_ok st e -> st_stale st' = st_stale st -> uses_ok st' e.
     Proof. intros H Heq x Hx. rewrite Heq. apply H. exact Hx. Qed.
 
-    Lemma constr_correct rho (x : var) t (ys : list var) e vs (c : fuel) v :
+    Lemma constr_correct rho (x : var) t (ys : list var) e vs (c : fuel) r :
       get_list ys rho = Some vs ->
-      exp_correct (M.set x (Vconstr t vs) rho) e c v 0 ->
-      exp_correct rho (Econstr x t ys e) c v 1.
+      exp_correct (M.set x (Vconstr t vs) rho) e c r 0 ->
+      exp_correct rho (Econstr x t ys e) c r 1.
     Proof.
       intros Hvs IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
@@ -2352,16 +2535,22 @@ Section Correct.
       destruct (pipeline_ident x) as (Hx1 & Hx2 & _); [lia |].
       assert (Huse' : uses_ok st e).
       { intros z Hz. apply Huse. simpl. apply union_list_spec. now left. }
-      cbn [trans] in Htr. bind_inv_as Htr r Hrep.
-      destruct r as [ord | ord n].
+      cbn [trans] in Htr. bind_inv_as Htr rep Hrep.
+      destruct rep as [ord | ord n].
       - (* a constant *)
         destruct ys as [| y ys]; [| discriminate].
         bind_inv_as Htr s' Htr'. apply Ret_inj in Htr. subst s.
         simpl in Hvs. injection Hvs as <-.
         assert (Hr : val_rel i h m (Vconstr t []) (Vlong (Int64.repr (constant_value ord)))).
         { constructor. exact Hrep. }
-        destruct (IH i st s' (PTree.set x (Vlong (Int64.repr (constant_value ord))) le) h m)
-          as (w' & h' & m' & Hstar & Hres & Hti & Hstep); auto.
+        eapply outcome_after
+          with (s1 := s') (le1 := PTree.set x (Vlong (Int64.repr (constant_value ord))) le)
+               (h1 := h) (m1 := m);
+          [intros k; apply seq_star; apply runs_set; apply eval_const | apply step_ok_refl | | |
+           apply (IH i st s' (PTree.set x (Vlong (Int64.repr (constant_value ord))) le) h m);
+           auto].
+        + cbn [depth]. lia.
+        + lia.
         + lia.
         + split; [| split; [exact Hs |]].
           * apply mem_inv_set; auto.
@@ -2369,11 +2558,6 @@ Section Correct.
             -- intros z Hz. destruct (Pos.eq_dec z x) as [-> | Hne]; [now left | right].
                apply Free_Econstr2; [congruence | exact Hz].
             -- simpl. lia.
-        + exists w', h', m'. split; [| split; [| split]]; auto.
-          * intros k0 k Hk0 Hcont.
-            eapply star_trans; [apply seq_star; apply runs_set; apply eval_const | | reflexivity].
-            apply Hstar; auto.
-          * eapply val_rel_mono; [| exact Hres]. lia.
       - (* a block *)
         destruct (negb (Nat.eqb (length ys) n)) eqn:Hn; [discriminate |].
         apply negb_false_iff, Nat.eqb_eq in Hn.
@@ -2497,28 +2681,26 @@ Section Correct.
           - intros f0 Hf0. rewrite M.gso; [apply T4; exact Hf0 |]. intros ->. contradiction. }
         assert (Hs1 : st_ok (LambdaANF_to_C.allocated st)).
         { destruct Hs as [S1 S2 S3 S4 S5 S6]. constructor; auto. }
-        destruct (IH i (LambdaANF_to_C.allocated st) s' le1 h' m') as (w' & h'' & m'' & Hstar & Hres & Hti & Hstep); auto.
+        eapply outcome_after with (s1 := s') (le1 := le1) (h1 := h') (m1 := m');
+          [intros k; eapply star_trans;
+           [apply seq_star; exact Hrun1 | apply seq_star; exact Hrun2 | reflexivity]
+          | | | | apply (IH i (LambdaANF_to_C.allocated st) s' le1 h' m'); auto].
+        + eapply step_ok_trans; [| apply step_ok_alloc; lia].
+          eapply (step_ok_region i st rho h m m'
+                    (fun b o => b = free_block h /\ free_start h <= o) Hm Hun Hkp).
+          intros b o [-> Ho]. left. split; [exact Hfh |]. intros [_ Hlt].
+          specialize (Hlt eq_refl). lia.
+        + cbn [depth]. lia.
+        + lia.
         + lia.
         + split; [exact Hm1 | split; [exact Hs1 | exact Htm1]].
         + eapply exp_ok_slots; [exact Hexp' |]. intros z Hz. now left.
-        + exists w', h'', m''. split; [| split; [| split]]; auto.
-          * intros k0 k Hk0 Hcont.
-            eapply star_trans; [apply seq_star; exact Hrun1 | | reflexivity].
-            eapply star_trans; [apply seq_star; exact Hrun2 | | reflexivity].
-            apply Hstar; auto.
-          * eapply val_rel_mono; [| exact Hres]. lia.
-          * eapply step_ok_trans; [| exact Hstep].
-            eapply step_ok_trans; [| apply step_ok_alloc; lia].
-            eapply (step_ok_region i st rho h m m'
-                      (fun b o => b = free_block h /\ free_start h <= o) Hm Hun Hkp).
-            intros b o [-> Ho]. left. split; [exact Hfh |]. intros [_ Hlt].
-            specialize (Hlt eq_refl). lia.
     Qed.
 
-    Lemma proj_correct rho (x : var) t n (y : var) e vs v0 (c : fuel) v :
+    Lemma proj_correct rho (x : var) t n (y : var) e vs v0 (c : fuel) r :
       M.get y rho = Some (Vconstr t vs) -> nthN vs n = Some v0 ->
-      exp_correct (M.set x v0 rho) e c v 0 ->
-      exp_correct rho (Eproj x t n y e) c v 1.
+      exp_correct (M.set x v0 rho) e c r 0 ->
+      exp_correct rho (Eproj x t n y e) c r 1.
     Proof.
       intros Hy Hn IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
@@ -2543,7 +2725,11 @@ Section Correct.
           + rewrite typeof_var_expr. reflexivity.
         - reflexivity.
         - rewrite field_address by lia. rewrite <- Hw0. f_equal. lia. }
-      destruct (IH i st s' (PTree.set x w0 le) h m) as (w' & h' & m' & Hstar & Hres & Hti & Hstep); auto.
+      eapply outcome_after with (s1 := s') (le1 := PTree.set x w0 le) (h1 := h) (m1 := m);
+        [intros k; apply seq_star; apply runs_set; exact Heval | apply step_ok_refl | | |
+         apply (IH i st s' (PTree.set x w0 le) h m); auto].
+      - cbn [depth]. lia.
+      - lia.
       - lia.
       - split; [| split; [exact Hs |]].
         + apply mem_inv_set; auto.
@@ -2552,11 +2738,6 @@ Section Correct.
             apply Free_Eproj2; [congruence | exact Hz].
           * simpl. lia.
       - intros z Hz. apply Huse. simpl. apply PS.add_spec. now right.
-      - exists w', h', m'. split; [| split; [| split]]; auto.
-        + intros k0 k Hk0 Hcont.
-          eapply star_trans; [apply seq_star; apply runs_set; exact Heval | | reflexivity].
-          apply Hstar; auto.
-        + eapply val_rel_mono; [| exact Hres]. lia.
     Qed.
 
     (** ** Case analysis *)
@@ -2757,11 +2938,11 @@ Section Correct.
         + reflexivity.
     Qed.
 
-    Lemma case_correct rho (y : var) t vs cl e n (c : fuel) v :
+    Lemma case_correct rho (y : var) t vs cl e n (c : fuel) r :
       M.get y rho = Some (Vconstr t vs) ->
       find_tag_nth cl t e n ->
-      exp_correct rho e c v 0 ->
-      exp_correct rho (Ecase y cl) c v 1.
+      exp_correct rho e c r 0 ->
+      exp_correct rho (Ecase y cl) c r 1.
     Proof.
       intros Hy Hfind IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
@@ -2776,7 +2957,7 @@ Section Correct.
       | ?g cl = _ =>
         destruct (case_branches st g eq_refl (fun _ _ _ => eq_refl) cl blocks constants Hcases
                                 t e n Hfind)
-          as (r & s_chk & st' & s_e & Hrep & Hent & Htr_e & Hkey)
+          as (rep & s_chk & st' & s_e & Hrep & Hent & Htr_e & Hkey)
       end.
       (* the value that is analysed *)
       destruct (var_word i st rho (Ecase y cl) le h m y Hi Htm) as (vy & wy & Hvy & Hwy & Hry).
@@ -2793,13 +2974,13 @@ Section Correct.
                         E0 (Clight.State fn (seq s_chk s_e) k' lenv le1 m) /\
                    (k' = k \/ exists rest, k' = Kseq rest (Kswitch k))).
       { inversion Hry as [? ord Hrep' | ? ? ord b ofs Hrep' Hobj Hlo Hhi Hreg Hhdr Hfields |]; subst.
-        - assert (Hr : r = Constant ord) by congruence. subst r.
+        - assert (Hr : rep = Constant ord) by congruence. subst rep.
           destruct (ctor_rep_of_inv _ _ _ Hrep)
             as (info & Hinfo & [(_ & Hle_ord & Hkind) | (_ & _ & Hkind)]); [| discriminate].
           assert (Ho : ord = Z.of_N (ctor_ordinal info)) by congruence.
           apply (case_constant_star le m y ord blocks constants (seq s_chk s_e)); auto.
           rewrite Ho. change Int64.half_modulus with (max_constant_ordinal + 1). lia.
-        - assert (Hr : r = Block ord (length vs)) by congruence. subst r.
+        - assert (Hr : rep = Block ord (length vs)) by congruence. subst rep.
           destruct (ctor_rep_of_inv _ _ _ Hrep)
             as (info & Hinfo & [(_ & _ & Hkind) | (_ & Hle_ord & Hkind)]); [discriminate |].
           assert (Ho : ord = Z.of_N (ctor_ordinal info)) by congruence.
@@ -2826,18 +3007,18 @@ Section Correct.
       { intros z Hz. apply Huse. eapply uses_now_case; eauto. }
       destruct (enter_correct i st rho e le1 h m s_chk st' Hi Hinv1 Hexp' Hent)
         as (le2 & h2 & m2 & Hrun2 & Hinv2 & Hstep2 & Hstale2 & Hslots2 & Hlinked2).
-      destruct (IH i st' s_e le2 h2 m2) as (w & h' & m' & Hstar & Hres & Hti & Hstep); auto.
-      { lia. }
-      { eapply uses_ok_state; eauto. }
-      { eapply exp_ok_slots; [exact Hexp' |]. intros z Hz. rewrite Hslots2 in Hz. now left. }
-      exists w, h', m'. split; [| split; [| split; [exact Hti |]]].
+      eapply outcome_prefix with (c0 := 0%nat) (s1 := s_e) (le1 := le2) (h1 := h2) (m1 := m2);
+        [| exact Hstep2 | | | apply (IH i st' s_e le2 h2 m2); auto].
       - intros k0 k Hk0 Hcont. destruct (Hbr k) as (k' & Hstar1 & Hk').
-        eapply star_trans; [exact Hstar1 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun2 | | reflexivity].
-        apply Hstar; auto.
-        destruct Hk' as [-> | [rest ->]]; [exact Hcont | constructor; constructor; exact Hcont].
-      - eapply val_rel_mono; [| exact Hres]. lia.
-      - eapply step_ok_trans; eauto.
+        exists k'. split.
+        + destruct Hk' as [-> | [rest ->]]; [exact Hcont | constructor; constructor; exact Hcont].
+        + apply runs_for_star.
+          eapply star_trans; [exact Hstar1 | apply seq_star; exact Hrun2 | reflexivity].
+      - pose proof (depth_case y cl t e Hin). lia.
+      - lia.
+      - lia.
+      - eapply uses_ok_state; eauto.
+      - eapply exp_ok_slots; [exact Hexp' |]. intros z Hz. rewrite Hslots2 in Hz. now left.
     Qed.
 
     (** ** Calls of the expression *)
@@ -2858,7 +3039,7 @@ Section Correct.
 
     (* A call whose result the function returns *)
     Lemma tail_call_correct e (r : ident) (f : var) (ys : list var) rho rho' fl f' vs
-          (xs : list var) t e_body rho'' (c : fuel) v (tr : trace) :
+          (xs : list var) t e_body rho'' (c : fuel) rs (tr : trace) :
       (forall y, y = f \/ In y ys -> occurs_free e y /\ PS.In y (uses_now prims e)) ->
       (forall g ps, self = Some (g, ps) ->
                     Pos.eqb f g && Nat.eqb (length ys) (length ps) = true ->
@@ -2867,18 +3048,13 @@ Section Correct.
       get_list ys rho = Some vs ->
       find_def f' fl = Some (t, xs, e_body) ->
       set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-      bstep_fuel cenv rho'' e_body c (Res v) tr ->
-      exp_correct rho'' e_body c v 0 ->
+      bstep_fuel cenv rho'' e_body c rs tr ->
+      exp_correct rho'' e_body c rs 0 ->
       forall i st s le h m,
         (to_nat c + 1 <= i)%nat -> (i < K)%nat ->
         tail_call nparam fenv self tmps st r f ys = Ret s ->
         inv i st rho e le h m -> uses_ok st e -> exp_ok st e ->
-        exists w h' m',
-          (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
-                        star step2 ge (Clight.State fn s k lenv le m) E0 (Returnstate w k0 m')) /\
-          val_rel (i - to_nat c - 1) h' m' v w /\
-          tinfo_ok h' fs0 m' tb tofs /\
-          step_ok h m h' m'.
+        outcome rs (to_nat c + 1) 1 (i - to_nat c - 1) s le h m.
     Proof.
       intros Hfree Hloop Hfun Hys Hfind Hset Hbstep IH i st s le h m Hc Hi Htc Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
@@ -2899,33 +3075,38 @@ Section Correct.
                 bind (call nparam fenv r f ys)
                      (fun c0 => ret (seq (leave st) (seq c0 (Sreturn (Some (Etempvar r tvalue))))))
                 = Ret s ->
-                exists w h' m',
-                  (forall k0 k, is_call_cont k0 -> cont_ok k0 k ->
-                                star step2 ge (Clight.State fn s k lenv le m) E0
-                                     (Returnstate w k0 m')) /\
-                  val_rel (i - to_nat c - 1) h' m' v w /\
-                  tinfo_ok h' fs0 m' tb tofs /\
-                  step_ok h m h' m').
+                outcome rs (to_nat c + 1) 1 (i - to_nat c - 1) s le h m).
       { intros Hb. bind_inv_as Hb c0 Hcall. apply Ret_inj in Hb. subst s.
         assert (Hlt : (to_nat c < i)%nat) by lia.
         assert (Hrf1 : val_rel i h m1 (Vfun rho' fl f') wf) by (eapply val_rel_kept; eauto).
-        destruct (call_correct i le h m1 fs0 r f ys c0 rho' fl f' wf vs ws xs t e_body rho'' c v tr
+        destruct (call_correct i le h m1 fs0 r f ys c0 rho' fl f' wf vs ws xs t e_body rho'' c rs tr
                                Hlt Hcall Hti1 Hle_ti Hvalf Hrf1 Hws Hrs1 Hfind Hset Hbstep)
-          as (w & h' & m2 & Hrun2 & Hres & Hti2 & Hroots2 & Hch2).
-        assert (Hloc2 : locals_ok h' m2).
-        { eapply locals_after_call; [apply (mem_inv_init i rho h m1 Hti1 Hloc1) | exact Hch2]. }
-        destruct (free_locals h' m2 Hloc2 Hti2) as (m3 & Hfree3 & Hti3 & Hk3 & Hstep3).
-        exists w, h', m3. split; [| split; [| split; [exact Hti3 |]]].
-        - intros k0 k Hk0 Hcont.
-          eapply star_trans; [apply seq_star; exact Hrun1 | | reflexivity].
-          eapply star_trans; [apply seq_star; exact Hrun2 | | reflexivity].
-          rewrite <- (cont_ok_call_cont k0 k Hk0 Hcont).
-          eapply star_return; [apply eval_Etempvar; apply PTree.gss | | exact Hfree3].
-          rewrite Hreturn. apply sem_cast_word; [reflexivity | eapply val_rel_word; eauto].
-        - eapply val_rel_kept; [exact Hk3 |].
-          replace (i - to_nat c - 1)%nat with (i - 1 - to_nat c)%nat by lia. exact Hres.
-        - eapply step_ok_trans; [exact Hstep1 |]. eapply step_ok_trans; [| exact Hstep3].
-          apply (step_ok_call init_state h m1 h' m2 0 st_ok_init Hroots2 Hch2). }
+          as [Hnskip Hcase].
+        destruct rs as [| v]; cbn [outcome].
+        - (* the function runs out of fuel *)
+          intros k0 k Hk0 Hcont.
+          destruct (seq_runs_for_oot fn lenv c0 (Sreturn (Some (Etempvar r tvalue))) k le m1
+                                     (S (to_nat c)) Hnskip Hcase) as (s' & Hs').
+          exists s'. apply runs_for_le with (c := (0 + S (to_nat c))%nat) (slack := 0%nat); [| lia].
+          eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun1 | exact Hs'].
+        - (* the function returns *)
+          destruct Hcase as (w & h' & m2 & Hrun2 & Hres & Hti2 & Hroots2 & Hch2).
+          assert (Hloc2 : locals_ok h' m2).
+          { eapply locals_after_call; [apply (mem_inv_init i rho h m1 Hti1 Hloc1) | exact Hch2]. }
+          destruct (free_locals h' m2 Hloc2 Hti2) as (m3 & Hfree3 & Hti3 & Hk3 & Hstep3).
+          exists w, h', m3. split; [| split; [| split; [exact Hti3 |]]].
+          + intros k0 k Hk0 Hcont.
+            apply runs_for_le with (c := (0 + (S (to_nat c) + 0))%nat) (slack := 0%nat); [| lia].
+            eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun1 |].
+            eapply runs_for_trans; [apply seq_runs_for; [exact Hnskip | exact Hrun2] |].
+            apply runs_for_star.
+            rewrite <- (cont_ok_call_cont k0 k Hk0 Hcont).
+            eapply star_return; [apply eval_Etempvar; apply PTree.gss | | exact Hfree3].
+            rewrite Hreturn. apply sem_cast_word; [reflexivity | eapply val_rel_word; eauto].
+          + eapply val_rel_kept; [exact Hk3 |].
+            replace (i - to_nat c - 1)%nat with (i - 1 - to_nat c)%nat by lia. exact Hres.
+          + eapply step_ok_trans; [exact Hstep1 |]. eapply step_ok_trans; [| exact Hstep3].
+            apply (step_ok_call init_state h m1 h' m2 0 st_ok_init Hroots2 Hch2). }
       revert Htc. unfold tail_call. cbv zeta.
       case_eq self; [intros [g ps] Hself_eq | intros Hself_eq]; intros Htc; [| exact (Hother Htc)].
       match type of Htc with
@@ -2974,33 +3155,42 @@ Section Correct.
           unfold tinfoId in Hr. lia.
         - rewrite Htmps. intros Hin. apply idents_from_ge in Hin. unfold tinfoId in Hin. lia. }
       assert (Hc' : (to_nat c <= i)%nat) by lia.
-      destruct (code_correct rho'' c v i vs ws le2 h m1 IH Hc' Hi Hset Hrs1 Hle2 Hti2 Hti1 Hloc1)
-        as (w & h' & m' & Hstar & Hres & Hti' & Hstep').
-      exists w, h', m'. split; [| split; [| split; [exact Hti' |]]].
-      - intros k0 k Hk0 Hcont.
-        eapply star_trans; [apply seq_star; exact Hrun1 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun2 | | reflexivity].
-        eapply star_trans; [apply cont_ok_continue; [exact Hcont | exact Hloops] | | reflexivity].
-        apply Hstar; [exact Hk0 | apply Cont_loop; exact Hloops].
-      - eapply val_rel_mono; [| exact Hres]. lia.
-      - eapply step_ok_trans; eauto.
+      pose proof (code_correct rho'' c rs i vs ws le2 h m1 IH Hc' Hi Hset Hrs1 Hle2 Hti2 Hti1 Hloc1)
+        as Hout.
+      pose proof (bo_depth _ _ Hbody) as Hdepth.
+      eapply outcome_prefix with (c0 := ratio); [| exact Hstep1 | | | exact Hout].
+      - intros k0 k Hk0 Hcont. exists (Kloop1 code Sskip k0).
+        split; [apply Cont_loop; exact Hloops |].
+        eapply (runs_for_trans 0 ratio); [apply runs_for_star; apply seq_star; exact Hrun1 |].
+        eapply (runs_for_trans 0 ratio); [apply runs_for_star; apply seq_star; exact Hrun2 |].
+        apply cont_ok_continue; [exact Hcont | exact Hloops].
+      - lia.
+      - lia.
     Qed.
 
     (* A call followed by the rest of the expression *)
+    (* The function returns and the rest [e] takes the fuel [c2], or the function runs out
+       of fuel *)
     Lemma letapp_correct rho (x f : var) t (ys : list var) e rho' fl f' vs (xs : list var)
-          e_body rho'' (c1 c2 : fuel) v v' (tr1 : trace) :
+          e_body rho'' (c1 c : fuel) rc r (tr1 : trace) :
       returns x e = false ->
       M.get f rho = Some (Vfun rho' fl f') ->
       get_list ys rho = Some vs ->
       find_def f' fl = Some (t, xs, e_body) ->
       set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-      bstep_fuel cenv rho'' e_body c1 (Res v) tr1 ->
-      exp_correct (M.set x v rho) e c2 v' 0 ->
-      exp_correct rho (Eletapp x f t ys e) (algebra.plus c1 c2) v' 1.
+      bstep_fuel cenv rho'' e_body c1 rc tr1 ->
+      match rc with
+      | Res v => exists c2, c = algebra.plus c1 c2 /\ exp_correct (M.set x v rho) e c2 r 0
+      | OOT => c = c1 /\ r = OOT
+      end ->
+      exp_correct rho (Eletapp x f t ys e) c r 1.
     Proof.
-      intros Hret Hfun Hys Hfind Hset Hbstep IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
+      intros Hret Hfun Hys Hfind Hset Hbstep Hrest i st s le h m Hc Hi Htr Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
-      rewrite to_nat_add in Hc.
+      assert (Hlt : (to_nat c1 < i)%nat).
+      { destruct rc as [| v0];
+          [destruct Hrest as [-> _] | destruct Hrest as (c2 & -> & _); rewrite to_nat_add in Hc];
+          lia. }
       pose proof (exp_ok_letapp _ _ _ _ _ _ Hexp) as Hexp'.
       pose proof (ti_tinfo _ _ _ _ _ _ _ Htm) as Hle_ti.
       destruct (eo_bound _ _ Hexp x) as (Hxr & Hxf & Hxs & Hxfree); [constructor |].
@@ -3070,11 +3260,21 @@ Section Correct.
       assert (Hrs2 : Forall2 (val_rel i h m2) vs ws).
       { eapply Forall2_impl; [| exact Hrs]. intros a b0 Hab.
         eapply val_rel_kept; [exact Hk2 |]. eapply val_rel_kept; [exact Hk1 | exact Hab]. }
-      assert (Hlt : (to_nat c1 < i)%nat) by lia.
       destruct (call_correct i le h m2 (cur_frames stp) x f ys c0 rho' fl f' wf vs ws xs t e_body
-                             rho'' c1 v tr1 Hlt Hcall (conj Hwf2 Hal2) Hle_ti Hvalf Hrf2 Hws Hrs2
+                             rho'' c1 rc tr1 Hlt Hcall (conj Hwf2 Hal2) Hle_ti Hvalf Hrf2 Hws Hrs2
                              Hfind Hset Hbstep)
-        as (w & h3 & m3 & Hrun3 & Hres3 & Hti3 & Hroots3 & Hch3).
+        as [Hnskip Hcase].
+      destruct rc as [| v].
+      { (* the function runs out of fuel *)
+        destruct Hrest as [-> ->]. cbn [outcome]. intros k0 k Hk0 Hcont.
+        destruct (seq_runs_for_oot fn lenv c0 (seq s_chk (seq s_reload s_e)) k le m2
+                                   (S (to_nat c1)) Hnskip Hcase) as (s' & Hs').
+        exists s'.
+        apply runs_for_le with (c := (0 + (0 + S (to_nat c1)))%nat) (slack := 0%nat); [| lia].
+        eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun1 |].
+        eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun2 | exact Hs']. }
+      destruct Hrest as (c2 & -> & IH). rewrite to_nat_add in Hc.
+      destruct Hcase as (w & h3 & m3 & Hrun3 & Hres3 & Hti3 & Hroots3 & Hch3).
       (* the state after the call *)
       remember (i - 1 - to_nat c1)%nat as i2 eqn:Hi2 in *.
       assert (Hloc3 : locals_ok h3 m3) by (eapply locals_after_call; [exact Hm2 | exact Hch3]).
@@ -3117,33 +3317,33 @@ Section Correct.
       assert (Hexp3 : exp_ok st3 e).
       { eapply exp_ok_slots; [exact Hexp2 |]. intros z Hz. rewrite Hslots5 in Hz. now left. }
       assert (Hc2 : (to_nat c2 + 0 <= i2)%nat) by lia.
-      destruct (IH i2 st3 s_e le5 h4 m4 Hc2 Hi2K Htr_e Hinv5 Huse5 Hexp3)
-        as (w' & h5 & m5 & Hstar & Hres & Hti5 & Hstep5).
-      exists w', h5, m5. split; [| split; [| split; [exact Hti5 |]]].
-      - intros k0 k Hk0 Hcont.
-        eapply star_trans; [apply seq_star; exact Hrun1 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun2 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun3 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun4 | | reflexivity].
-        eapply star_trans; [apply seq_star; exact Hrun5 | | reflexivity].
-        apply Hstar; auto.
-      - rewrite to_nat_add.
-        replace (i - (to_nat c1 + to_nat c2) - 1)%nat with (i2 - to_nat c2 - 0)%nat by lia.
-        exact Hres.
+      eapply outcome_prefix
+        with (c0 := S (to_nat c1)) (s1 := s_e) (le1 := le5) (h1 := h4) (m1 := m4);
+        [| | | | apply (IH i2 st3 s_e le5 h4 m4 Hc2 Hi2K Htr_e Hinv5 Huse5 Hexp3)].
+      - intros k0 k Hk0 Hcont. exists k. split; [exact Hcont |].
+        apply runs_for_le with (c := (0 + (0 + (S (to_nat c1) + 0)))%nat) (slack := 0%nat);
+          [| lia].
+        eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun1 |].
+        eapply runs_for_trans; [apply runs_for_star; apply seq_star; exact Hrun2 |].
+        eapply runs_for_trans; [apply seq_runs_for; [exact Hnskip | exact Hrun3] |].
+        apply runs_for_star.
+        eapply star_trans; [apply seq_star; exact Hrun4 | apply seq_star; exact Hrun5 | reflexivity].
       - eapply step_ok_trans; [exact Hstep1 |]. eapply step_ok_trans; [exact Hstep2 |].
         eapply step_ok_trans; [apply (step_ok_call stp h m2 h3 m3 0 Hsp Hroots3 Hch3) |].
-        eapply step_ok_trans; [exact Hstep4 | exact Hstep5].
+        exact Hstep4.
+      - rewrite to_nat_add. cbn [depth]. lia.
+      - rewrite to_nat_add. lia.
     Qed.
 
     Lemma app_correct rho (f : var) t (ys : list var) rho' fl f' vs (xs : list var)
-          e_body rho'' (c : fuel) v (tr : trace) :
+          e_body rho'' (c : fuel) rs (tr : trace) :
       M.get f rho = Some (Vfun rho' fl f') ->
       get_list ys rho = Some vs ->
       find_def f' fl = Some (t, xs, e_body) ->
       set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-      bstep_fuel cenv rho'' e_body c (Res v) tr ->
-      exp_correct rho'' e_body c v 0 ->
-      exp_correct rho (Eapp f t ys) c v 1.
+      bstep_fuel cenv rho'' e_body c rs tr ->
+      exp_correct rho'' e_body c rs 0 ->
+      exp_correct rho (Eapp f t ys) c rs 1.
     Proof.
       intros Hfun Hys Hfind Hset Hbstep IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
       cbn [trans] in Htr.
@@ -3158,25 +3358,37 @@ Section Correct.
                                    Pos.eqb f g && Nat.eqb (length ys) (length ps) = true ->
                                    calls_itself g (length ps) (Eapp f t ys) = true).
       { intros g ps _ Hb. exact Hb. }
-      exact (tail_call_correct _ resultId f ys rho rho' fl f' vs xs t e_body rho'' c v tr
+      exact (tail_call_correct _ resultId f ys rho rho' fl f' vs xs t e_body rho'' c rs tr
                                Hfree Hloop Hfun Hys Hfind Hset Hbstep IH
                                i st s le h m Hc Hi Htr Hinv Huse Hexp).
     Qed.
 
-    (* A call whose result is returned at once *)
+    (* An outcome with a result is an outcome without *)
+    Lemma outcome_oot r c slack i s le h m :
+      outcome r c slack i s le h m -> outcome OOT c slack i s le h m.
+    Proof.
+      destruct r as [| v]; cbn [outcome].
+      - intros H. exact H.
+      - intros (w & h' & m' & Hruns & _) k0 k Hk0 Hcont.
+        exists (Returnstate w k0 m'). apply Hruns; assumption.
+    Qed.
+
+    (* A call whose result is returned at once. The whole takes the fuel [c]: that of the
+       function, and one unit if the result is returned. *)
     Lemma letapp_tail_correct rho (x f : var) t (ys : list var) rho' fl f' vs (xs : list var)
-          e_body rho'' (c1 c2 : fuel) v (tr1 : trace) :
+          e_body rho'' (c1 c : fuel) rc r (tr1 : trace) :
       M.get f rho = Some (Vfun rho' fl f') ->
       get_list ys rho = Some vs ->
       find_def f' fl = Some (t, xs, e_body) ->
       set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-      bstep_fuel cenv rho'' e_body c1 (Res v) tr1 ->
-      exp_correct rho'' e_body c1 v 0 ->
-      exp_correct rho (Eletapp x f t ys (Ehalt x)) (algebra.plus c1 c2) v 1.
+      bstep_fuel cenv rho'' e_body c1 rc tr1 ->
+      exp_correct rho'' e_body c1 rc 0 ->
+      (to_nat c1 <= to_nat c <= to_nat c1 + 1)%nat ->
+      r = rc \/ r = OOT ->
+      exp_correct rho (Eletapp x f t ys (Ehalt x)) c r 1.
     Proof.
-      intros Hfun Hys Hfind Hset Hbstep IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
+      intros Hfun Hys Hfind Hset Hbstep IH Hfuel Hr i st s le h m Hc Hi Htr Hinv Huse Hexp.
       cbn [trans returns] in Htr. rewrite Pos.eqb_refl in Htr.
-      rewrite to_nat_add in Hc.
       assert (Hc1 : (to_nat c1 + 1 <= i)%nat) by lia.
       assert (Hfree : forall y, y = f \/ In y ys ->
                                 occurs_free (Eletapp x f t ys (Ehalt x)) y /\
@@ -3189,54 +3401,66 @@ Section Correct.
                                    Pos.eqb f g && Nat.eqb (length ys) (length ps) = true ->
                                    calls_itself g (length ps) (Eletapp x f t ys (Ehalt x)) = true).
       { intros g ps _ Hb. cbn [calls_itself returns]. rewrite Pos.eqb_refl. exact Hb. }
-      destruct (tail_call_correct _ x f ys rho rho' fl f' vs xs t e_body rho'' c1 v tr1
-                                  Hfree Hloop Hfun Hys Hfind Hset Hbstep IH
-                                  i st s le h m Hc1 Hi Htr Hinv Huse Hexp)
-        as (w & h' & m' & Hstar & Hres & Hti & Hstep).
-      exists w, h', m'. split; [exact Hstar |]. split; [| split; [exact Hti | exact Hstep]].
-      rewrite to_nat_add. eapply val_rel_mono; [| exact Hres]. lia.
+      pose proof (tail_call_correct _ x f ys rho rho' fl f' vs xs t e_body rho'' c1 rc tr1
+                                    Hfree Hloop Hfun Hys Hfind Hset Hbstep IH
+                                    i st s le h m Hc1 Hi Htr Hinv Huse Hexp) as Hout.
+      assert (Hout' : outcome r (to_nat c1 + 1) 1 (i - to_nat c1 - 1) s le h m).
+      { destruct Hr as [-> | ->]; [exact Hout | eapply outcome_oot; exact Hout]. }
+      eapply outcome_after with (s1 := s);
+        [intros k; apply star_refl | apply step_ok_refl | | | exact Hout'].
+      - cbn [depth]. lia.
+      - lia.
     Qed.
 
-    (* The code of an expression that evaluates to a value returns the layout of the value *)
+    (* The code of an expression has the outcome of its evaluation *)
     Lemma trans_correct :
       forall rho e (c : fuel) r (t : trace),
-        bstep_fuel cenv rho e c r t -> forall v, r = Res v -> exp_correct rho e c v 0.
+        bstep_fuel cenv rho e c r t -> exp_correct rho e c r 0.
     Proof.
       apply (bstep_fuel_ind' cenv
-               (fun rho e c r t => forall v, r = Res v -> exp_correct rho e c v 1)
-               (fun rho e c r t => forall v, r = Res v -> exp_correct rho e c v 0)).
-      - intros x t ys e rho rho' vs r cin cout Hys Hrho Hstep IH v Hv. subst.
+               (fun rho e c r t => exp_correct rho e c r 1)
+               (fun rho e c r t => exp_correct rho e c r 0)).
+      - intros x t ys e rho rho' vs r cin cout Hys Hrho Hstep IH. subst.
         eapply constr_correct; eauto.
-      - intros t vs rho x n y e v0 r cin cout Hy Hn Hstep IH v Hv. subst.
+      - intros t vs rho x n y e v0 r cin cout Hy Hn Hstep IH.
         eapply proj_correct; eauto.
-      - intros y r e t cl vl rho cin n cout Hy Hcc Hfind Hstep IH v Hv. subst.
+      - intros y r e t cl vl rho cin n cout Hy Hcc Hfind Hstep IH.
         eapply case_correct; eauto.
-      - intros rho' fl f' vs xs e rho'' rho f t ys r cin cout Hfun Hys Hfind Hset Hstep IH v Hv.
-        subst. eapply app_correct; eauto.
+      - intros rho' fl f' vs xs e rho'' rho f t ys r cin cout Hfun Hys Hfind Hset Hstep IH.
+        eapply app_correct; eauto.
       - intros rho' fl f' vs xs e_body e rho'' rho x f t ys v0 r cin1 cin2 cout1 cout2
-               Hfun Hys Hfind Hset Hstep1 IH1 Hstep2 IH2 v Hv. subst.
+               Hfun Hys Hfind Hset Hstep1 IH1 Hstep2 IH2.
         destruct (returns x e) eqn:Hret.
         + destruct e; try discriminate. simpl in Hret. apply Pos.eqb_eq in Hret. subst.
-          apply bstep_fuel_halt in Hstep2. rewrite M.gss in Hstep2. injection Hstep2 as <-.
-          eapply letapp_tail_correct; eauto.
-        + eapply letapp_correct; eauto.
-      - intros. discriminate.
-      - intros rho B e r cin cout Hstep IH v Hv i st s le h m Hc Hi Htr.
+          destruct (bstep_fuel_halt _ _ _ _ _ Hstep2) as [Hc2 Hr2].
+          eapply letapp_tail_correct with (rc := Res v0); eauto.
+          * rewrite to_nat_add. lia.
+          * destruct Hr2 as [-> | (v1 & -> & Hv)]; [now right | left].
+            rewrite M.gss in Hv. congruence.
+        + eapply letapp_correct with (rc := Res v0); eauto; simpl; eauto.
+      - intros rho' fl f' vs xs e_body e rho'' rho x f t ys cin cout Hfun Hys Hfind Hset Hstep IH.
+        destruct (returns x e) eqn:Hret.
+        + destruct e; try discriminate. simpl in Hret. apply Pos.eqb_eq in Hret. subst.
+          eapply letapp_tail_correct with (rc := OOT); eauto; lia.
+        + eapply letapp_correct with (rc := OOT); eauto; simpl; auto.
+      - intros rho B e r cin cout Hstep IH i st s le h m Hc Hi Htr.
         cbn [trans] in Htr. discriminate.
-      - intros rho' rho x p e r cin cout Hrho Hstep IH v Hv i st s le h m Hc Hi Htr Hinv Huse Hexp.
+      - intros rho' rho x p e r cin cout Hrho Hstep IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
         assert (Hg : good (Eprim_val x p e)) by (apply (eo_sub _ _ Hexp); apply rt_refl).
         destruct Hg.
-      - intros x v0 rho Hx v Hv. injection Hv as <-. apply halt_correct. exact Hx.
-      - intros. discriminate.
-      - intros rho e r cin cout Hstep IH v Hv. subst r.
-        intros i st s le h m Hc Hi Htr Hinv Huse Hexp.
-        rewrite to_nat_add in Hc. unfold one in Hc. rewrite to_nat_one in Hc.
-        assert (Hc' : (to_nat cin + 1 <= i)%nat) by lia.
-        destruct (IH v eq_refl i st s le h m Hc' Hi Htr Hinv Huse Hexp)
-          as (w & h' & m' & Hstar & Hres & Hti & Hstep').
-        exists w, h', m'. split; [exact Hstar |]. split; [| split; [exact Hti | exact Hstep']].
-        rewrite to_nat_add. unfold one. rewrite to_nat_one.
-        replace (i - (to_nat cin + 1) - 0)%nat with (i - to_nat cin - 1)%nat by lia. exact Hres.
+      - intros x v rho Hx. apply halt_correct. exact Hx.
+      - (* no fuel for a step *)
+        intros rho e c Hlt i st s le h m Hc Hi Htr Hinv Huse Hexp.
+        apply lt_one in Hlt. subst c. cbn [outcome]. intros k0 k _ _. eexists.
+        apply runs_for_le with (c := 0%nat) (slack := 0%nat);
+          [apply runs_for_star; apply star_refl | rewrite to_nat_zero; lia].
+      - (* one step *)
+        intros rho e r cin cout Hstep IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
+        rewrite to_nat_add in *. unfold one in *. rewrite to_nat_one in *.
+        eapply outcome_after with (s1 := s);
+          [intros k; apply star_refl | apply step_ok_refl | | |
+           apply (IH i st s le h m); auto; lia];
+          lia.
     Qed.
 
     End Call.
@@ -3244,16 +3468,16 @@ Section Correct.
     (** ** A call of the function *)
 
     (* The function called with the layouts of the arguments returns the layout of the
-       result *)
-    Lemma fun_correct i vs ws rho (c : fuel) v (tr : trace) tb tofs h fs m :
+       result, or runs when its body runs out of fuel *)
+    Lemma fun_correct i vs ws rho (c : fuel) r (tr : trace) tb tofs h fs m :
       (to_nat c <= i)%nat -> (i < K)%nat ->
       set_lists params vs (def_funs fds fds rho0 rho0) = Some rho ->
-      bstep_fuel cenv rho body c (Res v) tr ->
+      bstep_fuel cenv rho body c r tr ->
       tinfo_ok h fs m tb tofs ->
       Forall2 (val_rel i h m) vs ws ->
       args_in_tinfo nparam m tb tofs ws ->
-      call_returns cenv ge gc_inv (fun _ _ => False)
-                   (fun h' m' w' => val_rel (i - to_nat c) h' m' v w')
+      call_outcome cenv ge gc_inv r (S (to_nat c / ratio)) (fun _ _ => False)
+                   (fun v h' m' w' => val_rel (i - to_nat c) h' m' v w')
                    0 tb tofs fs h m (Internal fn) (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws).
     Proof.
       intros Hc Hi Hset Hbstep Hti Hrs Hargs.
@@ -3374,31 +3598,47 @@ Section Correct.
       assert (Hle1_ti : le1 ! tinfoId = Some (Vptr tb (Ptrofs.repr tofs))).
       { unfold le1. rewrite set_temps_other by exact Hti_par. unfold le0. apply PTree.gss. }
       (* the body *)
-      destruct (code_correct tb tofs fs fb rb Hown' rho c v i vs ws le1 h m1
-                             (trans_correct tb tofs fs fb rb Hown' rho body c (Res v) tr
-                                            Hbstep v eq_refl)
-                             Hc Hi Hset Hrs1 Hle1_par Hle1_ti Htok1 Hloc1)
-        as (w & h' & m' & Hstar & Hres & Hti' & Hroots' & Hch').
-      exists w, h', m'. split.
-      - intros k Hk.
-        eapply star_step with (t1 := E0) (t2 := E0); [| | reflexivity].
-        { apply step_internal_function. constructor.
-          - rewrite Hfn_vars. destruct (Nat.eqb nroots 0); [constructor |].
+      pose proof (code_correct tb tofs fs fb rb Hown' rho c r i vs ws le1 h m1
+                               (trans_correct tb tofs fs fb rb Hown' rho body c r tr Hbstep)
+                               Hc Hi Hset Hrs1 Hle1_par Hle1_ti Htok1 Hloc1) as Hout.
+      (* the call enters the function in one step and reaches its code *)
+      assert (Hstart : forall k, is_call_cont k ->
+                 exists s1 k1,
+                   step2 ge (Callstate (Internal fn)
+                                       (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws) k m)
+                         E0 s1 /\
+                   star step2 ge s1 E0 (Clight.State fn code k1 (local_env fb rb) le1 m1) /\
+                   cont_ok k k1).
+      { intros k Hk. eexists. exists (if loops then Kloop1 code Sskip k else k).
+        split; [| split].
+        - apply step_internal_function. constructor.
+          + rewrite Hfn_vars. destruct (Nat.eqb nroots 0); [constructor |].
             constructor; [intros [Heq | []]; discriminate |].
             constructor; [intros [] | constructor].
-          - rewrite Hfn_params. unfold var_names. cbn [map fst]. rewrite map_fst_tvalue.
+          + rewrite Hfn_params. unfold var_names. cbn [map fst]. rewrite map_fst_tvalue.
             constructor.
-            + intros Hin. apply firstn_In in Hin. contradiction.
-            + apply NoDup_norepet. apply NoDup_firstn. exact (bo_params _ _ Hbody).
-          - exact Hfn_temps.
-          - exact Halloc.
-          - exact Hbind. }
-        rewrite Hfn_body.
-        eapply star_trans; [apply seq_star; exact Hrun_load | | reflexivity].
-        case_eq loops; intros Hloops.
-        + eapply star_step with (t1 := E0) (t2 := E0); [apply step_loop | | reflexivity].
-          apply Hstar; [exact Hk | apply Cont_loop; exact Hloops].
-        + apply Hstar; [exact Hk | apply Cont_fun; exact Hloops].
+            * intros Hin. apply firstn_In in Hin. contradiction.
+            * apply NoDup_norepet. apply NoDup_firstn. exact (bo_params _ _ Hbody).
+          + exact Hfn_temps.
+          + exact Halloc.
+          + exact Hbind.
+        - rewrite Hfn_body.
+          eapply star_trans; [apply seq_star; exact Hrun_load | | reflexivity].
+          case_eq loops; intros Hloops; [apply star_one; apply step_loop | apply star_refl].
+        - case_eq loops; intros Hloops; [apply Cont_loop | apply Cont_fun]; exact Hloops. }
+      pose proof (bo_depth _ _ Hbody) as Hdepth.
+      destruct r as [| v]; cbn [call_outcome outcome] in *.
+      { (* the body runs out of fuel *)
+        intros k Hk. destruct (Hstart k Hk) as (s1 & k1 & Hstep & Hstar1 & Hcont).
+        destruct (Hout k k1 Hk Hcont) as (s' & Hrun). exists s'.
+        eapply runs_for_steps; [exact Hdepth | exact Hstep |].
+        eapply (runs_for_trans 0 (to_nat c)); [apply runs_for_star; exact Hstar1 | exact Hrun]. }
+      destruct Hout as (w & h' & m' & Hruns & Hres & Hti' & Hroots' & Hch').
+      exists w, h', m'. split.
+      - intros k Hk. destruct (Hstart k Hk) as (s1 & k1 & Hstep & Hstar1 & Hcont).
+        eapply runs_for_steps; [exact Hdepth | exact Hstep |].
+        eapply (runs_for_trans 0 (to_nat c)); [apply runs_for_star; exact Hstar1 |].
+        apply Hruns; assumption.
       - split; [exact Hres |]. split; [exact Hti' |].
         assert (Hnot_own : forall b o, Mem.valid_block m b -> ~ own_blocks fb rb b o).
         { intros b o Hv [Hn Hb]. destruct (Hfresh Hn) as (Hf1 & Hf2 & _).
@@ -3490,15 +3730,15 @@ Section Correct.
     body_ok ps e ->
     (forall f, fname = Some f -> exists t, find_def f fds = Some (t, ps, e)) ->
     type_of_function fn = fun_ty nparam (length ps) /\
-    forall i vs ws rho (c : fuel) v (tr : trace) tb tofs h fs m,
+    forall i vs ws rho (c : fuel) r (tr : trace) tb tofs h fs m,
       (to_nat c <= i)%nat -> (i < K)%nat ->
       set_lists ps vs (def_funs fds fds rho0 rho0) = Some rho ->
-      bstep_fuel cenv rho e c (Res v) tr ->
+      bstep_fuel cenv rho e c r tr ->
       tinfo_ok h fs m tb tofs ->
       Forall2 (val_rel i h m) vs ws ->
       args_in_tinfo nparam m tb tofs ws ->
-      call_returns cenv ge gc_inv (fun _ _ => False)
-                   (fun h' m' w' => val_rel (i - to_nat c) h' m' v w')
+      call_outcome cenv ge gc_inv r (S (to_nat c / ratio)) (fun _ _ => False)
+                   (fun v h' m' w' => val_rel (i - to_nat c) h' m' v w')
                    0 tb tofs fs h m (Internal fn) (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws).
   Proof.
     intros Htf Hbo Hname.
@@ -3562,8 +3802,8 @@ Section Correct.
     destruct j as [| j'].
     - apply fun_rel_0. exists t, xs, e. split; [exact Hfind | exact Hty].
     - apply fun_rel_S. exists t, xs, e. split; [exact Hfind |]. split; [exact Hty |].
-      intros i vs rho' c v' tr ws tb tofs h fs m Hi Hset Hbstep Hc Hti Hrs Hargs.
-      apply (Hcall i vs ws rho' c v' tr tb tofs h fs m); auto. lia.
+      intros i vs rho' c r tr ws tb tofs h fs m Hi Hset Hbstep Hc Hti Hrs Hargs.
+      apply (Hcall i vs ws rho' c r tr tb tofs h fs m); auto. lia.
   Qed.
 
   End Index.
@@ -3580,14 +3820,16 @@ Section Correct.
     apply (fun_related K IH j f t xs e b fd); auto. lia.
   Qed.
 
-  (* The function of the main expression returns the layout of its value *)
-  Lemma main_correct fn (c : fuel) v (tr : trace) :
+  (* The function of the main expression returns the layout of its value, or runs when the
+     main expression runs out of fuel *)
+  Lemma main_correct fn (c : fuel) r (tr : trace) :
     translate_function nparam prims cenv fenv tmp None [] main = Ret fn ->
-    bstep_fuel cenv (def_funs fds fds rho0 rho0) main c (Res v) tr ->
+    bstep_fuel cenv (def_funs fds fds rho0 rho0) main c r tr ->
     type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
     forall k tb tofs h fs m,
       tinfo_ok h fs m tb tofs ->
-      call_returns cenv ge gc_inv (fun _ _ => False) (fun h' m' w => val_rel k h' m' v w)
+      call_outcome cenv ge gc_inv r (S (to_nat c / ratio)) (fun _ _ => False)
+                   (fun v h' m' w => val_rel k h' m' v w)
                    0 tb tofs fs h m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
   Proof.
     intros Htf Hbstep.
@@ -3600,7 +3842,7 @@ Section Correct.
     - intros k tb tofs h fs m Hti.
       destruct (translated_correct (S (k + to_nat c)) (funs_related (S (k + to_nat c)))
                                    None [] main fn Htf Hmain Hnone) as [_ Hcall].
-      specialize (Hcall (k + to_nat c)%nat [] [] (def_funs fds fds rho0 rho0) c v tr tb tofs h fs m).
+      specialize (Hcall (k + to_nat c)%nat [] [] (def_funs fds fds rho0 rho0) c r tr tb tofs h fs m).
       replace (k + to_nat c - to_nat c)%nat with k in Hcall by lia.
       rewrite firstn_nil in Hcall. apply Hcall; auto.
       + lia.
@@ -3656,17 +3898,51 @@ Proof.
   apply (Hd x). split; assumption.
 Qed.
 
-(* The evaluation of a program is the evaluation of its main expression *)
+(* The evaluation of a program is the evaluation of its main expression, which takes at
+   most one unit of fuel less *)
 Lemma main_exp_step {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type}
-      {Ht : @trace_resource trace} cenv e (c : fuel) v (t : trace) :
-  bstep_fuel cenv (M.empty val) e c (Res v) t ->
+      {Ht : @trace_resource trace} cenv e (c : fuel) r (t : trace) :
+  bstep_fuel cenv (M.empty val) e c r t ->
   exists (c' : fuel) (t' : trace),
     bstep_fuel cenv (def_funs (functions e) (functions e) (M.empty val) (M.empty val))
-               (main_exp e) c' (Res v) t'.
+               (main_exp e) c' r t' /\
+    (to_nat c <= to_nat c' + 1)%nat.
 Proof.
-  intros H. destruct e; try (exists c, t; exact H).
-  inv H. match goal with [ H0 : bstep _ _ (Efun _ _) _ _ _ |- _ ] => inv H0 end. eauto.
+  intros H. destruct e; try (exists c, t; split; [exact H | lia]).
+  inv H.
+  - match goal with [ H0 : algebra.lt _ _ |- _ ] => apply lt_one in H0; subst end.
+    exists algebra.zero, algebra.zero. split; [constructor; apply zero_one_lt |].
+    rewrite to_nat_zero. lia.
+  - match goal with [ H0 : bstep _ _ (Efun _ _) _ _ _ |- _ ] => inv H0 end.
+    eexists _, _. split; [eassumption |].
+    rewrite to_nat_add. unfold one. rewrite to_nat_one. lia.
 Qed.
+
+(* A call that makes at least [lb] steps makes at least any smaller number of steps *)
+Lemma call_outcome_le {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type}
+      {Ht : @trace_resource trace} cenv ge gc_inv r lb lb' X R n tb tofs fs h m fd args :
+  (lb' <= lb)%nat ->
+  call_outcome cenv ge gc_inv r lb X R n tb tofs fs h m fd args ->
+  call_outcome cenv ge gc_inv r lb' X R n tb tofs fs h m fd args.
+Proof.
+  intros Hle. destruct r as [| v]; cbn [call_outcome].
+  - intros H k Hk. destruct (H k Hk) as (s & j & Hj & Hs). exists s, j. split; [lia | exact Hs].
+  - intros (w & h' & m' & H & Hpost). exists w, h', m'. split; [| exact Hpost].
+    intros k Hk. destruct (H k Hk) as (j & Hj & Hs). exists j. split; [lia | exact Hs].
+Qed.
+
+(* There is fuel of every size *)
+Lemma fuel_of_nat {fuel : Type} {Hf : @fuel_resource fuel} (n : nat) :
+  exists c : fuel, to_nat c = n.
+Proof.
+  induction n as [| n [c Hc]].
+  - exists algebra.zero. apply to_nat_zero.
+  - exists (algebra.plus c (algebra.one_i One)). rewrite to_nat_add, to_nat_one. lia.
+Qed.
+
+(* More than the depth of the functions of [e] and of its main expression *)
+Definition fuel_ratio (e : exp) : nat :=
+  S (Nat.max (depth_fundefs (functions e)) (depth (main_exp e))).
 
 Lemma fold_max_ge {A} (t : M.t A) acc :
   (acc <= M.fold (fun m x _ => Pos.max m x) t acc)%positive.
@@ -3696,7 +3972,7 @@ Section Source.
   Lemma source_fun_ok f t ps e' :
     find_def f (functions e) = Some (t, ps, e') ->
     Z.of_nat (length ps) <= max_args ->
-    body_ok tmp (functions e) ps e'.
+    body_ok (fuel_ratio e) tmp (functions e) ps e'.
   Proof.
     intros Hfind Harity.
     pose proof (find_def_correct _ _ _ _ _ Hfind) as Hin.
@@ -3722,11 +3998,12 @@ Section Source.
       eapply fun_in_fundefs_bound_var_fundefs; [exact Hin |].
       destruct Hx; [right; right; assumption | right; left; assumption].
     - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | exact Hsub].
+    - pose proof (depth_find_def _ _ _ _ _ Hfind). unfold fuel_ratio. lia.
     - exact Harity.
   Qed.
 
   (* What the proof uses of the main expression *)
-  Lemma source_main_ok : body_ok tmp (functions e) [] (main_exp e).
+  Lemma source_main_ok : body_ok (fuel_ratio e) tmp (functions e) [] (main_exp e).
   Proof.
     constructor.
     - apply main_exp_unique. exact Hub.
@@ -3740,6 +4017,7 @@ Section Source.
       apply (proj1 Hclosed) in Hfr. inv Hfr.
     - intros x [Hx | []]. apply source_ids. apply main_exp_bound. exact Hx.
     - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | apply main_exp_subterm].
+    - unfold fuel_ratio. lia.
     - simpl. unfold max_args. lia.
   Qed.
 
@@ -3754,9 +4032,11 @@ End Source.
 
 (** * The theorems *)
 
-(* If the program [e] evaluates to [v], the call of its C function with a thread info
-   returns the layout of [v]. This holds in every global environment [ge] that has the
-   generated functions, for example that of a program linked with the collector. *)
+(* The call of the C function of the program [e] with a thread info has the outcome of the
+   evaluation of [e]: it returns the layout of the value, or it runs when [e] runs out of
+   fuel, and it makes at least [c / fuel_ratio e] steps for the fuel [c]. This holds in
+   every global environment [ge] that has the generated functions, for example that of a
+   program linked with the collector. *)
 Theorem program_correct
         {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
   forall nparam prims e cenv tmp ge gc_inv,
@@ -3770,22 +4050,20 @@ Theorem program_correct
     (* the runtime *)
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
-    forall v (c : fuel) (t : trace),
-      bstep_fuel cenv (M.empty val) e c (Res v) t ->
-      exists b fn,
-        Genv.find_symbol ge bodyId = Some b /\
-        Genv.find_funct_ptr ge b = Some (Internal fn) /\
-        type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
+    exists b fn,
+      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_funct_ptr ge b = Some (Internal fn) /\
+      type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
+      forall r (c : fuel) (t : trace),
+        bstep_fuel cenv (M.empty val) e c r t ->
         forall k tb tofs h fs m,
           tinfo_ok cenv ge gc_inv h fs m tb tofs ->
-          call_returns cenv ge gc_inv (fun _ _ => False)
-                       (fun h' m' w => val_rel cenv ge nparam gc_inv k h' m' v w)
+          call_outcome cenv ge gc_inv r (to_nat c / fuel_ratio e) (fun _ _ => False)
+                       (fun v h' m' w => val_rel cenv ge nparam (fuel_ratio e) gc_inv k h' m' v w)
                        0 tb tofs fs h m
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
-  intros nparam prims e cenv tmp ge gc_inv Hprog Htmp
-         Hids Hub Hclosed Hnoprims Hgc Hisptr v c t Hstep.
-  destruct (main_exp_step _ _ _ _ _ Hstep) as (c' & t' & Hstep').
+  intros nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed Hnoprims Hgc Hisptr.
   assert (Htmp100 : (100 <= tmp)%positive).
   { pose proof (proj1 acc_leq_max_var_mut e 100%positive). lia. }
   destruct (prog_body _ _ _ _ _ _ _ Hprog) as (b & fn & Hb & Hfn & Htf).
@@ -3793,18 +4071,68 @@ Proof.
   (* the hypotheses on the functions *)
   assert (Hbodies : forall f t0 ps e',
              find_def f (functions e) = Some (t0, ps, e') ->
-             body_ok tmp (functions e) ps e').
+             body_ok (fuel_ratio e) tmp (functions e) ps e').
   { intros f t0 ps e' Hfind. eapply source_fun_ok; eauto.
     destruct (prog_funs _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn' & _ & _ & Htf').
     apply translate_function_inv in Htf'. exact (proj1 Htf'). }
-  assert (Hmain : body_ok tmp (functions e) [] (main_exp e)).
+  assert (Hmain : body_ok (fuel_ratio e) tmp (functions e) [] (main_exp e)).
   { eapply source_main_ok; eauto. }
   assert (Hfnames : forall f, M.get f (fun_arities (functions e)) <> None ->
                               (100 <= f < tmp)%positive).
   { intros f Hfn0. eapply source_fnames; eauto. }
-  exact (main_correct nparam prims cenv tmp (functions e) (main_exp e) (M.empty val) ge gc_inv
-                      Hprog Hgc Hisptr Hbodies Hmain Hfnames Htmp100
-                      fn c' v t' Htf Hstep').
+  pose proof (main_correct nparam (fuel_ratio e) prims cenv tmp (functions e) (main_exp e)
+                           (M.empty val) ge gc_inv
+                           Hprog Hgc Hisptr Hbodies Hmain Hfnames Htmp100 fn) as Hcorrect.
+  split.
+  - (* the type does not depend on the evaluation *)
+    destruct (Hcorrect algebra.zero OOT algebra.zero Htf) as [Hty _]; [| exact Hty].
+    constructor. apply zero_one_lt.
+  - intros r c t Hstep k tb tofs h fs m Hti.
+    destruct (main_exp_step _ _ _ _ _ Hstep) as (c' & t' & Hstep' & Hfuel).
+    destruct (Hcorrect c' r t' Htf Hstep') as [_ Hcall].
+    eapply call_outcome_le; [| apply Hcall; exact Hti].
+    assert (Hr : (0 < fuel_ratio e)%nat) by (unfold fuel_ratio; lia).
+    apply Nat.Div0.div_le_upper_bound.
+    pose proof (Nat.mul_succ_div_gt (to_nat c') (fuel_ratio e) ltac:(lia)).
+    rewrite Nat.mul_succ_r in *. lia.
+Qed.
+
+(* A fuel that takes at least [n] steps of the C code *)
+Lemma fuel_for_steps {fuel : Type} {Hf : @fuel_resource fuel} e (n : nat) :
+  exists c : fuel, (n <= to_nat c / fuel_ratio e)%nat.
+Proof.
+  destruct (fuel_of_nat (n * fuel_ratio e)) as [c Hc]. exists c.
+  rewrite Hc, Nat.div_mul by (unfold fuel_ratio; lia). apply Nat.le_refl.
+Qed.
+
+(* If the program diverges, the call of its C function runs for any number of steps *)
+Corollary program_diverges
+          {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
+  forall nparam prims e cenv tmp ge gc_inv,
+    program_ok nparam prims cenv tmp ge (functions e) (main_exp e) ->
+    (max_var e 100 < tmp)%positive ->
+    (forall x, bound_var e x -> (100 <= x)%positive) ->
+    unique_bindings e ->
+    closed_exp e ->
+    no_prims e ->
+    collector_ok cenv ge gc_inv ->
+    is_ptr_spec ge ->
+    @diverge cenv fuel _ trace _ (M.empty val) e ->
+    exists b fn,
+      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_funct_ptr ge b = Some (Internal fn) /\
+      forall tb tofs h fs m,
+        tinfo_ok cenv ge gc_inv h fs m tb tofs ->
+        forall n, call_runs ge n m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
+Proof.
+  intros nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed Hnoprims Hgc Hisptr Hdiv.
+  destruct (program_correct nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed
+                            Hnoprims Hgc Hisptr) as (b & fn & Hb & Hfn & _ & Hcall).
+  exists b, fn. split; [exact Hb |]. split; [exact Hfn |].
+  intros tb tofs h fs m Hti n.
+  destruct (fuel_for_steps e n) as [c Hc]. destruct (Hdiv c) as [t Hstep].
+  pose proof (Hcall OOT c t Hstep 0%nat tb tofs h fs m Hti) as Hruns.
+  eapply (call_outcome_le cenv ge gc_inv OOT) in Hruns; [exact Hruns | exact Hc].
 Qed.
 
 (* The program of [compile], with the definitions of the structs, has the generated
@@ -3832,7 +4160,7 @@ Proof.
   - exact (translate_program_ok nparam prims cenv tmp e defs p Hdefs Hmk Hub Hids).
 Qed.
 
-(* The theorem for the program of [compile] *)
+(* The two theorems for the program of [compile] *)
 Theorem compile_correct
         {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
   forall body_name nparam prims e cenv nenv names header prog p gc_inv,
@@ -3847,21 +4175,47 @@ Theorem compile_correct
     (* the runtime *)
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
-    forall v (c : fuel) (t : trace),
-      bstep_fuel cenv (M.empty val) e c (Res v) t ->
-      exists b fn,
-        Genv.find_symbol ge bodyId = Some b /\
-        Genv.find_funct_ptr ge b = Some (Internal fn) /\
-        type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
+    exists b fn,
+      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_funct_ptr ge b = Some (Internal fn) /\
+      type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
+      forall r (c : fuel) (t : trace),
+        bstep_fuel cenv (M.empty val) e c r t ->
         forall k tb tofs h fs m,
           tinfo_ok cenv ge gc_inv h fs m tb tofs ->
-          call_returns cenv ge gc_inv (fun _ _ => False)
-                       (fun h' m' w => val_rel cenv ge nparam gc_inv k h' m' v w)
+          call_outcome cenv ge gc_inv r (to_nat c / fuel_ratio e) (fun _ _ => False)
+                       (fun v h' m' w => val_rel cenv ge nparam (fuel_ratio e) gc_inv k h' m' v w)
                        0 tb tofs fs h m
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
   intros body_name nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
-         Hids Hub Hclosed Hnoprims Hgc Hisptr v c t Hstep.
+         Hids Hub Hclosed Hnoprims Hgc Hisptr.
   destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub) as (tmp & Htmp & Hprog).
   eapply program_correct; eauto.
+Qed.
+
+Corollary compile_diverges
+          {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
+  forall body_name nparam prims e cenv nenv names header prog p gc_inv,
+    compile body_name nparam prims e cenv nenv = Ret (names, header, prog) ->
+    make_program composites (prog_defs prog) = Ret p ->
+    let ge := globalenv p in
+    (forall x, bound_var e x -> (100 <= x)%positive) ->
+    unique_bindings e ->
+    closed_exp e ->
+    no_prims e ->
+    collector_ok cenv ge gc_inv ->
+    is_ptr_spec ge ->
+    @diverge cenv fuel _ trace _ (M.empty val) e ->
+    exists b fn,
+      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_funct_ptr ge b = Some (Internal fn) /\
+      forall tb tofs h fs m,
+        tinfo_ok cenv ge gc_inv h fs m tb tofs ->
+        forall n, call_runs ge n m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
+Proof.
+  intros body_name nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
+         Hids Hub Hclosed Hnoprims Hgc Hisptr Hdiv.
+  destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub) as (tmp & Htmp & Hprog).
+  eapply program_diverges; eauto.
 Qed.

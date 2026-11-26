@@ -600,3 +600,43 @@ Section Uses.
   Qed.
 
 End Uses.
+
+(** * The depth of an expression *)
+
+(* The length of the longest path of [e]: an evaluation of [e] takes at most this much
+   fuel outside the functions that it calls *)
+Fixpoint depth (e : exp) : nat :=
+  match e with
+  | Econstr _ _ _ e' | Eproj _ _ _ _ e' | Eletapp _ _ _ _ e' | Eprim_val _ _ e'
+  | Eprim _ _ _ e' | Efun _ e' => S (depth e')
+  | Ecase _ cs =>
+    S ((fix go (cs : list (ctor_tag * exp)) : nat :=
+          match cs with
+          | [] => 0%nat
+          | (_, e') :: cs' => Nat.max (depth e') (go cs')
+          end) cs)
+  | Eapp _ _ _ | Ehalt _ => 1%nat
+  end.
+
+Lemma depth_case y cs t e : In (t, e) cs -> (depth e < depth (Ecase y cs))%nat.
+Proof.
+  cbn [depth]. induction cs as [| [t0 e0] cs IH]; intros Hin; [contradiction |].
+  destruct Hin as [Heq | Hin].
+  - injection Heq as -> ->. lia.
+  - specialize (IH Hin). lia.
+Qed.
+
+(* The largest depth of a function of [fds] *)
+Fixpoint depth_fundefs (fds : fundefs) : nat :=
+  match fds with
+  | Fcons _ _ _ e fds' => Nat.max (depth e) (depth_fundefs fds')
+  | Fnil => 0%nat
+  end.
+
+Lemma depth_find_def f fds t xs e :
+  find_def f fds = Some (t, xs, e) -> (depth e <= depth_fundefs fds)%nat.
+Proof.
+  induction fds as [f0 t0 xs0 e0 fds IH |]; cbn [find_def depth_fundefs]; intros H.
+  - destruct (M.elt_eq f f0); [injection H as _ _ ->; lia | specialize (IH H); lia].
+  - discriminate.
+Qed.

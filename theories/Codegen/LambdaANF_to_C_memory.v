@@ -59,7 +59,7 @@ Proof. intros [A1 O1] [A2 O2]. split; auto. Qed.
 
 Section Properties.
 
-  Context (cenv : ctor_env) (ge : genv) (nparam : nat).
+  Context (cenv : ctor_env) (ge : genv) (nparam ratio : nat).
   Context (gc_inv : heap -> mem -> block -> Z -> Prop).
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
@@ -68,12 +68,13 @@ Section Properties.
   Notation is_value := (is_value cenv ge).
   Notation frame_ok := (frame_ok cenv ge).
   Notation still_represented := (still_represented cenv ge).
-  Notation fun_rel := (fun_rel cenv ge nparam gc_inv).
-  Notation val_rel := (val_rel cenv ge nparam gc_inv).
+  Notation fun_rel := (fun_rel cenv ge nparam ratio gc_inv).
+  Notation val_rel := (val_rel cenv ge nparam ratio gc_inv).
   Notation tinfo_wf := (tinfo_wf cenv ge gc_inv).
   Notation tinfo_ok := (tinfo_ok cenv ge gc_inv).
   Notation call_post := (call_post cenv ge gc_inv).
   Notation call_returns := (call_returns cenv ge gc_inv).
+  Notation call_outcome := (call_outcome cenv ge gc_inv).
 
   Hypothesis Hcol : collector_ok cenv ge gc_inv.
 
@@ -145,23 +146,23 @@ Section Properties.
     exists t xs e,
       find_def f fds = Some (t, xs, e) /\
       type_of_fundef fd = fun_ty nparam (length xs) /\
-      forall (j : nat) vs rho' (c : fuel) v' (tr : trace) ws tb tofs h fs m,
+      forall (j : nat) vs rho' (c : fuel) r (tr : trace) ws tb tofs h fs m,
         (j <= k)%nat ->
         set_lists xs vs (def_funs fds fds rho rho) = Some rho' ->
-        bstep_fuel cenv rho' e c (Res v') tr ->
+        bstep_fuel cenv rho' e c r tr ->
         (to_nat c <= j)%nat ->
         tinfo_ok h fs m tb tofs ->
         Forall2 (val_rel j h m) vs ws ->
         args_in_tinfo nparam m tb tofs ws ->
-        call_returns (fun _ _ => False)
-                     (fun h' m' w' => val_rel (j - to_nat c) h' m' v' w')
+        call_outcome r (S (to_nat c / ratio)) (fun _ _ => False)
+                     (fun v' h' m' w' => val_rel (j - to_nat c) h' m' v' w')
                      0 tb tofs fs h m
                      fd (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws).
   Proof.
     unfold val_rel. simpl.
     split; intros (t & xs & e & Hf' & Hty & H); exists t, xs, e; repeat split; auto;
-      intros j vs rho' c v' tr ws tb tofs h fs m Hj Hs Hb Hc Ht' Hvs Ha;
-      specialize (H j vs rho' c v' tr ws tb tofs h fs m Hj Hs Hb Hc Ht');
+      intros j vs rho' c r tr ws tb tofs h fs m Hj Hs Hb Hc Ht' Hvs Ha;
+      specialize (H j vs rho' c r tr ws tb tofs h fs m Hj Hs Hb Hc Ht');
       replace (k - (k - j))%nat with j in * by lia; auto.
   Qed.
 

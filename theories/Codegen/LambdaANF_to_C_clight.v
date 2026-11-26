@@ -437,6 +437,21 @@ Section Clight.
       destruct (zlt ((lim - a) / 8) n); reflexivity.
   Qed.
 
+  (** * Counted steps *)
+
+  Lemma starN_trans n1 n2 s1 s2 s3 :
+    starN step2 ge n1 s1 E0 s2 -> starN step2 ge n2 s2 E0 s3 ->
+    starN step2 ge (n1 + n2) s1 E0 s3.
+  Proof.
+    intros H1 H2. remember E0 as t eqn:Ht in H1. revert Ht H2.
+    induction H1 as [| n s t t1 s' t2 s'' Hstep Hrest IH Heq]; intros Ht H2; [exact H2 |].
+    subst t. destruct (Eapp_E0_inv _ _ Ht) as [-> ->].
+    simpl. eapply starN_step; [exact Hstep | apply IH; auto | reflexivity].
+  Qed.
+
+  Lemma steps_star lb s s' : steps ge lb s s' -> star step2 ge s E0 s'.
+  Proof. intros (n & _ & H). eapply starN_star; eauto. Qed.
+
   (** * Statements *)
 
   (* The statement [s] runs from [le, m] to [le', m'] and falls through *)
