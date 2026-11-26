@@ -48,6 +48,8 @@ From MetaRocq.PCUIC Require PCUICTyping PCUICClassification PCUICFirstorder.
 From MetaRocq.ErasurePlugin Require ErasureCorrectness.
 From MetaRocq.Template Require Typing.
 From CertiRocq.Compiler Require erasure_firstorder.
+From MetaRocq.Erasure Require StepIndex.Values StepIndex.EvalStepIndex StepIndex.EvalToEvalSI.
+From CertiRocq.LambdaBox_to_LambdaANF Require eval_SI_to_fuel_sem.
 
 Import Monads.
 Import MonadNotation.
@@ -170,23 +172,64 @@ Proof.
     destruct v_tgt; cbn in h2; try contradiction. subst. constructor.
 Qed.
 
-(** ** Assumptions *)
+(** ** From MetaRocq's evaluation to [fuel_sem] *)
+
+(** [fs_value_to_term] mirrors MetaRocq's [term_of_val] on the values produced by the conversion
+    of step-indexed values to [fuel_sem] values. *)
+Lemma fs_value_to_term_convert {efl : EEnvFlags} hBox hCofix hLazy hPrimArray Σ
+  (w : StepIndex.Values.value) h :
+  fs_value_to_term
+    (@eval_SI_to_fuel_sem.convert_vals efl hBox hCofix hLazy hPrimArray Σ w h) =
+  StepIndex.Values.term_of_val w.
+Proof.
+  have hlist : forall (l : list StepIndex.Values.value),
+    All_Forall.All (fun w => forall h,
+      fs_value_to_term (@eval_SI_to_fuel_sem.convert_vals efl hBox hCofix hLazy hPrimArray Σ w h) =
+      StepIndex.Values.term_of_val w) l ->
+    forall h, map fs_value_to_term (eval_SI_to_fuel_sem.convert_list' Σ
+      (@eval_SI_to_fuel_sem.convert_vals efl hBox hCofix hLazy hPrimArray Σ) l h) =
+      map StepIndex.Values.term_of_val l.
+  { induction 1 as [|x l hx hl IH]; intros h'; cbn; [reflexivity|]. f_equal; [apply hx|apply IH]. }
+  induction w using StepIndex.Values.value_rect in h |- *; cbn.
+  - exfalso. move: h => /=. rewrite hBox. discriminate.
+  - rewrite Nat2N.id. f_equal. now apply hlist.
+  - rewrite (hlist _ X). reflexivity.
+  - rewrite (hlist _ X). reflexivity.
+  - exfalso. move: h => /=. rewrite hCofix. discriminate.
+  - destruct p as [t m]; destruct m; cbn; try reflexivity.
+    exfalso. move: h => /=. rewrite /MetaRocq.Erasure.StepIndex.Utils.has_prim /= hPrimArray.
+    discriminate.
+  - exfalso. move: h => /=. rewrite hLazy. discriminate.
+Qed.
 
 (** Correspondence between MetaRocq's substitution-based call-by-value evaluation of erased
     programs, and CertiRocq's environment-based semantics [fuel_sem], for the erased programs
     produced by MetaRocq's pipeline. This is the composition of:
-    - [eval_eval_SI] from MetaRocq PR #1288 (EWcbvEval to the step-indexed, environment-based
-      evaluation relation [eval_SI]), and
-    - [evalSI_to_fuel_sem] from CertiRocq PR #156 ([eval_SI] to [fuel_sem]).
-    TODO: replace by these results once both PRs are merged. *)
-Axiom eval_to_fuel_sem :
-  forall (Σ : EAst.global_context) (t v : EAst.term),
+    - [eval_eval_SI] (EWcbvEval to MetaRocq's step-indexed, environment-based evaluation
+      relation), and
+    - [evalSI_to_fuel_sem] (the step-indexed evaluation to [fuel_sem]). *)
+Lemma eval_to_fuel_sem (Σ : EAst.global_context) (t v : EAst.term) :
     @wf_glob (certirocq_flags env_flags) Σ ->
     @wellformed (certirocq_flags env_flags) Σ 0 t ->
     @EWcbvEval.eval final_wcbv_flags Σ t v ->
     exists (v' : fuel_sem.value) (f tr : nat),
       @eval_env_step nat LambdaBox_resource_fuel LambdaBox_resource_trace Σ [] t (Val v') f tr /\
       v = fs_value_to_term v'.
+Proof.
+  intros hwfΣ hwft hev.
+  destruct (@StepIndex.EvalToEvalSI.eval_eval_SI (certirocq_flags env_flags) final_wcbv_flags
+    Σ [] t v t eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl hwfΣ hwft eq_refl hev
+    eq_refl) as (n & w & heq & hsi).
+  have hwfw : @StepIndex.Values.wellformed_val (certirocq_flags env_flags) Σ w = true.
+  { exact (@StepIndex.EvalStepIndex.eval_SI_wellformed_val (certirocq_flags env_flags) Σ [] t w n
+      eq_refl eq_refl eq_refl
+      hwfΣ eq_refl hwft hsi). }
+  have [f [tr hstep]] := @eval_SI_to_fuel_sem.evalSI_to_fuel_sem (certirocq_flags env_flags)
+    eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl Σ hwfΣ nat
+    LambdaBox_resource_fuel LambdaBox_resource_trace [] t w n eq_refl hwfw eq_refl hwft hsi.
+  eexists _, f, tr. split; [exact hstep|].
+  by rewrite fs_value_to_term_convert heq.
+Qed.
 
 (** The program produced by ANF conversion is closed and has unique bindings *)
 Lemma convert_top_anf_closed_unique_bindings func_tag default_tag default_itag next_id
