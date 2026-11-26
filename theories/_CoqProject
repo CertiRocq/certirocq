@@ -96,6 +96,7 @@ Codegen/LambdaANF_to_C_memory.v
 Codegen/LambdaANF_to_C_clight.v
 Codegen/LambdaANF_to_C_correct.v
 Codegen/toplevel.v
+Codegen/toplevel_theorems.v
 
 # CodegenWasm
 CodegenWasm/LambdaANF_to_Wasm_restrictions.v
