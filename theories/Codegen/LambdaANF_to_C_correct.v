@@ -51,31 +51,16 @@ Proof.
   destruct e; simpl; intros H; try solve [constructor]. now inv H.
 Qed.
 
+(* An expression that the proof covers: it is not a primitive *)
+Definition good (e : exp) : Prop :=
+  match e with
+  | Eprim_val _ _ _ | Eprim _ _ _ _ => False
+  | _ => True
+  end.
+
 (* No primitive operations and no primitive values *)
 Definition no_prims (e : exp) : Prop :=
-  forall e', subterm_or_eq e' e ->
-             match e' with
-             | Eprim_val _ _ _ | Eprim _ _ _ _ => False
-             | _ => True
-             end.
-
-(* Two constructors of a type that are both constants or both blocks have different
-   ordinals *)
-Definition distinct_ordinals (cenv : ctor_env) : Prop :=
-  forall t1 t2 i1 i2,
-    M.get t1 cenv = Some i1 -> M.get t2 cenv = Some i2 ->
-    ctor_ind_tag i1 = ctor_ind_tag i2 ->
-    (ctor_arity i1 = 0%N <-> ctor_arity i2 = 0%N) ->
-    ctor_ordinal i1 = ctor_ordinal i2 ->
-    t1 = t2.
-
-(* Sizes that the generator does not check: the ordinals fit in a word, no check for heap
-   room asks for more than the nursery, and the roots of a function fit in memory *)
-Definition within_limits (prims : M.t primitive) (cenv : ctor_env) (e : exp) : Prop :=
-  (forall t i, M.get t cenv = Some i -> Z.of_N (ctor_ordinal i) < Int64.half_modulus) /\
-  (forall e', subterm_or_eq e' e ->
-              Z.of_nat (alloc_need prims e') <= nursery_size /\
-              8 * Z.of_nat (max_roots prims (fun_arities (functions e)) e') <= Ptrofs.max_signed).
+  forall e', subterm_or_eq e' e -> good e'.
 
 (** * The C program *)
 
@@ -306,27 +291,21 @@ End Program.
 
 (** * A function that runs *)
 
-(* An expression that the proof covers: it is not a primitive, and its check for heap
-   room asks for at most the nursery *)
-Definition good (prims : M.t primitive) (e : exp) : Prop :=
-  Z.of_nat (alloc_need prims e) <= nursery_size /\
-  match e with
-  | Eprim_val _ _ _ | Eprim _ _ _ _ => False
-  | _ => True
-  end.
-
 Lemma ctor_rep_of_inv cenv t r :
   ctor_rep_of cenv t = Ret r ->
   exists info,
     M.get t cenv = Some info /\
-    ((ctor_arity info = 0%N /\ r = Constant (Z.of_N (ctor_ordinal info))) \/
+    ((ctor_arity info = 0%N /\ Z.of_N (ctor_ordinal info) <= max_constant_ordinal /\
+      r = Constant (Z.of_N (ctor_ordinal info))) \/
      (ctor_arity info <> 0%N /\ Z.of_N (ctor_ordinal info) <= max_block_ordinal /\
       r = Block (Z.of_N (ctor_ordinal info)) (N.to_nat (ctor_arity info)))).
 Proof.
   unfold ctor_rep_of. destruct (M.get t cenv) as [info |]; [| discriminate].
   intros H. exists info. split; auto.
   destruct (ctor_arity info =? 0)%N eqn:Ha.
-  - apply N.eqb_eq in Ha. inv H. now left.
+  - apply N.eqb_eq in Ha.
+    destruct (Z.of_N (ctor_ordinal info) <=? max_constant_ordinal) eqn:Ho; [| discriminate].
+    apply Z.leb_le in Ho. inv H. left. auto.
   - apply N.eqb_neq in Ha.
     destruct (Z.of_N (ctor_ordinal info) <=? max_block_ordinal) eqn:Ho; [| discriminate].
     apply Z.leb_le in Ho. inv H. right. auto.
@@ -357,16 +336,12 @@ Section Correct.
       bo_params_funs : forall x, In x ps -> M.get x fenv = None;
       bo_free : forall x, occurs_free e x -> In x ps \/ M.get x fenv <> None;
       bo_ids : forall x, bound_var e x \/ In x ps -> (100 <= x < tmp)%positive;
-      bo_sub : forall e', subterm_or_eq e' e -> good prims e';
-      bo_roots : 8 * Z.of_nat (max_roots prims fenv e) <= Ptrofs.max_signed;
+      bo_sub : forall e', subterm_or_eq e' e -> good e';
       bo_arity : Z.of_nat (length ps) <= max_args }.
 
   Hypothesis Hprog : program_ok nparam prims cenv tmp ge fds main.
   Hypothesis Hgc : collector_ok cenv ge gc_inv.
   Hypothesis Hisptr : is_ptr_spec ge.
-  Hypothesis Hord : distinct_ordinals cenv.
-  Hypothesis Hsmall : forall t i, M.get t cenv = Some i ->
-                                  Z.of_N (ctor_ordinal i) < Int64.half_modulus.
   Hypothesis Hbodies : forall f t ps e, find_def f fds = Some (t, ps, e) -> body_ok ps e.
   Hypothesis Hmain : body_ok [] main.
   Hypothesis Hfnames : forall f, M.get f fenv <> None -> (100 <= f < tmp)%positive.
@@ -592,7 +567,7 @@ Section Correct.
                              (100 <= x < tmp)%positive /\ M.get x fenv = None /\
                              ~ In x (st_slots st) /\ ~ occurs_free e x;
         eo_free : forall x, occurs_free e x -> (100 <= x < tmp)%positive;
-        eo_sub : forall e', subterm_or_eq e' e -> good prims e';
+        eo_sub : forall e', subterm_or_eq e' e -> good e';
         eo_roots : (max_roots prims fenv e <= nroots)%nat;
         eo_loop : forall g ps, self = Some (g, ps) ->
                                calls_itself g (length ps) e = true -> loops = true }.
@@ -1078,8 +1053,8 @@ Section Correct.
     (** ** The expression *)
 
     Lemma good_sub e e' :
-      (forall e0, subterm_or_eq e0 e -> good prims e0) -> dsubterm_e e' e ->
-      forall e0, subterm_or_eq e0 e' -> good prims e0.
+      (forall e0, subterm_or_eq e0 e -> good e0) -> dsubterm_e e' e ->
+      forall e0, subterm_or_eq e0 e' -> good e0.
     Proof.
       intros H Hd e0 He0. apply H. eapply rt_trans; [exact He0 |]. apply rt_step. exact Hd.
     Qed.
@@ -1174,7 +1149,8 @@ Section Correct.
       remember (alloc_need prims e) as n eqn:Hneed.
       remember (List.filter (fun x => negb (in_list x (st_slots st))) live) as saved eqn:Hsaved_def.
       destruct (max_args <? Z.of_nat (length saved)) eqn:Hsaved; [discriminate |].
-      apply Z.ltb_ge in Hsaved. apply Ret_inj in Hcr. subst s.
+      destruct (nursery_size <? Z.of_nat n) eqn:Hnursery; [discriminate |].
+      apply Z.ltb_ge in Hsaved. apply Z.ltb_ge in Hnursery. apply Ret_inj in Hcr. subst s.
       (* the state before the check *)
       assert (Hd : st_dirty st = false).
       { destruct (st_dirty st) eqn:E; auto. rewrite (so_dirty _ Hs E) in Hroom. discriminate. }
@@ -1183,8 +1159,7 @@ Section Correct.
       pose proof (wf_free _ _ _ _ _ _ _ _ Hwf) as [Hfh [Hfr1 Hfr2] Hfs Hfa Hfp].
       pose proof (wf_range _ _ _ _ _ _ _ _ Hwf) as (Ht0 & Htmax & Htal).
       pose proof (ti_tinfo _ _ _ _ _ _ _ Htm) as Hti.
-      assert (Hn : 0 <= Z.of_nat n <= nursery_size).
-      { split; [lia |]. subst n. apply (eo_sub _ _ Hexp e). apply rt_refl. }
+      assert (Hn : 0 <= Z.of_nat n <= nursery_size) by lia.
       assert (Hvar_ne : forall x, occurs_free e x -> x <> allocId /\ x <> tinfoId).
       { intros x Hx. apply (eo_free _ _ Hexp) in Hx. unfold allocId, tinfoId. split; lia. }
       set (le1 := PTree.set allocId (Vptr (free_block h) (Ptrofs.repr (free_start h))) le).
@@ -2406,8 +2381,8 @@ Section Correct.
         bind_inv_as Htr s' Htr'. apply Ret_inj in Htr. subst s.
         pose proof (get_list_length_eq _ _ _ Hvs) as Hlen.
         assert (Hnv : n = length vs) by (rewrite <- Hn; exact Hlen). clear Hn. subst n.
-        destruct (ctor_rep_of_inv _ _ _ Hrep) as (info & Hinfo & [[_ Hkind] | (Har & Hord_le & Hkind)]);
-          [discriminate |].
+        destruct (ctor_rep_of_inv _ _ _ Hrep)
+          as (info & Hinfo & [(_ & _ & Hkind) | (Har & Hord_le & Hkind)]); [discriminate |].
         assert (Hord_eq : ord = Z.of_N (ctor_ordinal info)) by congruence.
         assert (Hnz : length vs <> 0%nat).
         { assert (Hl : length vs = N.to_nat (ctor_arity info)) by congruence. lia. }
@@ -2593,6 +2568,9 @@ Section Correct.
       (forall t e' cs',
           go ((t, e') :: cs') =
           bind (ctor_rep_of cenv t) (fun r =>
+          if clashes cenv t r cs' then
+            Err "Codegen: two constructors of a case have the same ordinal"
+          else
           bind (enter prims fenv (Z.of_nat nroots) st e') (fun '(s_chk, st') =>
           bind (trans nparam prims cenv fenv self (Z.of_nat nroots) tmps st' e') (fun s =>
           bind (go cs') (fun '(blocks, constants) =>
@@ -2603,7 +2581,7 @@ Section Correct.
       forall cl blocks constants,
         go cl = Ret (blocks, constants) ->
         forall t e n,
-          find_tag_nth cl t e n -> caseConsistent cenv cl t ->
+          find_tag_nth cl t e n ->
           exists r s_chk st' s_e,
             ctor_rep_of cenv t = Ret r /\
             enter prims fenv (Z.of_nat nroots) st e = Ret (s_chk, st') /\
@@ -2614,14 +2592,15 @@ Section Correct.
             end.
     Proof.
       intros Hnil Hcons.
-      induction cl as [| [t0 e0] cl IH]; intros blocks constants Hgo t e n Hfind Hcc.
+      induction cl as [| [t0 e0] cl IH]; intros blocks constants Hgo t e n Hfind.
       - inversion Hfind.
       - rewrite Hcons in Hgo.
-        bind_inv_as Hgo r0 Hrep0. bind_inv_as Hgo p Hent0. destruct p as [s_chk0 st0].
+        bind_inv_as Hgo r0 Hrep0.
+        destruct (clashes cenv t0 r0 cl) eqn:Hclash; [discriminate |].
+        bind_inv_as Hgo p Hent0. destruct p as [s_chk0 st0].
         cbv beta iota in Hgo.
         bind_inv_as Hgo s0 Htr0. bind_inv_as Hgo q Hgo'. destruct q as [blocks' constants'].
         cbv beta iota in Hgo.
-        inversion Hcc as [| info info' ? ? ? ? Hinfo Hinfo' Htag Hcc']; subst.
         inversion Hfind as [| ? ? ? ? ? n' Hfind' Hne]; subst.
         + (* the first branch *)
           exists r0, s_chk0, st0, s0. split; [exact Hrep0 |]. split; [exact Hent0 |].
@@ -2629,27 +2608,20 @@ Section Correct.
           destruct r0; apply Ret_inj in Hgo; apply pair_equal_spec in Hgo; destruct Hgo as [<- <-];
             apply first_key_head.
         + (* a later branch *)
-          destruct (IH _ _ Hgo' _ _ _ Hfind' Hcc')
+          destruct (IH _ _ Hgo' _ _ _ Hfind')
             as (r & s_chk & st' & s_e & Hrep & Hent & Htr & Hkey).
           exists r, s_chk, st', s_e. split; [exact Hrep |]. split; [exact Hent |].
           split; [exact Htr |].
-          destruct (ctor_rep_of_inv _ _ _ Hrep0) as (i0 & Hi0 & Hk0).
-          destruct (ctor_rep_of_inv _ _ _ Hrep) as (i1 & Hi1 & Hk1).
-          assert (Hi0' : i0 = info') by congruence. assert (Hi1' : i1 = info) by congruence.
-          subst i0 i1.
-          assert (Hdiff : (ctor_arity info' = 0%N <-> ctor_arity info = 0%N) ->
-                          ctor_ordinal info' <> ctor_ordinal info).
-          { intros Har Heq. apply Hne.
-            exact (Hord t0 t info' info Hinfo' Hinfo (eq_sym Htag) Har Heq). }
-          destruct Hk0 as [[Ha0 ->] | (Ha0 & Ho0 & ->)];
-            destruct Hk1 as [[Ha1 ->] | (Ha1 & Ho1 & ->)];
+          (* the generator checked that the two constructors have different keys *)
+          pose proof (clashes_false _ _ _ _ _ _ _ Hclash
+                                    (find_tag_nth_In_patterns _ _ _ _ Hfind')
+                                    (fun Heq => Hne (eq_sym Heq)) Hrep) as Hdiff.
+          destruct r0 as [o0 | o0 a0], r as [o | o a];
             apply Ret_inj in Hgo; apply pair_equal_spec in Hgo; destruct Hgo as [<- <-].
-          * apply first_key_cons; [| exact Hkey]. unfold constant_value.
-            assert (ctor_ordinal info' <> ctor_ordinal info) by (apply Hdiff; tauto). lia.
+          * apply first_key_cons; [| exact Hkey]. unfold constant_value. lia.
           * exact Hkey.
           * exact Hkey.
-          * apply first_key_cons; [| exact Hkey].
-            assert (ctor_ordinal info' <> ctor_ordinal info) by (apply Hdiff; tauto). lia.
+          * apply first_key_cons; [| exact Hkey]. lia.
     Qed.
 
     (* The case analysis of a block goes to the statement of its ordinal *)
@@ -2787,12 +2759,11 @@ Section Correct.
 
     Lemma case_correct rho (y : var) t vs cl e n (c : fuel) v :
       M.get y rho = Some (Vconstr t vs) ->
-      caseConsistent cenv cl t ->
       find_tag_nth cl t e n ->
       exp_correct rho e c v 0 ->
       exp_correct rho (Ecase y cl) c v 1.
     Proof.
-      intros Hy Hcc Hfind IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
+      intros Hy Hfind IH i st s le h m Hc Hi Htr Hinv Huse Hexp.
       pose proof Hinv as (Hm & Hs & Htm).
       pose proof (find_tag_nth_In_patterns _ _ _ _ Hfind) as Hin.
       pose proof (exp_ok_case _ _ _ _ _ Hexp Hin) as Hexp'.
@@ -2804,7 +2775,7 @@ Section Correct.
       match type of Hcases with
       | ?g cl = _ =>
         destruct (case_branches st g eq_refl (fun _ _ _ => eq_refl) cl blocks constants Hcases
-                                t e n Hfind Hcc)
+                                t e n Hfind)
           as (r & s_chk & st' & s_e & Hrep & Hent & Htr_e & Hkey)
       end.
       (* the value that is analysed *)
@@ -2823,14 +2794,14 @@ Section Correct.
                    (k' = k \/ exists rest, k' = Kseq rest (Kswitch k))).
       { inversion Hry as [? ord Hrep' | ? ? ord b ofs Hrep' Hobj Hlo Hhi Hreg Hhdr Hfields |]; subst.
         - assert (Hr : r = Constant ord) by congruence. subst r.
-          destruct (ctor_rep_of_inv _ _ _ Hrep) as (info & Hinfo & [[_ Hkind] | (_ & _ & Hkind)]);
-            [| discriminate].
+          destruct (ctor_rep_of_inv _ _ _ Hrep)
+            as (info & Hinfo & [(_ & Hle_ord & Hkind) | (_ & _ & Hkind)]); [| discriminate].
           assert (Ho : ord = Z.of_N (ctor_ordinal info)) by congruence.
           apply (case_constant_star le m y ord blocks constants (seq s_chk s_e)); auto.
-          rewrite Ho. split; [lia | apply (Hsmall _ _ Hinfo)].
+          rewrite Ho. change Int64.half_modulus with (max_constant_ordinal + 1). lia.
         - assert (Hr : r = Block ord (length vs)) by congruence. subst r.
           destruct (ctor_rep_of_inv _ _ _ Hrep)
-            as (info & Hinfo & [[_ Hkind] | (_ & Hle_ord & Hkind)]); [discriminate |].
+            as (info & Hinfo & [(_ & _ & Hkind) | (_ & Hle_ord & Hkind)]); [discriminate |].
           assert (Ho : ord = Z.of_N (ctor_ordinal info)) by congruence.
           apply (case_block_star le m y b ofs ord (Z.of_nat (length vs)) blocks constants
                                  (seq s_chk s_e)); auto.
@@ -3253,8 +3224,8 @@ Section Correct.
       - intros rho B e r cin cout Hstep IH v Hv i st s le h m Hc Hi Htr.
         cbn [trans] in Htr. discriminate.
       - intros rho' rho x p e r cin cout Hrho Hstep IH v Hv i st s le h m Hc Hi Htr Hinv Huse Hexp.
-        assert (Hg : good prims (Eprim_val x p e)) by (apply (eo_sub _ _ Hexp); apply rt_refl).
-        destruct Hg as [_ []].
+        assert (Hg : good (Eprim_val x p e)) by (apply (eo_sub _ _ Hexp); apply rt_refl).
+        destruct Hg.
       - intros x v0 rho Hx v Hv. injection Hv as <-. apply halt_correct. exact Hx.
       - intros. discriminate.
       - intros rho e r cin cout Hstep IH v Hv. subst r.
@@ -3463,6 +3434,7 @@ Section Correct.
   Lemma translate_function_inv fname ps e fn :
     translate_function nparam prims cenv fenv tmp fname ps e = Ret fn ->
     Z.of_nat (length ps) <= max_args /\
+    8 * Z.of_nat (max_roots prims fenv e) <= Ptrofs.max_signed /\
     exists s_check st1 s_body,
       enter prims fenv (Z.of_nat (max_roots prims fenv e)) init_state e = Ret (s_check, st1) /\
       trans nparam prims cenv fenv (option_map (fun f => (f, ps)) fname)
@@ -3484,8 +3456,12 @@ Section Correct.
                  x = boxedId \/ In x (idents_from tmp (length ps))).
   Proof.
     unfold translate_function.
-    destruct (max_args <? Z.of_nat (length ps)) eqn:Hmax; [discriminate |].
-    apply Z.ltb_ge in Hmax. intros H. split; [exact Hmax |]. cbv zeta in H.
+    destruct (max_args <? Z.of_nat (length ps)) eqn:Hmax; [discriminate |]. cbv zeta.
+    match goal with
+    | |- (if ?b then _ else _) = _ -> _ => destruct b eqn:Hroots; [discriminate |]
+    end.
+    apply Z.ltb_ge in Hmax. apply Z.ltb_ge in Hroots. intros H.
+    split; [exact Hmax |]. split; [exact Hroots |]. cbv zeta in H.
     bind_inv_as H p Hent. destruct p as [s_check st1]. cbv beta iota in H.
     bind_inv_as H s_body Htr. apply Ret_inj in H. subst fn.
     exists s_check, st1, s_body.
@@ -3527,8 +3503,8 @@ Section Correct.
   Proof.
     intros Htf Hbo Hname.
     destruct (translate_function_inv _ _ _ _ Htf)
-      as (Harity & s_check & st1 & s_body & Hent & Htr & Hret & Hcc & Hpar & Hvars & Hbody_eq
-          & Htemps).
+      as (Harity & Hnr & s_check & st1 & s_body & Hent & Htr & Hret & Hcc & Hpar & Hvars
+          & Hbody_eq & Htemps).
     assert (Hps : forall p, In p ps -> (100 <= p < tmp)%positive).
     { intros p Hp. apply (bo_ids _ _ Hbo). right. exact Hp. }
     split.
@@ -3545,7 +3521,7 @@ Section Correct.
         injection Hg as <- <-. split; [reflexivity |]. split; [apply Hname; reflexivity |].
         split; reflexivity.
       + apply Nat.le_refl.
-      + exact (bo_roots _ _ Hbo).
+      + exact Hnr.
       + exact Hpar.
       + exact Hvars.
       + intros x y Hx Hy Heq. subst y. apply Htemps in Hy.
@@ -3702,13 +3678,12 @@ Qed.
 
 Section Source.
 
-  Context (prims : M.t primitive) (cenv : ctor_env) (e : exp) (tmp : positive).
+  Context (e : exp) (tmp : positive).
 
   Hypothesis Hids : forall x, bound_var e x -> (100 <= x)%positive.
   Hypothesis Hub : unique_bindings e.
   Hypothesis Hclosed : closed_exp e.
   Hypothesis Hnoprims : no_prims e.
-  Hypothesis Hlimits : within_limits prims cenv e.
   Hypothesis Htmp : (max_var e 100 < tmp)%positive.
 
   Lemma source_ids x : bound_var e x -> (100 <= x < tmp)%positive.
@@ -3717,16 +3692,11 @@ Section Source.
     pose proof (proj1 bound_var_leq_max_var_mut e x 100%positive H). lia.
   Qed.
 
-  Lemma source_good e' : subterm_or_eq e' e -> good prims e'.
-  Proof.
-    intros H. split; [apply (proj1 (proj2 Hlimits e' H)) | apply (Hnoprims e' H)].
-  Qed.
-
   (* What the proof uses of a function of the program *)
   Lemma source_fun_ok f t ps e' :
     find_def f (functions e) = Some (t, ps, e') ->
     Z.of_nat (length ps) <= max_args ->
-    body_ok prims tmp (functions e) ps e'.
+    body_ok tmp (functions e) ps e'.
   Proof.
     intros Hfind Harity.
     pose proof (find_def_correct _ _ _ _ _ Hfind) as Hin.
@@ -3751,13 +3721,12 @@ Section Source.
     - intros x Hx. apply source_ids. apply functions_bound.
       eapply fun_in_fundefs_bound_var_fundefs; [exact Hin |].
       destruct Hx; [right; right; assumption | right; left; assumption].
-    - intros e0 He0. apply source_good. eapply rt_trans; [exact He0 | exact Hsub].
-    - apply (proj2 (proj2 Hlimits e' Hsub)).
+    - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | exact Hsub].
     - exact Harity.
   Qed.
 
   (* What the proof uses of the main expression *)
-  Lemma source_main_ok : body_ok prims tmp (functions e) [] (main_exp e).
+  Lemma source_main_ok : body_ok tmp (functions e) [] (main_exp e).
   Proof.
     constructor.
     - apply main_exp_unique. exact Hub.
@@ -3770,8 +3739,7 @@ Section Source.
     - intros x Hx. right. destruct (main_exp_free _ _ Hx) as [Hn | Hfr]; [exact Hn |].
       apply (proj1 Hclosed) in Hfr. inv Hfr.
     - intros x [Hx | []]. apply source_ids. apply main_exp_bound. exact Hx.
-    - intros e0 He0. apply source_good. eapply rt_trans; [exact He0 | apply main_exp_subterm].
-    - apply (proj2 (proj2 Hlimits _ (main_exp_subterm e))).
+    - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | apply main_exp_subterm].
     - simpl. unfold max_args. lia.
   Qed.
 
@@ -3796,11 +3764,9 @@ Theorem program_correct
     (max_var e 100 < tmp)%positive ->
     (* the source program *)
     (forall x, bound_var e x -> (100 <= x)%positive) ->
-    distinct_ordinals cenv ->
     unique_bindings e ->
     closed_exp e ->
     no_prims e ->
-    within_limits prims cenv e ->
     (* the runtime *)
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
@@ -3818,7 +3784,7 @@ Theorem program_correct
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
   intros nparam prims e cenv tmp ge gc_inv Hprog Htmp
-         Hids Hord Hub Hclosed Hnoprims Hlimits Hgc Hisptr v c t Hstep.
+         Hids Hub Hclosed Hnoprims Hgc Hisptr v c t Hstep.
   destruct (main_exp_step _ _ _ _ _ Hstep) as (c' & t' & Hstep').
   assert (Htmp100 : (100 <= tmp)%positive).
   { pose proof (proj1 acc_leq_max_var_mut e 100%positive). lia. }
@@ -3827,17 +3793,17 @@ Proof.
   (* the hypotheses on the functions *)
   assert (Hbodies : forall f t0 ps e',
              find_def f (functions e) = Some (t0, ps, e') ->
-             body_ok prims tmp (functions e) ps e').
+             body_ok tmp (functions e) ps e').
   { intros f t0 ps e' Hfind. eapply source_fun_ok; eauto.
     destruct (prog_funs _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn' & _ & _ & Htf').
     apply translate_function_inv in Htf'. exact (proj1 Htf'). }
-  assert (Hmain : body_ok prims tmp (functions e) [] (main_exp e)).
+  assert (Hmain : body_ok tmp (functions e) [] (main_exp e)).
   { eapply source_main_ok; eauto. }
   assert (Hfnames : forall f, M.get f (fun_arities (functions e)) <> None ->
                               (100 <= f < tmp)%positive).
   { intros f Hfn0. eapply source_fnames; eauto. }
   exact (main_correct nparam prims cenv tmp (functions e) (main_exp e) (M.empty val) ge gc_inv
-                      Hprog Hgc Hisptr Hord (proj1 Hlimits) Hbodies Hmain Hfnames Htmp100
+                      Hprog Hgc Hisptr Hbodies Hmain Hfnames Htmp100
                       fn c' v t' Htf Hstep').
 Qed.
 
@@ -3875,11 +3841,9 @@ Theorem compile_correct
     let ge := globalenv p in
     (* the source program *)
     (forall x, bound_var e x -> (100 <= x)%positive) ->
-    distinct_ordinals cenv ->
     unique_bindings e ->
     closed_exp e ->
     no_prims e ->
-    within_limits prims cenv e ->
     (* the runtime *)
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
@@ -3897,7 +3861,7 @@ Theorem compile_correct
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
   intros body_name nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
-         Hids Hord Hub Hclosed Hnoprims Hlimits Hgc Hisptr v c t Hstep.
+         Hids Hub Hclosed Hnoprims Hgc Hisptr v c t Hstep.
   destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub) as (tmp & Htmp & Hprog).
   eapply program_correct; eauto.
 Qed.

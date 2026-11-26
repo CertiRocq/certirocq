@@ -342,6 +342,28 @@ Proof.
   - destruct pre; discriminate.
 Qed.
 
+(* Two constructors of a case that passed the test of the generator have different keys *)
+Lemma clashes_false cenv t r cs t' e' r' :
+  clashes cenv t r cs = false ->
+  In (t', e') cs -> t' <> t ->
+  ctor_rep_of cenv t' = Ret r' ->
+  match r', r with
+  | Constant o, Constant o' | Block o _, Block o' _ => o <> o'
+  | _, _ => True
+  end.
+Proof.
+  intros Hc Hin Hne Hrep.
+  assert (Hno : forall o o', r' = Constant o /\ r = Constant o' \/
+                             (exists a a', r' = Block o a /\ r = Block o' a') -> o <> o').
+  { intros o o' Hr ->.
+    assert (Ht : clashes cenv t r cs = true); [| congruence].
+    apply existsb_exists. exists (t', e'). split; [exact Hin |]. cbn [fst].
+    apply andb_true_iff. split; [apply negb_true_iff, Pos.eqb_neq; exact Hne |].
+    rewrite Hrep. destruct Hr as [[-> ->] | (a & a' & -> & ->)]; apply Z.eqb_refl. }
+  destruct r' as [o | o a], r as [o' | o' a']; try exact I; apply Hno;
+    [left | right; exists a, a']; split; reflexivity.
+Qed.
+
 (** * The analyses *)
 
 Section Analyses.

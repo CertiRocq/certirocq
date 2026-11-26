@@ -70,6 +70,9 @@ Definition frameT : type := Tstruct stackFrameId noattr.
 (* The size of [tinfo->args] *)
 Definition max_args : Z := 1024.
 
+(* The number of words of the nursery, [NURSERY_SIZE] in [gc_stack.h] *)
+Definition nursery_size : Z := 2 ^ 16.
+
 (* The definitions of [struct stack_frame] and [struct thread_info] in [gc_stack.h] *)
 Definition composites : list composite_definition :=
   [ Composite stackFrameId Struct
@@ -145,6 +148,9 @@ Inductive ctor_rep : Type :=
 
 (* The collector does not look inside blocks whose header has a larger ordinal *)
 Definition max_block_ordinal : Z := 250.
+
+(* The integer of a constant with a larger ordinal does not fit in a word *)
+Definition max_constant_ordinal : Z := 2 ^ 63 - 1.
 
 Definition constant_value (ordinal : Z) : Z := 2 * ordinal + 1.
 Definition block_header (ordinal : Z) (words : Z) : Z := Z.shiftl words 10 + ordinal.
@@ -310,12 +316,24 @@ Section Translation.
     | None => Err ("Codegen: unknown constructor " ++ show_pos t)
     | Some info =>
       let ordinal := Z.of_N (ctor_ordinal info) in
-      if (ctor_arity info =? 0)%N then Ret (Constant ordinal)
+      if (ctor_arity info =? 0)%N then
+        if (ordinal <=? max_constant_ordinal)%Z then Ret (Constant ordinal)
+        else Err ("Codegen: constructor " ++ show_pos t ++ " has ordinal " ++
+                  show_binnat (ctor_ordinal info) ++ ", more than fits in a word")
       else if (ordinal <=? max_block_ordinal)%Z then
              Ret (Block ordinal (N.to_nat (ctor_arity info)))
       else Err ("Codegen: constructor " ++ show_pos t ++ " has ordinal " ++
                 show_binnat (ctor_ordinal info) ++ ", more than the collector supports")
     end.
+
+  (* A constructor of [cs] other than [t] has the kind and the ordinal of [r] *)
+  Definition clashes (t : ctor_tag) (r : ctor_rep) (cs : list (ctor_tag * exp)) : bool :=
+    existsb (fun c =>
+               negb (Pos.eqb (fst c) t) &&
+               match ctor_rep_of (fst c), r with
+               | Ret (Constant o), Constant o' | Ret (Block o _), Block o' _ => (o =? o')%Z
+               | _, _ => false
+               end) cs.
 
   (** ** Analyses *)
 
@@ -578,6 +596,8 @@ Section Translation.
       let reread := fun x => in_list x live && negb (in_list x (st_stale st)) in
       if (max_args <? Z.of_nat (length saved))%Z then
         Err "Codegen: more variables to save than tinfo->args holds"
+      else if (nursery_size <? Z.of_nat n)%Z then
+        Err "Codegen: allocation of more words than the nursery holds"
       else
         Ret (Sset allocId tinfo_alloc ;;;
              Sifthenelse
@@ -746,14 +766,17 @@ Section Translation.
              | [] => Ret ([], [])
              | (t, e') :: cs' =>
                r <- ctor_rep_of t ;;
-               '(s_check, st') <- enter st e' ;;
-               s <- trans st' e' ;;
-               '(blocks, constants) <- go cs' ;;
-               match r with
-               | Block ordinal _ => ret ((ordinal, s_check ;;; s) :: blocks, constants)
-               | Constant ordinal =>
-                 ret (blocks, (constant_value ordinal, s_check ;;; s) :: constants)
-               end
+               if clashes t r cs' then
+                 Err "Codegen: two constructors of a case have the same ordinal"
+               else
+                 '(s_check, st') <- enter st e' ;;
+                 s <- trans st' e' ;;
+                 '(blocks, constants) <- go cs' ;;
+                 match r with
+                 | Block ordinal _ => ret ((ordinal, s_check ;;; s) :: blocks, constants)
+                 | Constant ordinal =>
+                   ret (blocks, (constant_value ordinal, s_check ;;; s) :: constants)
+                 end
              end) cs ;;
         ret (case_stmt (var_expr y) (fst cases) (snd cases))
       | Eletapp x f _ ys e' =>
@@ -783,28 +806,31 @@ Section Translation.
     if (max_args <? Z.of_nat (length ps))%Z then
       Err "Codegen: function with more parameters than tinfo->args holds"
     else
-      let self := option_map (fun f => (f, ps)) f in
-      let loops := match f with
-                   | Some f => calls_itself f (length ps) e
-                   | None => false
-                   end in
       let nroots := max_roots e in
-      let tmps := idents_from tmp (length ps) in
-      '(s_check, st) <- enter (Z.of_nat nroots) init_state e ;;
-      s <- trans self (Z.of_nat nroots) tmps st e ;;
-      let code := s_check ;;; s in
-      let body := load_args nparam (skipn nparam ps) ;;;
-                  (if loops then Sloop code Sskip else code) in
-      let added := (allocId, tptr tvalue) :: (resultId, tvalue) :: (boxedId, tbool) ::
-                   map (fun x => (x, tvalue)) tmps in
-      ret (mkfunction
-             tvalue cc_default
-             ((tinfoId, tptr tinfoT) :: map (fun x => (x, tvalue)) (firstn nparam ps))
-             (if Nat.eqb nroots 0 then []
-              else [(frameId, frameT); (rootsId, tarray tvalue (Z.of_nat nroots))])
-             (map (fun x => (x, tvalue)) (skipn nparam ps ++ bound_vars e) ++
-              List.filter (fun d => assigns (fst d) body) added)%list
-             body).
+      if (Ptrofs.max_signed <? 8 * Z.of_nat nroots)%Z then
+        Err "Codegen: function with more roots than fit in memory"
+      else
+        let self := option_map (fun f => (f, ps)) f in
+        let loops := match f with
+                     | Some f => calls_itself f (length ps) e
+                     | None => false
+                     end in
+        let tmps := idents_from tmp (length ps) in
+        '(s_check, st) <- enter (Z.of_nat nroots) init_state e ;;
+        s <- trans self (Z.of_nat nroots) tmps st e ;;
+        let code := s_check ;;; s in
+        let body := load_args nparam (skipn nparam ps) ;;;
+                    (if loops then Sloop code Sskip else code) in
+        let added := (allocId, tptr tvalue) :: (resultId, tvalue) :: (boxedId, tbool) ::
+                     map (fun x => (x, tvalue)) tmps in
+        ret (mkfunction
+               tvalue cc_default
+               ((tinfoId, tptr tinfoT) :: map (fun x => (x, tvalue)) (firstn nparam ps))
+               (if Nat.eqb nroots 0 then []
+                else [(frameId, frameT); (rootsId, tarray tvalue (Z.of_nat nroots))])
+               (map (fun x => (x, tvalue)) (skipn nparam ps ++ bound_vars e) ++
+                List.filter (fun d => assigns (fst d) body) added)%list
+               body).
 
   Fixpoint translate_fundefs (tmp : positive) (fds : fundefs)
     : error (list (ident * globdef fundef type)) :=

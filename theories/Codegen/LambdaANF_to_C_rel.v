@@ -27,9 +27,6 @@ Definition next_ofs : Z := 0.
 Definition root_ofs : Z := 8.
 Definition prev_ofs : Z := 16.
 
-(* The number of words of the nursery, [NURSERY_SIZE] in [gc_stack.h] *)
-Definition nursery_size : Z := 2 ^ 16.
-
 (** * The heap *)
 
 (* What the proof sees of the collector's heap: its blocks, the addresses of its objects,
