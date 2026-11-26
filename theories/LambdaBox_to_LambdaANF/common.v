@@ -244,6 +244,12 @@ Section InductiveEnv.
     let default_ctor_env := M.set default_tag info (M.empty ctor_ty_info) in
     convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
 
+  (** The constructor environment and the constructor tag map of an inductive environment. *)
+  Definition top_cenv (g : ienv) : ctor_env :=
+    let '(_, cenv, _, _, _) := convert_env g in cenv.
+
+  Definition top_tgm (g : ienv) : conId_map := snd (convert_env g).
+
 End InductiveEnv.
 
 
