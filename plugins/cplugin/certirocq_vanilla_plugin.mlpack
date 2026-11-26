@@ -186,6 +186,20 @@ EImplementLazyForce
 EPushForce
 EConstantsToValues
 ETransform
+GuardedToUnguardedFix
+RebuildWfEnv
+RemoveParams
+RemoveMatchOnBox
+InlineProjections
+ConstructorsAsBlocks
+CoInductiveToInductive
+PushForce
+ReorderCstrs
+Unboxing
+Inlining
+ConstsToValues
+ImplementBox
+ImplementLazyForce
 Erasure0
 
 ZArith_dec
