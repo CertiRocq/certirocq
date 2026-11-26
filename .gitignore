@@ -117,7 +117,21 @@ result
 /tests/programs/glue_*.h
 /tests/programs/*_opt
 /tests/programs/*_opt[1-5]
+/tests/programs/*_default
+/tests/programs/*_O0
+/tests/programs/*_cps
+/tests/closures/CertiRocq.Tests.tests.*.c
+/tests/closures/CertiRocq.Tests.tests.*.h
+/tests/closures/glue.c
+/tests/closures/glue.h
+/tests/closures/clos
+/tests/closures/clos_capture
+/tests/closures/rec_clos
+/tests/closures/rec_clos2
+/tests/closures/rec_clos2_direct
 /tests/wasm/CertiRocq.Tests.uint63_unit_tests.*.wasm
 /tests/wasm/CertiRocq.Tests.tests.*.wasm
 bootstrap/certirocqchk/glue.*
 bootstrap/certirocqc/glue.*
+# Scratch files of the rocq-mcp proof server
+rocq_mcp_cache_*
