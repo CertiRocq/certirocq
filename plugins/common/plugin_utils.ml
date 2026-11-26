@@ -77,7 +77,7 @@ Valid options:\n\
 --time                     : Time the main compilation phases.\n\
 --time-anf                 : Time LambdaANF optimization subphases.\n\
 --anf-variant N            : Select an experimental LambdaANF pipeline variant.\n\
---allow-unsafe-erasure     : Allow unsafe MetaRocq erasure passes, including cofixpoint-to-fixpoint translation.\n\
+--allow-unsafe-erasure     : Allow unsafe MetaRocq erasure passes: unboxing, inductive extraction and beta-reduction.\n\
 --typed-erasure            : Use MetaRocq typed erasure and dearging.\n\
 --bypass-qed               : Allow quotation to inspect Qed-opaque constants.\n\
 --build-dir DIR            : Write generated files under DIR.\n\
