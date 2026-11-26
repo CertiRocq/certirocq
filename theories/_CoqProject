@@ -90,6 +90,11 @@ Codegen/tactics.v
 Codegen/LambdaANF_to_Clight.v
 Codegen/LambdaANF_to_Clight_stack.v
 Codegen/LambdaANF_to_C.v
+Codegen/LambdaANF_to_C_static.v
+Codegen/LambdaANF_to_C_rel.v
+Codegen/LambdaANF_to_C_memory.v
+Codegen/LambdaANF_to_C_clight.v
+Codegen/LambdaANF_to_C_correct.v
 Codegen/toplevel.v
 
 # CodegenWasm
