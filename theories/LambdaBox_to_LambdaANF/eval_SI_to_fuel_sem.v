@@ -47,29 +47,26 @@ Section ConvertVals.
   Context {hBox : has_tBox = false}.
   Context {hCofix : has_tCoFix = false}.
   Context {hLazy : has_tLazy_Force = false}.
-  Context {hPrim : has_tPrim = {| 
-      has_primint := false;
-      has_primfloat := false;
-      has_primstring := false;
-      has_primarray := false;
-    |}
-  }.
-  Context {hBlocks : cstr_as_blocks = true}.
-  Context {hApp : has_tApp = true}.
+  Context {hPrimArray : has_primarray = false}.
   Context (Σ : EAst.global_declarations).
   Context (wf_Σ : wf_glob Σ).
 
 
-  Lemma no_prim {X} (p : EPrimitive.prim_val X) : Utils.has_prim p = false.
-  Proof.
-    destruct has_tPrim; injection hPrim as ? ? ? ?; subst.
-    now destruct p as [[] ?]; cbn.
-  Qed.
-  Lemma no_prim' p : has_prim p = false.
-  Proof.
-    destruct has_tPrim; injection hPrim as ? ? ? ?; subst.
-    now destruct p as [[] ?]; cbn.
-  Qed.
+  (** Primitive integers, floats and strings are translated as is; arrays
+      are excluded by [hPrimArray]. *)
+  Definition convert_prim {X} (p : EPrimitive.prim_val X) :
+    MetaRocq.Erasure.StepIndex.Utils.has_prim p = true -> AstCommon.primitive_value :=
+    match p with
+    | existT t m =>
+      match m as m0 in EPrimitive.prim_model t0
+        return MetaRocq.Erasure.StepIndex.Utils.has_prim (existT (@EPrimitive.prim_model X) t0 m0) = true -> AstCommon.primitive_value with
+      | EPrimitive.primIntModel i => λ _, existT _ AstCommon.primInt i
+      | EPrimitive.primFloatModel f => λ _, existT _ AstCommon.primFloat f
+      | EPrimitive.primStringModel s => λ _, existT _ AstCommon.primString s
+      | EPrimitive.primArrayModel _ => λ h,
+          False_rect _ (Bool.diff_false_true (eq_trans (eq_sym hPrimArray) h))
+      end
+    end.
 
 
   Fixpoint convert_list' (cv : ∀ v, wellformed_val Σ v = true -> value) (vs : list Values.value) : forallb (wellformed_val Σ) vs = true -> list value :=
@@ -103,14 +100,13 @@ Section ConvertVals.
         ClosFix_v new_Γ mfix t
     | vBox => λ wf_v, False_rect _ _
     | vCoFixClos a b c d =>  λ wf_v, False_rect _ _
-    | vPrim p => λ wf_v, False_rect _ _
+    | vPrim p => λ wf_v, Prim_v (convert_prim p (extract_andb_left wf_v))
     | vLazy t Γ => λ wf_v, False_rect _ _
     end
   .
   Proof.
-    - ok.
+    - simpl in *. now rewrite hBox in wf_v.
     - simpl in *. now rewrite hCofix in wf_v. 
-    - simpl in *. now rewrite no_prim in wf_v.
     - simpl in *. now rewrite hLazy in wf_v. 
   Defined.
 
@@ -208,21 +204,15 @@ Section exist_fuel.
   Context {hBox : has_tBox = false}.
   Context {hCofix : has_tCoFix = false}.
   Context {hLazy : has_tLazy_Force = false}.
-  Context {hPrim : has_tPrim = {| 
-      has_primint := false;
-      has_primfloat := false;
-      has_primstring := false;
-      has_primarray := false;
-    |}
-  }.
+  Context {hPrimArray : has_primarray = false}.
   Context {hBlocks : cstr_as_blocks = true}.
   Context {hApp : has_tApp = true}.
   Context {hRel : has_tRel = true}.
   Context (Σ : EAst.global_declarations).
   Context (wf_Σ : wf_glob Σ).
 
-  Notation cvt_list := (@convert_list efl hBox hCofix hLazy hPrim hBlocks hApp Σ).
-  Notation cvt_vals := (@convert_vals efl hBox hCofix hLazy hPrim hBlocks hApp Σ).
+  Notation cvt_list := (@convert_list efl hBox hCofix hLazy hPrimArray Σ).
+  Notation cvt_vals := (@convert_vals efl hBox hCofix hLazy hPrimArray Σ).
 
   Ltac assumption_upto_prf := 
     match goal with
@@ -394,8 +384,9 @@ Section exist_fuel.
       cbn. constructor.
       + apply eval_step. now rewrite -> (MRPrelude.uip_bool _ _ _ H0).
       + now rewrite -> (MRPrelude.uip_bool _ _ _ H1).
-    - simpl in wf_e. exfalso.
-      now unshelve erewrite no_prim' in wf_e.
+    - clear evih. destruct ev; [do 2 eexists; now constructor..|].
+      exfalso. cbn in wf_e.
+      now rewrite hPrimArray in wf_e.
     - simpl in *; exfalso.
       now rewrite hLazy in wf_v.
     - simpl in *; exfalso.
@@ -411,21 +402,15 @@ Section nat_fuel.
   Context {hBox : has_tBox = false}.
   Context {hCofix : has_tCoFix = false}.
   Context {hLazy : has_tLazy_Force = false}.
-  Context {hPrim : has_tPrim = {| 
-      has_primint := false;
-      has_primfloat := false;
-      has_primstring := false;
-      has_primarray := false;
-    |}
-  }.
+  Context {hPrimArray : has_primarray = false}.
   Context {hBlocks : cstr_as_blocks = true}.
   Context {hApp : has_tApp = true}.
   Context {hRel : has_tRel = true}.
   Context (Σ : EAst.global_declarations).
   Context (wf_Σ : wf_glob Σ).
 
-  Notation cvt_list := (@convert_list efl hBox hCofix hLazy hPrim hBlocks hApp Σ).
-  Notation cvt_vals := (@convert_vals efl hBox hCofix hLazy hPrim hBlocks hApp Σ).
+  Notation cvt_list := (@convert_list efl hBox hCofix hLazy hPrimArray Σ).
+  Notation cvt_vals := (@convert_vals efl hBox hCofix hLazy hPrimArray Σ).
 
   Ltac assumption_upto_prf :=
     match goal with
@@ -622,8 +607,10 @@ Section nat_fuel.
       constructor.
       + now rewrite -> (MRPrelude.uip_bool _ _ _ H0).
       + now rewrite -> (MRPrelude.uip_bool _ _ _ H1).
-    - simpl in wf_e. exfalso.
-      now unshelve erewrite no_prim' in wf_e.
+    - clear evih. destruct ev; [eapply step_to_fuel; [now constructor|]..|].
+      1-3: cost.
+      exfalso. cbn in wf_e.
+      now rewrite hPrimArray in wf_e.
     - simpl in *; exfalso.
       now rewrite hLazy in wf_v.
     - simpl in *; exfalso.
