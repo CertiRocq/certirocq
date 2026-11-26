@@ -80,7 +80,7 @@ Definition Clight_trans_ANF bodyName prims (args : nat) (t : toplevel.LambdaANF_
 
 Definition Clight_trans_C bodyName prims (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
   let '(_, pr_env, cenv, _, _, nenv, _, _, prog) := t in
-  match LambdaANF_to_C.compile bodyName args pr_env prog cenv nenv with
+  match LambdaANF_to_C.compile bodyName LambdaANF_to_C.bodyId nil args pr_env prog cenv nenv with
   | Ret (nenv, header, prog) => (Ret (add_prim_names prims nenv, header, prog), ""%bs)
   | Err s => (Err s, ""%bs)
   end.

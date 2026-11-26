@@ -759,7 +759,21 @@ Section Compose.
   Qed.
 
 
-  (* Top-level correctness for linking *)
+  (* The relation of the pipeline adds no free variables *)
+  Lemma R_n_exp_fv P PG n m e1 e2 :
+    R_n_exp cenv clo_tag preserves_fv (post_prop cenv) P PG n m e1 e2 ->
+    occurs_free e2 \subset occurs_free e1.
+  Proof.
+    intros Hrel. destruct Hrel as (e3 & Hrel1 & e4 & [Hwf _] & Hrel2).
+    assert (Htr : Transitive preserves_fv) by (clear; now firstorder).
+    eapply preord_exp_n_wf_pres in Hrel1; [| exact Htr ].
+    eapply preord_exp_n_wf_pres in Hrel2; [| exact Htr ].
+    change (preserves_fv e1 e2).
+    eapply Htr; [ exact Hrel1 |]. eapply Htr; [ exact Hwf | exact Hrel2 ].
+  Qed.
+
+  (* Top-level correctness for linking. Each target binds each variable once and its bound
+     variables are above its [v]. The first target is closed and the second uses only [x]. *)
   Corollary anf_pipeline_linking_correct lf x v1 v2 o1 o2 e1 e2 c1 c2 :
 
     closed_exp e1 ->
@@ -774,29 +788,52 @@ Section Compose.
       anf_pipeline v1 o1 e1 c1 = (Ret e1', c1') /\
       anf_pipeline v2 o2 e2 c2 = (Ret e2', c2') /\
 
-      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2').
+      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2') /\
+
+      closed_exp e1' /\
+      unique_bindings e1' /\
+      (forall y, y \in bound_var e1' -> (v1 < y)%positive) /\
+
+      occurs_free e2' \subset [set x] /\
+      unique_bindings e2' /\
+      (forall y, y \in bound_var e2' -> (v2 < y)%positive).
   Proof.
-    intros.
-    edestruct anf_pipeline_correct with (e := e1) (opts := o1); eauto. now constructor. destructAll.
-    edestruct anf_pipeline_correct with (e := e2) (opts := o2); eauto. now constructor. destructAll.
-
-    do 4 eexists.
+    intros Hc1 Hws1 Hmax1 Hfv2 Hws2 Hmax2.
+    edestruct (anf_pipeline_correct o1 v1 e1 c1 Hws1 Hmax1 I)
+      as (e1' & c1' & Heq1 & [Hun1 _] & _ & [Habove1 _] & n1 & m1 & Hrel1).
+    edestruct (anf_pipeline_correct o2 v2 e2 c2 Hws2 Hmax2 I)
+      as (e2' & c2' & Heq2 & [Hun2 _] & _ & [Habove2 _] & n2 & m2 & Hrel2).
+    exists e1', e2', c1', c2'.
 
     split. eassumption.
     split. eassumption.
 
-    eapply R_n_exp_in_refines.
+    split; [| split; [| split; [| split; [| split; [| split ] ] ] ] ].
 
-    6:{ eapply Rel_exp_n_preserves_linking; eauto.
-        - intros. eapply H15.
-        - eapply simple_bound_compat. }
+    - eapply R_n_exp_in_refines.
 
-    now eauto.
-    clear; now firstorder.
-    clear; now firstorder.
-    eapply simple_bound_post_upper_bound.
+      6:{ eapply Rel_exp_n_preserves_linking; eauto.
+          - intros P PG Hpp. eapply Hpp.
+          - eapply simple_bound_compat. }
 
-    eapply link_closed; eauto.
+      now eauto.
+      clear; now firstorder.
+      clear; now firstorder.
+      eapply simple_bound_post_upper_bound.
+
+      eapply link_closed; eauto.
+
+    - eapply R_n_exp_closed; eassumption.
+
+    - eassumption.
+
+    - eassumption.
+
+    - eapply Included_trans; [| eassumption ]. eapply R_n_exp_fv. eassumption.
+
+    - eassumption.
+
+    - eassumption.
   Qed.
 
 

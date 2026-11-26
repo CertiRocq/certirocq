@@ -1,6 +1,7 @@
 (* Correctness of the translation of LambdaANF to Clight in [LambdaANF_to_C]. The main
-   steps are [trans_correct] (an expression), [fun_correct] (a call), [program_correct] and
-   [compile_correct]. Divergence is [program_diverges] and [compile_diverges]. *)
+   steps are [trans_correct] (an expression), [fun_correct] (a call), [unit_correct] (a
+   program), [compile_correct] and [link_correct] (two programs compiled separately).
+   Divergence is [program_diverges] and [compile_diverges]. *)
 
 From Stdlib Require Import ZArith.ZArith Lists.List Relations.Relations Sets.Ensembles
      micromega.Lia.
@@ -12,6 +13,7 @@ From MetaRocq.Utils Require Import bytestring.
 From CertiRocq.Common Require Import compM Pipeline_utils.
 From CertiRocq.LambdaANF Require Import Ensembles_util List_util map_util set_util term term_util
      identifiers rename algebra eval.
+From CertiRocq.LambdaANF Require rel_comp.
 From CertiRocq.Codegen Require Import LambdaANF_to_C LambdaANF_to_C_static LambdaANF_to_C_rel
      LambdaANF_to_C_memory LambdaANF_to_C_clight.
 
@@ -88,29 +90,29 @@ Proof.
 Qed.
 
 (* A program built with [make_program] has the given definitions and structs *)
-Lemma make_program_inv types defs p :
-  make_program types defs = Ret p ->
+Lemma make_program_inv body_id types defs p :
+  make_program body_id types defs = Ret p ->
   prog_defs p = defs /\ build_composite_env types = Errors.OK (prog_comp_env p).
 Proof.
   unfold make_program.
-  destruct (Ctypes.make_program types defs [bodyId] mainId) as [p' | msg] eqn:H; intros Heq; inv Heq.
+  destruct (Ctypes.make_program types defs [body_id] mainId) as [p' | msg] eqn:H; intros Heq; inv Heq.
   destruct (ctypes_make_program_inv _ _ _ _ _ H) as [Hd Ht]. split; auto.
   rewrite <- Ht. apply prog_comp_env_eq.
 Qed.
 
 (* The program with the definitions of the structs can always be built *)
-Lemma make_program_composites defs :
-  exists p, make_program composites defs = Ret p.
+Lemma make_program_composites body_id defs :
+  exists p, make_program body_id composites defs = Ret p.
 Proof.
   destruct composites_ok as [ce Hce].
   unfold make_program.
-  destruct (Ctypes.make_program composites defs [bodyId] mainId) as [p | msg] eqn:H; eauto.
+  destruct (Ctypes.make_program composites defs [body_id] mainId) as [p | msg] eqn:H; eauto.
   exfalso. revert H. unfold Ctypes.make_program.
   assert (G : forall (r : Errors.res composite_env) (e : r = build_composite_env composites),
              r = Errors.OK ce ->
              match r as a return (a = build_composite_env composites -> Errors.res (Ctypes.program function)) with
              | Errors.OK ce => fun Heq =>
-                          Errors.OK {| prog_defs := defs; prog_public := [bodyId]; prog_main := mainId;
+                          Errors.OK {| prog_defs := defs; prog_public := [body_id]; prog_main := mainId;
                                 prog_types := composites; prog_comp_env := ce;
                                 prog_comp_env_eq := Ctypes.make_program_obligation_1 composites Heq |}
              | Errors.Error e => fun _ => Errors.Error e
@@ -154,13 +156,43 @@ Proof. induction l; simpl; congruence. Qed.
 (* Keeps the reduction tactics from unfolding the generator *)
 Local Opaque translate_function.
 
+(* The global environment [ge] has the structs, a collector of the right type and the
+   pointer test *)
+Record runtime_ok (ge : genv) : Prop :=
+  { rt_structs : structs_ok ge;
+    rt_gc : exists b fd,
+        Genv.find_symbol ge gcArgsId = Some b /\
+        Genv.find_funct_ptr ge b = Some fd /\
+        type_of_fundef fd = gc_args_ty;
+    rt_is_ptr : exists b,
+        Genv.find_symbol ge isPtrId = Some b /\
+        Genv.find_funct_ptr ge b
+        = Some (External (extern "certirocq_is_ptr" is_ptr_params tbool)
+                         is_ptr_params tbool cc_default) }.
+
+(* The global environment [ge] has the functions that [defs] defines *)
+Definition has_functions (ge : genv) (defs : list (ident * globdef fundef type)) : Prop :=
+  forall id fn, In (id, Gfun (Internal fn)) defs ->
+                exists b, Genv.find_symbol ge id = Some b /\
+                          Genv.find_funct_ptr ge b = Some (Internal fn).
+
+(* No function of [e] or of the runtime has the identifier [id] *)
+Definition body_id_ok (e : exp) (id : ident) : Prop :=
+  ~ bound_var e id /\ id <> gcArgsId /\ id <> isPtrId.
+
+Lemma bodyId_ok e : (forall x, bound_var e x -> (100 <= x)%positive) -> body_id_ok e bodyId.
+Proof.
+  intros H. split; [| split; discriminate]. intros Hb. apply H in Hb. unfold bodyId in Hb. lia.
+Qed.
+
 Section Program.
 
   Context (nparam : nat) (prims : M.t primitive) (cenv : ctor_env) (tmp : positive).
 
-  (* What the proof uses of the global environment [ge] of the C program: the structs,
-     the two functions of the runtime, and the functions of the source program *)
-  Record program_ok (ge : genv) (fds : fundefs) (main : exp) : Prop :=
+  (* What the proof uses of the global environment [ge] of the C program: the runtime, the
+     functions of the source program, and the function [body_id] of its main expression *)
+  Record program_ok (ge : genv) (body_id : ident) (imports : list var) (fds : fundefs)
+         (main : exp) : Prop :=
     { prog_structs : structs_ok ge;
       prog_gc : exists b fd,
           Genv.find_symbol ge gcArgsId = Some b /\
@@ -178,9 +210,9 @@ Section Program.
             Genv.find_funct_ptr ge b = Some (Internal fn) /\
             translate_function nparam prims cenv (fun_arities fds) tmp (Some f) ps e = Ret fn;
       prog_body : exists b fn,
-          Genv.find_symbol ge bodyId = Some b /\
+          Genv.find_symbol ge body_id = Some b /\
           Genv.find_funct_ptr ge b = Some (Internal fn) /\
-          translate_function nparam prims cenv (fun_arities fds) tmp None [] main = Ret fn }.
+          translate_function nparam prims cenv (fun_arities fds) tmp None imports main = Ret fn }.
 
   Lemma translate_fundefs_names fenv : forall fds funs,
       translate_fundefs nparam prims cenv fenv tmp fds = Ret funs ->
@@ -235,55 +267,91 @@ Section Program.
     intros Hin. apply all_fun_name_bound in Hin. auto.
   Qed.
 
-  (* The global environment of the program that [translate_program] builds *)
-  Lemma translate_program_ok e defs p :
-    translate_program nparam prims cenv tmp e = Ret defs ->
-    make_program composites defs = Ret p ->
+  (* A program built with the structs has the runtime and the functions that it defines,
+     if the names of its definitions are distinct *)
+  Lemma make_program_ok body_id defs p :
+    make_program body_id composites defs = Ret p ->
+    list_norepet (map fst defs) ->
+    incl runtime_defs defs ->
+    runtime_ok (globalenv p) /\ has_functions (globalenv p) defs.
+  Proof.
+    intros Hmk Hnr Hincl.
+    destruct (make_program_inv _ _ _ _ Hmk) as [Hdefs Hce]. rewrite <- Hdefs in Hnr.
+    split.
+    - constructor.
+      + exists (prog_comp_env p). split; [exact Hce | auto].
+      + destruct (program_function
+                    p gcArgsId
+                    (External (extern "garbage_collect_args" gc_args_params tvoid)
+                              gc_args_params tvoid cc_default) Hnr) as (b & Hb & Hgcb).
+        { rewrite Hdefs. apply Hincl. now left. }
+        exists b. eexists. split; [exact Hb | split; [exact Hgcb | reflexivity]].
+      + apply program_function; auto. rewrite Hdefs. apply Hincl. right. now left.
+    - intros id fn Hin. apply program_function; auto. rewrite Hdefs. exact Hin.
+  Qed.
+
+  (* The definitions that [translate_program] builds have distinct names, and the
+     functions of the runtime are among them *)
+  Lemma translate_program_names body_id imports e defs :
+    translate_program nparam prims cenv tmp body_id imports e = Ret defs ->
     unique_bindings e ->
     (forall x, bound_var e x -> (100 <= x)%positive) ->
-    program_ok (globalenv p) (functions e) (main_exp e).
+    body_id_ok e body_id ->
+    list_norepet (map fst defs) /\ incl runtime_defs defs.
   Proof.
-    intros Htr Hmk Hub Hid.
-    destruct (make_program_inv _ _ _ Hmk) as [Hdefs Hce].
+    intros Htr Hub Hid (Hbid & Hgcid & Hptrid).
     unfold translate_program in Htr.
     replace (match e with Efun fds main => (fds, main) | _ => (Fnil, e) end)
       with (functions e, main_exp e) in Htr by (destruct e; reflexivity).
-    bind_inv Htr. bind_inv Htr. injection Htr as Htr. rewrite <- Htr in Hdefs. clear Htr.
+    bind_inv Htr. bind_inv Htr. injection Htr as Htr. subst defs.
     rename x into funs. rename x0 into body. rename E into Hfuns. rename E0 into Hbody.
     assert (Hfb : forall f, bound_var_fundefs (functions e) f -> (100 <= f)%positive).
     { intros f Hf. apply Hid. now apply functions_bound. }
     pose proof (functions_unique _ Hub) as Hfu.
-    assert (Hnr : list_norepet (map fst (prog_defs p))).
-    { rewrite Hdefs. unfold runtime_defs. cbn [map fst app]. rewrite map_app. cbn [map fst].
-      replace (map fst funs) with (all_fun_name (functions e))
-        by (symmetry; exact (translate_fundefs_names _ _ _ Hfuns)).
-      assert (Hno : forall id, (id < 100)%positive -> ~ In id (all_fun_name (functions e))).
-      { intros id Hlt Hin. apply all_fun_name_bound, Hfb in Hin. lia. }
-      constructor; [| constructor].
-      - intros [Heq | Hin]; [discriminate |].
-        apply in_app_or in Hin. destruct Hin as [Hin | [Heq | []]]; [| discriminate].
-        apply (Hno gcArgsId); [reflexivity | auto].
-      - intros Hin. apply in_app_or in Hin. destruct Hin as [Hin | [Heq | []]]; [| discriminate].
-        apply (Hno isPtrId); [reflexivity | auto].
-      - apply list_norepet_append; auto using all_fun_name_norepet.
-        + constructor; [intros [] | constructor].
-        + intros x y Hx [Hy | []] Heq. subst. apply (Hno bodyId); [reflexivity | auto]. }
-    constructor.
-    - exists (prog_comp_env p). split; [exact Hce | auto].
-    - destruct (program_function
-                  p gcArgsId
-                  (External (extern "garbage_collect_args" gc_args_params tvoid)
-                            gc_args_params tvoid cc_default) Hnr) as (b & Hb & Hgcb).
-      { rewrite Hdefs. now left. }
-      exists b. eexists. split; [exact Hb | split; [exact Hgcb | reflexivity]].
-    - apply program_function; auto. rewrite Hdefs. right. now left.
+    split; [| intros d [<- | [<- | []]]; [now left | right; now left]].
+    unfold runtime_defs. cbn [map fst app]. rewrite map_app. cbn [map fst].
+    match goal with
+    | |- list_norepet (_ :: _ :: ?l ++ _) =>
+      replace l with (all_fun_name (functions e))
+        by (symmetry; exact (translate_fundefs_names _ _ _ Hfuns))
+    end.
+    assert (Hno : forall id, (id < 100)%positive -> ~ In id (all_fun_name (functions e))).
+    { intros id Hlt Hin. apply all_fun_name_bound, Hfb in Hin. lia. }
+    assert (Hnob : ~ In body_id (all_fun_name (functions e))).
+    { intros Hin. apply Hbid. apply functions_bound. apply all_fun_name_bound. exact Hin. }
+    constructor; [| constructor].
+    - intros [Heq | Hin]; [discriminate |].
+      apply in_app_or in Hin. destruct Hin as [Hin | [Heq | []]]; [| congruence].
+      apply (Hno gcArgsId); [reflexivity | auto].
+    - intros Hin. apply in_app_or in Hin. destruct Hin as [Hin | [Heq | []]]; [| congruence].
+      apply (Hno isPtrId); [reflexivity | auto].
+    - apply list_norepet_append; auto using all_fun_name_norepet.
+      + constructor; [intros [] | constructor].
+      + intros x y Hx [Hy | []] Heq. subst. exact (Hnob Hx).
+  Qed.
+
+  (* What the proof uses of a global environment that has the runtime and the functions
+     that [translate_program] builds *)
+  Lemma translate_program_ok ge body_id imports e defs :
+    translate_program nparam prims cenv tmp body_id imports e = Ret defs ->
+    runtime_ok ge ->
+    has_functions ge defs ->
+    program_ok ge body_id imports (functions e) (main_exp e).
+  Proof.
+    intros Htr [Hst Hgcf Hptrf] Hhas.
+    unfold translate_program in Htr.
+    replace (match e with Efun fds main => (fds, main) | _ => (Fnil, e) end)
+      with (functions e, main_exp e) in Htr by (destruct e; reflexivity).
+    bind_inv Htr. bind_inv Htr. injection Htr as Htr. subst defs.
+    rename x into funs. rename x0 into body. rename E into Hfuns. rename E0 into Hbody.
+    constructor; auto.
     - intros f t ps e' Hfind.
       destruct (translate_fundefs_find _ _ _ _ _ _ _ Hfuns Hfind) as (fn & Hfn & Hin').
-      destruct (program_function p f (Internal fn) Hnr) as (b & Hb & Hf).
-      { rewrite Hdefs. right. right. apply in_or_app. now left. }
+      destruct (Hhas f fn) as (b & Hb & Hf).
+      { right. right. apply in_or_app. now left. }
       exists b, fn. auto.
-    - destruct (program_function p bodyId (Internal body) Hnr) as (b & Hb & Hf).
-      { rewrite Hdefs. right. right. apply in_or_app. right. now left. }
+    - destruct (Hhas body_id body) as (b & Hb & Hf).
+      { right. right. apply in_or_app. right. now left. }
       exists b, body. auto.
   Qed.
 
@@ -323,6 +391,7 @@ Section Correct.
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
   Context (nparam ratio : nat) (prims : M.t primitive) (cenv : ctor_env) (tmp : positive).
   Context (fds : fundefs) (main : exp) (rho0 : eval.env) (ge : genv).
+  Context (body_id : ident) (imports : list var).
   Context (gc_inv : heap -> mem -> block -> Z -> Prop).
 
   Let fenv := fun_arities fds.
@@ -347,11 +416,11 @@ Section Correct.
       bo_depth : (depth e < ratio)%nat;
       bo_arity : Z.of_nat (length ps) <= max_args }.
 
-  Hypothesis Hprog : program_ok nparam prims cenv tmp ge fds main.
+  Hypothesis Hprog : program_ok nparam prims cenv tmp ge body_id imports fds main.
   Hypothesis Hgc : collector_ok cenv ge gc_inv.
   Hypothesis Hisptr : is_ptr_spec ge.
   Hypothesis Hbodies : forall f t ps e, find_def f fds = Some (t, ps, e) -> body_ok ps e.
-  Hypothesis Hmain : body_ok [] main.
+  Hypothesis Hmain : body_ok imports main.
   Hypothesis Hfnames : forall f, M.get f fenv <> None -> (100 <= f < tmp)%positive.
   Hypothesis Htmp : (100 <= tmp)%positive.
 
@@ -444,7 +513,7 @@ Section Correct.
       Genv.find_funct_ptr ge b = Some fd ->
       fun_rel j (Vfun rho0 fds f) fd.
 
-  Let Hstructs := prog_structs _ _ _ _ _ _ _ Hprog.
+  Let Hstructs := prog_structs _ _ _ _ _ _ _ _ _ Hprog.
 
   (* The name of a function stands for a pointer to its C function *)
   Lemma fun_word i f :
@@ -455,7 +524,7 @@ Section Correct.
   Proof.
     intros Hi Hfn. unfold fenv in Hfn. rewrite fun_arities_find in Hfn.
     destruct (find_def f fds) as [[[t xs] e] |] eqn:Hfind; [| congruence].
-    destruct (prog_funs _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b & fn & Hb & Hfp & _).
+    destruct (prog_funs _ _ _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b & fn & Hb & Hfp & _).
     exists b, (Internal fn). repeat split; auto. eapply Hrel; eauto.
   Qed.
 
@@ -1350,7 +1419,7 @@ Section Correct.
         eapply store_words_load; eauto.
         rewrite Forall_forall in Hwords. specialize (Hwords w (nth_error_In _ _ Hj)).
         destruct w; try contradiction; reflexivity. }
-      destruct (prog_gc _ _ _ _ _ _ _ Hprog) as (bgc & fdgc & Hbgc & Hfgc & Htygc).
+      destruct (prog_gc _ _ _ _ _ _ _ _ _ Hprog) as (bgc & fdgc & Hbgc & Hfgc & Htygc).
       destruct (gc_collect _ _ _ Hgc bgc fdgc tb tofs h (cur_frames st) m1
                            (Z.of_nat (length saved)) (Z.of_nat n) Hbgc Hfgc)
         as (wg & h' & m2 & Hcall & Hroom' & Hok' & Hroots' & Hch').
@@ -2843,7 +2912,7 @@ Section Correct.
       destruct blocks as [| bl0 blocks']; [exfalso; eapply first_key_not_nil; eauto |].
       destruct constants as [| cn0 constants'].
       - exists le. split; [auto |]. intros k. exact (Htag le k Hy).
-      - destruct (prog_is_ptr _ _ _ _ _ _ _ Hprog) as (bp & Hbp & Hfp).
+      - destruct (prog_is_ptr _ _ _ _ _ _ _ _ _ Hprog) as (bp & Hbp & Hfp).
         destruct Hisptr as [Hptr _].
         set (le1 := PTree.set boxedId Vtrue le).
         assert (Hy1 : var_val ge le1 fenv y (Vptr b ofs)).
@@ -2908,7 +2977,7 @@ Section Correct.
       destruct constants as [| cn0 constants']; [exfalso; eapply first_key_not_nil; eauto |].
       destruct blocks as [| bl0 blocks'].
       - exists le. split; [auto |]. intros k. exact (Hsw le k Hy).
-      - destruct (prog_is_ptr _ _ _ _ _ _ _ Hprog) as (bp & Hbp & Hfp).
+      - destruct (prog_is_ptr _ _ _ _ _ _ _ _ _ Hprog) as (bp & Hbp & Hfp).
         destruct Hisptr as [_ Hint].
         set (le1 := PTree.set boxedId Vfalse le).
         assert (Hy1 : var_val ge le1 fenv y (Vlong (Int64.repr (constant_value ord)))).
@@ -3795,7 +3864,7 @@ Section Correct.
     fun_rel j (Vfun rho0 fds f) fd.
   Proof.
     intros Hj Hfind Hb Hfd.
-    destruct (prog_funs _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn & Hb' & Hfn & Htf).
+    destruct (prog_funs _ _ _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn & Hb' & Hfn & Htf).
     assert (b' = b) by congruence. subst b'. assert (fd = Internal fn) by congruence. subst fd.
     destruct (translated_correct (Some f) xs e fn Htf (Hbodies _ _ _ _ Hfind)) as [Hty Hcall].
     { intros f0 Hf0. injection Hf0 as <-. eauto. }
@@ -3820,33 +3889,37 @@ Section Correct.
     apply (fun_related K IH j f t xs e b fd); auto. lia.
   Qed.
 
-  (* The function of the main expression returns the layout of its value, or runs when the
-     main expression runs out of fuel *)
-  Lemma main_correct fn (c : fuel) r (tr : trace) :
-    translate_function nparam prims cenv fenv tmp None [] main = Ret fn ->
-    bstep_fuel cenv (def_funs fds fds rho0 rho0) main c r tr ->
-    type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
-    forall k tb tofs h fs m,
-      tinfo_ok h fs m tb tofs ->
-      call_outcome cenv ge gc_inv r (S (to_nat c / ratio)) (fun _ _ => False)
-                   (fun v h' m' w => val_rel k h' m' v w)
-                   0 tb tofs fs h m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
+  (* The function of the main expression, called with the layout of the values of the
+     imports, returns the layout of its value, or runs when the expression runs out of fuel *)
+  Lemma main_correct fn :
+    translate_function nparam prims cenv fenv tmp None imports main = Ret fn ->
+    type_of_function fn = fun_ty nparam (length imports) /\
+    forall vs rho (c : fuel) r (tr : trace),
+      set_lists imports vs (def_funs fds fds rho0 rho0) = Some rho ->
+      bstep_fuel cenv rho main c r tr ->
+      forall k ws tb tofs h fs m,
+        tinfo_ok h fs m tb tofs ->
+        Forall2 (val_rel (k + to_nat c) h m) vs ws ->
+        args_in_tinfo nparam m tb tofs ws ->
+        call_outcome cenv ge gc_inv r (S (to_nat c / ratio)) (fun _ _ => False)
+                     (fun v h' m' w => val_rel k h' m' v w)
+                     0 tb tofs fs h m
+                     (Internal fn) (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws).
   Proof.
-    intros Htf Hbstep.
+    intros Htf.
     assert (Hnone : forall f : var, @None var = Some f ->
-                                    exists t, find_def f fds = Some (t, @nil var, main)).
+                                    exists t, find_def f fds = Some (t, imports, main)).
     { intros f Hf0. discriminate. }
     split.
-    - destruct (translated_correct 1 (funs_related 1) None [] main fn Htf Hmain Hnone) as [Hty _].
+    - destruct (translated_correct 1 (funs_related 1) None imports main fn Htf Hmain Hnone)
+        as [Hty _].
       exact Hty.
-    - intros k tb tofs h fs m Hti.
+    - intros vs rho c r tr Hset Hbstep k ws tb tofs h fs m Hti Hws Hargs.
       destruct (translated_correct (S (k + to_nat c)) (funs_related (S (k + to_nat c)))
-                                   None [] main fn Htf Hmain Hnone) as [_ Hcall].
-      specialize (Hcall (k + to_nat c)%nat [] [] (def_funs fds fds rho0 rho0) c r tr tb tofs h fs m).
+                                   None imports main fn Htf Hmain Hnone) as [_ Hcall].
+      specialize (Hcall (k + to_nat c)%nat vs ws rho c r tr tb tofs h fs m).
       replace (k + to_nat c - to_nat c)%nat with k in Hcall by lia.
-      rewrite firstn_nil in Hcall. apply Hcall; auto.
-      + lia.
-      + intros i w _ Hw. destruct i; discriminate.
+      apply Hcall; auto. lia.
   Qed.
 
 End Correct.
@@ -3901,12 +3974,11 @@ Qed.
 (* The evaluation of a program is the evaluation of its main expression, which takes at
    most one unit of fuel less *)
 Lemma main_exp_step {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type}
-      {Ht : @trace_resource trace} cenv e (c : fuel) r (t : trace) :
-  bstep_fuel cenv (M.empty val) e c r t ->
+      {Ht : @trace_resource trace} cenv rho e (c : fuel) r (t : trace) :
+  bstep_fuel cenv rho e c r t ->
   exists (c' : fuel) (t' : trace),
-    bstep_fuel cenv (def_funs (functions e) (functions e) (M.empty val) (M.empty val))
-               (main_exp e) c' r t' /\
-    (to_nat c <= to_nat c' + 1)%nat.
+    bstep_fuel cenv (def_funs (functions e) (functions e) rho rho) (main_exp e) c' r t' /\
+    (to_nat c' <= to_nat c <= to_nat c' + 1)%nat.
 Proof.
   intros H. destruct e; try (exists c, t; split; [exact H | lia]).
   inv H.
@@ -3952,15 +4024,54 @@ Proof.
   eapply Pos.le_trans; [| apply IH]. lia.
 Qed.
 
+Lemma fold_left_max_ge (l : list positive) acc : (acc <= fold_left Pos.max l acc)%positive.
+Proof.
+  revert acc. induction l as [| x l IH]; intros acc; simpl; [lia |].
+  eapply Pos.le_trans; [| apply IH]. lia.
+Qed.
+
+Lemma fold_left_max_in (l : list positive) acc x :
+  In x l -> (x <= fold_left Pos.max l acc)%positive.
+Proof.
+  revert acc. induction l as [| y l IH]; intros acc Hin; simpl; [destruct Hin |].
+  destruct Hin as [-> | Hin]; [| apply IH; exact Hin].
+  eapply Pos.le_trans; [| apply fold_left_max_ge]. lia.
+Qed.
+
+(* Variables keep their values when they are set to the values they have *)
+Lemma set_lists_same (xs : list var) (vs : list val) (rho : eval.env) :
+  get_list xs rho = Some vs -> set_lists xs vs rho = Some rho.
+Proof.
+  revert vs. induction xs as [| x xs IH]; intros vs H; simpl in H.
+  - inv H. reflexivity.
+  - destruct (M.get x rho) as [v |] eqn:Hx; [| discriminate].
+    destruct (get_list xs rho) as [vs' |] eqn:Hxs; [| discriminate]. inv H.
+    simpl. rewrite (IH vs' eq_refl). f_equal. apply M.gsident. exact Hx.
+Qed.
+
+(* The functions of a program do not change the values of the other variables *)
+Lemma get_list_def_funs (xs : list var) fds (rho : eval.env) :
+  (forall x, In x xs -> ~ name_in_fundefs fds x) ->
+  get_list xs (def_funs fds fds rho rho) = get_list xs rho.
+Proof.
+  induction xs as [| x xs IH]; intros H; simpl; [reflexivity |].
+  rewrite def_funs_neq by (apply H; now left).
+  rewrite IH by (intros y Hy; apply H; now right). reflexivity.
+Qed.
+
 Section Source.
 
-  Context (e : exp) (tmp : positive).
+  Context (e : exp) (imports : list var) (tmp : positive) (ratio : nat).
 
   Hypothesis Hids : forall x, bound_var e x -> (100 <= x)%positive.
   Hypothesis Hub : unique_bindings e.
-  Hypothesis Hclosed : closed_exp e.
+  Hypothesis Hfree : forall x, occurs_free e x -> In x imports.
+  Hypothesis Hfuns : closed_fundefs (functions e).
   Hypothesis Hnoprims : no_prims e.
   Hypothesis Htmp : (max_var e 100 < tmp)%positive.
+  Hypothesis Himports : NoDup imports.
+  Hypothesis Himp : forall x, In x imports -> (100 <= x < tmp)%positive /\ ~ bound_var e x.
+  Hypothesis Hratio : (fuel_ratio e <= ratio)%nat.
 
   Lemma source_ids x : bound_var e x -> (100 <= x < tmp)%positive.
   Proof.
@@ -3972,7 +4083,7 @@ Section Source.
   Lemma source_fun_ok f t ps e' :
     find_def f (functions e) = Some (t, ps, e') ->
     Z.of_nat (length ps) <= max_args ->
-    body_ok (fuel_ratio e) tmp (functions e) ps e'.
+    body_ok ratio tmp (functions e) ps e'.
   Proof.
     intros Hfind Harity.
     pose proof (find_def_correct _ _ _ _ _ Hfind) as Hin.
@@ -3993,32 +4104,38 @@ Section Source.
       inversion Hu as [? Hy | ? Hy]; subst; [left; exact Hy |].
       inversion Hy as [? Hz | ? Hz]; subst.
       + right. apply fun_arities_name. exact Hz.
-      + exfalso. apply functions_free in Hz. apply (proj1 Hclosed) in Hz. inv Hz.
+      + exfalso. apply (proj1 Hfuns) in Hz. inv Hz.
     - intros x Hx. apply source_ids. apply functions_bound.
       eapply fun_in_fundefs_bound_var_fundefs; [exact Hin |].
       destruct Hx; [right; right; assumption | right; left; assumption].
     - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | exact Hsub].
-    - pose proof (depth_find_def _ _ _ _ _ Hfind). unfold fuel_ratio. lia.
+    - pose proof (depth_find_def _ _ _ _ _ Hfind). unfold fuel_ratio in Hratio. lia.
     - exact Harity.
   Qed.
 
   (* What the proof uses of the main expression *)
-  Lemma source_main_ok : body_ok (fuel_ratio e) tmp (functions e) [] (main_exp e).
+  Lemma source_main_ok :
+    Z.of_nat (length imports) <= max_args ->
+    body_ok ratio tmp (functions e) imports (main_exp e).
   Proof.
-    constructor.
+    intros Harity. constructor.
     - apply main_exp_unique. exact Hub.
-    - constructor.
-    - intros x Hx. split; [intros [] |].
-      destruct (M.get x (fun_arities (functions e))) eqn:Hfx; [| reflexivity]. exfalso.
-      eapply main_exp_disjoint; [exact Hub | exact Hx |].
+    - exact Himports.
+    - intros x Hx. split.
+      + intros Hin. apply (proj2 (Himp x Hin)). apply main_exp_bound. exact Hx.
+      + destruct (M.get x (fun_arities (functions e))) eqn:Hfx; [| reflexivity]. exfalso.
+        eapply main_exp_disjoint; [exact Hub | exact Hx |].
+        apply name_in_fundefs_bound_var_fundefs. apply fun_arities_name. congruence.
+    - intros x Hin. destruct (M.get x (fun_arities (functions e))) eqn:Hfx; [| reflexivity].
+      exfalso. apply (proj2 (Himp x Hin)). apply functions_bound.
       apply name_in_fundefs_bound_var_fundefs. apply fun_arities_name. congruence.
-    - intros x [].
-    - intros x Hx. right. destruct (main_exp_free _ _ Hx) as [Hn | Hfr]; [exact Hn |].
-      apply (proj1 Hclosed) in Hfr. inv Hfr.
-    - intros x [Hx | []]. apply source_ids. apply main_exp_bound. exact Hx.
+    - intros x Hx. destruct (main_exp_free _ _ Hx) as [Hn | Hfr]; [right; exact Hn |].
+      left. apply Hfree. exact Hfr.
+    - intros x [Hx | Hin]; [| exact (proj1 (Himp x Hin))].
+      apply source_ids. apply main_exp_bound. exact Hx.
     - intros e0 He0. apply Hnoprims. eapply rt_trans; [exact He0 | apply main_exp_subterm].
-    - unfold fuel_ratio. lia.
-    - simpl. unfold max_args. lia.
+    - unfold fuel_ratio in Hratio. lia.
+    - exact Harity.
   Qed.
 
   Lemma source_fnames f :
@@ -4032,15 +4149,89 @@ End Source.
 
 (** * The theorems *)
 
-(* The call of the C function of the program [e] with a thread info has the outcome of the
-   evaluation of [e]: it returns the layout of the value, or it runs when [e] runs out of
-   fuel, and it makes at least [c / fuel_ratio e] steps for the fuel [c]. This holds in
-   every global environment [ge] that has the generated functions, for example that of a
-   program linked with the collector. *)
+(* The call of the C function of [e], with the layout of the values [vs] of the imports, has
+   the outcome of the evaluation of [e], and makes at least [c / ratio] steps for the fuel
+   [c]. This holds in every global environment [ge] that has the generated functions. *)
+Theorem unit_correct
+        {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
+  forall nparam prims e cenv tmp ge gc_inv body_id imports ratio rho0 vs,
+    program_ok nparam prims cenv tmp ge body_id imports (functions e) (main_exp e) ->
+    (max_var e 100 < tmp)%positive ->
+    (fuel_ratio e <= ratio)%nat ->
+    (* the source program *)
+    (forall x, bound_var e x -> (100 <= x)%positive) ->
+    unique_bindings e ->
+    no_prims e ->
+    (* its free variables are imports, and only the main expression uses them *)
+    (forall x, occurs_free e x -> In x imports) ->
+    closed_fundefs (functions e) ->
+    NoDup imports ->
+    (forall x, In x imports -> (100 <= x < tmp)%positive /\ ~ bound_var e x) ->
+    get_list imports rho0 = Some vs ->
+    (* the runtime *)
+    collector_ok cenv ge gc_inv ->
+    is_ptr_spec ge ->
+    exists b fn,
+      Genv.find_symbol ge body_id = Some b /\
+      Genv.find_funct_ptr ge b = Some (Internal fn) /\
+      type_of_function fn = fun_ty nparam (length imports) /\
+      forall r (c : fuel) (t : trace),
+        bstep_fuel cenv rho0 e c r t ->
+        forall k ws tb tofs h fs m,
+          tinfo_ok cenv ge gc_inv h fs m tb tofs ->
+          Forall2 (val_rel cenv ge nparam ratio gc_inv (k + to_nat c) h m) vs ws ->
+          args_in_tinfo nparam m tb tofs ws ->
+          call_outcome cenv ge gc_inv r (to_nat c / ratio) (fun _ _ => False)
+                       (fun v h' m' w => val_rel cenv ge nparam ratio gc_inv k h' m' v w)
+                       0 tb tofs fs h m
+                       (Internal fn) (Vptr tb (Ptrofs.repr tofs) :: firstn nparam ws).
+Proof.
+  intros nparam prims e cenv tmp ge gc_inv body_id imports ratio rho0 vs
+         Hprog Htmp Hratio Hids Hub Hnoprims Hfree Hfuns Hnd Himp Hget Hgc Hisptr.
+  assert (Htmp100 : (100 <= tmp)%positive).
+  { pose proof (proj1 acc_leq_max_var_mut e 100%positive). lia. }
+  destruct (prog_body _ _ _ _ _ _ _ _ _ Hprog) as (b & fn & Hb & Hfn & Htf).
+  exists b, fn. split; [exact Hb |]. split; [exact Hfn |].
+  (* the hypotheses on the functions *)
+  assert (Hbodies : forall f t0 ps e',
+             find_def f (functions e) = Some (t0, ps, e') ->
+             body_ok ratio tmp (functions e) ps e').
+  { intros f t0 ps e' Hfind. eapply source_fun_ok; eauto.
+    destruct (prog_funs _ _ _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn' & _ & _ & Htf').
+    apply translate_function_inv in Htf'. exact (proj1 Htf'). }
+  assert (Hmain : body_ok ratio tmp (functions e) imports (main_exp e)).
+  { eapply source_main_ok; eauto.
+    pose proof Htf as Htf'. apply translate_function_inv in Htf'. exact (proj1 Htf'). }
+  assert (Hfnames : forall f, M.get f (fun_arities (functions e)) <> None ->
+                              (100 <= f < tmp)%positive).
+  { intros f Hfn0. eapply source_fnames; eauto. }
+  destruct (main_correct nparam ratio prims cenv tmp (functions e) (main_exp e) rho0 ge
+                         body_id imports gc_inv
+                         Hprog Hgc Hisptr Hbodies Hmain Hfnames Htmp100 fn Htf)
+    as [Hty Hcorrect].
+  split; [exact Hty |].
+  intros r c t Hstep k ws tb tofs h fs m Hti Hws Hargs.
+  destruct (main_exp_step _ _ _ _ _ _ Hstep) as (c' & t' & Hstep' & Hfuel).
+  assert (Hset : set_lists imports vs (def_funs (functions e) (functions e) rho0 rho0)
+                 = Some (def_funs (functions e) (functions e) rho0 rho0)).
+  { apply set_lists_same. rewrite get_list_def_funs; [exact Hget |].
+    intros x Hin Hname. apply (proj2 (Himp x Hin)). apply functions_bound.
+    apply name_in_fundefs_bound_var_fundefs. exact Hname. }
+  eapply call_outcome_le;
+    [| apply (Hcorrect vs _ c' r t' Hset Hstep' k ws tb tofs h fs m Hti)].
+  - assert (Hr : (0 < ratio)%nat) by (unfold fuel_ratio in Hratio; lia).
+    apply Nat.Div0.div_le_upper_bound.
+    pose proof (Nat.mul_succ_div_gt (to_nat c') ratio ltac:(lia)).
+    rewrite Nat.mul_succ_r in *. lia.
+  - eapply Forall2_impl; [| exact Hws]. intros v w Hv. eapply val_rel_mono; [| exact Hv]. lia.
+  - exact Hargs.
+Qed.
+
+(* The same for a program without imports, in the empty environment *)
 Theorem program_correct
         {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
-  forall nparam prims e cenv tmp ge gc_inv,
-    program_ok nparam prims cenv tmp ge (functions e) (main_exp e) ->
+  forall nparam prims e cenv tmp ge gc_inv body_id,
+    program_ok nparam prims cenv tmp ge body_id [] (functions e) (main_exp e) ->
     (max_var e 100 < tmp)%positive ->
     (* the source program *)
     (forall x, bound_var e x -> (100 <= x)%positive) ->
@@ -4051,7 +4242,7 @@ Theorem program_correct
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
     exists b fn,
-      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_symbol ge body_id = Some b /\
       Genv.find_funct_ptr ge b = Some (Internal fn) /\
       type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
       forall r (c : fuel) (t : trace),
@@ -4063,38 +4254,19 @@ Theorem program_correct
                        0 tb tofs fs h m
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
-  intros nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed Hnoprims Hgc Hisptr.
-  assert (Htmp100 : (100 <= tmp)%positive).
-  { pose proof (proj1 acc_leq_max_var_mut e 100%positive). lia. }
-  destruct (prog_body _ _ _ _ _ _ _ Hprog) as (b & fn & Hb & Hfn & Htf).
-  exists b, fn. split; [exact Hb |]. split; [exact Hfn |].
-  (* the hypotheses on the functions *)
-  assert (Hbodies : forall f t0 ps e',
-             find_def f (functions e) = Some (t0, ps, e') ->
-             body_ok (fuel_ratio e) tmp (functions e) ps e').
-  { intros f t0 ps e' Hfind. eapply source_fun_ok; eauto.
-    destruct (prog_funs _ _ _ _ _ _ _ Hprog _ _ _ _ Hfind) as (b' & fn' & _ & _ & Htf').
-    apply translate_function_inv in Htf'. exact (proj1 Htf'). }
-  assert (Hmain : body_ok (fuel_ratio e) tmp (functions e) [] (main_exp e)).
-  { eapply source_main_ok; eauto. }
-  assert (Hfnames : forall f, M.get f (fun_arities (functions e)) <> None ->
-                              (100 <= f < tmp)%positive).
-  { intros f Hfn0. eapply source_fnames; eauto. }
-  pose proof (main_correct nparam (fuel_ratio e) prims cenv tmp (functions e) (main_exp e)
-                           (M.empty val) ge gc_inv
-                           Hprog Hgc Hisptr Hbodies Hmain Hfnames Htmp100 fn) as Hcorrect.
-  split.
-  - (* the type does not depend on the evaluation *)
-    destruct (Hcorrect algebra.zero OOT algebra.zero Htf) as [Hty _]; [| exact Hty].
-    constructor. apply zero_one_lt.
-  - intros r c t Hstep k tb tofs h fs m Hti.
-    destruct (main_exp_step _ _ _ _ _ Hstep) as (c' & t' & Hstep' & Hfuel).
-    destruct (Hcorrect c' r t' Htf Hstep') as [_ Hcall].
-    eapply call_outcome_le; [| apply Hcall; exact Hti].
-    assert (Hr : (0 < fuel_ratio e)%nat) by (unfold fuel_ratio; lia).
-    apply Nat.Div0.div_le_upper_bound.
-    pose proof (Nat.mul_succ_div_gt (to_nat c') (fuel_ratio e) ltac:(lia)).
-    rewrite Nat.mul_succ_r in *. lia.
+  intros nparam prims e cenv tmp ge gc_inv body_id Hprog Htmp Hids Hub Hclosed Hnoprims Hgc Hisptr.
+  destruct (unit_correct nparam prims e cenv tmp ge gc_inv body_id [] (fuel_ratio e)
+                         (M.empty val) [] Hprog Htmp (Nat.le_refl _) Hids Hub Hnoprims)
+    as (b & fn & Hb & Hfn & Hty & Hcall); auto.
+  - intros x Hx. apply (proj1 Hclosed) in Hx. inv Hx.
+  - split; intros x Hx; [| inv Hx]. apply functions_free in Hx. apply (proj1 Hclosed) in Hx.
+    exact Hx.
+  - constructor.
+  - intros x [].
+  - exists b, fn. split; [exact Hb |]. split; [exact Hfn |]. split; [exact Hty |].
+    intros r c t Hstep k tb tofs h fs m Hti.
+    specialize (Hcall r c t Hstep k [] tb tofs h fs m Hti (List.Forall2_nil _)).
+    rewrite firstn_nil in Hcall. apply Hcall. intros i w _ Hw. destruct i; discriminate.
 Qed.
 
 (* A fuel that takes at least [n] steps of the C code *)
@@ -4108,8 +4280,8 @@ Qed.
 (* If the program diverges, the call of its C function runs for any number of steps *)
 Corollary program_diverges
           {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
-  forall nparam prims e cenv tmp ge gc_inv,
-    program_ok nparam prims cenv tmp ge (functions e) (main_exp e) ->
+  forall nparam prims e cenv tmp ge gc_inv body_id,
+    program_ok nparam prims cenv tmp ge body_id [] (functions e) (main_exp e) ->
     (max_var e 100 < tmp)%positive ->
     (forall x, bound_var e x -> (100 <= x)%positive) ->
     unique_bindings e ->
@@ -4119,14 +4291,15 @@ Corollary program_diverges
     is_ptr_spec ge ->
     @diverge cenv fuel _ trace _ (M.empty val) e ->
     exists b fn,
-      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_symbol ge body_id = Some b /\
       Genv.find_funct_ptr ge b = Some (Internal fn) /\
       forall tb tofs h fs m,
         tinfo_ok cenv ge gc_inv h fs m tb tofs ->
         forall n, call_runs ge n m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
-  intros nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed Hnoprims Hgc Hisptr Hdiv.
-  destruct (program_correct nparam prims e cenv tmp ge gc_inv Hprog Htmp Hids Hub Hclosed
+  intros nparam prims e cenv tmp ge gc_inv body_id Hprog Htmp Hids Hub Hclosed Hnoprims Hgc
+         Hisptr Hdiv.
+  destruct (program_correct nparam prims e cenv tmp ge gc_inv body_id Hprog Htmp Hids Hub Hclosed
                             Hnoprims Hgc Hisptr) as (b & fn & Hb & Hfn & _ & Hcall).
   exists b, fn. split; [exact Hb |]. split; [exact Hfn |].
   intros tb tofs h fs m Hti n.
@@ -4135,48 +4308,72 @@ Proof.
   eapply (call_outcome_le cenv ge gc_inv OOT) in Hruns; [exact Hruns | exact Hc].
 Qed.
 
-(* The program of [compile], with the definitions of the structs, has the generated
-   functions. Its collector is an external function. *)
-Lemma compile_program_ok body_name nparam prims e cenv nenv names header prog p :
-  compile body_name nparam prims e cenv nenv = Ret (names, header, prog) ->
-  make_program composites (prog_defs prog) = Ret p ->
-  (forall x, bound_var e x -> (100 <= x)%positive) ->
-  unique_bindings e ->
+(* What the proof uses of a global environment that has the runtime and the functions of
+   the program of [compile]. [tmp] is above the identifiers of [e] and the imports. *)
+Lemma compile_program_ok body_name body_id imports nparam prims e cenv nenv names header prog ge :
+  compile body_name body_id imports nparam prims e cenv nenv = Ret (names, header, prog) ->
+  runtime_ok ge ->
+  has_functions ge (prog_defs prog) ->
   exists tmp,
     (max_var e 100 < tmp)%positive /\
-    program_ok nparam prims cenv tmp (globalenv p) (functions e) (main_exp e).
+    (forall x, In x imports -> (x < tmp)%positive) /\
+    program_ok nparam prims cenv tmp ge body_id imports (functions e) (main_exp e).
 Proof.
-  intros Hcomp Hmk Hids Hub.
+  intros Hcomp Hrt Hhas.
   unfold compile in Hcomp. rewrite ptr64 in Hcomp. cbv beta iota zeta in Hcomp.
   bind_inv_as Hcomp defs Hdefs. bind_inv_as Hcomp prog' Hprog'. bind_inv_as Hcomp header' Hheader.
   apply Ret_inj in Hcomp. assert (Hprog_eq : prog' = prog) by congruence. subst prog'.
-  destruct (make_program_inv _ _ _ Hprog') as [Hdefs_eq _]. rewrite Hdefs_eq in Hmk.
+  destruct (make_program_inv _ _ _ _ Hprog') as [Hdefs_eq _]. rewrite Hdefs_eq in Hhas.
   match type of Hdefs with
-  | translate_program _ _ _ ?x _ = _ => remember x as tmp eqn:Htmp_def
+  | translate_program _ _ _ ?x _ _ _ = _ => remember x as tmp eqn:Htmp_def
   end.
-  exists tmp. split.
+  exists tmp. split; [| split].
   - rewrite Htmp_def. apply Pos.lt_succ_r.
-    eapply Pos.le_trans; [| apply fold_max_ge]. apply fold_max_ge.
-  - exact (translate_program_ok nparam prims cenv tmp e defs p Hdefs Hmk Hub Hids).
+    eapply Pos.le_trans; [| apply fold_max_ge]. eapply Pos.le_trans; [| apply fold_max_ge].
+    apply fold_left_max_ge.
+  - intros x Hin. rewrite Htmp_def. apply Pos.lt_succ_r.
+    eapply Pos.le_trans; [| apply fold_max_ge]. eapply Pos.le_trans; [| apply fold_max_ge].
+    apply fold_left_max_in. exact Hin.
+  - exact (translate_program_ok nparam prims cenv tmp ge body_id imports e defs Hdefs Hrt Hhas).
+Qed.
+
+(* The program of [compile], built with the structs, has the runtime and its own
+   functions. Its collector is an external function. *)
+Lemma compile_alone_ok body_name body_id imports nparam prims e cenv nenv names header prog p :
+  compile body_name body_id imports nparam prims e cenv nenv = Ret (names, header, prog) ->
+  make_program body_id composites (prog_defs prog) = Ret p ->
+  (forall x, bound_var e x -> (100 <= x)%positive) ->
+  unique_bindings e ->
+  body_id_ok e body_id ->
+  runtime_ok (globalenv p) /\ has_functions (globalenv p) (prog_defs prog).
+Proof.
+  intros Hcomp Hmk Hids Hub Hbid.
+  unfold compile in Hcomp. rewrite ptr64 in Hcomp. cbv beta iota zeta in Hcomp.
+  bind_inv_as Hcomp defs Hdefs. bind_inv_as Hcomp prog' Hprog'. bind_inv_as Hcomp header' Hheader.
+  apply Ret_inj in Hcomp. assert (Hprog_eq : prog' = prog) by congruence. subst prog'.
+  destruct (make_program_inv _ _ _ _ Hprog') as [Hdefs_eq _]. rewrite Hdefs_eq in *.
+  destruct (translate_program_names _ _ _ _ _ _ _ _ Hdefs Hub Hids Hbid) as [Hnr Hincl].
+  eapply make_program_ok; eauto.
 Qed.
 
 (* The two theorems for the program of [compile] *)
 Theorem compile_correct
         {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
-  forall body_name nparam prims e cenv nenv names header prog p gc_inv,
-    compile body_name nparam prims e cenv nenv = Ret (names, header, prog) ->
-    make_program composites (prog_defs prog) = Ret p ->
+  forall body_name body_id nparam prims e cenv nenv names header prog p gc_inv,
+    compile body_name body_id [] nparam prims e cenv nenv = Ret (names, header, prog) ->
+    make_program body_id composites (prog_defs prog) = Ret p ->
     let ge := globalenv p in
     (* the source program *)
     (forall x, bound_var e x -> (100 <= x)%positive) ->
     unique_bindings e ->
     closed_exp e ->
     no_prims e ->
+    body_id_ok e body_id ->
     (* the runtime *)
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
     exists b fn,
-      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_symbol ge body_id = Some b /\
       Genv.find_funct_ptr ge b = Some (Internal fn) /\
       type_of_function fn = Tfunction [tptr tinfoT] tvalue cc_default /\
       forall r (c : fuel) (t : trace),
@@ -4188,34 +4385,274 @@ Theorem compile_correct
                        0 tb tofs fs h m
                        (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
-  intros body_name nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
-         Hids Hub Hclosed Hnoprims Hgc Hisptr.
-  destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub) as (tmp & Htmp & Hprog).
+  intros body_name body_id nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
+         Hids Hub Hclosed Hnoprims Hbid Hgc Hisptr.
+  destruct (compile_alone_ok _ _ _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub Hbid) as [Hrt Hhas].
+  destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ _ _ Hcomp Hrt Hhas) as (tmp & Htmp & _ & Hprog).
   eapply program_correct; eauto.
 Qed.
 
 Corollary compile_diverges
           {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
-  forall body_name nparam prims e cenv nenv names header prog p gc_inv,
-    compile body_name nparam prims e cenv nenv = Ret (names, header, prog) ->
-    make_program composites (prog_defs prog) = Ret p ->
+  forall body_name body_id nparam prims e cenv nenv names header prog p gc_inv,
+    compile body_name body_id [] nparam prims e cenv nenv = Ret (names, header, prog) ->
+    make_program body_id composites (prog_defs prog) = Ret p ->
     let ge := globalenv p in
     (forall x, bound_var e x -> (100 <= x)%positive) ->
     unique_bindings e ->
     closed_exp e ->
     no_prims e ->
+    body_id_ok e body_id ->
     collector_ok cenv ge gc_inv ->
     is_ptr_spec ge ->
     @diverge cenv fuel _ trace _ (M.empty val) e ->
     exists b fn,
-      Genv.find_symbol ge bodyId = Some b /\
+      Genv.find_symbol ge body_id = Some b /\
       Genv.find_funct_ptr ge b = Some (Internal fn) /\
       forall tb tofs h fs m,
         tinfo_ok cenv ge gc_inv h fs m tb tofs ->
         forall n, call_runs ge n m (Internal fn) [Vptr tb (Ptrofs.repr tofs)].
 Proof.
-  intros body_name nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
-         Hids Hub Hclosed Hnoprims Hgc Hisptr Hdiv.
-  destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub) as (tmp & Htmp & Hprog).
+  intros body_name body_id nparam prims e cenv nenv names header prog p gc_inv Hcomp Hmk ge
+         Hids Hub Hclosed Hnoprims Hbid Hgc Hisptr Hdiv.
+  destruct (compile_alone_ok _ _ _ _ _ _ _ _ _ _ _ _ Hcomp Hmk Hids Hub Hbid) as [Hrt Hhas].
+  destruct (compile_program_ok _ _ _ _ _ _ _ _ _ _ _ _ Hcomp Hrt Hhas) as (tmp & Htmp & _ & Hprog).
   eapply program_diverges; eauto.
+Qed.
+
+(** * Two programs that are compiled separately *)
+
+Lemma half_div_le (a b r : nat) : (b <= a)%nat -> ((a + b) / (2 * r) <= a / r)%nat.
+Proof.
+  intros Hle. destruct r as [| r]; [simpl; lia |].
+  rewrite <- (Nat.Div0.div_mul_cancel_l a (S r) 2) by lia.
+  apply Nat.Div0.div_le_mono. lia.
+Qed.
+
+(* The environment in which the linked programs evaluate the first one *)
+Definition link_env (lf : fun_tag) (x : var) (e1 e2 : exp) : eval.env :=
+  let f := (max_var e1 (max_var e2 x) + 1)%positive in
+  M.set f (Vfun (M.empty val) (Fcons f lf [] e1 Fnil) f) (M.empty val).
+
+(* The linked programs evaluate [e1], and then [e2] with the value of [e1] in [x]. The
+   two evaluations take the fuel of the whole but two units. *)
+Lemma link_step {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type}
+      {Ht : @trace_resource trace} cenv lf x e1 e2 (c : fuel) r (t : trace) :
+  bstep_fuel cenv (M.empty val) (rel_comp.link lf x e1 e2) c r t ->
+  (r = OOT /\ (to_nat c <= 1)%nat) \/
+  (r = OOT /\ exists (c1 : fuel) (t1 : trace),
+      bstep_fuel cenv (link_env lf x e1 e2) e1 c1 OOT t1 /\
+      to_nat c = (to_nat c1 + 2)%nat) \/
+  (exists v1 (c1 c2 : fuel) (t1 t2 : trace),
+      bstep_fuel cenv (link_env lf x e1 e2) e1 c1 (Res v1) t1 /\
+      bstep_fuel cenv (M.set x v1 (link_env lf x e1 e2)) e2 c2 r t2 /\
+      to_nat c = (to_nat c1 + to_nat c2 + 2)%nat).
+Proof.
+  intros H. unfold rel_comp.link in H. unfold link_env.
+  set (f := (max_var e1 (max_var e2 x) + 1)%positive) in *.
+  inv H.
+  - left. split; [reflexivity |].
+    match goal with [ H0 : algebra.lt _ _ |- _ ] => apply lt_one in H0; subst end.
+    rewrite to_nat_zero. lia.
+  - match goal with [ H0 : bstep _ _ (Efun _ _) _ _ _ |- _ ] => inv H0 end.
+    match goal with [ H0 : bstep_fuel _ _ (Eletapp _ _ _ _ _) _ _ _ |- _ ] => inv H0 end.
+    + left. split; [reflexivity |].
+      match goal with [ H0 : algebra.lt _ _ |- _ ] => apply lt_one in H0; subst end.
+      rewrite to_nat_add, to_nat_zero. unfold one. rewrite to_nat_one. lia.
+    + match goal with [ H0 : bstep _ _ (Eletapp _ _ _ _ _) _ _ _ |- _ ] => inv H0 end;
+        cbn [def_funs] in *;
+        match goal with
+        | [ Hget : M.get f (M.set f _ _) = Some (Vfun _ _ _) |- _ ] =>
+          rewrite M.gss in Hget; inv Hget
+        end;
+        match goal with [ Hl : get_list [] _ = Some _ |- _ ] => cbn [get_list] in Hl; inv Hl end;
+        match goal with
+        | [ Hfd : find_def f (Fcons f _ _ _ Fnil) = Some _ |- _ ] =>
+          cbn [find_def] in Hfd; destruct (M.elt_eq f f) as [_ | Hne]; [| congruence]; inv Hfd
+        end;
+        match goal with
+        | [ Hs : set_lists [] [] _ = Some _ |- _ ] => cbn [set_lists] in Hs; inv Hs
+        end.
+      * right. right. do 5 eexists. split; [eassumption |]. split; [eassumption |].
+        rewrite !to_nat_add. unfold one. rewrite !to_nat_one. lia.
+      * right. left. split; [reflexivity |]. do 2 eexists. split; [eassumption |].
+        rewrite !to_nat_add. unfold one. rewrite !to_nat_one. lia.
+Qed.
+
+(* More than the depth of the functions and of the main expressions of [e1] and [e2] *)
+Definition link_ratio (e1 e2 : exp) : nat := Nat.max (fuel_ratio e1) (fuel_ratio e2).
+
+(* A fuel for which a call of the linked programs takes at least [n] steps *)
+Lemma link_fuel_for_steps {fuel : Type} {Hf : @fuel_resource fuel} e1 e2 (n : nat) :
+  exists c : fuel, (n <= (to_nat c - 2) / (2 * link_ratio e1 e2))%nat.
+Proof.
+  destruct (fuel_of_nat (n * (2 * link_ratio e1 e2) + 2)) as [c Hc]. exists c.
+  rewrite Hc. replace (n * (2 * link_ratio e1 e2) + 2 - 2)%nat
+    with (n * (2 * link_ratio e1 e2))%nat by lia.
+  rewrite Nat.div_mul by (unfold link_ratio, fuel_ratio; lia). apply Nat.le_refl.
+Qed.
+
+Section Linking.
+
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  Context (cenv : ctor_env) (ge : genv) (gc_inv : heap -> mem -> block -> Z -> Prop).
+  Context (nparam ratio : nat).
+
+  (* The call of [fd1] and then the call of [fd2] with its result, for the result [r] of
+     the linked programs: the layout of the value, or one call runs for [lb] steps *)
+  Definition link_outcome (r : @res val) (lb : nat) (k : nat) (tb : block) (tofs : Z)
+             (fs : list frame) (h : heap) (m : mem) (fd1 fd2 : fundef) : Prop :=
+    let tinfo := Vptr tb (Ptrofs.repr tofs) in
+    match r with
+    | Res v =>
+      exists w1 m1 w h' m',
+        (forall k0, is_call_cont k0 ->
+                    star step2 ge (Callstate fd1 [tinfo] k0 m) E0 (Returnstate w1 k0 m1)) /\
+        (forall k0, is_call_cont k0 ->
+                    star step2 ge (Callstate fd2 [tinfo; w1] k0 m1) E0 (Returnstate w k0 m')) /\
+        val_rel cenv ge nparam ratio gc_inv k h' m' v w /\
+        tinfo_ok cenv ge gc_inv h' fs m' tb tofs
+    | OOT =>
+      call_runs ge lb m fd1 [tinfo] \/
+      exists w1 m1,
+        (forall k0, is_call_cont k0 ->
+                    star step2 ge (Callstate fd1 [tinfo] k0 m) E0 (Returnstate w1 k0 m1)) /\
+        call_runs ge lb m1 fd2 [tinfo; w1]
+    end.
+
+End Linking.
+
+(* The calls of the C functions of two programs that are compiled separately, the second
+   with the result of the first for [x], have the outcome of the linked programs. This
+   holds in every global environment that has the functions of both. *)
+Theorem link_correct
+        {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace} :
+  forall nparam prims1 prims2 cenv tmp1 tmp2 ge gc_inv lf x e1 e2 id1 id2,
+    program_ok nparam prims1 cenv tmp1 ge id1 [] (functions e1) (main_exp e1) ->
+    program_ok nparam prims2 cenv tmp2 ge id2 [x] (functions e2) (main_exp e2) ->
+    (max_var e1 100 < tmp1)%positive ->
+    (max_var e2 100 < tmp2)%positive ->
+    (* [x] is a C argument of the second function *)
+    (0 < nparam)%nat ->
+    (* the first program *)
+    (forall y, bound_var e1 y -> (100 <= y)%positive) ->
+    unique_bindings e1 ->
+    closed_exp e1 ->
+    no_prims e1 ->
+    (* the second program, which uses [x] in its main expression only *)
+    (forall y, bound_var e2 y -> (100 <= y)%positive) ->
+    unique_bindings e2 ->
+    no_prims e2 ->
+    occurs_free e2 \subset [set x] ->
+    closed_fundefs (functions e2) ->
+    (100 <= x < tmp2)%positive ->
+    ~ bound_var e2 x ->
+    (* the runtime *)
+    collector_ok cenv ge gc_inv ->
+    is_ptr_spec ge ->
+    exists b1 fn1 b2 fn2,
+      Genv.find_symbol ge id1 = Some b1 /\
+      Genv.find_funct_ptr ge b1 = Some (Internal fn1) /\
+      Genv.find_symbol ge id2 = Some b2 /\
+      Genv.find_funct_ptr ge b2 = Some (Internal fn2) /\
+      forall r (c : fuel) (t : trace),
+        bstep_fuel cenv (M.empty val) (rel_comp.link lf x e1 e2) c r t ->
+        forall k tb tofs h fs m,
+          tinfo_ok cenv ge gc_inv h fs m tb tofs ->
+          link_outcome cenv ge gc_inv nparam (link_ratio e1 e2) r
+                       ((to_nat c - 2) / (2 * link_ratio e1 e2)) k tb tofs fs h m
+                       (Internal fn1) (Internal fn2).
+Proof.
+  intros nparam prims1 prims2 cenv tmp1 tmp2 ge gc_inv lf x e1 e2 id1 id2
+         Hprog1 Hprog2 Htmp1 Htmp2 Hnparam Hids1 Hub1 Hcl1 Hnp1 Hids2 Hub2 Hnp2 Hfree2 Hfuns2
+         Hx Hxb Hgc Hisptr.
+  remember (link_ratio e1 e2) as ratio eqn:Hratio.
+  assert (Hr1 : (fuel_ratio e1 <= ratio)%nat) by (subst ratio; unfold link_ratio; lia).
+  assert (Hr2 : (fuel_ratio e2 <= ratio)%nat) by (subst ratio; unfold link_ratio; lia).
+  (* the first program, in the environment of the linked programs *)
+  destruct (unit_correct nparam prims1 e1 cenv tmp1 ge gc_inv id1 [] ratio
+                         (link_env lf x e1 e2) [] Hprog1 Htmp1 Hr1 Hids1 Hub1 Hnp1)
+    as (b1 & fn1 & Hb1 & Hfn1 & _ & Hcall1); auto.
+  { intros y Hy. apply (proj1 Hcl1) in Hy. inv Hy. }
+  { split; intros y Hy; [| inv Hy]. apply functions_free in Hy. apply (proj1 Hcl1) in Hy.
+    exact Hy. }
+  { constructor. }
+  { intros y []. }
+  destruct (prog_body _ _ _ _ _ _ _ _ _ Hprog2) as (b2 & fn2 & Hb2 & Hfn2 & _).
+  exists b1, fn1, b2, fn2.
+  split; [exact Hb1 |]. split; [exact Hfn1 |]. split; [exact Hb2 |]. split; [exact Hfn2 |].
+  intros r c t Hstep k tb tofs h fs m Hti.
+  assert (Hnil : args_in_tinfo nparam m tb tofs []).
+  { intros i w _ Hw. destruct i; discriminate. }
+  assert (Hfirst : forall w : Values.val, firstn nparam [w] = [w]).
+  { intros w. destruct nparam; [lia |]. simpl. now rewrite firstn_nil. }
+  (* the second program, once the first has returned [v1] *)
+  assert (Hcall2 : forall v1 r2 (c2 : fuel) (t2 : trace),
+             bstep_fuel cenv (M.set x v1 (link_env lf x e1 e2)) e2 c2 r2 t2 ->
+             forall k2 w1 h1 m1,
+               tinfo_ok cenv ge gc_inv h1 fs m1 tb tofs ->
+               val_rel cenv ge nparam ratio gc_inv (k2 + to_nat c2) h1 m1 v1 w1 ->
+               call_outcome cenv ge gc_inv r2 (to_nat c2 / ratio) (fun _ _ => False)
+                            (fun v h' m' w => val_rel cenv ge nparam ratio gc_inv k2 h' m' v w)
+                            0 tb tofs fs h1 m1
+                            (Internal fn2) [Vptr tb (Ptrofs.repr tofs); w1]).
+  { intros v1 r2 c2 t2 Hstep2 k2 w1 h1 m1 Hti1 Hv1.
+    destruct (unit_correct nparam prims2 e2 cenv tmp2 ge gc_inv id2 [x] ratio
+                           (M.set x v1 (link_env lf x e1 e2)) [v1]
+                           Hprog2 Htmp2 Hr2 Hids2 Hub2 Hnp2)
+      as (b2' & fn2' & Hb2' & Hfn2' & _ & Hc2); auto.
+    - intros y Hy. apply Hfree2 in Hy. inv Hy. now left.
+    - constructor; [intros [] | constructor].
+    - intros y [<- | []]. split; [exact Hx | exact Hxb].
+    - cbn [get_list]. rewrite M.gss. reflexivity.
+    - assert (b2' = b2) by congruence. subst b2'.
+      assert (fn2' = fn2) by congruence. subst fn2'.
+      specialize (Hc2 r2 c2 t2 Hstep2 k2 [w1] tb tofs h1 fs m1 Hti1).
+      rewrite Hfirst in Hc2. apply Hc2.
+      + constructor; [exact Hv1 | constructor].
+      + intros i w Hi Hw. destruct i; [lia |]. destruct i; discriminate. }
+  destruct (link_step _ _ _ _ _ _ _ _ Hstep)
+    as [[-> Hc] | [[-> (c1 & t1 & Hstep1 & Hc)]
+                  | (v1 & c1 & c2 & t1 & t2 & Hstep1 & Hstep2 & Hc)]].
+  - (* no fuel to start *)
+    left. replace (to_nat c - 2)%nat with 0%nat by lia. rewrite Nat.Div0.div_0_l.
+    intros k0 Hk0. eexists. exists 0%nat. split; [lia | constructor].
+  - (* the first program runs out of fuel *)
+    left.
+    pose proof (Hcall1 OOT c1 t1 Hstep1 0%nat [] tb tofs h fs m Hti (List.Forall2_nil _) Hnil)
+      as H1.
+    rewrite firstn_nil in H1.
+    eapply (call_outcome_le cenv ge gc_inv OOT) in H1; [exact H1 |].
+    rewrite Hc. replace (to_nat c1 + 2 - 2)%nat with (to_nat c1 + 0)%nat by lia.
+    apply half_div_le. lia.
+  - (* the first program returns [v1] *)
+    destruct r as [| v].
+    + (* the second program runs out of fuel *)
+      pose proof (Hcall1 (Res v1) c1 t1 Hstep1 (to_nat c2) [] tb tofs h fs m Hti
+                         (List.Forall2_nil _) Hnil) as H1.
+      rewrite firstn_nil in H1. destruct H1 as (w1 & h1 & m1 & Hsteps1 & Hv1 & Hti1 & _ & _).
+      destruct (Nat.le_gt_cases (to_nat c2) (to_nat c1)) as [Hle | Hgt].
+      * left. intros k0 Hk0. destruct (Hsteps1 k0 Hk0) as (n & Hn & Hs).
+        exists (Returnstate w1 k0 m1), n. split; [| exact Hs].
+        eapply Nat.le_trans; [| exact Hn]. rewrite Hc.
+        replace (to_nat c1 + to_nat c2 + 2 - 2)%nat with (to_nat c1 + to_nat c2)%nat by lia.
+        apply half_div_le. exact Hle.
+      * right. exists w1, m1. split.
+        -- intros k0 Hk0. eapply steps_star. apply Hsteps1. exact Hk0.
+        -- pose proof (Hcall2 v1 OOT c2 t2 Hstep2 0%nat w1 h1 m1 Hti1 Hv1) as H2.
+           eapply (call_outcome_le cenv ge gc_inv OOT) in H2; [exact H2 |].
+           rewrite Hc.
+           replace (to_nat c1 + to_nat c2 + 2 - 2)%nat with (to_nat c2 + to_nat c1)%nat by lia.
+           apply half_div_le. lia.
+    + (* the second program returns [v] *)
+      pose proof (Hcall1 (Res v1) c1 t1 Hstep1 (k + to_nat c2)%nat [] tb tofs h fs m Hti
+                         (List.Forall2_nil _) Hnil) as H1.
+      rewrite firstn_nil in H1. destruct H1 as (w1 & h1 & m1 & Hsteps1 & Hv1 & Hti1 & _ & _).
+      destruct (Hcall2 v1 (Res v) c2 t2 Hstep2 k w1 h1 m1 Hti1 Hv1)
+        as (w & h' & m' & Hsteps2 & Hv & Hti' & _ & _).
+      exists w1, m1, w, h', m'. split; [| split; [| split]].
+      * intros k0 Hk0. eapply steps_star. apply Hsteps1. exact Hk0.
+      * intros k0 Hk0. eapply steps_star. apply Hsteps2. exact Hk0.
+      * exact Hv.
+      * exact Hti'.
 Qed.

@@ -44,17 +44,17 @@ Definition frameId      : ident := 16%positive.
 Definition rootsId      : ident := 17%positive.
 Definition resultId     : ident := 18%positive.
 Definition boxedId      : ident := 19%positive.
-(* The function for the main expression, and the entry point of the Clight program *)
+(* The function for the main expression of a program that is compiled alone *)
 Definition bodyId       : ident := 20%positive.
 Definition mainId       : ident := 21%positive.
 
-Definition reserved_names (body_name : string) : list (ident * string) :=
+Definition reserved_names (body_id : ident) (body_name : string) : list (ident * string) :=
   [ (threadInfoId, "thread_info"); (allocId, "alloc"); (limitId, "limit"); (heapId, "heap");
     (argsId, "args"); (fpId, "fp"); (nallocId, "nalloc"); (odataId, "odata");
     (stackFrameId, "stack_frame"); (nextId, "next"); (rootId, "root"); (prevId, "prev");
     (gcArgsId, "garbage_collect_args"); (isPtrId, "certirocq_is_ptr");
     (tinfoId, "tinfo"); (frameId, "frame"); (rootsId, "roots"); (resultId, "result");
-    (boxedId, "boxed"); (bodyId, body_name); (mainId, "main") ].
+    (boxedId, "boxed"); (body_id, body_name); (mainId, "main") ].
 
 (** * C types *)
 
@@ -869,50 +869,56 @@ Definition runtime_defs : list (ident * globdef fundef type) :=
     (isPtrId, external "certirocq_is_ptr" is_ptr_params tbool) ].
 
 (* The printed programs have no [types]: the printed file includes [gc_stack.h] *)
-Definition make_program (types : list composite_definition)
+Definition make_program (body_id : ident) (types : list composite_definition)
            (defs : list (ident * globdef fundef type)) : error Clight.program :=
-  match Ctypes.make_program types defs [bodyId] mainId with
+  match Ctypes.make_program types defs [body_id] mainId with
   | Errors.OK p => Ret p
   | Errors.Error _ => Err "Codegen: could not build the Clight program"
   end.
 
 (* The names for printing. Pipeline names get their identifier as a suffix. *)
-Definition make_names (body_name : string) (tmps : list ident) (nenv : name_env) : name_env :=
+Definition make_names (body_id : ident) (body_name : string) (tmps : list ident)
+           (nenv : name_env) : name_env :=
   let nenv := fold_left (fun m x => M.set x (nNamed "tmp") m) tmps nenv in
   let nenv := M.map (fun x n => match n with
                                 | nAnon => nAnon
                                 | nNamed s => nNamed (s ++ "_" ++ show_pos x)
                                 end) nenv in
-  fold_left (fun m d => M.set (fst d) (nNamed (snd d)) m) (reserved_names body_name) nenv.
+  fold_left (fun m d => M.set (fst d) (nNamed (snd d)) m)
+            (reserved_names body_id body_name) nenv.
 
-(* The functions of the runtime, the functions of [e] and the function for its main
-   expression *)
+(* The functions of the runtime, the functions of [e] and the function [body_id] for its
+   main expression. The free variables [imports] of [e] are the parameters of [body_id]. *)
 Definition translate_program (nparam : nat) (prims : M.t primitive) (cenv : ctor_env)
-           (tmp : positive) (e : exp) : error (list (ident * globdef fundef type)) :=
+           (tmp : positive) (body_id : ident) (imports : list var) (e : exp)
+  : error (list (ident * globdef fundef type)) :=
   let '(fds, main) := match e with
                       | Efun fds main => (fds, main)
                       | _ => (Fnil, e)
                       end in
   let fenv := fun_arities fds in
   funs <- translate_fundefs nparam prims cenv fenv tmp fds ;;
-  body <- translate_function nparam prims cenv fenv tmp None [] main ;;
-  ret (runtime_defs ++ funs ++ [(bodyId, Gfun (Internal body))])%list.
+  body <- translate_function nparam prims cenv fenv tmp None imports main ;;
+  ret (runtime_defs ++ funs ++ [(body_id, Gfun (Internal body))])%list.
 
-(* Returns the names for printing, the header program and the program *)
-Definition compile (body_name : string) (nparam : nat) (prims : M.t primitive) (e : exp)
-           (cenv : ctor_env) (nenv : name_env)
+(* Returns the names for printing, the header program and the program. A program that is
+   compiled alone has the function [bodyId] and no [imports]. *)
+Definition compile (body_name : string) (body_id : ident) (imports : list var) (nparam : nat)
+           (prims : M.t primitive) (e : exp) (cenv : ctor_env) (nenv : name_env)
   : error (name_env * Clight.program * Clight.program) :=
   if Archi.ptr64 then
-    (* An identifier above those of the program, the primitives and the names *)
+    (* An identifier above those of the program, the imports, the primitives and the names *)
     let top := M.fold (fun m x _ => Pos.max m x) nenv
-                      (M.fold (fun m x _ => Pos.max m x) prims (max_var e 100%positive)) in
+                      (M.fold (fun m x _ => Pos.max m x) prims
+                              (fold_left Pos.max imports (max_var e 100%positive))) in
     let tmp := Pos.succ top in
     let ntmps := match e with
                  | Efun fds _ => max_arity fds
                  | _ => 0%nat
                  end in
-    defs <- translate_program nparam prims cenv tmp e ;;
-    prog <- make_program [] defs ;;
-    header <- make_program [] [(bodyId, external body_name [tptr tinfoT] tvalue)] ;;
-    ret (make_names body_name (idents_from tmp ntmps) nenv, header, prog)
+    defs <- translate_program nparam prims cenv tmp body_id imports e ;;
+    prog <- make_program body_id [] defs ;;
+    let params := tptr tinfoT :: repeat tvalue (Nat.min (length imports) nparam) in
+    header <- make_program body_id [] [(body_id, external body_name params tvalue)] ;;
+    ret (make_names body_id body_name (idents_from tmp ntmps) nenv, header, prog)
   else Err "Codegen: only 64-bit targets are supported".
