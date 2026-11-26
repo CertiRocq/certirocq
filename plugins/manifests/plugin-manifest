@@ -260,6 +260,7 @@ Inlining
 ConstsToValues
 ImplementBox
 ImplementLazyForce
+CheckWellformed
 Erasure0
 
 ZArith_dec

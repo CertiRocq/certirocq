@@ -11,6 +11,7 @@ Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
 From MetaRocq.Erasure Require Import EAst Erasure.
 From MetaRocq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import CheckWellformed.
 From MetaRocq.Utils Require Import MRString.
 From CertiRocq Require Import metarocq_pipeline.
 Import Monads.
