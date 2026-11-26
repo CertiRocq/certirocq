@@ -13,6 +13,8 @@ Import ListNotations.
 From MetaRocq.Erasure Require Import EProgram ERemapInductives EBeta.
 From MetaRocq.Common Require Import Transform.
 From MetaRocq.ErasurePlugin Require Import ETransform.
+From MetaRocq.ErasurePlugin.transforms Require Import RebuildWfEnv CoInductiveToInductive
+  Unboxing ConstsToValues ImplementBox ImplementLazyForce.
 Import Transform.
 
 Import EWellformed.
