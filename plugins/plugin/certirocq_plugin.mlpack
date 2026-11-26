@@ -249,6 +249,13 @@ Anf
 Anf_convert_env
 Cps
 Merge_dup_funs
+Freshen
+Case_inline
+Eta_rec
+Apply_n
+Specialize
+Unthunk
+Lift_literals
 Toplevel
 Toplevel0
 Ssrnat

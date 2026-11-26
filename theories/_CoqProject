@@ -81,6 +81,12 @@ LambdaANF/lambda_lifting_corresp.v
 LambdaANF/inline.v
 LambdaANF/inline_correct.v
 LambdaANF/merge_dup_funs.v
+LambdaANF/case_inline.v
+LambdaANF/eta_rec.v
+LambdaANF/apply_n.v
+LambdaANF/specialize.v
+LambdaANF/unthunk.v
+LambdaANF/lift_literals.v
 LambdaANF/merge_dup_funs_correct.v
 LambdaANF/toplevel.v
 LambdaANF/toplevel_theorems.v

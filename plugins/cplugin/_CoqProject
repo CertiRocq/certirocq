@@ -47,6 +47,8 @@ extraction/anf.ml
 extraction/anf.mli
 extraction/anf_convert_env.ml
 extraction/anf_convert_env.mli
+extraction/apply_n.ml
+extraction/apply_n.mli
 extraction/archi.ml
 extraction/archi.mli
 extraction/ascii.ml
@@ -89,6 +91,8 @@ extraction/bytestring.ml
 extraction/bytestring.mli
 extraction/cRelationClasses.ml
 extraction/cRelationClasses.mli
+extraction/case_inline.ml
+extraction/case_inline.mli
 extraction/classes1.ml
 extraction/classes1.mli
 extraction/classes2.ml
@@ -211,6 +215,8 @@ extraction/errors0.ml
 extraction/errors0.mli
 extraction/etaExpand.ml
 extraction/etaExpand.mli
+extraction/eta_rec.ml
+extraction/eta_rec.mli
 extraction/eval.ml
 extraction/eval.mli
 extraction/exAst.ml
@@ -233,6 +239,8 @@ extraction/floatOps.ml
 extraction/floatOps.mli
 extraction/floats.ml
 extraction/floats.mli
+extraction/freshen.ml
+extraction/freshen.mli
 extraction/globalenvs.ml
 extraction/globalenvs.mli
 extraction/glue.ml
@@ -275,6 +283,8 @@ extraction/lambdaANF_to_Clight.ml
 extraction/lambdaANF_to_Clight.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
+extraction/lift_literals.ml
+extraction/lift_literals.mli
 extraction/list0.ml
 extraction/list0.mli
 extraction/listDef.ml
@@ -451,6 +461,8 @@ extraction/smallstep.ml
 extraction/smallstep.mli
 extraction/specFloat.ml
 extraction/specFloat.mli
+extraction/specialize.ml
+extraction/specialize.mli
 extraction/specif.ml
 extraction/specif.mli
 extraction/ssrbool.ml
@@ -491,6 +503,8 @@ extraction/univLoopChecking.ml
 extraction/univLoopChecking.mli
 extraction/universes0.ml
 extraction/universes0.mli
+extraction/unthunk.ml
+extraction/unthunk.mli
 extraction/utils.ml
 extraction/utils.mli
 extraction/values0.ml
