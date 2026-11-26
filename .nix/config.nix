@@ -28,7 +28,7 @@
       ExtLib.job = false;
       ExtLib.override.version = "0.13.0";
       metarocq.job = true;
-      metarocq.override.version = "step-index-fuel-costs"; # TODO: back to "9.1" once MetaRocq/metarocq#1342 is merged
+      metarocq.override.version = "9.1";
       # Built against the cached CertiRocq package, see its overlay.
       CertiRocq-bootstrap.job = true;
     }; rocqPackages = {
