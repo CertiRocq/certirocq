@@ -1299,7 +1299,10 @@ Section Closure_conversion_correct.
       (forall k rho1 rho2,
           cc_approx_env_P cenv clo_tag (occurs_free e) k boundG rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
-          cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho1) (e', rho2)).
+          cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho1) (e', rho2)) /\
+      (* the new bound variables are fresh identifiers *)
+      bound_var e' \subset bound_var e :|: (fun x => (next_var c <= x)%positive) /\
+      (next_var c <= next_var c')%positive.
   Proof.
     intros Hun Hdis Hlt. unfold closure_conversion_top.
     set (fvmap := populate_map (exp_fv e) (Maps.PTree.empty VarInfo)).
@@ -1311,6 +1314,9 @@ Section Closure_conversion_correct.
     { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
 
     assert (Hlt''' : (G < next_var c1)%positive).
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
+
+    assert (HleG : (next_var c <= G)%positive).
     { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
 
 
@@ -1385,7 +1391,7 @@ Section Closure_conversion_correct.
     { eapply Closure_conversion_occurs_free_toplevel; try eassumption.
       tci. eapply unique_bindings_fundef_names_unique_mut. eassumption. }
 
-    do 2 eexists. split; [| split; [| split; [| split; [| split; [| split ]]]]].
+    do 2 eexists. split; [| split; [| split; [| split; [| split; [| split; [| split; [| split ]]]]]]].
     - reflexivity.
     - rewrite H0. eassumption.
     - rewrite (H0 e'). eassumption.
@@ -1423,6 +1429,11 @@ Section Closure_conversion_correct.
       eapply Closure_conversion_correct_top; try eassumption.
       intros Hn.
       eapply bound_var_leq_max_var with (y := 1%positive) in Hn. unfold Ensembles.In in *. zify. lia.
+    - rewrite (H0 e'). intros z Hz. eapply bound_var_app_ctx in Hz. destruct Hz as [z Hz | z Hz].
+      + right. eapply H2 in Hz. unfold Ensembles.In, Range in *. zify; lia.
+      + eapply H4 in Hz. destruct Hz as [z Hz | z Hz]; [ now left | right ].
+        unfold Ensembles.In, Range in *. zify; lia.
+    - destruct c2. simpl in *. zify; lia.
   Qed.
 
 End Closure_conversion_correct.

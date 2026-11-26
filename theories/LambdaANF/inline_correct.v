@@ -2429,7 +2429,10 @@ Section Inline_correct.
       (max_var e' 1%positive) < (next_var c') /\
       (forall k rho1 rho2,
           preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-          preord_exp cenv P PG k (e, rho1) (e', rho2)).
+          preord_exp cenv P PG k (e, rho1) (e', rho2)) /\
+      (* all bound variables are renamed above [z] *)
+      (forall x, x \in bound_var e' -> z < x) /\
+      z < next_var c'.
   Proof.
     intros Hun Hdis. edestruct (inline_correct_mut d) as [He _]. eassumption.
     unfold inline_top', triple in *.
@@ -2490,7 +2493,7 @@ Section Inline_correct.
     destruct e0. contradiction. destructAll.
 
     destruct p. destruct i. do 3 eexists.
-    split; [| split; [| split; [| split; [| split ]]]].
+    split; [| split; [| split; [| split; [| split; [| split; [| split ]]]]]].
     - reflexivity.
     - eassumption.
     - eapply Included_trans. eassumption. rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty.
@@ -2516,6 +2519,11 @@ Section Inline_correct.
       eapply preord_exp_post_monotonic. eassumption.
       eapply H5; eauto.
       intros x Hin. unfold id. now eauto.
+    - intros x Hin. eapply H3 in Hin. unfold Ensembles.In, Range in Hin.
+      simpl in *. inv Hnames. simpl in *.
+      destruct (set_util.PS.max_elt (exp_fv e)); zify; lia.
+    - simpl in *. inv Hnames. simpl in *.
+      destruct (set_util.PS.max_elt (exp_fv e)); zify; lia.
   Qed.
 
 End Inline_correct.

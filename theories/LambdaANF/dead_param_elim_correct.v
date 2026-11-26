@@ -1347,7 +1347,10 @@ Section Correct.
       (forall k rho1 rho2,
           preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
-          preord_exp cenv PL PG k (e, rho1) (e', rho2)).
+          preord_exp cenv PL PG k (e, rho1) (e', rho2)) /\
+      (* no new bound variables, no fresh identifier taken *)
+      bound_var e' \subset bound_var e /\
+      next_var c' = next_var c.
   Proof.
     intros Hun Hleq Hdis. unfold DPE.
 
@@ -1361,10 +1364,13 @@ Section Correct.
                   (max_var e' 1 < next_var c')%positive /\
                   (forall (k : nat) (rho1 rho2 : env),
                       preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
-    { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2)) /\
+                  bound_var e' \subset bound_var e /\
+                  next_var c' = next_var c).
+    { do 2 eexists. split; [| split; [| split; [| split; [| split; [| split; [| split ] ] ] ]]]; eauto; sets.
       now destruct c; eauto.
-      intros. eapply preord_exp_refl; eauto. }
+      intros. eapply preord_exp_refl; eauto.
+      now destruct c. }
 
     assert (Hid' :
               exists (e' : exp) (c' : comp_data),
@@ -1375,8 +1381,10 @@ Section Correct.
                   (max_var e' 1 < next_var c')%positive /\
                   (forall (k : nat) (rho1 rho2 : env),
                       preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
-    { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2)) /\
+                  bound_var e' \subset bound_var e /\
+                  next_var c' = next_var c).
+    { do 2 eexists. split; [| split; [| split; [| split; [| split; [| split; [| split ] ] ] ]]]; eauto; sets.
       intros. eapply preord_exp_refl; eauto. }
 
     destruct (is_hoisted e) eqn:Hhoist; [ | now eauto ].
@@ -1410,18 +1418,18 @@ Section Correct.
     contradiction. destructAll.
 
     (* bound_var *)
-    assert (Hbe := Elim_exp_bound_var _ _ _ _ H12).
-    assert (Hbf := Elim_fundefs_bound_var _ _ _ _ H11).
+    assert (Hbe := Elim_exp_bound_var _ _ _ _ H14).
+    assert (Hbf := Elim_fundefs_bound_var _ _ _ _ H13).
     (* unique bindings *)
     inv Hun.
-    assert (Hue := Elim_exp_unique_bindings _ _ _ _ H12 H14).
-    assert (Huf := Elim_fundefs_unique_bindings _ _ _ _ H11 H15).
+    assert (Hue := Elim_exp_unique_bindings _ _ _ _ H14 H16).
+    assert (Huf := Elim_fundefs_unique_bindings _ _ _ _ H13 H17).
     (* free vars *)
-    assert (Hfve := Elim_exp_occurs_free _ _ _ _ H12).
-    assert (Hfvf := Elim_fundefs_occurs_free _ _ _ _ H11 H7).
+    assert (Hfve := Elim_exp_occurs_free _ _ _ _ H14).
+    assert (Hfvf := Elim_fundefs_occurs_free _ _ _ _ H13 H9).
 
 
-    do 2 eexists.  split; [| split; [| split; [| split; [| split ] ]]].
+    do 2 eexists.  split; [| split; [| split; [| split; [| split; [| split; [| split ] ] ] ]]].
     - reflexivity.
     - econstructor; eauto.
       eapply Disjoint_Included. eassumption. eassumption. sets.
@@ -1438,9 +1446,9 @@ Section Correct.
 
     - (* Semantic correctness *)
       intros k rho1 rho2 Henv Hbin.
-      inv H9.
+      inv H11.
 
-      eapply Elim_fundefs_correct in H11; try eauto.
+      eapply Elim_fundefs_correct in H13; try eauto.
       2:{ sets. }
       2:{ eapply preord_env_P_antimon. eassumption. normalize_occurs_free. sets. }
       destructAll.
@@ -1458,6 +1466,8 @@ Section Correct.
           eapply preord_env_P_monotonic; [| eassumption ]. lia.
           repeat normalize_sets. eapply Included_Setminus_compat; sets.
           rewrite Union_Setminus_Included; sets. tci.
+    - repeat normalize_bound_var. sets.
+    - congruence.
   Qed.
 
 End Correct.
