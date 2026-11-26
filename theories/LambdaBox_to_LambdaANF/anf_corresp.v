@@ -697,6 +697,7 @@ Section Corresp.
       (* Decompose wellformed: has_tFix && forallb isLambda && wf_fix_gen *)
       apply Bool.andb_true_iff in Hwf as [Hwf_lhs Hwf_fix].
       apply Bool.andb_true_iff in Hwf_lhs as [_ Hwf_lam].
+      rewrite forallb_isLambda_no_lazy in Hwf_lam.
       (* wf_fix_gen gives: idx < length mfix && forallb test_def mfix *)
       (* We need to extract these from Hwf_fix *)
       (* Step 1: add_fix_names *)

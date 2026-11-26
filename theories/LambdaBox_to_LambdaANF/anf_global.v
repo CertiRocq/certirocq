@@ -39,7 +39,7 @@ Section ValRelWeaken.
   Context (func_tag default_tag : positive)
           (tgm : conId_map).
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HNLF : NoLazyForce efl}.
 
   Let Hf_src := LambdaBox_resource_fuel.
   Let Ht_src := LambdaBox_resource_trace.
@@ -119,7 +119,7 @@ Section ValRelWeaken.
     (* Restrict eval from Σ_full to Σ_tail *)
     assert (Hwf_body : wellformed Σ_tail 0 body = true).
     { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl Hbody). }
-    exact (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src Σ_full Σ_tail
+    exact (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src Σ_full Σ_tail
                     [] body (fuel_sem.Val v_i) f0 t0 Hwf_tail Hext
                     ltac:(constructor) Hwf_body Heval_full)).
   Qed.
@@ -442,7 +442,7 @@ Section ValRelWeaken.
               unfold declared_constant. exact Hlk_some. }
           (* Apply eval_preserves_wf_restricted to get well_formed_val Σ' *)
           assert (Hwf_src : well_formed_val Σ' src_v).
-          { eapply (@eval_preserves_wf_restricted _ _ Hf_src Ht_src Σ_full Σ');
+          { eapply (@eval_preserves_wf_restricted _ _ _ Hf_src Ht_src Σ_full Σ');
               [exact Hwf' | exact Hext_full | constructor | exact Hwf_body_Σ' | exact Heval_full]. }
           (* Apply outer IH *)
           eapply IH; [exact Hwf_src | exact Hrel_full].
@@ -526,7 +526,7 @@ Section ValRelWeaken.
             - eapply (wf_glob_globals_wf Σ' Hwf' k decl body); [| exact Hbody].
               unfold declared_constant. exact Hlk_some. }
           assert (Hwf_src : well_formed_val Σ' src_v).
-          { eapply (@eval_preserves_wf_restricted _ _ Hf_src Ht_src Σ_full Σ');
+          { eapply (@eval_preserves_wf_restricted _ _ _ Hf_src Ht_src Σ_full Σ');
               [exact Hwf' | exact Hext_full | constructor | exact Hwf_body_Σ' | exact Heval_full]. }
           eapply IH; [exact Hwf_src | exact Hrel_full].
       + (* Prim_v *)
@@ -651,7 +651,7 @@ Section GlobalBindingsCorrect.
 
   Let cvt_correct :=
     @anf_cvt_correct func_tag default_tag kon_tag
-      tgm cmap cenv Σ _ dcon_to_tag_inj
+      tgm cmap cenv Σ _ _ dcon_to_tag_inj
       cenv_tgm_coh Hcmap_eval_coherent
       Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists.
 
@@ -806,7 +806,7 @@ Section GlobalBindingsCorrect.
       destruct (Hglob_term _ _ _ Hlk_full Hbody0) as [src_v0 [f0 [t0 Heval_full]]].
       assert (Hwf_body0 : wellformed Σ_proc 0 body0 = true).
       { eapply wf_glob_globals_wf; eauto. }
-      pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+      pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                            Σ Σ_proc
                            [] body0 (fuel_sem.Val src_v0) f0 t0
                            Hwf_proc Hext_proc ltac:(constructor)
@@ -858,7 +858,7 @@ Section GlobalBindingsCorrect.
     assert (Henv : env_rel_at cm_acc Σ_proc [] [] rho) by constructor.
     assert (Hwfe : well_formed_env Σ_proc []) by constructor.
     assert (Hwf_src : well_formed_val Σ_proc src_v).
-    { eapply eval_preserves_wf; [exact Hglob_wf_proc | constructor | exact Hwf | exact Heval]. }
+    { eapply (eval_preserves_wf _); [exact Hglob_wf_proc | constructor | exact Hwf | exact Heval]. }
     assert (Hwf_src_full : well_formed_val Σ src_v).
     { eapply well_formed_val_extends; eauto. }
     destruct (val_rel_exists src_v Hwf_src_full) as [anf_v Hrel_v].
@@ -866,7 +866,7 @@ Section GlobalBindingsCorrect.
     { eapply anf_val_rel_weaken; eauto. }
     pose proof (@anf_cvt_correct
                   func_tag default_tag kon_tag
-                  tgm cm_acc cenv Σ_proc _ dcon_to_tag_inj
+                  tgm cm_acc cenv Σ_proc _ _ dcon_to_tag_inj
                   cenv_tgm_coh Hcoh_acc
                   Hglob_term_proc Hglob_fuel_zero_proc Hglob_wf_proc Hval_rel_exists_acc
                   [] body (fuel_sem.Val src_v) f t Heval)
@@ -1088,7 +1088,7 @@ Section GlobalBindingsCorrect.
     { eapply declared_constant_cons_inv_neq; eauto. }
     assert (Hwf_body1_tail : wellformed Σ_tail 0 body1 = true).
     { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl1_tail Hbody1). }
-    pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+    pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                          ((k, d) :: Σ_tail) Σ_tail
                          [] body1 (fuel_sem.Val src_v) f t
                          Hwf_tail Hext_tail ltac:(constructor)
@@ -1261,11 +1261,11 @@ Section GlobalBindingsCorrect.
         { eapply eval_env_fuel_extends; eauto. }
         pose proof (Hrel0 _ _ _ Heval_full) as Hrel_full.
         assert (Hwf_src1 : well_formed_val Σ_proc src_v1).
-        { eapply eval_preserves_wf; [exact (wf_glob_globals_wf Σ_proc Hwf_proc) | constructor | | exact Heval_proc].
+        { eapply (eval_preserves_wf _); [exact (wf_glob_globals_wf Σ_proc Hwf_proc) | constructor | | exact Heval_proc].
           exact (wf_glob_globals_wf Σ_proc Hwf_proc _ _ _ Hdecl_proc Hbody_full). }
         assert (Hrel_part : val_rel_at cm0 Σ_proc src_v1 anf_v0).
         { exact (@anf_val_rel_weaken
-                   func_tag default_tag tgm efl
+                   func_tag default_tag tgm efl _
                   
                    cmap Σ
                    cm0 Σ_proc
@@ -1281,7 +1281,7 @@ Section GlobalBindingsCorrect.
         - intro Hnone. rewrite Hlk in Hnone. discriminate.
         - exact Hlk. }
       assert (Heval_cur_proc : eval_at Σ_proc [] body (Val src_v) f t).
-      { pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+      { pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                            Σ Σ_proc
                            [] body (fuel_sem.Val src_v) f t
                            Hwf_proc Hext_proc ltac:(constructor)
@@ -1354,7 +1354,7 @@ Section GlobalBindingsCorrect.
           { eapply declared_constant_cons_inv_neq.
             - intro Heq. apply (eq_kername_bool_neq_inv Hk2). symmetry. exact Heq.
             - exact Hdecl2. }
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
                                Σ_proc
                                [] body (fuel_sem.Val src_v0) f0 t0
@@ -1392,7 +1392,7 @@ Section GlobalBindingsCorrect.
             - exact Hdecl1. }
           assert (Hwf_body1_tail : wellformed Σ_proc 0 body1 = true).
           { exact (wf_glob_globals_wf Σ_proc Hwf_proc _ _ _ Hdecl1_tail Hbody1). }
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
                                Σ_proc
                                [] body1 (fuel_sem.Val src_v0) f0 t0
@@ -1401,7 +1401,7 @@ Section GlobalBindingsCorrect.
             as Heval1_tail.
           destruct (Hglob_term k {| EAst.cst_body := Some body |} body Hdecl_cur_full eq_refl)
             as [src_v_new [f_new [t_new Heval_new_full]]].
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                Σ Σ_proc
                                [] body (fuel_sem.Val src_v_new) f_new t_new
                                Hwf_proc Hext_proc ltac:(constructor)
@@ -1764,7 +1764,7 @@ Section GlobalBindingsCoherence.
           (cmap : const_map)
           (Σ : EAst.global_context).
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HNLF : NoLazyForce efl}.
   Context (HnoAxioms : has_axioms = false).
 
   Let Hf_src := LambdaBox_resource_fuel.
@@ -1954,7 +1954,7 @@ Section GlobalBindingsCoherence.
     { eapply coh_declared_constant_cons_inv_neq; eauto. }
     assert (Hwf_body1_tail : wellformed Σ_tail 0 body1 = true).
     { exact (wf_glob_globals_wf Σ_tail Hwf_tail _ _ _ Hdecl1_tail Hbody1). }
-    pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+    pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                          ((k, d) :: Σ_tail) Σ_tail
                          [] body1 (fuel_sem.Val src_v) f t
                          Hwf_tail Hext_tail ltac:(constructor)
@@ -2107,7 +2107,7 @@ Section GlobalBindingsCoherence.
           { eapply coh_declared_constant_cons_inv_neq.
             - intro Heq. apply (eq_kername_bool_neq_inv Hk2). symmetry. exact Heq.
             - exact Hdecl2. }
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
                                Σ_proc
                                [] body (fuel_sem.Val src_v) f t
@@ -2139,7 +2139,7 @@ Section GlobalBindingsCoherence.
             - exact Hdecl1. }
           assert (Hwf_body1_tail : wellformed Σ_proc 0 body1 = true).
           { exact (wf_glob_globals_wf Σ_proc Hwf_proc _ _ _ Hdecl1_tail Hbody1). }
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                ((k, EAst.ConstantDecl {| EAst.cst_body := Some body |}) :: Σ_proc)
                                Σ_proc
                                [] body1 (fuel_sem.Val src_v) f t
@@ -2148,7 +2148,7 @@ Section GlobalBindingsCoherence.
             as Heval1_tail.
           destruct (Hglob_term k {| EAst.cst_body := Some body |} body Hdecl_cur_full eq_refl)
             as [src_v_new [f_new [t_new Heval_new_full]]].
-          pose proof (proj1 (@eval_env_fuel_restrict _ _ Hf_src Ht_src
+          pose proof (proj1 (@eval_env_fuel_restrict _ _ _ Hf_src Ht_src
                                Σ Σ_proc
                                [] body (fuel_sem.Val src_v_new) f_new t_new
                                Hwf_proc Hext_proc_full ltac:(constructor)
@@ -2355,7 +2355,7 @@ Section GlobalBindingsTopLevel.
   Proof.
     intros C_env S S' Hcvt.
     exact (@global_ctx_cmap_eval_coherent_top_by_construction
-             func_tag default_tag tgm cmap Σ efl HnoAxioms
+             func_tag default_tag tgm cmap Σ efl _ HnoAxioms
              Hglob_term Hglob_fuel_zero Hwf_glob
              C_env S S' Hcvt).
   Qed.

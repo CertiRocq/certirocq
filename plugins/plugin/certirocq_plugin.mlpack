@@ -59,6 +59,7 @@ MRPrelude
 MROption
 MRList
 MRProd
+MRClasses
 SemiLattice
 ReflectEq
 MRCompare
@@ -179,6 +180,7 @@ EBeta
 ECoInductiveToInductive
 EImplementBox
 EImplementLazyForce
+EPushForce
 EConstantsToValues
 ETransform
 Erasure0

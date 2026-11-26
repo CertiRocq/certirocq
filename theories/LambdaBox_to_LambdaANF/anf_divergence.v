@@ -35,7 +35,7 @@ Section Divergence.
           (cenv : ctor_env)
           (Σ : EAst.global_context).
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HNLF : NoLazyForce efl}.
 
   Context (dcon_to_tag_inj : inj_conIdMap tgm).
 
@@ -1221,7 +1221,7 @@ Section Divergence.
     - constructor.
     - inversion Hwf_es; subst.
       constructor.
-      + eapply eval_preserves_wf; eauto.
+      + eapply (eval_preserves_wf Σ); eauto.
       + eapply IHHmany; eauto.
   Qed.
 
@@ -1990,7 +1990,7 @@ Section Divergence.
     assert (Hlt : f_oot < f_val).
     { eapply src_eval_val_gt_oot; eauto. }
     assert (Hwf_v : well_formed_val Σ v).
-    { eapply eval_preserves_wf.
+    { eapply (eval_preserves_wf Σ).
       - exact Hglob_wf.
       - exact Hwf.
       - rewrite Hlen_env. exact Hwfe.
@@ -2017,7 +2017,7 @@ Section Divergence.
     assert (Hlt : f_oot < f_val).
     { eapply src_eval_val_gt_oot; eauto. }
     assert (Hwf_v : well_formed_val Σ v).
-    { eapply eval_preserves_wf.
+    { eapply (eval_preserves_wf Σ).
       - exact Hglob_wf.
       - exact Hwf.
       - rewrite Hlen_env. exact Hwfe.
@@ -2145,14 +2145,14 @@ Section Divergence.
           assert (Hwfe2 : wellformed Σ (Datatypes.length vnames) e2 = true).
           { eapply proj2. eapply wellformed_tApp. exact Hwfe. }
           assert (Hwf_clos : well_formed_val Σ (fuel_sem.Clos_v rho_clos na_clos body_clos)).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval1].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact Heval1].
             pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
             rewrite Henv_len.
             exact Hwfe1. }
           assert (Hwf_v2 : well_formed_val Σ varg).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact Heval2].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact Heval2].
             pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
@@ -2646,7 +2646,7 @@ Section Divergence.
             destruct (Nat.eq_dec fv (Datatypes.S f1)) as [Hfv | Hneq_fv].
             -- subst fv.
                assert (Hwf_src_v : well_formed_val Σ src_v).
-               { eapply eval_preserves_wf;
+               { eapply (eval_preserves_wf Σ);
                    [exact Hglob_wf | exact Hwf | | exact Hval1].
                  pose proof Henv as Henv_len.
                  unfold anf_env_rel' in Henv_len.
@@ -2755,7 +2755,7 @@ Section Divergence.
           assert (Hwfe2 : wellformed Σ (Datatypes.length vnames) e2 = true).
           { eapply proj2. eapply wellformed_tApp. exact Hwfe. }
           assert (Hwf_v1 : well_formed_val Σ v1).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact H].
             pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
@@ -2862,7 +2862,7 @@ Section Divergence.
             destruct (Nat.eq_dec fv (Datatypes.S f2)) as [Hfv | Hneq_fv].
             -- subst fv.
                assert (Hwf_v2 : well_formed_val Σ src_v2).
-               { eapply eval_preserves_wf;
+               { eapply (eval_preserves_wf Σ);
                    [exact Hglob_wf | exact Hwf | | exact Hval2].
                  pose proof Henv as Henv_len.
                  unfold anf_env_rel' in Henv_len.
@@ -3024,14 +3024,14 @@ Section Divergence.
           assert (Hwfe2 : wellformed Σ (Datatypes.length vnames) e2 = true).
           { eapply proj2. eapply wellformed_tApp. exact Hwfe. }
           assert (Hwf_fix : well_formed_val Σ (fuel_sem.ClosFix_v rho' mfix idx)).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact H].
             pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
             rewrite Henv_len.
             exact Hwfe1. }
           assert (Hwf_v2 : well_formed_val Σ v2).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H2].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact H2].
             pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
@@ -3563,7 +3563,7 @@ Section Divergence.
           { pose proof Henv as Henv_len.
             unfold anf_env_rel' in Henv_len.
             apply Forall2_length in Henv_len.
-            eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H].
+            eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact H].
             rewrite Henv_len.
             exact Hwfb. }
           destruct (val_rel_exists v1 Hwf_v1) as [v1' Hrel1].
@@ -4317,7 +4317,7 @@ Section Divergence.
           { exact (@anf_env_rel_length func_tag default_tag tgm cmap Σ
                                        _ _ _ Henv). }
           assert (Hwf_con : well_formed_val Σ (fuel_sem.Con_v (dcon_of_con ind c) vs0)).
-          { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf | | exact H].
+          { eapply (eval_preserves_wf Σ); [exact Hglob_wf | exact Hwf | | exact H].
             rewrite Hlen_env. exact Hwfe_mch. }
           destruct (val_rel_exists (fuel_sem.Con_v (dcon_of_con ind c) vs0) Hwf_con)
             as [v_con Hcon_rel_saved].

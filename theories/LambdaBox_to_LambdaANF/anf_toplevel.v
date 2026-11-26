@@ -209,7 +209,7 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  Hglob_term Hglob_fuel_zero Hwf_glob
+                  Hglob_term Hglob_fuel_zero Hwf_glob HnoLazy
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
@@ -236,7 +236,7 @@ Section Refinement.
 
     pose proof (@anf_cvt_correct
                   func_tag default_tag default_itag
-                  tgm cmap cenv Σ efl
+                  tgm cmap cenv Σ efl _
                   dcon_to_tag_inj 
                   cenv_tgm_coh Hcmap_eval_coherent
                   Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists
@@ -281,7 +281,7 @@ Section Refinement.
     specialize (Hcorr (Ehalt r) Hdis_ehalt).
 
     assert (Hwf_src_v : well_formed_val Σ src_v).
-    { eapply eval_preserves_wf; [exact Hglob_wf | exact Hwf_nil | exact Hwf | exact Heval]. }
+    { eapply (eval_preserves_wf _); [exact Hglob_wf | exact Hwf_nil | exact Hwf | exact Heval]. }
     destruct (val_rel_exists src_v Hwf_src_v) as [v_anf Hrel_anf].
     specialize (Hcorr src_v v_anf eq_refl Hrel_anf).
 
@@ -387,7 +387,7 @@ Section Refinement.
       as Hcmap_nodup_keys.
     pose proof (@global_ctx_cmap_eval_coherent_top
                   func_tag default_tag tgm cmap Σ efl HnoAxioms
-                  Hglob_term Hglob_fuel_zero Hwf_glob
+                  Hglob_term Hglob_fuel_zero Hwf_glob HnoLazy
                   C_env Sg Sg' Hglob_cvt)
       as Hcmap_eval_coherent.
     pose (val_rel_exists :=
@@ -445,7 +445,7 @@ Section Refinement.
       destruct (Hdiv_src cin) as [t Hoot].
       pose proof (@anf_cvt_correct_oot_lower_bound
                     func_tag default_tag default_itag
-                    tgm cmap cenv Σ efl
+                    tgm cmap cenv Σ efl _
                     dcon_to_tag_inj                    
                     cenv_tgm_coh Hcmap_eval_coherent
                     Hglob_term Hglob_fuel_zero Hglob_wf val_rel_exists

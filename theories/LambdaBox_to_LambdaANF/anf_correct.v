@@ -49,7 +49,7 @@ Section Correct.
           (cenv : ctor_env)
           (Σ : EAst.global_context).
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HnoLazy : NoLazyForce efl}.
 
   Context (dcon_to_tag_inj : inj_conIdMap tgm).
   Context (cenv_tgm_coh : anf_convert_env.cenv_tgm_coherence cenv tgm).
