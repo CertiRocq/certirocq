@@ -261,8 +261,7 @@ let make_options (l : command_args list) (pr : prim list) (fname : string) : opt
 
 let make_unsafe_passes b =
   let open Erasure0 in
-  { cofix_to_lazy = b;
-    unboxing = b;
+  { unboxing = b;
     betared = b;
     inductives_extraction = b }
 

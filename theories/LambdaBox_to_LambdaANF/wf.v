@@ -14,9 +14,20 @@ From CertiRocq.LambdaBox_to_LambdaANF Require Import fuel_sem common.
 Import ListNotations.
 
 
+(** The source programs of the ANF translation contain no [tLazy]/[tForce]:
+    they are implemented by [EImplementLazyForce] at the end of the MetaRocq
+    pipeline. Hence every fixpoint body is a lambda. The class is resolved
+    by [eq_refl] for concrete flags, or from a hypothesis in context. *)
+Class NoLazyForce (efl : EEnvFlags) : Prop :=
+  no_lazy_force : has_tLazy_Force = false.
+
+#[export] Hint Extern 1 (NoLazyForce _) =>
+  first [ exact eq_refl | assumption ] : typeclass_instances.
+
+
 Section WF.
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HnoLazy : NoLazyForce efl}.
   Context (Σ : global_context).
 
   (** A term is well-formed in an environment of size [n] *)
@@ -93,6 +104,18 @@ Section WF.
     split; assumption.
   Qed.
 
+  (** Without lazy values, the fixpoint bodies accepted by [wellformed]
+      are lambdas. *)
+  Lemma forallb_isLambda_no_lazy (mfix : mfixpoint term) :
+    forallb (fun d => EAst.isLambda d.(EAst.dbody) ||
+                      has_tLazy_Force && EAstUtils.isLazy d.(EAst.dbody)) mfix =
+    forallb (fun d => EAst.isLambda d.(EAst.dbody)) mfix.
+  Proof.
+    rewrite no_lazy_force.
+    induction mfix as [|d mfix IH]; simpl in *; [reflexivity|].
+    now rewrite orb_false_r, IH.
+  Qed.
+
   Lemma wellformed_tFix n mfix idx :
     wellformed Σ n (EAst.tFix mfix idx) = true ->
     (idx < List.length mfix)%nat /\
@@ -110,7 +133,8 @@ Section WF.
     split; [exact Hidx |].
     apply Forall_forall. intros d Hd.
     split.
-    - rewrite forallb_forall in Hlam. exact (Hlam d Hd).
+    - rewrite forallb_forall in Hlam. specialize (Hlam d Hd).
+      rewrite no_lazy_force, orb_false_r in Hlam. exact Hlam.
     - rewrite forallb_forall in Hbodies. exact (Hbodies d Hd).
   Qed.
 
@@ -213,7 +237,7 @@ End WF.
 
 Section WF_EVAL.
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HnoLazy : NoLazyForce efl}.
   Context {trace : Type}
           {Hf : @LambdaBox_resource nat}
           {Ht : @LambdaBox_resource trace}.
@@ -517,7 +541,7 @@ End WF_EVAL.
 
 Section EVAL_RESTRICT.
 
-  Context {efl : EEnvFlags}.
+  Context {efl : EEnvFlags} {HnoLazy : NoLazyForce efl}.
   Context {trace : Type}
           {Hf : @LambdaBox_resource nat}
           {Ht : @LambdaBox_resource trace}.

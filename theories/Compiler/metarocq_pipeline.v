@@ -78,7 +78,6 @@ Admit Obligations.
 
 (** The CertiRocq MetaRocq pipeline is composed of the verified typed or untyped MetaRocq pipelines plus:
 
-    - CoFixpoints to fixpoints (unverified, only relevant if the source term contains cofixpoints)
     - Transformation of constants to values (verified, simplifies the ANF proof)
     - Transformation of lazy/force to lambda abstractions and applications (verified)
     - Unboxing of single argument constructors (verified)
@@ -91,14 +90,10 @@ Program Definition certirocq_post_metarocq_pipeline (extracted : list kername) e
   let efl := EConstructorsAsBlocks.switch_cstr_as_blocks
   (EInlineProjections.disable_projections_env_flag
    (ERemoveParams.switch_no_params EWellformed.all_env_flags)) in
+  (* Coinductives and cofixpoints have already been translated to inductive
+     types and lazy fixpoints by the MetaRocq pipeline *)
   let efl' := efl_coind_to_ind efl in
   (* Rebuild the efficient lookup table *)
-  rebuild_wf_env_transform (efl := efl) false false ▷
-  (* Coinductives & cofixpoints are translated to inductive types and thunked fixpoints *)
-  coinductive_to_inductive_transformation efl
-      (has_app := eq_refl) (has_rel := eq_refl) 
-      (has_pars := eq_refl) (has_cstrblocks := eq_refl) ▷
-  (* Lazy-to-lambda *)
   rebuild_wf_env_transform (efl := efl') false false ▷
   unbox_transformation efl' final_wcbv_flags (has_app := _) (has_cofix := _) (has_prop_case := eq_refl) (has_letin := eq_refl) (has_cstrparams := eq_refl) (has_cstr_block := eq_refl) ▷
   ETransform.optional_self_transform econf.(enable_unsafe).(inductives_extraction)
@@ -115,15 +110,15 @@ Program Definition certirocq_post_metarocq_pipeline (extracted : list kername) e
   implement_box_transformation (switch_off_thunk efl') eq_refl eq_refl eq_refl eq_refl eq_refl true.
 Next Obligation.
 Proof.
-  destruct econf as [[? ? [] ?] ? ? ? ? ?]; cbn in *; intuition eauto.
+  destruct econf as [[? [] ?] ? ? ? ? ?]; cbn in *; intuition eauto.
 Qed.
 Next Obligation.
 Proof.
-  destruct econf as [[? ? [] []] ? ? [] ? []]; cbn in *; intuition eauto.
+  destruct econf as [[? [] []] ? ? [] ? []]; cbn in *; intuition eauto.
 Qed.
 Next Obligation.
 Proof.
-  destruct econf as [[? ? [] []] ? ? [] ? []]; cbn in *; intuition eauto.
+  destruct econf as [[? [] []] ? ? [] ? []]; cbn in *; intuition eauto.
 Qed.
 
 Program Definition run_erase_program {guard : PCUICWfEnvImpl.abstract_guard_impl} (extracted : list kername)
@@ -133,11 +128,3 @@ Program Definition run_erase_program {guard : PCUICWfEnvImpl.abstract_guard_impl
     run (typed_erasure_pipeline econf ▷ certirocq_post_metarocq_pipeline extracted econf) p
   else
    run (erasure_pipeline_mapping econf ▷ certirocq_post_metarocq_pipeline extracted econf) p.
-Next Obligation.
-Proof.
-  destruct econf as [[[] ? ? ?] ? ? [] ? ?]; cbn in *; intuition eauto.
-Qed.
-Next Obligation.
-Proof.
-  destruct econf as [[[] ? ? ?] ? ? [] ? []]; cbn in *; intuition eauto.
-Qed.
