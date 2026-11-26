@@ -28,10 +28,11 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup
-            startGroup "Pin the MetaRocq 9.1 branch"
+            startGroup "Pin the MetaRocq step-index-fuel-costs branch"
               # CertiRocq depends on this unreleased version of MetaRocq.
+              # TODO: back to #9.1 once MetaRocq/metarocq#1342 is merged.
               opam pin add --yes --no-action \
-                'git+https://github.com/MetaRocq/metarocq.git#9.1'
+                'git+https://github.com/MetaRocq/metarocq.git#step-index-fuel-costs'
             endGroup
           before_script: |
             startGroup "Install more dependencies"
