@@ -4,7 +4,8 @@ From CertiRocq Require Import
      LambdaANF.term LambdaANF.term_util LambdaANF.state LambdaANF.eval LambdaANF.shrink_cps
      LambdaANF.inline LambdaANF.uncurry LambdaANF.closure_conversion
      LambdaANF.closure_conversion LambdaANF.hoisting LambdaANF.dead_param_elim LambdaANF.lambda_lifting
-     LambdaANF.merge_dup_funs.
+     LambdaANF.merge_dup_funs LambdaANF.case_inline LambdaANF.eta_rec LambdaANF.apply_n
+     LambdaANF.specialize LambdaANF.unthunk LambdaANF.lift_literals.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common anf_convert_env.
 From CertiRocq.LambdaBox_to_LambdaANF Require anf cps.
 (* From CertiRocq.Codegen Require Import LambdaANF_to_Clight. *)
@@ -145,6 +146,12 @@ Section IDENT.
       inl_before      : bool;    (* Perform shrink/inline loop before closure conversion *)
       inl_after       : bool;    (* Perform shrink/inline loop after closure conversion *)
       dpe             : bool;    (* Turn it off for the top-level theorm because it does not have a proof yet *)
+      opt_unthunk     : bool;    (* Evaluate constants once *)
+      opt_literals    : bool;    (* Build the literal data of functions once *)
+      opt_case        : bool;    (* Replace the function of a [match] in tail position by the case *)
+      opt_eta         : bool;    (* Uncurry functions defined with an induction principle *)
+      opt_spec        : bool;    (* Specialize recursive functions for a known function argument *)
+      opt_apply       : bool;    (* Unknown calls with two arguments without a closure in between *)
     }.
 
 
@@ -171,6 +178,30 @@ Section IDENT.
   Definition merge_dup_funs_trans : anf_trans :=
     fun e c => (Ret (merge_dup_funs 10 e), c).
 
+  Definition unthunk_trans : anf_trans :=
+    fun e c => (Ret (unthunk true (M.empty _) (M.empty _) e), c).
+
+  Definition lift_literals_trans : anf_trans :=
+    fun e c => let (e', c') := lift_literals e c in (Ret e', c').
+
+  Definition inline_case_trans : anf_trans :=
+    fun e c => let (e', c') := inline_case e c in (Ret e', c').
+
+  Definition sink_trans : anf_trans :=
+    fun e c => (Ret (sink nil e), c).
+
+  Definition eta_trans : anf_trans :=
+    fun e c => let (e', c') := eta (M.empty _) e c in (Ret e', c').
+
+  Definition tail_calls_trans : anf_trans :=
+    fun e c => (Ret (tail_calls e), c).
+
+  Definition specialize_trans : anf_trans :=
+    fun e c => let (e', c') := specialize 40 e c in (Ret e', c').
+
+  Definition apply_n_trans : anf_trans :=
+    fun e c => let (e', c') := apply_n clo_tag e c in (Ret e', c').
+
   Section Pipeline.
 
     Context (anf_opts : anf_options).
@@ -182,9 +213,20 @@ Section IDENT.
 
     Definition anf_pipeline (e : exp) : anf_state exp :=
       e <- time_anf "Shrink" shrink_err e;;
+      e <- (if opt_unthunk anf_opts then time_anf "Unthunk constants" unthunk_trans e else id_trans e) ;;
+      e <- (if opt_literals anf_opts then time_anf "Lift literals" lift_literals_trans e else id_trans e) ;;
+      e <- (if opt_case anf_opts then time_anf "Inline case functions" inline_case_trans e else id_trans e) ;;
+      e <- (if opt_eta anf_opts then time_anf "Sink recursive calls" sink_trans e else id_trans e) ;;
+      e <- (if opt_eta anf_opts then time_anf "Eta expand" eta_trans e else id_trans e) ;;
+      e <- (if opt_case anf_opts then time_anf "Tail calls" tail_calls_trans e else id_trans e) ;;
+      e <- (if opt_case anf_opts then time_anf "Shrink" shrink_err e else id_trans e) ;;
       e <- time_anf "Uncurry" (uncurry_top (cps anf_opts)) e ;;
       e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100) e ;;
       e <- (if inl_before anf_opts then
+              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
+            else id_trans e) ;;
+      e <- (if opt_spec anf_opts then time_anf "Specialize" specialize_trans e else id_trans e) ;;
+      e <- (if opt_spec anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
             else id_trans e) ;;
       e <- (if (do_lambda_lift anf_opts) then
@@ -204,6 +246,15 @@ Section IDENT.
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
             else id_trans e) ;;
       e <- time_anf "Merge duplicate functions" merge_dup_funs_trans e ;;
+      e <- (if andb (opt_apply anf_opts) (negb (cps anf_opts)) then
+              time_anf "Apply" apply_n_trans e
+            else id_trans e) ;;
+      e <- (if andb (opt_apply anf_opts) (negb (cps anf_opts)) then
+              time_anf "Shrink" shrink_err e
+            else id_trans e) ;;
+      e <- (if andb (opt_apply anf_opts) (negb (cps anf_opts)) then
+              time_anf "Merge duplicate functions" merge_dup_funs_trans e
+            else id_trans e) ;;
       ret e.
 
       Print LambdaANFenv.
@@ -250,6 +301,7 @@ Section IDENT.
   Open Scope nat.
 
   Definition make_anf_options (opts : Options) : anf_options :=
+    let o2 := (2 <=? o_level opts) in
     let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) :=
         let default := (true, false, 1, true, true) in
         match anf_variant opts with
@@ -276,6 +328,12 @@ Section IDENT.
        inl_before   := inl_before;
        inl_after    := inl_after;
        dpe          := true;
+       opt_unthunk  := o2;
+       opt_literals := o2;
+       opt_case     := o2;
+       opt_eta      := o2;
+       opt_spec     := o2;
+       opt_apply    := o2;
     |}.
 
 

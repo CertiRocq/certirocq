@@ -554,6 +554,41 @@ Section Compose.
     clear. firstorder.
   Qed.
 
+  (* TODO: prove the passes below correct *)
+  Lemma unthunk_correct :
+    correct cenv unthunk_trans.
+  Admitted.
+
+  Lemma lift_literals_correct :
+    correct cenv lift_literals_trans.
+  Admitted.
+
+  Lemma inline_case_correct :
+    correct cenv inline_case_trans.
+  Admitted.
+
+  Lemma sink_correct :
+    correct cenv sink_trans.
+  Admitted.
+
+  Lemma eta_correct :
+    correct cenv eta_trans.
+  Admitted.
+
+  Lemma tail_calls_correct :
+    correct cenv tail_calls_trans.
+  Admitted.
+
+  Lemma specialize_correct :
+    correct cenv specialize_trans.
+  Admitted.
+
+  Lemma apply_n_correct :
+    correct cenv apply_n_trans.
+  Admitted.
+
+  Ltac destruct_option := match goal with |- context [if ?b then _ else _] => destruct b end.
+
   Theorem anf_pipeline_correct opts v :
     correct_cc cenv clo_tag (anf_pipeline v opts).
   Proof.
@@ -563,6 +598,48 @@ Section Compose.
 
     eapply correct_time.
     now eapply shrink_err_correct.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply unthunk_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply lift_literals_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply inline_case_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply sink_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply eta_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply tail_calls_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply shrink_err_correct.
+    now eapply correct_id_trans.
 
     eapply correct_cc_compose_l.
 
@@ -576,6 +653,18 @@ Section Compose.
     eapply correct_cc_compose_l.
 
     destruct (inl_before opts).
+    eapply correct_time. now eapply inline_loop_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
+    eapply correct_time. now eapply specialize_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_cc_compose_l.
+
+    destruct_option.
     eapply correct_time. now eapply inline_loop_correct.
     now eapply correct_id_trans.
 
@@ -624,6 +713,24 @@ Section Compose.
     eapply correct_compose.
 
     eapply correct_time. now eapply merge_dup_funs_correct.
+
+    eapply correct_compose.
+
+    destruct_option.
+    eapply correct_time. now eapply apply_n_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_compose.
+
+    destruct_option.
+    eapply correct_time. now eapply shrink_err_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_compose.
+
+    destruct_option.
+    eapply correct_time. now eapply merge_dup_funs_correct.
+    now eapply correct_id_trans.
 
     now eapply correct_id_trans.
   Qed.
