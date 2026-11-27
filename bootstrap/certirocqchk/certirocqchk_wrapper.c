@@ -69,7 +69,7 @@ CAMLprim value certirocqchk_wrapper(value prog) {
   pthread_attr_destroy(&attr);
 
   if (!c.ran) {
-    printf("could not run the checker on a large stack, using the current one\n");
+    printf("could not run the checker on a large stack, using the current one\n"); fflush(stdout);
     c.res = run_checker(prog);
   }
 
@@ -87,16 +87,16 @@ static value run_checker(value prog) {
 
   // Run Coq program
   tinfo = make_tinfo();
-  printf("about to call checker\n");
+  printf("about to call checker\n"); fflush(stdout);
   closure = body(tinfo);
   // closure = call(tinfo, closure, opts); takes only a single program argument today
   res = call(tinfo, closure, prog);
-  printf("checker returned a value\n");
+  printf("checker returned a value\n"); fflush(stdout);
   end = clock();
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;
   msec = 1000*sec;
-  printf("Time taken %f seconds %f milliseconds\n", sec, msec);
+  printf("Time taken %f seconds %f milliseconds\n", sec, msec); fflush(stdout);
 
   CAMLreturn(res);
 }
