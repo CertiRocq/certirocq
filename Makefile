@@ -1,9 +1,13 @@
 # CertiRocq is built with dune (see dune-project); these targets are shortcuts.
 
-.PHONY: all install test clean
+.PHONY: all compiler install test clean
 
 all:
-	dune build
+	dune build --display=short
+
+# The compiler part of theories/, the plugins and the runtime, without the proofs
+compiler:
+	dune build @@compiler --display=short
 
 install:
 	dune install
