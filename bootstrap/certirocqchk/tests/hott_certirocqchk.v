@@ -3,7 +3,7 @@
     [MetaRocq SafeCheck] (the same checker, extracted to OCaml, [hott_safecheck.v]). *)
 
 From CertiRocq.CertiRocqCheck Require Import Loader.
-From CertiRocq.CertiRocqCheck.Tests Require Import hott_example.
+From CertiRocq.CertiRocqCheck.tests Require Import hott_example.
 
 (* The same constants as MetaRocq's test-suite/safechecker_test.v *)
 Time CertiRocqCheck issect'.

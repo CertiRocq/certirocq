@@ -62,6 +62,12 @@ mkCoqDerivation {
     done
     [ $status = 0 ]
 
+    # Benchmark of certirocqchk on MetaRocq's hott_example.v. The results are printed as a
+    # GitHub Actions notice, which shows up as an annotation of the CI run and of the pull
+    # request; a failure of the benchmark only gives a warning.
+    BENCH_ANNOTATIONS=github RUNS=3 make -C bootstrap/certirocqchk bench-hott TESTCOQOPTS='$(COQOPTS)' \
+      || echo "::warning title=certirocqchk benchmark::make bench-hott failed"
+
     runHook postCheck
   '';
 

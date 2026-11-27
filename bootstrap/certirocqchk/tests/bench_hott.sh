@@ -9,13 +9,17 @@
 # (default 5), in separate processes, after one warm-up run that is not counted; the table
 # gives the median and the range (min-max) of the timings.
 #
-# Usage: [RUNS=n] tests/bench_hott.sh <rocq c options to find the certirocqchk plugin>
+# With BENCH_ANNOTATIONS=github, the results are also printed as a GitHub Actions notice (and a
+# failure as a warning), which shows up as an annotation of the CI run and of the pull request.
+#
+# Usage: [RUNS=n] [BENCH_ANNOTATIONS=github] tests/bench_hott.sh <rocq c options to find the
+#   certirocqchk plugin>
 # Run by make bench-hott in bootstrap/certirocqchk, after building the plugin (make plugin).
 
 set -eo pipefail
 cd "$(dirname "$0")/.."
 export LC_ALL=C   # Decimal points in the timings
-TESTS="-Q tests CertiRocq.CertiRocqCheck.Tests"
+TESTS="-Q tests CertiRocq.CertiRocqCheck.tests"
 RUNS=${RUNS:-5}
 ulimit -Ss 65500 2>/dev/null || true
 
@@ -38,13 +42,22 @@ gen() {
     for ((k = 0; k < REPEATS[i]; k++)); do echo "$3${CONSTANTS[i]}."; done > "$OUT/$1_block$i.v"
     {
       echo "$2"
-      echo "From CertiRocq.CertiRocqCheck.Tests Require Import hott_example."
+      echo "From CertiRocq.CertiRocqCheck.tests Require Import hott_example."
       echo "Time Load \"$OUT/$1_block$i.v\"."
     } > "$OUT/$1_$i.v"
   done
 }
 gen safecheck "From MetaRocq.SafeCheckerPlugin Require Import Loader." "MetaRocq SafeCheck @"
 gen certirocqchk "From CertiRocq.CertiRocqCheck Require Import Loader." "CertiRocqCheck "
+
+# annotate <notice|warning> <title> <message lines...>: a GitHub Actions annotation, if requested
+annotate() {
+  [ "${BENCH_ANNOTATIONS:-}" = github ] || return 0
+  local kind=$1 title=$2; shift 2
+  local msg; msg=$(printf '%s\n' "$@" | sed 's/%/%25/g' | awk 'NR > 1 { printf "%%0A" } { printf "%s", $0 }')
+  title=$(printf '%s' "$title" | sed 's/%/%25/g; s/:/%3A/g; s/,/%2C/g')
+  echo "::$kind title=$title::$msg"
+}
 
 # run <name> <command...>: run the command, its output in $OUT/<name>.log and its real time
 # (in seconds) in $OUT/<name>.time; on failure, show the errors and stop.
@@ -54,6 +67,8 @@ run() {
   if ! { time "$@" > "$OUT/$name.log" 2>&1 ; } 2> "$OUT/$name.time"; then
     echo "$name failed:" >&2
     awk '/Error|Anomaly/ { n = 5 } n > 0 { print; n-- }' "$OUT/$name.log" >&2
+    annotate warning "certirocqchk benchmark failed" "$name failed:" \
+      "$(awk '/Error|Anomaly/ { n = 5 } n > 0 { print; n-- }' "$OUT/$name.log")"
     exit 1
   fi
 }
@@ -86,7 +101,7 @@ run example rocq c $TESTS tests/hott_example.v
 
 for i in $(seq 0 "$RUNS"); do
   printf '\rRun %d/%d' "$i" "$RUNS" >&2
-  run rocqchk.$i rocqchk -silent $TESTS -norec CertiRocq.CertiRocqCheck.Tests.hott_example
+  run rocqchk.$i rocqchk -silent $TESTS -norec CertiRocq.CertiRocqCheck.tests.hott_example
   for j in "${!CONSTANTS[@]}"; do
     run safecheck.$i.$j rocq c $TESTS "$OUT/safecheck_$j.v"
     run certirocqchk.$i.$j rocq c "$@" $TESTS "$OUT/certirocqchk_$j.v"
@@ -119,13 +134,22 @@ echo "constant the given number of times in a row, in its own session."
 echo
 echo "| Constant | Checks per run | certirocqchk | certirocqchk (checker only) | MetaRocq SafeCheck (OCaml) | certirocqchk / SafeCheck |"
 echo "|---|---:|---:|---:|---:|---:|"
-paste "$OUT/constants" "$OUT/repeats" "$OUT/certirocqchk.stats" "$OUT/ccheck.stats" "$OUT/safecheck.stats" |
-  awk -F'[\t ]' 'function ms(x) { return sprintf(x < 10 ? "%.3f" : "%.1f", x) }
+paste "$OUT/constants" "$OUT/repeats" "$OUT/certirocqchk.stats" "$OUT/ccheck.stats" "$OUT/safecheck.stats" > "$OUT/all.stats"
+awk -F'[\t ]' 'function ms(x) { return sprintf(x < 10 ? "%.3f" : "%.1f", x) }
     { ratio = ($9 > 0) ? sprintf("%.1fx", $3 / $9) : "-";
       printf "| `%s` | %d | %s (%s-%s) | %s (%s-%s) | %s (%s-%s) | %s |\n", $1, $2,
-        ms($3), ms($4), ms($5), ms($6), ms($7), ms($8), ms($9), ms($10), ms($11), ratio }'
+        ms($3), ms($4), ms($5), ms($6), ms($7), ms($8), ms($9), ms($10), ms($11), ratio }' "$OUT/all.stats"
 echo
 read -r med min max < "$OUT/rocqchk.stats"
-printf 'rocqchk on the whole file (%s declarations, dependencies admitted, process included): %.0f ms (%.0f-%.0f)\n' \
+ROCQCHK=$(printf 'rocqchk on the whole file (%s declarations, dependencies admitted, process included): %.0f ms (%.0f-%.0f)' \
   "$(grep -cE '^(Definition|Inductive|Lemma|Record|Class|Fixpoint|Theorem)' tests/hott_example.v)" \
-  "$med" "$min" "$max"
+  "$med" "$min" "$max")
+echo "$ROCQCHK"
+
+# The annotation is plain text: one line per constant, with the medians
+annotate notice "certirocqchk benchmark (hott_example.v)" \
+  "Time of one check, median of $RUNS runs:" \
+  "$(awk -F'[\t ]' 'function ms(x) { return sprintf(x < 10 ? "%.3f" : "%.1f", x) }
+    { ratio = ($9 > 0) ? sprintf("%.1fx", $3 / $9) : "-";
+      printf "%s: certirocqchk %s ms (checker only %s ms), SafeCheck %s ms, certirocqchk / SafeCheck %s\n", $1, ms($3), ms($6), ms($9), ratio }' "$OUT/all.stats")" \
+  "$ROCQCHK"

@@ -2,7 +2,7 @@
     [hott_certirocqchk.v]. *)
 
 From MetaRocq.SafeCheckerPlugin Require Import Loader.
-From CertiRocq.CertiRocqCheck.Tests Require Import hott_example.
+From CertiRocq.CertiRocqCheck.tests Require Import hott_example.
 
 Time MetaRocq SafeCheck @issect'.
 Time MetaRocq SafeCheck @ap_pp.

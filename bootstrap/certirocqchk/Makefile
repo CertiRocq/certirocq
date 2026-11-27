@@ -54,7 +54,7 @@ test.vo: test.v
 	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
 # MetaRocq's hott_example.v
-HOTTOPTS = -Q tests CertiRocq.CertiRocqCheck.Tests
+HOTTOPTS = -Q tests CertiRocq.CertiRocqCheck.tests
 
 tests/hott_example.vo: tests/hott_example.v
 	coqc ${HOTTOPTS} $<
