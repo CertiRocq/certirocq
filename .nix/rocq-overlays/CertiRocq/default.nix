@@ -56,7 +56,7 @@ in
 }).overrideAttrs (o: {
   buildPhase = ''
     runHook preBuild
-    dune build -p ${concatStringsSep "," packages} ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+    dune build -p ${concatStringsSep "," packages} --display=short ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
     runHook postBuild
   '';
   doCheck = true;
@@ -68,10 +68,10 @@ in
     runHook preCheck
   '' + (if bootstrap then ''
     echo "running the tests and the bootstrap"
-    dune build -p ${concatStringsSep "," allPackages} @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+    dune build -p ${concatStringsSep "," allPackages} --display=short @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
   '' else ''
     echo "running the tests"
-    dune build -p ${concatStringsSep "," packages} @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+    dune build -p ${concatStringsSep "," packages} --display=short @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
   '') + ''
     runHook postCheck
   '';
