@@ -1,6 +1,7 @@
 ; The theories of the compiler, without its proofs: the rules below load the pipeline,
 ; and as they are sandboxed, they must depend on all the theories that it needs, which
-; are computed with rocq dep.
+; are computed with rocq dep. They read them from this file, one per line, relative
+; to this directory.
 (rule
  (targets compiler_theories)
  (deps
@@ -18,10 +19,6 @@
      -v
      "roots=%{workspace_root}/theories/Compiler/pipeline.vo %{workspace_root}/theories/Common/Pipeline_utils.vo")))))
 
-(alias
- (name compiler_theories)
- (deps %{read-lines:compiler_theories}))
-
 ; The compiler, compiled to C by the CertiRocq plugin. The rule uses the theories and
 ; the plugin of the build directory, without installing them: it depends on the files
 ; of the plugin that findlib loads, from the install directory that dune adds to
@@ -37,7 +34,7 @@
  (deps
   compile.v
   (glob_files compiler/*.vo)
-  (alias compiler_theories)
+  %{read-lines:compiler_theories}
   (glob_files %{workspace_root}/plugins/plugin/*.vo)
   %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
   %{lib:rocq-certirocq.plugin:../META})
@@ -98,7 +95,7 @@
   test.v
   (glob_files compiler/*.vo)
   (glob_files theories/*.vo)
-  (alias compiler_theories)
+  %{read-lines:compiler_theories}
   (glob_files %{workspace_root}/plugins/plugin/*.vo)
   (glob_files %{workspace_root}/plugins/cplugin/*.vo)
   %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
