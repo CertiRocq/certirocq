@@ -41,8 +41,15 @@ The CPS conversion is not yet proved correct.
   used to lift expression-level correctness to programs with translated global
   declarations.
 
+- **anf_scoping.v** — The program produced by ANF conversion is closed and
+  has unique bindings.
+
 - **anf_toplevel.v** — End-to-end theorems for the top-level executable
   ANF conversion.
+
+- **anf_cenv.v** — Constructor environments: ANF conversion keeps the one
+  computed from the inductive declarations, and the LambdaANF pipeline only
+  extends it with fresh tags.
 
 ## Design Notes
 

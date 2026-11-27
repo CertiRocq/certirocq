@@ -33,6 +33,7 @@ LambdaBox_to_LambdaANF/anf_divergence.v
 LambdaBox_to_LambdaANF/anf_global.v
 LambdaBox_to_LambdaANF/anf_scoping.v
 LambdaBox_to_LambdaANF/anf_toplevel.v
+LambdaBox_to_LambdaANF/anf_cenv.v
 
 # LambdaANF
 LambdaANF/Ensembles_util.v
@@ -113,7 +114,6 @@ Glue/glue.v
 Compiler/metarocq_pipeline.v
 Compiler/pipeline.v
 Compiler/correctness.v
-Compiler/anf_cenv.v
 Compiler/pipeline_correctness.v
 
 # Extraction

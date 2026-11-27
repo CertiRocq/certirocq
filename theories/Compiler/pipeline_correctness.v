@@ -37,11 +37,7 @@
     [assume_wellformed_inductives_mapping] and MetaRocq's
     [assume_that_we_only_erase_on_welltyped_programs] to build the precondition of erasure; the
     theorems take these properties as hypotheses, and do not depend on the choice of this
-    precondition ([erase_program_run]).
-
-    The constructor environment along ANF conversion and the LambdaANF pipeline is handled in
-    [anf_cenv.v], and the scoping of the programs produced by ANF conversion in
-    [anf_scoping.v]. *)
+    precondition ([erase_program_run]). *)
 
 From Stdlib Require Import ssreflect ssrbool.
 From Equations Require Import Equations.
@@ -54,10 +50,10 @@ From MetaRocq.Erasure Require EFirstorder.
 From MetaRocq.ErasurePlugin Require Import Erasure.
 From MetaRocq.Utils Require Import utils.
 From CertiRocq.LambdaBox_to_LambdaANF Require Import common fuel_sem anf_convert_env anf_correct
-  anf_toplevel anf_scoping.
+  anf_toplevel anf_scoping anf_cenv.
 Require Import LambdaANF.term LambdaANF.state LambdaANF.eval LambdaANF.identifiers
   LambdaANF.term_util LambdaANF.rel_comp LambdaANF.bounds.
-From CertiRocq Require Import metarocq_pipeline pipeline correctness anf_cenv.
+From CertiRocq Require Import metarocq_pipeline pipeline correctness.
 From MetaRocq.TemplatePCUIC Require TemplateToPCUIC.
 From MetaRocq.PCUIC Require PCUICTyping PCUICClassification PCUICFirstorder.
 From MetaRocq.ErasurePlugin Require ErasureCorrectness.
