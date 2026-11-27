@@ -364,9 +364,7 @@ Inductive repr_expr_LambdaANF_Wasm {lenv} : LambdaANF.term.exp -> N -> list basi
     repr_var (lenv:=lenv) y y' ->
     repr_expr_LambdaANF_Wasm (Eproj x t n y e) mem
       ([ BI_local_get y'
-       ; BI_const_num (nat_to_value (((N.to_nat n) + 1) * 4))
-       ; BI_binop T_i32 (Binop_i BOI_add)
-       ; BI_load T_i32 None {| memarg_offset:=0%N; memarg_align:=2%N |}
+       ; BI_load T_i32 None {| memarg_offset:=N.of_nat (4 * (1 + N.to_nat n)); memarg_align:=2%N |}
        ; BI_local_set x'
        ] ++ e')
 
@@ -4110,7 +4108,6 @@ Proof with eauto.
 
      exists sr', f', k', lh'. cbn. split.
      { (* take steps *)
-       have I := Hinv'. destruct I as [_ [_ [_ [_ [_ [_ [Hlinmem _]]]]]]].
        have Hly := HlocInBound _ _ Hy'.
        have Hlx := HlocInBound _ _ Hx'.
        assert (x0 = y'). { eapply repr_var_det; eassumption. } subst x0.
@@ -4118,21 +4115,16 @@ Proof with eauto.
        eapply rt_trans. apply reduce_trans_frame. apply reduce_trans_label.
        (* get_local y' *)
        dostep_nary 0. apply r_local_get. apply H1.
-       (* add offset n *)
-       dostep_nary 2. constructor. apply rs_binop_success=>//.
-       assert (Har: Wasm_int.N_of_uint i32m (Wasm_int.Int32.iadd (wasm_value_to_i32 (Val_ptr addr))
-            (nat_to_i32 ((N.to_nat n + 1) * 4))) = ((4 + addr) + 4 * n)%N). {
-          replace (4 + addr)%N with (addr + 4)%N by lia. replace (4*n)%N with (n*4)%N by lia. cbn.
-       unfold load in Hload.
-       destruct (4 + addr + 4 * n + (0 + 4) <=? mem_length m)%N eqn:Heqn. 2: by inv Hload.
-       apply N.leb_le in Heqn.
-       destruct Hlinmem as [Hmem1 [m' [Hmem2 [size [Hmem3 [Hmem4 Hmem5]]]]]].
-       assert (m' = m). { unfold smem in H10, Hmem2. subst f_before_IH. rewrite Hmem1 in H10, Hmem2.
-        congruence. } subst.
-       apply mem_length_upper_bound in Hmem5. cbn in Hmem5.
-       by repeat (rewrite Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; try lia). }
-
-       dostep_nary 1. eapply r_load_success. eassumption. rewrite Har. apply Hload.
+       (* load the field at its static offset *)
+       assert (Har: Wasm_int.N_of_uint i32m (wasm_value_to_i32 (Val_ptr addr)) = addr). {
+         cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
+       dostep_nary 1. eapply r_load_success with (bs:=bs). eassumption. rewrite Har.
+       change (load m addr (N.of_nat (4 * (1 + N.to_nat n))) 4 = Some bs).
+       unfold load in Hload |- *.
+       rewrite N.add_0_r in Hload.
+       rewrite N.add_assoc.
+       replace (addr + N.of_nat (4 * (1 + N.to_nat n)))%N with (4 + addr + 4 * n)%N by lia.
+       exact Hload.
        (* save result in x' *)
        dostep_nary 1. eapply r_local_set' with (f':=f_before_IH); subst f_before_IH=>//.
        apply /ssrnat.leP. now apply HlocInBound in Hx'.
