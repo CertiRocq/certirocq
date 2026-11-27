@@ -42,7 +42,7 @@ Definition context_restr (lenv: localvar_env) (c: t_context) :=
   (* locals in bound, i32 *)
   (forall x x', @repr_var lenv x x' -> lookup_N (tc_locals c) x' = Some (T_num T_i32)) /\
   (* globals i32, mut *)
-  (forall var, In var [glob_mem_ptr; glob_cap; glob_result; glob_out_of_mem] ->
+  (forall var, In var [glob_mem_ptr; glob_tmp_i32; glob_result; glob_out_of_mem] ->
     lookup_N (tc_globals c) var = Some {| tg_mut:= MUT_var; tg_t:= T_num T_i32|}) /\
   (* globals i64, mut *)
   (forall var, In var [glob_tmp1; glob_tmp2; glob_tmp3; glob_tmp4] ->
@@ -279,7 +279,7 @@ Proof.
   { (* Ternary operations *)
     inv H2; unfold addmuldiv_instrs, diveucl_21_instrs, load_local_i64.
     - (* diveucl_21 *) {
-      remember (diveucl_21_loop glob_cap glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_es.
+      remember (diveucl_21_loop glob_tmp_i32 glob_tmp1 glob_tmp2 glob_tmp3 glob_tmp4 63) as loop_es.
       (* Avoid unfolding too much to avoid slowdown *)
 
       repeat match goal with
