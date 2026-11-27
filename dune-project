@@ -2,6 +2,9 @@
 (using rocq 0.11)
 (name certirocq)
 
+; The rules that depend on an alias, sandboxed by default, also see its dependencies
+(expand_aliases_in_sandbox)
+
 ; The theories, the optimized plugin and the C runtime
 (package (name rocq-certirocq))
 ; The plugin extracted without optimizations, used to bootstrap

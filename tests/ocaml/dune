@@ -1,0 +1,46 @@
+; Some of the test programs, extracted to OCaml and run as benchmarks, compiled to
+; bytecode and to native code
+
+(rocq.extraction
+ (prelude tests)
+ (extracted_modules demo1 demo2 list_sum vs_easy vs_hard binom sha_fast)
+ (theories
+  CertiRocq
+  CertiRocq.Plugin
+  CertiRocq.Tests.lib
+  Stdlib
+  Ltac2
+  Flocq
+  MenhirLib
+  compcert
+  Equations
+  ExtLib
+  HB
+  elpi
+  elpi_elpi
+  mathcomp.boot
+  parseque
+  Wasm
+  MetaRocq.Utils
+  MetaRocq.Common
+  MetaRocq.Template
+  MetaRocq.PCUIC
+  MetaRocq.TemplatePCUIC
+  MetaRocq.SafeChecker
+  MetaRocq.SafeCheckerPlugin
+  MetaRocq.Erasure
+  MetaRocq.ErasurePlugin))
+
+(executable
+ (name main)
+ (modes byte exe)
+ (libraries unix)
+ ; The extracted code is not warning-free
+ (flags (:standard -w -a)))
+
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (run %{dep:main.bc} 10)
+   (run %{dep:main.exe} 10))))

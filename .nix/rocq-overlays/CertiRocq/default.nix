@@ -62,19 +62,17 @@ in
   doCheck = true;
   # For the Wasm tests
   nativeCheckInputs = [ pkgs.nodejs_22 pkgs.python3 ];
+  # The tests under tests/, and with the bootstrap those of the bootstrapped compiler and
+  # checker, which dune runs with the plugins of the build directory
   checkPhase = ''
     runHook preCheck
-  '' + optionalString bootstrap ''
-    echo "running bootstrap"
+  '' + (if bootstrap then ''
+    echo "running the tests and the bootstrap"
     dune build -p ${concatStringsSep "," allPackages} @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
-  '' + ''
-    echo "running tests"
-    # Some test programs recurse deeper than the default stack allows
-    ulimit -Ss "$(ulimit -Hs)"
-    patchShebangs tests
-    installed=$PWD/_build/install/default/lib
-    ROCQPATH=$installed/coq/user-contrib''${ROCQPATH:+:$ROCQPATH} \
-      OCAMLPATH=$installed''${OCAMLPATH:+:$OCAMLPATH} make -C tests
+  '' else ''
+    echo "running the tests"
+    dune build -p ${concatStringsSep "," packages} @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+  '') + ''
     runHook postCheck
   '';
   installPhase = ''

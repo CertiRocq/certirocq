@@ -1,0 +1,4 @@
+; The C runtime next to the CertiRocq.Plugin theory, as it is installed, so that the
+; plugin also finds it in the build directory (see runtime_dir in certirocq.ml): the
+; tests and the bootstrap use the plugin from there, without installing it.
+(copy_files ../../../runtime/*.{c,h,o})

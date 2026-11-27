@@ -11,3 +11,5 @@
 -I _build/default/bootstrap/certirocqc
 -R _build/default/bootstrap/certirocqchk CertiRocq.CertiRocqCheck
 -I _build/default/bootstrap/certirocqchk
+
+-R _build/default/tests/lib CertiRocq.Tests.lib

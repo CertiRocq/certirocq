@@ -1,0 +1,21 @@
+; Programs using GMP, evaluated with CertiRocq Eval, which compiles them to C and loads
+; them in Rocq: compiling Nat2GMP.v runs the test.
+;
+; As in ../programs, the rule uses the plugin from the build directory, without
+; installing it. Eval links the programs with the runtime next to the CertiRocq.Plugin
+; theory, and with an OCaml driver that refers to the plugin.
+(rule
+ (alias runtest)
+ (deps
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  (glob_files %{workspace_root}/plugins/plugin/runtime/*)
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmi}
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmx}
+  %{lib:rocq-certirocq.plugin:certirocq_plugin__Certirocq.cmi}
+  %{lib:rocq-certirocq.plugin:certirocq_plugin__Certirocq.cmx}
+  Nat2GMP.v)
+ (action
+  (system
+   "mkdir -p _build && rocq c -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin Nat2GMP.v")))

@@ -2359,7 +2359,6 @@ Definition myMain :=
                         example1_myfail; example1_myfail;
                           example_ent; harder_ent;
                             harder_ent2; harder_ent3].
-Extraction "myMain" myMain.
 
 Definition ce_harder_ent := check_entailment harder_ent.
 Definition ce_harder_ent2 := check_entailment harder_ent.
@@ -2382,4 +2381,3 @@ Definition main :=
         harder_ent2;
         harder_ent3 *).
 
-Extraction "vs" main.

@@ -1,5 +1,30 @@
-; The compiler, compiled to C by the CertiRocq plugin. The rule uses the theories of
-; the build directory, and the plugins as installed there, which dune adds to
+; The theories of the compiler, without its proofs: the rules below load the pipeline,
+; and as they are sandboxed, they must depend on all the theories that it needs, which
+; are computed with rocq dep.
+(rule
+ (targets compiler_theories)
+ (deps
+  vo_closure.awk
+  (:sources (glob_files_rec %{workspace_root}/theories/*.v)))
+ (action
+  (with-stdout-to
+   %{targets}
+   (pipe-stdout
+    (run rocq dep -R %{workspace_root}/theories CertiRocq %{sources})
+    (run
+     awk
+     -f
+     vo_closure.awk
+     -v
+     "roots=%{workspace_root}/theories/Compiler/pipeline.vo %{workspace_root}/theories/Common/Pipeline_utils.vo")))))
+
+(alias
+ (name compiler_theories)
+ (deps %{read-lines:compiler_theories}))
+
+; The compiler, compiled to C by the CertiRocq plugin. The rule uses the theories and
+; the plugin of the build directory, without installing them: it depends on the files
+; of the plugin that findlib loads, from the install directory that dune adds to
 ; OCAMLPATH.
 (rule
  (targets
@@ -12,9 +37,10 @@
  (deps
   compile.v
   (glob_files compiler/*.vo)
-  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (alias compiler_theories)
   (glob_files %{workspace_root}/plugins/plugin/*.vo)
-  (package rocq-certirocq))
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META})
  (action
   (system
    "rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q compiler CertiRocq.CertiRocqC.Compiler compile.v")))
@@ -64,19 +90,23 @@
     -Wno-incompatible-pointer-types))
   (include_dirs ../../runtime)))
 
-; The test, with the theories of the build directory and the installed plugins
+; The test, with the theories and the plugins of the build directory, as above
 (rule
  (alias runtest)
+ (package rocq-certirocqc)
  (deps
   test.v
   (glob_files compiler/*.vo)
   (glob_files theories/*.vo)
-  (glob_files_rec %{workspace_root}/theories/*.vo)
+  (alias compiler_theories)
   (glob_files %{workspace_root}/plugins/plugin/*.vo)
   (glob_files %{workspace_root}/plugins/cplugin/*.vo)
-  (package rocq-certirocq)
-  (package rocq-certirocq-vanilla)
-  (package rocq-certirocqc))
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  %{lib:rocq-certirocq-vanilla.plugin:certirocq_vanilla_plugin.cmxs}
+  %{lib:rocq-certirocq-vanilla.plugin:../META}
+  %{lib:rocq-certirocqc.plugin:certirocqc_plugin.cmxs}
+  %{lib:rocq-certirocqc.plugin:../META})
  (action
   (system
    "mkdir -p tests && rocq c -Q %{workspace_root}/theories CertiRocq -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/plugins/cplugin CertiRocq.VanillaPlugin -Q compiler CertiRocq.CertiRocqC.Compiler -Q theories CertiRocq.CertiRocqC test.v")))

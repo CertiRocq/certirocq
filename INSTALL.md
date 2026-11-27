@@ -77,18 +77,23 @@ machine has cores.
 $ make test
 ```
 
-This runs the tests of the bootstrapped compiler and checker (`dune test`),
-then the regression suites under `tests/`. These use the packages as installed
-in the build directory, `_build/install/default`; to run a single suite, point
-`ROCQPATH` and `OCAMLPATH` there:
+This is `dune test`: it runs the regression suites under `tests/`, and the tests of
+the bootstrapped compiler and checker under `bootstrap/`. They use the plugins from
+the build directory, without installing them, and only need the theories of the
+compiler, not its proofs. To run a single suite, give its directory:
 
 ```console
-$ ROCQPATH=$PWD/_build/install/default/lib/coq/user-contrib \
-  OCAMLPATH=$PWD/_build/install/default/lib make -C tests programs
+$ dune test tests/programs
 ```
 
+Dune only reruns a suite when something it depends on has changed; add `--force` to
+rerun it anyway.
+
+`make compiler` (`dune build @@compiler`) builds only the theories that the plugins
+need, the plugins and the runtime.
+
 The Wasm tests under `tests/wasm/` additionally require `node` (the CI uses
-Node.js 22) and `wabt`.
+Node.js 22).
 
 ## Installing CertiRocq (optional)
 

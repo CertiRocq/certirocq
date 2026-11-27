@@ -1,0 +1,20 @@
+; The programs of tests.v with axioms realized in C, compiled to C, then run and checked
+; against their expected outputs.
+;
+; As in ../programs, the rule uses the plugin from the build directory, without
+; installing it.
+(rule
+ (alias runtest)
+ (deps
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  (glob_files %{workspace_root}/runtime/*.{c,h})
+  tests.v
+  run.sh
+  TESTS
+  (glob_files *.{c,h})
+  (glob_files expected_outputs/*.txt))
+ (action
+  (system
+   "ulimit -Ss \"$(ulimit -Hs)\" && rocq c -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.Tests tests.v && RUNTIME=%{workspace_root}/runtime sh run.sh")))
