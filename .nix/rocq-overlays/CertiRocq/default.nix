@@ -9,17 +9,23 @@
   metarocq-safechecker,
   ExtLib,
   version ? null,
-  # Whether the check phase builds and tests the bootstrapped compiler and checker
-  # (only in the bootstrap bundle of .nix/config.nix)
+  # Whether to build and test the bootstrapped compiler and checker instead of the
+  # packages (only in the bootstrap bundle of .nix/config.nix)
   bootstrap ? false,
 }:
 
 with lib;
 let
   # The theories, the optimized plugin and its runtime, and the vanilla plugin
-  packages = [ "rocq-certirocq" "rocq-certirocq-vanilla" ];
-  # The bootstrapped compiler and checker, which are only built by the tests
-  allPackages = packages ++ [ "rocq-certirocqc" "rocq-certirocqchk" ];
+  packages = concatStringsSep "," [ "rocq-certirocq" "rocq-certirocq-vanilla" ];
+  # With the bootstrapped compiler and checker, which are only built by the tests
+  allPackages = concatStringsSep "," [
+    "rocq-certirocq" "rocq-certirocq-vanilla" "rocq-certirocqc" "rocq-certirocqchk"
+  ];
+  # A dune command, printed in the log
+  dune = args: ''
+    ( set -x; dune ${args} --display=progress ''${enableParallelBuilding:+-j $NIX_BUILD_CORES} )
+  '';
 in
 (mkRocqDerivation {
   pname = "CertiRocq";
@@ -54,32 +60,36 @@ in
     license = licenses.mit;
   };
 }).overrideAttrs (o: {
+  # With the bootstrap, only the theories of the compiler, without its proofs (the
+  # default bundle builds them), the plugins and the runtime
   buildPhase = ''
     runHook preBuild
-    dune build -p ${concatStringsSep "," packages} --display=short ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+  '' + (if bootstrap then dune "build -p ${allPackages} @@compiler"
+        else dune "build -p ${packages}") + ''
     runHook postBuild
   '';
   doCheck = true;
   # For the Wasm tests
   nativeCheckInputs = [ pkgs.nodejs_22 pkgs.python3 ];
-  # The tests under tests/, and with the bootstrap those of the bootstrapped compiler and
-  # checker, which dune runs with the plugins of the build directory
+  # The tests under tests/, or with the bootstrap those of the bootstrapped compiler
+  # and checker (the default bundle runs the others), which dune runs with the plugins
+  # of the build directory
   checkPhase = ''
     runHook preCheck
-  '' + (if bootstrap then ''
-    echo "running the tests and the bootstrap"
-    dune build -p ${concatStringsSep "," allPackages} --display=short @install @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
-  '' else ''
-    echo "running the tests"
-    dune build -p ${concatStringsSep "," packages} --display=short @runtest ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
-  '') + ''
+  '' + (if bootstrap then dune "build -p ${allPackages} @bootstrap/runtest"
+        else dune "build -p ${packages} @runtest") + ''
     runHook postCheck
   '';
+  # The bootstrap bundle only tests: there is nothing to install
   installPhase = ''
     runHook preInstall
-    dune install --prefix=$out --libdir $OCAMLFIND_DESTDIR ${concatStringsSep " " packages}
+  '' + (if bootstrap then ''
+    mkdir -p $out
+  '' else ''
+    dune install --prefix=$out --libdir $OCAMLFIND_DESTDIR ${replaceStrings [","] [" "] packages}
     mkdir $out/lib/coq/
     mv $OCAMLFIND_DESTDIR/coq $out/lib/coq/${rocq-core.rocq-version}
+  '') + ''
     runHook postInstall
   '';
 })

@@ -1,8 +1,7 @@
-# Builds CertiRocq with the bootstrap bundle of .nix/config.nix, whose check phase
-# also builds and tests the bootstrapped compiler and checker. It only runs on the
-# pull requests that have the "bootstrap" label, and is skipped on the others:
-# adding the label runs it. It is a separate workflow so that labeling a pull
-# request does not restart the regular Nix CI.
+# Builds and tests the bootstrapped compiler and checker, with the bootstrap bundle
+# of .nix/config.nix. It only runs on the pull requests that have the "bootstrap"
+# label, and is skipped on the others: adding the label runs it. It is a separate
+# workflow so that labeling a pull request does not restart the regular Nix CI.
 name: Nix CI with bootstrap
 on:
   pull_request:
@@ -33,7 +32,9 @@ jobs:
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
         extraPullNames: coq, coq-community, math-comp
         name: metarocq
-    # The dependencies are those of the default bundle, usually in the cache
+    # The dependencies are those of the default bundle, usually in the cache. Only the
+    # theories of the compiler are built, not its proofs, which the regular Nix CI
+    # builds.
     - name: Building CertiRocq with the bootstrap
       run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
         "bootstrap" --argstr job "CertiRocq"
