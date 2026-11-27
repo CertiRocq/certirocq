@@ -15,6 +15,12 @@ PASSED=0
 CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
 RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
 
+# Prints a command, then runs it
+run() {
+    echo "$@"
+    "$@"
+}
+
 # The C files that each test needs besides the generated ones
 extra_files() {
     case $1 in
@@ -29,8 +35,7 @@ extra_files() {
 for f in $FILES
 do
     TOTAL=$((TOTAL + 1))
-    echo "Compiling ${f}..."
-    if ! ${CCOMPILER} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+    if ! run ${CCOMPILER} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
          main.c "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${f}.c" glue.c $(extra_files "${f}"); then
         echo "FAIL ${f}: compilation failed" >&2
         exit 1

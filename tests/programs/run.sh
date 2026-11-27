@@ -16,6 +16,12 @@ PASSED=0
 CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
 RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
 
+# Prints a command, then runs it
+run() {
+    echo "$@"
+    "$@"
+}
+
 run_variant() {
     f=$1
     variant=$2
@@ -25,8 +31,7 @@ run_variant() {
 
     TOTAL=$((TOTAL + 1))
 
-    echo "Compiling ${exe}..."
-    if ! ${CCOMPILER} -o "${exe}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+    if ! run ${CCOMPILER} -o "${exe}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
          "${f}_main.c" "glue_${f}.c" "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${exe}.c"; then
         echo "FAIL ${exe}: compilation failed" >&2
         exit 1
