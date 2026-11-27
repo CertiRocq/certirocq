@@ -22,9 +22,10 @@ let
   allPackages = concatStringsSep "," [
     "rocq-certirocq" "rocq-certirocq-vanilla" "rocq-certirocqc" "rocq-certirocqchk"
   ];
-  # A dune command, printed in the log
-  dune = args: ''
-    ( set -x; dune ${args} --display=progress ''${enableParallelBuilding:+-j $NIX_BUILD_CORES} )
+  # A dune command, printed in the log, with the progress of the builds, but each
+  # command of the tests and of the bootstrap (to see what a long one is running)
+  dune = display: args: ''
+    ( set -x; dune ${args} --display=${display} ''${enableParallelBuilding:+-j $NIX_BUILD_CORES} )
   '';
 in
 (mkRocqDerivation {
@@ -64,8 +65,8 @@ in
   # default bundle builds them), the plugins and the runtime
   buildPhase = ''
     runHook preBuild
-  '' + (if bootstrap then dune "build -p ${allPackages} @@compiler"
-        else dune "build -p ${packages}") + ''
+  '' + (if bootstrap then dune "progress" "build -p ${allPackages} @@compiler"
+        else dune "progress" "build -p ${packages}") + ''
     runHook postBuild
   '';
   doCheck = true;
@@ -76,8 +77,8 @@ in
   # of the build directory
   checkPhase = ''
     runHook preCheck
-  '' + (if bootstrap then dune "build -p ${allPackages} @bootstrap/runtest"
-        else dune "build -p ${packages} @runtest") + ''
+  '' + (if bootstrap then dune "short" "build -p ${allPackages} @bootstrap/runtest"
+        else dune "short" "build -p ${packages} @runtest") + ''
     runHook postCheck
   '';
   # The bootstrap bundle only tests: there is nothing to install
