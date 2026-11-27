@@ -11,6 +11,7 @@ Require Import ExtLib.Structures.Monad.
 Require Import MetaRocq.Common.BasicAst.
 From MetaRocq.Erasure Require Import EAst Erasure.
 From MetaRocq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import CheckWellformed.
 From MetaRocq.Utils Require Import MRString.
 From CertiRocq Require Import metarocq_pipeline.
 Import Monads.
@@ -67,10 +68,17 @@ Section Pipeline.
       print_list string_of_kername ", " l)%bs
     end.
 
+  (** Checks that the erased program is well-formed w.r.t. the flags [efl], e.g. that it does
+      not use features unsupported by CertiRocq (primitive arrays). *)
+  Definition check_wellformed (efl : EWellformed.EEnvFlags) (p : toplevel.LambdaBoxEAstTerm) : pipelineM Datatypes.unit :=
+    if check_wf_eprogram efl p then ret tt
+    else failwith "The erased program is not well-formed: it uses features unsupported by CertiRocq (e.g. primitive arrays)".
+
   Program Definition erase_program (econf : Erasure.erasure_configuration) imap
           (p : Ast.Env.program) : EAst.global_declarations * EAst.term :=
     run_erase_program (map (fun pr => (fst pr).(prim_name)) prims) econf (imap, p) _.
   Next Obligation.
+    apply certirocq_erasure_pipeline_pre.
     split.
     now eapply assume_wellformed_inductives_mapping.
     split.
@@ -90,6 +98,8 @@ Section Pipeline.
     o <- get_options ;;
     p <- compile_LambdaBoxEAst o.(erasure_config) o.(inductives_mapping) p ;;
     check_axioms p ;;
+    (* Axioms are only allowed when they can be realized by registered primitives *)
+    check_wellformed (certirocq_check_flags (match prims with [] => false | _ => true end)) p ;;
     p <- (if direct o
           then compile_LambdaANF_ANF next_id prims p
           else compile_LambdaANF_CPS next_id prims p) ;;
