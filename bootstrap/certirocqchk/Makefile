@@ -48,14 +48,27 @@ CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everyt
 
 plugin: compile.vo certirocqchk
 
-test: test.vo
+test: test.vo tests/hott_certirocqchk.vo
 
 test.vo: test.v
 	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
+# MetaRocq's hott_example.v
+HOTTOPTS = -Q tests CertiRocq.CertiRocqCheck.Tests
+
+tests/hott_example.vo: tests/hott_example.v
+	coqc ${HOTTOPTS} $<
+
+tests/hott_certirocqchk.vo: tests/hott_certirocqchk.v tests/hott_example.vo
+	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} ${HOTTOPTS} $<
+
+# Timings of certirocqchk, rocqchk and MetaRocq SafeCheck on hott_example.v
+bench-hott:
+	bash tests/bench_hott.sh ${TESTCOQOPTS}
+
 clean: Makefile.certirocqchk
 	make -f Makefile.certirocqchk clean
-	rm -f *.cm* *.o *.vo
+	rm -f *.cm* *.o *.vo tests/*.vo* tests/*.glob tests/.*.aux
 
 Makefile.certirocqchk: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certirocqchk
@@ -102,6 +115,6 @@ install: Loader.vo certirocqchk_plugin.cmxs
 	make -f Makefile.certirocqchk install
 	ocamlfind install -add rocq-certirocqchk certirocqchk_plugin.cmx* certirocqchk_plugin.cmi
 
-.PHONY: plugin test
+.PHONY: plugin test bench-hott
 
 .NOTPARALLEL:
