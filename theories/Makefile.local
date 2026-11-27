@@ -1,0 +1,14 @@
+# Extraction does not remove the files of the modules it no longer extracts, and
+# clean_extraction.sh copies all the extracted files into the plugins, whose
+# _CoqProject lists them all. So before the build, remove the output of each
+# extraction that is about to be run again (make -q exits with 1 when the target
+# is out of date). This only applies to "make all", not to "make <file>.vo".
+EXTRACTION_DIRS = Extraction ExtractionVanilla
+
+pre-all::
+	$(HIDE)for d in $(EXTRACTION_DIRS); do \
+	  $(MAKE) --no-print-directory -q -f "$(SELF)" $$d/extraction.vo > /dev/null 2>&1; \
+	  if [ $$? -eq 1 ]; then \
+	    echo "CLEAN $$d/*.ml $$d/*.mli"; rm -f $$d/*.ml $$d/*.mli; \
+	  fi; \
+	done
