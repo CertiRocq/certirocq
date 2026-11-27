@@ -9,9 +9,10 @@ PREVIEW_BYTES=2000
 TOTAL=0
 PASSED=0
 
-# The C compiler (clang, or else gcc, unless CC is set) and the directory of the C
+# The C compiler (clang, or else gcc, unless CCOMPILER is set: not CC, which build
+# environments set to their default compiler) and the directory of the C
 # runtime, which the dune rule sets
-CC=${CC:-$(command -v clang || command -v gcc)}
+CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
 RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
 
 # The C files that each test needs besides the generated ones
@@ -29,7 +30,7 @@ for f in $FILES
 do
     TOTAL=$((TOTAL + 1))
     echo "Compiling ${f}..."
-    if ! ${CC} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+    if ! ${CCOMPILER} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
          main.c "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${f}.c" glue.c $(extra_files "${f}"); then
         echo "FAIL ${f}: compilation failed" >&2
         exit 1
