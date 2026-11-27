@@ -146,10 +146,13 @@ ROCQCHK=$(printf 'rocqchk on the whole file (%s declarations, dependencies admit
   "$med" "$min" "$max")
 echo "$ROCQCHK"
 
-# The annotation is plain text: one line per constant, with the medians
+# The annotation is plain text: an aligned table of the medians, in milliseconds
 annotate notice "certirocqchk benchmark (hott_example.v)" \
-  "Time of one check, median of $RUNS runs:" \
+  "Time of one check in ms, median of $RUNS runs; ratio = certirocqchk / SafeCheck" \
+  "" \
   "$(awk -F'[\t ]' 'function ms(x) { return sprintf(x < 10 ? "%.3f" : "%.1f", x) }
+    BEGIN { printf "%-20s %12s %14s %10s %8s\n", "constant", "certirocqchk", "checker only", "SafeCheck", "ratio" }
     { ratio = ($9 > 0) ? sprintf("%.1fx", $3 / $9) : "-";
-      printf "%s: certirocqchk %s ms (checker only %s ms), SafeCheck %s ms, certirocqchk / SafeCheck %s\n", $1, ms($3), ms($6), ms($9), ratio }' "$OUT/all.stats")" \
+      printf "%-20s %12s %14s %10s %8s\n", $1, ms($3), ms($6), ms($9), ratio }' "$OUT/all.stats")" \
+  "" \
   "$ROCQCHK"
