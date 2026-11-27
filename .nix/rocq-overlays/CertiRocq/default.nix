@@ -27,6 +27,15 @@ let
   dune = display: args: ''
     ( set -x; dune ${args} --display=${display} ''${enableParallelBuilding:+-j $NIX_BUILD_CORES} )
   '';
+  # A dune command printing each Rocq file and C compilation as it finishes, with the
+  # output and errors of the commands, but not the OCaml commands
+  dune-rocq = args: ''
+    ( set -x -o pipefail
+      dune ${args} --display=short ''${enableParallelBuilding:+-j $NIX_BUILD_CORES} 2>&1 \
+        | { grep --line-buffered -vE \
+              '^ +(ocamldep|ocamlc|ocamlopt|ocamlmklib|ocamlfind|ocaml-index|ocamllex|menhir|ppx|odoc) ' \
+            || true; } )
+  '';
 in
 (mkRocqDerivation {
   pname = "CertiRocq";
@@ -65,8 +74,8 @@ in
   # default bundle builds them), the plugins and the runtime
   buildPhase = ''
     runHook preBuild
-  '' + (if bootstrap then dune "progress" "build -p ${allPackages} @@compiler"
-        else dune "progress" "build -p ${packages}") + ''
+  '' + (if bootstrap then dune-rocq "build -p ${allPackages} @@compiler"
+        else dune-rocq "build -p ${packages}") + ''
     runHook postBuild
   '';
   doCheck = true;
