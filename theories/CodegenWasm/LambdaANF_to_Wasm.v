@@ -357,9 +357,8 @@ Fixpoint translate_body (nenv : name_env) (cenv : ctor_env) (lenv: localvar_env)
       x_var <- translate_var nenv lenv x "translate_body proj x";;
 
       Ret ([ BI_local_get y_var
-           ; BI_const_num (nat_to_value (((N.to_nat n) + 1) * 4)) (* skip ctor_id and previous constr arguments *)
-           ; BI_binop T_i32 (Binop_i BOI_add)
-           ; BI_load T_i32 None {| memarg_offset:=0%N; memarg_align:=2%N |}
+             (* Skip the constructor tag and preceding fields. *)
+           ; BI_load T_i32 None {| memarg_offset:=N.of_nat (4 * (1 + N.to_nat n)); memarg_align:=2%N |}
            ; BI_local_set x_var
            ] ++ following_instr)
 
