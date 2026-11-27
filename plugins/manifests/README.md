@@ -21,7 +21,13 @@ The generator validates `.mlpack` entries against the modules available in the
 plugin directory, `static/`, and `extraction/`, plus the common modules compiled
 from `plugins/common/`.
 
-Regenerate the checked-in files with:
+These files are not versioned: `make plugin` and `make cplugin` generate them
+after extraction. The `_CoqProject` files depend on the extracted files, so they
+are regenerated after each extraction; before the extraction is run again, the
+build removes the files of the previous one (`theories/Makefile.local`), so that
+modules that are no longer extracted are not left in the plugins.
+
+Generate them explicitly with:
 
 ```console
 $ make plugin-manifests

@@ -30,6 +30,11 @@ Makefile.conf
 /plugins/plugin/extraction
 /plugins/cplugin/extraction
 /plugins/cplugin/Makefile
+# Generated from plugins/manifests/plugin-manifest
+/plugins/plugin/_CoqProject
+/plugins/plugin/certirocq_plugin.mlpack
+/plugins/cplugin/_CoqProject
+/plugins/cplugin/certirocq_vanilla_plugin.mlpack
 theories/.coqdeps.d
 libraries/.coqdeps.d
 myMain.ml
