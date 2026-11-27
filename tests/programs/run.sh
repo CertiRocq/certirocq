@@ -10,6 +10,18 @@ PREVIEW_BYTES=2000
 TOTAL=0
 PASSED=0
 
+# The C compiler (clang, or else gcc, unless CCOMPILER is set: not CC, which build
+# environments set to their default compiler) and the directory of the C
+# runtime, which the dune rule sets
+CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
+RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
+
+# Prints a command, then runs it
+run() {
+    echo "$@"
+    "$@"
+}
+
 run_variant() {
     f=$1
     variant=$2
@@ -19,8 +31,9 @@ run_variant() {
 
     TOTAL=$((TOTAL + 1))
 
-    if [ ! -x "${exe}" ]; then
-        echo "FAIL ${exe}: executable not found" >&2
+    if ! run ${CCOMPILER} -o "${exe}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+         "${f}_main.c" "glue_${f}.c" "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${exe}.c"; then
+        echo "FAIL ${exe}: compilation failed" >&2
         exit 1
     fi
 

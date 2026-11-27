@@ -54,8 +54,9 @@ in
   bundles."default" = {
     inherit rocqPackages;
   };
-  ## The same, with the check phase also building and testing the
-  ## bootstrapped compiler and checker, which takes about 15 more minutes.
+  ## The same, but CertiRocq only builds the theories of its compiler (not
+  ## its proofs), its plugins and its runtime, and builds and tests the
+  ## bootstrapped compiler and checker.
   ## It has no generated workflow: .github/workflows/nix-bootstrap.yml
   ## builds it on the pull requests labeled "bootstrap".
   bundles."bootstrap" = {

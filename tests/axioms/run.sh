@@ -9,10 +9,37 @@ PREVIEW_BYTES=2000
 TOTAL=0
 PASSED=0
 
+# The C compiler (clang, or else gcc, unless CCOMPILER is set: not CC, which build
+# environments set to their default compiler) and the directory of the C
+# runtime, which the dune rule sets
+CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
+RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
+
+# Prints a command, then runs it
+run() {
+    echo "$@"
+    "$@"
+}
+
+# The C files that each test needs besides the generated ones
+extra_files() {
+    case $1 in
+        print_lst) echo print.c ;;
+        fibn|list_sum_int63) echo int63.c ;;
+        list_sum_int63_tinfo) echo int63_tinfo.c ;;
+        *) echo "FAIL $1: unknown test" >&2; exit 1 ;;
+    esac
+}
+
 # Run each test, exit upon failure.
 for f in $FILES
 do
     TOTAL=$((TOTAL + 1))
+    if ! run ${CCOMPILER} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+         main.c "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${f}.c" glue.c $(extra_files "${f}"); then
+        echo "FAIL ${f}: compilation failed" >&2
+        exit 1
+    fi
     if [ -x "${f}" ]; then
         echo "Running ${f}..."
         "./${f}" > "${TMPDIR}/${f}.txt"

@@ -1,0 +1,7 @@
+; The programs compiled by the tests. Private: it is not installed.
+(rocq.theory
+ (name CertiRocq.Tests.lib)
+ ; bignum.v, coqprime.v and SqlQueries3.v need libraries that are not dependencies
+ (modules Binom Color vs sha256 coind stack_machine)
+ (flags (:standard -w -deprecated))
+ (theories Stdlib Flocq MenhirLib compcert))

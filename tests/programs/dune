@@ -1,0 +1,24 @@
+; The programs of tests.v, compiled to C with and without optimizations, and in CPS,
+; then run and checked against their expected outputs.
+;
+; The rule uses the plugin from the build directory, without installing it: it depends
+; on the theory that loads it, which needs none of the theories of the compiler, and on
+; the files of the plugin that findlib loads. The programs recurse deeply, so it takes
+; the largest stack allowed.
+(rule
+ (alias runtest)
+ (deps
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  (glob_files %{workspace_root}/tests/lib/*.vo)
+  (glob_files %{workspace_root}/runtime/*.{c,h})
+  tests.v
+  run.sh
+  TESTS
+  CPS_TESTS
+  (glob_files *_main.c)
+  (glob_files expected_outputs/*.txt))
+ (action
+  (system
+   "ulimit -Ss \"$(ulimit -Hs)\" && rocq c -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/tests/lib CertiRocq.Tests.lib -Q . CertiRocq.Tests tests.v && RUNTIME=%{workspace_root}/runtime sh run.sh")))

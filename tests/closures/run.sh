@@ -9,9 +9,26 @@ PREVIEW_BYTES=2000
 TOTAL=0
 PASSED=0
 
+# The C compiler (clang, or else gcc, unless CCOMPILER is set: not CC, which build
+# environments set to their default compiler) and the directory of the C
+# runtime, which the dune rule sets
+CCOMPILER=${CCOMPILER:-$(command -v clang || command -v gcc)}
+RUNTIME=${RUNTIME:?RUNTIME must be the directory of the C runtime}
+
+# Prints a command, then runs it
+run() {
+    echo "$@"
+    "$@"
+}
+
 for f in $FILES
 do
     TOTAL=$((TOTAL + 1))
+    if ! run ${CCOMPILER} -o "${f}" -w -Wno-everything -O2 -fomit-frame-pointer -I"${RUNTIME}" \
+         main.c "${RUNTIME}/gc_stack.c" "CertiRocq.Tests.tests.${f}.c" glue.c print.c; then
+        echo "FAIL ${f}: compilation failed" >&2
+        exit 1
+    fi
     if [ -x "${f}" ]; then
         echo "Running ${f}..."
         "./${f}" > "${TMPDIR}/${f}.txt"

@@ -1,8 +1,0 @@
-
-package "plugin" (
-  requires = "rocq-runtime.plugins.ltac rocq-metarocq-template.extractable stdlib-shims"
-  archive(byte) = "certirocq_erasure_plugin.cma"
-  archive(native) = "certirocq_erasure_plugin.cmxa"
-  plugin(byte) = "certirocq_erasure_plugin.cma"
-  plugin(native) = "certirocq_erasure_plugin.cmxs"
-)

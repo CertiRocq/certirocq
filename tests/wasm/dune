@@ -1,0 +1,33 @@
+; The programs of tests.v and the unit tests of the primitive integers of
+; uint63_unit_tests.v, compiled to WebAssembly and run with node.
+;
+; As in ../programs, the rules use the plugin from the build directory, without
+; installing it. Compiling tests.v needs a large stack: they take the largest one
+; allowed (it is capped at 64MB on macOS).
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  (glob_files %{workspace_root}/tests/lib/*.vo)
+  tests.v
+  TESTS
+  run_wasm_tests.py
+  (glob_files_rec js/**))
+ (action
+  (system
+   "ulimit -Ss \"$(ulimit -Hs)\" && rocq c -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q %{workspace_root}/tests/lib CertiRocq.Tests.lib -Q . CertiRocq.Tests tests.v && python3 run_wasm_tests.py")))
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files %{workspace_root}/plugins/plugin/*.vo)
+  %{lib:rocq-certirocq.plugin:certirocq_plugin.cmxs}
+  %{lib:rocq-certirocq.plugin:../META}
+  uint63_unit_tests.v
+  (glob_files_rec js/**))
+ (action
+  (system
+   "rocq c -quiet -Q %{workspace_root}/plugins/plugin CertiRocq.Plugin -Q . CertiRocq.Tests uint63_unit_tests.v && node js/run_uint63_unit_tests.js")))

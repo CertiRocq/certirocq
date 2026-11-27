@@ -1,0 +1,7 @@
+; The compiler part of theories/ and the plugins on top of it, without the
+; correctness proofs: dune builds the .vo files of theories/ on demand.
+(alias
+ (name compiler)
+ (deps
+  (alias_rec plugins/all)
+  (alias_rec runtime/all)))
